@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
 import 'desktop/desktop_tray_controller.dart';
+import 'desktop/windows_paste_fix.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -58,6 +59,11 @@ Future<void> main() async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Windows clipboard history (Win+V) sends malformed Ctrl+V key sequences.
+      // Workaround Flutter engine bug flutter#143997 until upstream is fixed.
+      WindowsPasteFix.instance.inject();
+
       FlutterLogger.installGlobalHandlers();
       try {
         final prefs = await SharedPreferences.getInstance();

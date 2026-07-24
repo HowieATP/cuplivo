@@ -198,7 +198,8 @@ Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   };
   final google = _googleToolMetadata(message);
   final rawPart = google?['part'];
-  final id = rawPart is Map ? rawPart['id']?.toString() : null;
+  final rawFunctionCall = rawPart is Map ? rawPart['functionCall'] : null;
+  final id = rawFunctionCall is Map ? rawFunctionCall['id']?.toString() : null;
   if (id != null && id.isNotEmpty) {
     (part['functionResponse'] as Map<String, dynamic>)['id'] = id;
   }
@@ -587,8 +588,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final args =
               (call['args'] as Map?)?.cast<String, dynamic>() ??
               const <String, dynamic>{};
-          // Prefer API-provided id (part-level), fall back to synthetic.
-          final partId = _effectiveToolCallId(fc['id'], 'fn', idx);
+          // Prefer API-provided functionCall id, fall back to synthetic.
+          final partId = _effectiveToolCallId(call['id'], 'fn', idx);
           yield ChatStreamChunk(
             content: '',
             isDone: false,
@@ -615,7 +616,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             'functionResponse': {
               'name': name,
               'response': {'result': res},
-              if (fc.containsKey('id')) 'id': fc['id'],
+              if (call.containsKey('id')) 'id': call['id'],
             },
           };
           responseParts.add(frPart);
@@ -1331,8 +1332,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                           .cast<String, dynamic>();
                     } catch (_) {}
                   }
-                  // Prefer API-provided id (part-level), fall back to synthetic
-                  final apiId = p['id']?.toString();
+                  // Prefer API-provided functionCall id, fall back to synthetic
+                  final apiId = fc['id']?.toString();
                   final id = _effectiveToolCallId(apiId, 'call', p.hashCode);
 
                   // Capture thought signature (Gemini 3 Pro requirement)

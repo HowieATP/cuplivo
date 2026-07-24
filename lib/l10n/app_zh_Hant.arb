@@ -379,6 +379,9 @@
   "markdownTableDefaultFileNameStem": "表格",
   "markdownTableCopiedCsvSnackbar": "已複製 CSV，長按複製可複製為圖片",
   "markdownTableCopiedMarkdownSnackbar": "已複製表格",
+  "markdownTableCopyMarkdownLabel": "複製為 Markdown",
+  "markdownTableCopyTsvLabel": "複製為 TSV（Excel）",
+  "markdownTableCopyPngLabel": "複製為 PNG 圖片",
   "codeBlockCollapsedLines": "… 已摺疊 {n} 行",
   "@codeBlockCollapsedLines": {
     "placeholders": {

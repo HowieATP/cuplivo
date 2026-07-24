@@ -37,6 +37,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../desktop/desktop_context_menu.dart';
 import 'package:Cuplivo/desktop/html_preview_dialog.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
@@ -2788,13 +2789,54 @@ class _MarkdownTableBlock extends StatelessWidget {
           table: table,
           bodyBg: bodyBg,
           borderColor: borderColor,
-          compact: useCompactTable,
+          compact: true,
         );
 
         if (!useCompactTable) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: tableSurface,
+          final l10n = AppLocalizations.of(context)!;
+          return Container(
+            key: const ValueKey('markdown-table-block-desktop'),
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
+                cs.surface,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            foregroundDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor, width: 0.8),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _MarkdownTableToolbar(
+                  label: l10n.markdownTableLabel,
+                  backgroundColor: headerBg,
+                  copyLabel: l10n.shareProviderSheetCopyButton,
+                  exportLabel: l10n.markdownTableExportCsvTooltip,
+                  imageActionLabel: l10n.messageExportSheetExportImage,
+                  showCopyMenu: true,
+                  tsvCopyLabel: l10n.markdownTableCopyTsvLabel,
+                  pngCopyLabel: l10n.markdownTableCopyPngLabel,
+                  onCopyTsv: () => _copyAsTsv(context),
+                  onCopy: () => _copyMarkdown(context),
+                  onCopyImage: () => _copyImage(context),
+                  onExport: () => _exportCsv(context),
+                  onExportImage: () => _exportImage(context),
+                  onImageAction: () => _exportImage(context),
+                ),
+                GestureDetector(
+                  key: const ValueKey('markdown-table-body-desktop'),
+                  behavior: HitTestBehavior.opaque,
+                  child: tableSurface,
+                ),
+              ],
+            ),
           );
         }
 
@@ -2965,6 +3007,17 @@ class _MarkdownTableBlock extends StatelessWidget {
   Future<void> _copyMarkdown(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     await Clipboard.setData(ClipboardData(text: rows.toMarkdown()));
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.markdownTableCopiedMarkdownSnackbar,
+      type: NotificationType.success,
+    );
+  }
+
+  Future<void> _copyAsTsv(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    await Clipboard.setData(ClipboardData(text: rows.toTsv()));
     if (!context.mounted) return;
     showAppSnackBar(
       context,
@@ -3271,7 +3324,7 @@ class _MarkdownTableCell extends StatelessWidget {
 }
 
 class _MarkdownTableToolbar extends StatelessWidget {
-  const _MarkdownTableToolbar({
+  _MarkdownTableToolbar({
     required this.label,
     required this.backgroundColor,
     required this.copyLabel,
@@ -3282,7 +3335,11 @@ class _MarkdownTableToolbar extends StatelessWidget {
     required this.onExport,
     required this.onExportImage,
     required this.onImageAction,
-  });
+    this.showCopyMenu = false,
+    this.tsvCopyLabel,
+    this.onCopyTsv,
+    this.pngCopyLabel,
+  }) : _copyMenuKey = GlobalKey();
 
   final String label;
   final Color backgroundColor;
@@ -3294,6 +3351,11 @@ class _MarkdownTableToolbar extends StatelessWidget {
   final VoidCallback onExport;
   final VoidCallback onExportImage;
   final VoidCallback onImageAction;
+  final bool showCopyMenu;
+  final String? tsvCopyLabel;
+  final VoidCallback? onCopyTsv;
+  final String? pngCopyLabel;
+  final GlobalKey _copyMenuKey;
 
   @override
   Widget build(BuildContext context) {
@@ -3327,19 +3389,7 @@ class _MarkdownTableToolbar extends StatelessWidget {
               ),
             ),
           ),
-          Tooltip(
-            message: copyLabel,
-            child: IosIconButton(
-              icon: Lucide.Copy,
-              semanticLabel: copyLabel,
-              onTap: onCopy,
-              onLongPress: onCopyImage,
-              size: 15,
-              minSize: 32,
-              padding: const EdgeInsets.all(7),
-              color: cs.onSurfaceVariant.withValues(alpha: 0.68),
-            ),
-          ),
+          _copyButton(context),
           Tooltip(
             message: imageActionLabel,
             child: IosIconButton(
@@ -3366,6 +3416,65 @@ class _MarkdownTableToolbar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _copyButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final showMenu = showCopyMenu && tsvCopyLabel != null && onCopyTsv != null;
+
+    if (!showMenu) {
+      return Tooltip(
+        message: copyLabel,
+        child: IosIconButton(
+          icon: Lucide.Copy,
+          semanticLabel: copyLabel,
+          onTap: onCopy,
+          onLongPress: onCopyImage,
+          size: 15,
+          minSize: 32,
+          padding: const EdgeInsets.all(7),
+          color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: copyLabel,
+      child: IosIconButton(
+        key: _copyMenuKey,
+        icon: Lucide.Copy,
+        semanticLabel: copyLabel,
+        onTap: () {
+          final l10n = AppLocalizations.of(context)!;
+          showDesktopAnchoredMenu(
+            context,
+            anchorKey: _copyMenuKey,
+            items: [
+              DesktopContextMenuItem(
+                icon: Lucide.Copy,
+                label: l10n.markdownTableCopyMarkdownLabel,
+                onTap: onCopy,
+              ),
+              DesktopContextMenuItem(
+                icon: Lucide.Clipboard,
+                label: tsvCopyLabel!,
+                onTap: onCopyTsv!,
+              ),
+              DesktopContextMenuItem(
+                icon: Lucide.Image,
+                label: pngCopyLabel ?? l10n.markdownTableCopyPngLabel,
+                onTap: onCopyImage,
+              ),
+            ],
+          );
+        },
+        onLongPress: onCopyImage,
+        size: 15,
+        minSize: 32,
+        padding: const EdgeInsets.all(7),
+        color: cs.onSurfaceVariant.withValues(alpha: 0.68),
       ),
     );
   }
@@ -3423,6 +3532,10 @@ class _MarkdownTableData {
   );
 
   String toMarkdown() => _rowsToMarkdown(
+    rows.map((row) => row.cells.map((c) => c.text).toList()).toList(),
+  );
+
+  String toTsv() => _rowsToTsv(
     rows.map((row) => row.cells.map((c) => c.text).toList()).toList(),
   );
 }
@@ -3494,6 +3607,20 @@ String _markdownTableCell(String value) {
 
 String _csvCell(String value) {
   if (!value.contains(',') &&
+      !value.contains('"') &&
+      !value.contains('\n') &&
+      !value.contains('\r')) {
+    return value;
+  }
+  return '"${value.replaceAll('"', '""')}"';
+}
+
+String _rowsToTsv(List<List<String>> rows) {
+  return rows.map((row) => row.map(_tsvCell).join('\t')).join('\r\n');
+}
+
+String _tsvCell(String value) {
+  if (!value.contains('\t') &&
       !value.contains('"') &&
       !value.contains('\n') &&
       !value.contains('\r')) {

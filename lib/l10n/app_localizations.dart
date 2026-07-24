@@ -2651,6 +2651,24 @@ abstract class AppLocalizations {
   /// **'Table copied.'**
   String get markdownTableCopiedMarkdownSnackbar;
 
+  /// No description provided for @markdownTableCopyMarkdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as Markdown'**
+  String get markdownTableCopyMarkdownLabel;
+
+  /// No description provided for @markdownTableCopyTsvLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as TSV (Excel)'**
+  String get markdownTableCopyTsvLabel;
+
+  /// No description provided for @markdownTableCopyPngLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as PNG image'**
+  String get markdownTableCopyPngLabel;
+
   /// No description provided for @codeBlockCollapsedLines.
   ///
   /// In en, this message translates to:

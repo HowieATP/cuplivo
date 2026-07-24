@@ -116,19 +116,18 @@ class _IosIconButtonState extends State<IosIconButton> {
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
+          // Only register tap visual feedback when onTap is present.
+          // onTapDown/Up/Cancel create a TapGestureRecognizer that wins the
+          // gesture arena over a parent menu trigger (e.g.
+          // showDesktopAnchoredMenu), silently swallowing the tap when
+          // onTap is null.
+          onTapDown: (widget.enabled && widget.onTap != null)
               ? (_) => setState(() => _pressed = true)
               : null,
-          onTapUp:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
+          onTapUp: (widget.enabled && widget.onTap != null)
               ? (_) => setState(() => _pressed = false)
               : null,
-          onTapCancel:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
+          onTapCancel: (widget.enabled && widget.onTap != null)
               ? () => setState(() => _pressed = false)
               : null,
           onTap: widget.enabled ? widget.onTap : null,

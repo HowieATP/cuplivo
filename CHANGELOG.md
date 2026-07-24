@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.3] - 2026-07-25
+
+### Added
+
+- Skills v2: YAML-based skill definitions, async I/O, GitHub import, auxiliary file tools (#103)
+- Render update release notes as markdown in side drawer (#106)
+
+### Fixed
+
+- Win+V clipboard history paste on Windows — workaround for Flutter engine bug (#105)
+- Fix log viewer categorization on Windows — application logs tab was always empty due to backslash path separator handling (#100)
+
 ## [2.1.2] - 2026-07-22
 
 ### Added
@@ -25,9 +37,9 @@
 ## [2.1.0] - 2026-07-21
 
 > ⚠ **This release includes a critical backup-restore fix.** In versions 1.5.0–2.0.2, "Smart Merge" did not merge assistants from the backup file into the local database — now fixed to merge correctly.
->
+> 
 > v2.0 introduced **Android-specific Proactive Care** ("Ta 的来信"). Extra permissions may be requested; existing features are unaffected without granting them.
->
+> 
 > v2.1 introduces the **Skill** mechanism. This is a first cut — not fully featured yet; improvements will follow in subsequent releases.
 
 ### Added
@@ -44,9 +56,9 @@
 ## [2.0.2] - 2026-07-21
 
 > ✅ **"Ta 的来信" (proactive care) is now fully functional in this release.**
->
+> 
 > **Proactive Care** lets AI assistatns send care messages to you on a configurable schedule **on Android only**. Extra permissions may be requested; for users who don't need this feature, just ignore them. **Existing features will not be affected without new permissions**.
->
+> 
 > Users on other platforms can still install this version as it introduces other fixes around the feature of MultiAI.
 
 ### Added

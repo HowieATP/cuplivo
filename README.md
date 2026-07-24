@@ -39,7 +39,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
    - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
-4. **Skill mechanism** — Import SKILL.md files or create them manually, bind skills to assistants, and use `load_skill` tool to dynamically load skill instructions. Skills are persisted on the filesystem and included in backups.
+4. **Skills** — GitHub import from public repositories, and auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups.
 
 5. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
    - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
@@ -63,6 +63,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)
     - Large base64 images no longer cause regex stack overflow
+    - Win+V clipboard history paste fix for Flutter engine bug on Windows
     - Various other stability improvements
 
 ## ⚠️ Note

@@ -1133,6 +1133,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditGeneralErrorMessage => '发生错误，试试输入图片链接';
 
   @override
+  String get providerCustomRequestTitle => '自定义请求';
+
+  @override
+  String get providerCustomRequestHeaders => 'Headers';
+
+  @override
+  String get providerCustomRequestBody => 'Body';
+
+  @override
   String get providerDetailPageMultiKeyModeTitle => '多Key模式';
 
   @override
@@ -6947,6 +6956,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditGeneralErrorMessage => '发生错误，试试输入图片链接';
 
   @override
+  String get providerCustomRequestTitle => '自定义请求';
+
+  @override
+  String get providerCustomRequestHeaders => 'Headers';
+
+  @override
+  String get providerCustomRequestBody => 'Body';
+
+  @override
   String get providerDetailPageMultiKeyModeTitle => '多Key模式';
 
   @override
@@ -12759,6 +12777,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditGeneralErrorMessage => '發生錯誤，試試輸入圖片連結';
+
+  @override
+  String get providerCustomRequestTitle => '自訂請求';
+
+  @override
+  String get providerCustomRequestHeaders => 'Headers';
+
+  @override
+  String get providerCustomRequestBody => 'Body';
 
   @override
   String get providerDetailPageMultiKeyModeTitle => '多Key模式';

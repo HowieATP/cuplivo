@@ -1178,6 +1178,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong. Try entering an image URL.';
 
   @override
+  String get providerCustomRequestTitle => 'Custom Request';
+
+  @override
+  String get providerCustomRequestHeaders => 'Headers';
+
+  @override
+  String get providerCustomRequestBody => 'Body';
+
+  @override
   String get providerDetailPageMultiKeyModeTitle => 'Multi-Key Mode';
 
   @override

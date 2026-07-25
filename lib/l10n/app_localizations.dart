@@ -2261,6 +2261,24 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Try entering an image URL.'**
   String get assistantEditGeneralErrorMessage;
 
+  /// No description provided for @providerCustomRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Request'**
+  String get providerCustomRequestTitle;
+
+  /// No description provided for @providerCustomRequestHeaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Headers'**
+  String get providerCustomRequestHeaders;
+
+  /// No description provided for @providerCustomRequestBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get providerCustomRequestBody;
+
   /// No description provided for @providerDetailPageMultiKeyModeTitle.
   ///
   /// In en, this message translates to:

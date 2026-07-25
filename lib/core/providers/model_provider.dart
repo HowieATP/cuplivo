@@ -353,6 +353,8 @@ class ProviderManager {
     );
   }
 
+  /// Mirrors [ChatApiService._customHeaders] in chat_api_service.dart.
+  /// Keep both in sync when changing header merge order.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
     String modelId,
@@ -360,13 +362,21 @@ class ProviderManager {
     final ov = _modelOverride(cfg, modelId);
     return <String, String>{
       ...providerDefaultHeaders(cfg),
+      ...ModelOverridePayloadParser.customHeaders({
+        'headers': cfg.customHeaders,
+      }),
       ...ModelOverridePayloadParser.customHeaders(ov),
     };
   }
 
+  /// Mirrors [ChatApiService._customBody] in chat_api_service.dart.
+  /// Keep both in sync when changing body merge order.
   static Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) {
     final ov = _modelOverride(cfg, modelId);
-    return ModelOverridePayloadParser.customBody(ov);
+    return {
+      ...ModelOverridePayloadParser.customBody({'body': cfg.customBody}),
+      ...ModelOverridePayloadParser.customBody(ov),
+    };
   }
 
   static BaseProvider forConfig(ProviderConfig cfg) {

@@ -144,6 +144,8 @@ class ChatApiService {
     );
   }
 
+  /// Mirrored by [ProviderManager._customHeaders] in model_provider.dart.
+  /// Keep both in sync when changing header merge order.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
     String modelId,
@@ -151,6 +153,9 @@ class ChatApiService {
     final ov = _modelOverride(cfg, modelId);
     final out = <String, String>{
       ...providerDefaultHeaders(cfg),
+      ...ModelOverridePayloadParser.customHeaders({
+        'headers': cfg.customHeaders,
+      }),
       ...ModelOverridePayloadParser.customHeaders(ov),
     };
     // AIhubmix promo header (opt-in per-provider)
@@ -164,9 +169,14 @@ class ChatApiService {
     return ModelOverridePayloadParser.parseOverrideValue(v);
   }
 
+  /// Mirrored by [ProviderManager._customBody] in model_provider.dart.
+  /// Keep both in sync when changing body merge order.
   static Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) {
     final ov = _modelOverride(cfg, modelId);
-    return ModelOverridePayloadParser.customBody(ov);
+    return {
+      ...ModelOverridePayloadParser.customBody({'body': cfg.customBody}),
+      ...ModelOverridePayloadParser.customBody(ov),
+    };
   }
 
   static bool _isAihubmix(ProviderConfig cfg) {

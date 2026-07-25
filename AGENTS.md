@@ -56,6 +56,9 @@
 - Theme and dynamic color follow the repo as-is:
   - `lib/theme/**` is the single source of truth for theming and tokens
   - Android dynamic color is only enabled per-platform in `main.dart`. Do not extrapolate Android visual or interaction rules to desktop.
+- 桌面端导航通过 `DesktopHomePage` 的 nav rail / 侧边栏切换页面，不使用 Navigator 路由栈。
+- 移动端使用命令式 `Navigator.push` 在全屏页面间导航。
+- 桌面端有独立的窗口控制（`desktop_window_controller.dart`）、托盘（`desktop_tray_controller.dart`）、热键（`desktop/hotkeys/`）——这些不应被视为"移动端功能在宽屏上的延伸"。
 
 ### 1.4 Fork & Upstream
 
@@ -265,6 +268,60 @@ flutter analyze
   - Documentation and comments: Does complex intent need minimal explanation?
   - Compatibility boundary: Does it affect existing user data, config, persisted fields, import/export formats, or established interactions?
 - Compatibility is not a default-ignore item. When existing data or published behavior is involved, explicitly judge compatibility. If breaking, the delivery notes must state the breakage scope and migration path.
+
+### 3.12 State Management
+
+- 状态管理使用 **Provider + ChangeNotifier**（无 Riverpod / Bloc / GetX）。
+- 所有 Provider 在 `lib/main.dart` 的 `MultiProvider` 树中注册。
+- 读取状态用 `context.watch<T>()`，触发动作用 `context.read<T>()`。
+- 不存在 `get_it` / `injectable` 等 DI 容器——新增依赖通过在 Provider 树中添加条目完成。
+
+### 3.13 Navigation
+
+- 使用 **Navigator 1.0** 命令式导航（`Navigator.push(MaterialPageRoute(...))`），无 go_router / auto_route。
+- 桌面端在 `DesktopHomePage` shell 内使用侧边栏切换，不依赖 Navigator 路由。
+- 路由追踪通过 `RouteObserver<ModalRoute>` 全局注册。
+
+### 3.14 Database & Storage
+
+- 主数据库：**Drift (SQLite)**，定义在 `lib/core/database/app_database.dart`，含 7 张表、版本 7 及迁移策略。
+- 生成代码命令：`dart run build_runner build --delete-conflicting-outputs`。
+- 通过 `ChatDatabaseRepository` 访问数据，勿直接操作数据库连接。
+- 轻量设置使用 `shared_preferences`。
+- ⚠️ **Assistant 存储约束**（历史遗留，极其重要）：
+  - Cuplivo 从一开始就使用 SQLite，从未使用 Hive。
+  - Assistant 数据已从 SharedPreferences **迁移至 SQLite**，但仍有残留代码可能写回 SharedPreferences。
+  - **持久化 assistant 时绝不可写回 SharedPreferences**，必须写至 SQLite。
+  - 备份时仍会合并至 `settings.json`，这是唯一允许 assistant 进入文件系统的路径。
+  - 任何将 assistant 写回 SharedPreferences 的修改都是数据灾难风险，必须拒绝。
+
+### 3.15 Network Layer
+
+- HTTP 客户端使用 **Dio**，通过 `DioHttpClient`（`lib/core/services/network/dio_http_client.dart`）封装。
+- 支持 SOCKS5 代理、CancelToken、自定义请求日志。
+- 所有 LLM API 调用在 `lib/core/services/api/chat_api_service.dart` 中编排。
+- 新增 API 调用应使用 `DioHttpClient`，而非直接 `http.get` / `dio.Dio`。
+
+### 3.16 Error Handling
+
+- 不引入 Result/Either 等统一错误封装。错误处理遵循以下两种模式：
+  - **可恢复错误**：`debugPrint`（导入必要文件）记录上下文后继续。
+  - **不可恢复/应上报的错误**：`throw Exception`（或具体 Exception 子类）。
+- 禁止 `catch (_) { /* silently ignore */ }`——如 3.6 所述，不得添加静默降级。
+
+### 3.17 Testing Constraints
+
+- 测试框架：仅 `flutter_test`（**无 mockito / mocktail**）。
+- Mock 策略：手工编写 Fake/Mock 类或使用 vendored 依赖中的手工 mock。
+- 不得为方便测试而暴露私有 API 或扩大 public 接口。
+
+### 3.18 Feature Module Convention
+
+- 代码按 **feature-first** 组织：`lib/features/<name>/` 下包含 `pages/`、`widgets/`、`controllers/`、`services/`（视需要）。
+- 跨 feature 共享的逻辑：`lib/core/`（providers、services、models、database）。
+- 跨 feature 共享的 UI：`lib/shared/`（widgets、dialogs、responsive）。
+- 桌面专属 UI/逻辑：`lib/desktop/`（不混入 `lib/features/`）。
+- 主题：`lib/theme/`（单一声源）。
 
 ## 4. Recommended Execution Order
 

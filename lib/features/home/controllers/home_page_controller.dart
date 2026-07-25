@@ -1099,6 +1099,16 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> createNewConversationAnimated() async {
+    // Guardrail: block rapid creation if conversation has only preset messages
+    if (_shouldBlockNewConversation) {
+      final l10n = AppLocalizations.of(_context)!;
+      showAppSnackBar(
+        _context,
+        message: l10n.homePagePresetConversationBlocked,
+        type: NotificationType.warning,
+      );
+      return;
+    }
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
@@ -1120,6 +1130,13 @@ class HomePageController extends ChangeNotifier {
         _inputFocus.requestFocus();
       });
     }
+  }
+
+  bool get _shouldBlockNewConversation {
+    final a = _context.read<AssistantProvider>().currentAssistant;
+    if (a == null || a.presetMessages.isEmpty) return false;
+    if (currentConversation == null) return false;
+    return _chatController.messages.every((m) => m.isPreset);
   }
 
   Future<void> _createNewConversation() async {

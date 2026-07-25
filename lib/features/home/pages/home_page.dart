@@ -438,6 +438,7 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
+  bool _presetsExpanded = false;
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -1118,6 +1119,65 @@ class _HomePageState extends State<HomePage>
     return count - 1;
   }
 
+  Widget _buildPresetToggleBar(
+    BuildContext context, {
+    required int presetCount,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: IosCardPress(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(10),
+        baseColor: Colors.transparent,
+        pressedBlendStrength: 0.05,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Divider(
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+                height: 1,
+                thickness: 1,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isExpanded ? Lucide.ChevronDown : Lucide.ChevronRight,
+                    size: 16,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    l10n.homePagePresetMessagesCount(presetCount),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Divider(
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+                height: 1,
+                thickness: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageListView(
     BuildContext context, {
     required double topContentPadding,
@@ -1136,8 +1196,26 @@ class _HomePageState extends State<HomePage>
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
+
+    // Filter preset messages and build collapse toggle
+    final allMessages = _controller.chatController.collapsedMessages;
+    final presetCount = allMessages.takeWhile((m) => m.isPreset).length;
+    final showPresetToggle = presetCount > 0;
+    final messages = !_presetsExpanded && showPresetToggle
+        ? allMessages.skip(presetCount).toList()
+        : allMessages;
+
+    Widget? presetHeaderWidget;
+    if (showPresetToggle) {
+      presetHeaderWidget = _buildPresetToggleBar(
+        context,
+        presetCount: presetCount,
+        isExpanded: _presetsExpanded,
+        onToggle: () => setState(() => _presetsExpanded = !_presetsExpanded),
+      );
+    }
+
     // Build inline multi-AI card widgets keyed by anchor user message ID
-    final messages = _controller.chatController.collapsedMessages;
     final afterMessageWidgets = <String, Widget>{};
     for (final anchorId in _controller.multiAIEngine.anchorMessageIds) {
       final subgrouped = _controller.multiAIEngine.getMessagesForAnchor(
@@ -1153,14 +1231,23 @@ class _HomePageState extends State<HomePage>
       );
     }
 
+    int truncIndex = _computeTruncCollapsedIndex();
+    if (truncIndex >= 0) {
+      if (showPresetToggle && !_presetsExpanded) {
+        truncIndex -= presetCount;
+      }
+      truncIndex += 1; // headerWidget occupies ListView index 0
+    }
+
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
       scrollController: _scrollController,
       observerController: _controller.scrollCtrl.observerController,
       messages: messages,
+      headerWidget: presetHeaderWidget,
       byGroup: _controller.chatController.groupedMessages,
       versionSelections: _controller.versionSelections,
-      truncCollapsedIndex: _computeTruncCollapsedIndex(),
+      truncCollapsedIndex: truncIndex,
       reasoning: _controller.reasoning,
       reasoningSegments: _controller.reasoningSegments,
       contentSplits: _controller.contentSplits,

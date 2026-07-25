@@ -679,6 +679,15 @@
   "homePageDone": "完成",
   "homePageProcessingFiles": "正在解析文件……",
   "homePageDropToUpload": "将文件拖拽到此处上传",
+  "homePagePresetMessagesCount": "{count} 条预设消息",
+  "@homePagePresetMessagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homePagePresetConversationBlocked": "请先发送消息后再创建新对话",
   "chatHistoryPageTitle": "聊天历史",
   "chatHistoryPageSearchTooltip": "搜索",
   "chatHistoryPageDeleteAllTooltip": "删除未置顶",

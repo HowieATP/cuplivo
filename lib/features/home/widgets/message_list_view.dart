@@ -134,6 +134,7 @@ class MessageListView extends StatefulWidget {
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
     this.hideMoreActions,
+    this.headerWidget,
   });
 
   final ScrollController scrollController;
@@ -211,6 +212,10 @@ class MessageListView extends StatefulWidget {
   final bool Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
   final bool Function()? onLoadMoreAfter;
+
+  /// An optional widget rendered as the first item in the list.
+  /// When provided, [messages] indices are shifted by 1.
+  final Widget? headerWidget;
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
@@ -292,6 +297,7 @@ class _MessageListViewState extends State<MessageListView> {
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
+            final hasHeader = widget.headerWidget != null;
             final list = ListView.builder(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
@@ -301,15 +307,23 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
-              itemCount: widget.messages.length,
+              itemCount: hasHeader
+                  ? widget.messages.length + 1
+                  : widget.messages.length,
               keyboardDismissBehavior: _keyboardDismissBehavior,
               itemBuilder: (context, index) {
-                if (index < 0 || index >= widget.messages.length) {
+                // headerWidget occupies index 0; message index = index - 1
+                if (hasHeader && index == 0) {
+                  return widget.headerWidget!;
+                }
+                final adjustedIndex = hasHeader ? index - 1 : index;
+                if (adjustedIndex < 0 ||
+                    adjustedIndex >= widget.messages.length) {
                   return const SizedBox.shrink();
                 }
                 return _buildMessageItem(
                   context,
-                  index: index,
+                  index: adjustedIndex,
                   isProcessingFiles: isProcessing,
                 );
               },

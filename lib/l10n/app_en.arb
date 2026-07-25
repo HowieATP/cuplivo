@@ -328,6 +328,15 @@
   "homePageSelectMessagesToShare": "Please select messages to share",
   "homePageDone": "Done",
   "homePageDropToUpload": "Drop files to upload",
+  "homePagePresetMessagesCount": "{count} preset messages",
+  "@homePagePresetMessagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "homePagePresetConversationBlocked": "Send a message first before creating a new conversation",
   "assistantEditPageTitle": "Assistant",
   "assistantEditPageNotFound": "Assistant not found",
   "assistantEditPageBasicTab": "Basic",

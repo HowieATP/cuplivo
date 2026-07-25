@@ -928,6 +928,7 @@ class ChatService extends ChangeNotifier {
     String? groupId,
     String? subgroupId,
     int? version,
+    bool isPreset = false,
   }) async {
     if (!_initialized) await init();
 
@@ -971,6 +972,7 @@ class ChatService extends ChangeNotifier {
       groupId: groupId,
       subgroupId: subgroupId,
       version: version,
+      isPreset: isPreset,
     );
 
     if (!temporary) {
@@ -1298,6 +1300,7 @@ class ChatService extends ChangeNotifier {
         reasoningFinishedAt: src.reasoningFinishedAt,
         translation: src.translation,
         reasoningSegmentsJson: src.reasoningSegmentsJson,
+        isPreset: src.isPreset,
       );
       await _repo.putMessage(clone, messageOrder: ids.length);
       ids.add(clone.id);
@@ -1455,6 +1458,33 @@ class ChatService extends ChangeNotifier {
     await _saveConversation(c);
     notifyListeners();
     return c;
+  }
+
+  /// Maps a raw-space [truncateIndex] (count of all raw messages) to the
+  /// equivalent skip count in collapsed space (version-collapsed groups).
+  /// Returns 0 when no truncation is active or the result is non-positive.
+  static int rawToCollapsedSkip({
+    required List<ChatMessage> rawMessages,
+    required List<ChatMessage> collapsedMessages,
+    required int truncateIndex,
+  }) {
+    if (truncateIndex <= 0 || truncateIndex > rawMessages.length) return 0;
+    final firstIndexByGroup = <String, int>{};
+    for (var i = 0; i < rawMessages.length; i++) {
+      final gid = rawMessages[i].groupId ?? rawMessages[i].id;
+      firstIndexByGroup.putIfAbsent(gid, () => i);
+    }
+    var skip = 0;
+    for (final m in collapsedMessages) {
+      final gid = m.groupId ?? m.id;
+      final firstIdx = firstIndexByGroup[gid];
+      if (firstIdx != null && firstIdx < truncateIndex) {
+        skip++;
+      } else {
+        break;
+      }
+    }
+    return skip;
   }
 
   Future<void> deleteMessage(String messageId) async {

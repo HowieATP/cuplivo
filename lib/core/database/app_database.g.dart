@@ -952,6 +952,21 @@ class $MessageRowsTable extends MessageRows
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isPresetMeta = const VerificationMeta(
+    'isPreset',
+  );
+  @override
+  late final GeneratedColumn<bool> isPreset = GeneratedColumn<bool>(
+    'is_preset',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_preset" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -976,6 +991,7 @@ class $MessageRowsTable extends MessageRows
     cachedTokens,
     durationMs,
     messageOrder,
+    isPreset,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1166,6 +1182,12 @@ class $MessageRowsTable extends MessageRows
     } else if (isInserting) {
       context.missing(_messageOrderMeta);
     }
+    if (data.containsKey('is_preset')) {
+      context.handle(
+        _isPresetMeta,
+        isPreset.isAcceptableOrUnknown(data['is_preset']!, _isPresetMeta),
+      );
+    }
     return context;
   }
 
@@ -1263,6 +1285,10 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.int,
         data['${effectivePrefix}message_order'],
       )!,
+      isPreset: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_preset'],
+      )!,
     );
   }
 
@@ -1295,6 +1321,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   final int? cachedTokens;
   final int? durationMs;
   final int messageOrder;
+  final bool isPreset;
   const MessageRow({
     required this.id,
     required this.conversationId,
@@ -1318,6 +1345,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.cachedTokens,
     this.durationMs,
     required this.messageOrder,
+    required this.isPreset,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1372,6 +1400,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       map['duration_ms'] = Variable<int>(durationMs);
     }
     map['message_order'] = Variable<int>(messageOrder);
+    map['is_preset'] = Variable<bool>(isPreset);
     return map;
   }
 
@@ -1427,6 +1456,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ? const Value.absent()
           : Value(durationMs),
       messageOrder: Value(messageOrder),
+      isPreset: Value(isPreset),
     );
   }
 
@@ -1464,6 +1494,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       cachedTokens: serializer.fromJson<int?>(json['cachedTokens']),
       durationMs: serializer.fromJson<int?>(json['durationMs']),
       messageOrder: serializer.fromJson<int>(json['messageOrder']),
+      isPreset: serializer.fromJson<bool>(json['isPreset']),
     );
   }
   @override
@@ -1494,6 +1525,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'cachedTokens': serializer.toJson<int?>(cachedTokens),
       'durationMs': serializer.toJson<int?>(durationMs),
       'messageOrder': serializer.toJson<int>(messageOrder),
+      'isPreset': serializer.toJson<bool>(isPreset),
     };
   }
 
@@ -1520,6 +1552,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<int?> cachedTokens = const Value.absent(),
     Value<int?> durationMs = const Value.absent(),
     int? messageOrder,
+    bool? isPreset,
   }) => MessageRow(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
@@ -1553,6 +1586,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     cachedTokens: cachedTokens.present ? cachedTokens.value : this.cachedTokens,
     durationMs: durationMs.present ? durationMs.value : this.durationMs,
     messageOrder: messageOrder ?? this.messageOrder,
+    isPreset: isPreset ?? this.isPreset,
   );
   MessageRow copyWithCompanion(MessageRowsCompanion data) {
     return MessageRow(
@@ -1608,6 +1642,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       messageOrder: data.messageOrder.present
           ? data.messageOrder.value
           : this.messageOrder,
+      isPreset: data.isPreset.present ? data.isPreset.value : this.isPreset,
     );
   }
 
@@ -1635,7 +1670,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('completionTokens: $completionTokens, ')
           ..write('cachedTokens: $cachedTokens, ')
           ..write('durationMs: $durationMs, ')
-          ..write('messageOrder: $messageOrder')
+          ..write('messageOrder: $messageOrder, ')
+          ..write('isPreset: $isPreset')
           ..write(')'))
         .toString();
   }
@@ -1664,6 +1700,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     cachedTokens,
     durationMs,
     messageOrder,
+    isPreset,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1690,7 +1727,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.completionTokens == this.completionTokens &&
           other.cachedTokens == this.cachedTokens &&
           other.durationMs == this.durationMs &&
-          other.messageOrder == this.messageOrder);
+          other.messageOrder == this.messageOrder &&
+          other.isPreset == this.isPreset);
 }
 
 class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
@@ -1716,6 +1754,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   final Value<int?> cachedTokens;
   final Value<int?> durationMs;
   final Value<int> messageOrder;
+  final Value<bool> isPreset;
   final Value<int> rowid;
   const MessageRowsCompanion({
     this.id = const Value.absent(),
@@ -1740,6 +1779,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.cachedTokens = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.messageOrder = const Value.absent(),
+    this.isPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageRowsCompanion.insert({
@@ -1765,6 +1805,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.cachedTokens = const Value.absent(),
     this.durationMs = const Value.absent(),
     required int messageOrder,
+    this.isPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
@@ -1795,6 +1836,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<int>? cachedTokens,
     Expression<int>? durationMs,
     Expression<int>? messageOrder,
+    Expression<bool>? isPreset,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1822,6 +1864,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       if (cachedTokens != null) 'cached_tokens': cachedTokens,
       if (durationMs != null) 'duration_ms': durationMs,
       if (messageOrder != null) 'message_order': messageOrder,
+      if (isPreset != null) 'is_preset': isPreset,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1849,6 +1892,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Value<int?>? cachedTokens,
     Value<int?>? durationMs,
     Value<int>? messageOrder,
+    Value<bool>? isPreset,
     Value<int>? rowid,
   }) {
     return MessageRowsCompanion(
@@ -1875,6 +1919,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
       messageOrder: messageOrder ?? this.messageOrder,
+      isPreset: isPreset ?? this.isPreset,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1952,6 +1997,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     if (messageOrder.present) {
       map['message_order'] = Variable<int>(messageOrder.value);
     }
+    if (isPreset.present) {
+      map['is_preset'] = Variable<bool>(isPreset.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1983,6 +2031,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
           ..write('cachedTokens: $cachedTokens, ')
           ..write('durationMs: $durationMs, ')
           ..write('messageOrder: $messageOrder, ')
+          ..write('isPreset: $isPreset, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6160,6 +6209,7 @@ typedef $$MessageRowsTableCreateCompanionBuilder =
       Value<int?> cachedTokens,
       Value<int?> durationMs,
       required int messageOrder,
+      Value<bool> isPreset,
       Value<int> rowid,
     });
 typedef $$MessageRowsTableUpdateCompanionBuilder =
@@ -6186,6 +6236,7 @@ typedef $$MessageRowsTableUpdateCompanionBuilder =
       Value<int?> cachedTokens,
       Value<int?> durationMs,
       Value<int> messageOrder,
+      Value<bool> isPreset,
       Value<int> rowid,
     });
 
@@ -6367,6 +6418,11 @@ class $$MessageRowsTableFilterComposer
 
   ColumnFilters<int> get messageOrder => $composableBuilder(
     column: $table.messageOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPreset => $composableBuilder(
+    column: $table.isPreset,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6560,6 +6616,11 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPreset => $composableBuilder(
+    column: $table.isPreset,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationRowsTableOrderingComposer get conversationId {
     final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -6683,6 +6744,9 @@ class $$MessageRowsTableAnnotationComposer
     column: $table.messageOrder,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isPreset =>
+      $composableBuilder(column: $table.isPreset, builder: (column) => column);
 
   $$ConversationRowsTableAnnotationComposer get conversationId {
     final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
@@ -6816,6 +6880,7 @@ class $$MessageRowsTableTableManager
                 Value<int?> cachedTokens = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 Value<int> messageOrder = const Value.absent(),
+                Value<bool> isPreset = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion(
                 id: id,
@@ -6840,6 +6905,7 @@ class $$MessageRowsTableTableManager
                 cachedTokens: cachedTokens,
                 durationMs: durationMs,
                 messageOrder: messageOrder,
+                isPreset: isPreset,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6866,6 +6932,7 @@ class $$MessageRowsTableTableManager
                 Value<int?> cachedTokens = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 required int messageOrder,
+                Value<bool> isPreset = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion.insert(
                 id: id,
@@ -6890,6 +6957,7 @@ class $$MessageRowsTableTableManager
                 cachedTokens: cachedTokens,
                 durationMs: durationMs,
                 messageOrder: messageOrder,
+                isPreset: isPreset,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

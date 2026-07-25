@@ -49,6 +49,8 @@ class ChatMessage {
 
   final int? durationMs;
 
+  final bool isPreset;
+
   factory ChatMessage({
     String? id,
     required String role,
@@ -71,6 +73,7 @@ class ChatMessage {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    bool isPreset = false,
   }) {
     final resolvedId = id ?? const Uuid().v4();
     return ChatMessage._(
@@ -95,6 +98,7 @@ class ChatMessage {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      isPreset: isPreset,
     );
   }
 
@@ -120,6 +124,7 @@ class ChatMessage {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.isPreset = false,
   });
 
   // Sentinel for copyWith — not passed vs explicitly null.
@@ -147,6 +152,7 @@ class ChatMessage {
     Object? completionTokens = sentinel,
     Object? cachedTokens = sentinel,
     Object? durationMs = sentinel,
+    Object? isPreset = sentinel,
   }) {
     return ChatMessage(
       id: identical(id, sentinel) ? this.id : id as String,
@@ -200,6 +206,9 @@ class ChatMessage {
       durationMs: identical(durationMs, sentinel)
           ? this.durationMs
           : durationMs as int?,
+      isPreset: identical(isPreset, sentinel)
+          ? this.isPreset
+          : isPreset as bool,
     );
   }
 
@@ -226,6 +235,7 @@ class ChatMessage {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'isPreset': isPreset,
     };
   }
 
@@ -256,6 +266,7 @@ class ChatMessage {
       completionTokens: json['completionTokens'] as int?,
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
+      isPreset: json['isPreset'] as bool? ?? false,
     );
   }
 }

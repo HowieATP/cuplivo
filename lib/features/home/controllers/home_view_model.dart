@@ -892,10 +892,11 @@ class HomeViewModel extends ChangeNotifier {
             conversationId: currentConversation!.id,
             role: role,
             content: content,
+            isPreset: true,
           );
-          _chatController.reloadMessages();
-          notifyListeners();
         }
+        _chatController.reloadMessages();
+        notifyListeners();
       }
     } catch (_) {}
 
@@ -1450,7 +1451,13 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.suggestionModelId;
     if (provKey == null || mdlId == null) return;
 
-    final msgs = collapseVersions(_chatService.getMessages(convo.id));
+    final rawMsgs = _chatService.getMessages(convo.id);
+    final msgs = collapseVersions(rawMsgs);
+    final collapsedTruncateIndex = ChatService.rawToCollapsedSkip(
+      rawMessages: rawMsgs,
+      collapsedMessages: msgs,
+      truncateIndex: convo.truncateIndex,
+    );
     final lastAssistant = msgs.cast<ChatMessage?>().lastWhere(
       (m) =>
           m != null &&
@@ -1475,7 +1482,7 @@ class HomeViewModel extends ChangeNotifier {
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: convo.truncateIndex,
+        truncateIndex: collapsedTruncateIndex,
         locale: locale,
         thinkingBudget: budget,
       );

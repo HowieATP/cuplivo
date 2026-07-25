@@ -1367,6 +1367,18 @@ abstract class AppLocalizations {
   /// **'Drop files to upload'**
   String get homePageDropToUpload;
 
+  /// No description provided for @homePagePresetMessagesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} preset messages'**
+  String homePagePresetMessagesCount(int count);
+
+  /// No description provided for @homePagePresetConversationBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a message first before creating a new conversation'**
+  String get homePagePresetConversationBlocked;
+
   /// No description provided for @assistantEditPageTitle.
   ///
   /// In en, this message translates to:

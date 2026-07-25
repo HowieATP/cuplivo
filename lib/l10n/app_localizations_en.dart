@@ -687,6 +687,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageDropToUpload => 'Drop files to upload';
 
   @override
+  String homePagePresetMessagesCount(int count) {
+    return '$count preset messages';
+  }
+
+  @override
+  String get homePagePresetConversationBlocked =>
+      'Send a message first before creating a new conversation';
+
+  @override
   String get assistantEditPageTitle => 'Assistant';
 
   @override

@@ -11,6 +11,7 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
+import 'chat/chat_service.dart';
 import 'chat/prompt_transformer.dart';
 import 'instruction_injection_store.dart';
 import 'logging/flutter_logger.dart';
@@ -285,8 +286,13 @@ class ProactiveCareMessageFlow {
       conversation.versionSelections,
     );
     final tIndex = conversation.truncateIndex;
-    final effective = (tIndex >= 0 && tIndex <= collapsed.length)
-        ? collapsed.sublist(tIndex)
+    final collapsedSkip = ChatService.rawToCollapsedSkip(
+      rawMessages: messages,
+      collapsedMessages: collapsed,
+      truncateIndex: tIndex,
+    );
+    final effective = collapsedSkip > 0
+        ? collapsed.sublist(collapsedSkip)
         : collapsed;
     return <Map<String, dynamic>>[
       for (final m in effective)

@@ -63,6 +63,7 @@ class MessageRows extends Table {
   IntColumn get cachedTokens => integer().nullable()();
   IntColumn get durationMs => integer().nullable()();
   IntColumn get messageOrder => integer()();
+  BoolColumn get isPreset => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -238,7 +239,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -312,6 +313,11 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           "UPDATE assistant_rows SET skill_ids_json = '[]' WHERE skill_ids_json IS NULL",
         );
+      }
+      if (from < 8) {
+        try {
+          await migrator.addColumn(messageRows, messageRows.isPreset);
+        } catch (_) {}
       }
     },
   );

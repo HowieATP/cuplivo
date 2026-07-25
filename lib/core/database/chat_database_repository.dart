@@ -1145,6 +1145,7 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      isPreset: row.isPreset,
     );
   }
 
@@ -1176,6 +1177,7 @@ class ChatDatabaseRepository {
       completionTokens: row['completion_tokens'] as int?,
       cachedTokens: row['cached_tokens'] as int?,
       durationMs: row['duration_ms'] as int?,
+      isPreset: row['is_preset'] == 1,
     );
   }
 
@@ -1219,6 +1221,7 @@ class ChatDatabaseRepository {
       completionTokens: Value(message.completionTokens),
       cachedTokens: Value(message.cachedTokens),
       durationMs: Value(message.durationMs),
+      isPreset: Value(message.isPreset),
       messageOrder: messageOrder,
     );
   }

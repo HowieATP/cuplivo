@@ -675,6 +675,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDropToUpload => '将文件拖拽到此处上传';
 
   @override
+  String homePagePresetMessagesCount(int count) {
+    return '$count 条预设消息';
+  }
+
+  @override
+  String get homePagePresetConversationBlocked => '请先发送消息后再创建新对话';
+
+  @override
   String get assistantEditPageTitle => '助手';
 
   @override
@@ -6481,6 +6489,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageDropToUpload => '将文件拖拽到此处上传';
 
   @override
+  String homePagePresetMessagesCount(int count) {
+    return '$count 条预设消息';
+  }
+
+  @override
+  String get homePagePresetConversationBlocked => '请先发送消息后再创建新对话';
+
+  @override
   String get assistantEditPageTitle => '助手';
 
   @override
@@ -12285,6 +12301,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePageDropToUpload => '將檔案拖曳到此處以上傳';
+
+  @override
+  String homePagePresetMessagesCount(int count) {
+    return '$count 條預設訊息';
+  }
+
+  @override
+  String get homePagePresetConversationBlocked => '請先傳送訊息後再建立新對話';
 
   @override
   String get assistantEditPageTitle => '助理';

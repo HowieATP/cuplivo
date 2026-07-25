@@ -465,6 +465,12 @@ class SettingsProvider extends ChangeNotifier {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
     if (lower.contains('fable') || lower.contains('mythos')) return true;
+    if (RegExp(
+      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
+      caseSensitive: false,
+    ).hasMatch(lower)) {
+      return true;
+    }
     final m = RegExp(
       r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
       caseSensitive: false,
@@ -489,6 +495,12 @@ class SettingsProvider extends ChangeNotifier {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
     if (lower.contains('fable') || lower.contains('mythos')) return true;
+    if (RegExp(
+      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
+      caseSensitive: false,
+    ).hasMatch(lower)) {
+      return true;
+    }
     final m = RegExp(
       r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
       caseSensitive: false,

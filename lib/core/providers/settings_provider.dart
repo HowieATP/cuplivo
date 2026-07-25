@@ -109,6 +109,15 @@ class SettingsProvider extends ChangeNotifier {
   static const String _thinkingBudgetKey = 'thinking_budget_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
+  static const String _summaryThinkingEnabledKey =
+      'summary_thinking_enabled_v1';
+  static const String _suggestionThinkingEnabledKey =
+      'suggestion_thinking_enabled_v1';
+  static const String _compressThinkingEnabledKey =
+      'compress_thinking_enabled_v1';
+  static const String _translateThinkingEnabledKey =
+      'translate_thinking_enabled_v1';
+  static const String _ocrThinkingEnabledKey = 'ocr_thinking_enabled_v1';
   static const String _displayShowUserAvatarKey = 'display_show_user_avatar_v1';
   static const String _displayShowModelIconKey = 'display_show_model_icon_v1';
   static const String _displayShowModelNameTimestampKey =
@@ -947,6 +956,14 @@ class SettingsProvider extends ChangeNotifier {
     _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
     _titleGenerationThinkingEnabled =
         prefs.getBool(_titleGenerationThinkingEnabledKey) ?? true;
+    _summaryThinkingEnabled = prefs.getBool(_summaryThinkingEnabledKey) ?? true;
+    _suggestionThinkingEnabled =
+        prefs.getBool(_suggestionThinkingEnabledKey) ?? true;
+    _compressThinkingEnabled =
+        prefs.getBool(_compressThinkingEnabledKey) ?? true;
+    _translateThinkingEnabled =
+        prefs.getBool(_translateThinkingEnabledKey) ?? true;
+    _ocrThinkingEnabled = prefs.getBool(_ocrThinkingEnabledKey) ?? true;
 
     // display settings
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
@@ -3414,6 +3431,100 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     return assistantBudget ?? _thinkingBudget;
   }
 
+  // Summary thinking toggle. Defaults to true for backward compatibility.
+  bool _summaryThinkingEnabled = true;
+  bool get summaryThinkingEnabled => _summaryThinkingEnabled;
+  Future<void> setSummaryThinkingEnabled(bool enabled) async {
+    if (_summaryThinkingEnabled == enabled) return;
+    _summaryThinkingEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_summaryThinkingEnabledKey, enabled);
+  }
+
+  Future<void> resetSummaryThinkingEnabled() async =>
+      setSummaryThinkingEnabled(true);
+
+  int? summaryThinkingBudgetFor(int? assistantBudget) {
+    if (!_summaryThinkingEnabled) return 0;
+    return assistantBudget ?? _thinkingBudget;
+  }
+
+  // Suggestion thinking toggle.
+  bool _suggestionThinkingEnabled = true;
+  bool get suggestionThinkingEnabled => _suggestionThinkingEnabled;
+  Future<void> setSuggestionThinkingEnabled(bool enabled) async {
+    if (_suggestionThinkingEnabled == enabled) return;
+    _suggestionThinkingEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_suggestionThinkingEnabledKey, enabled);
+  }
+
+  Future<void> resetSuggestionThinkingEnabled() async =>
+      setSuggestionThinkingEnabled(true);
+
+  int? suggestionThinkingBudgetFor(int? assistantBudget) {
+    if (!_suggestionThinkingEnabled) return 0;
+    return assistantBudget ?? _thinkingBudget;
+  }
+
+  // Compress thinking toggle.
+  bool _compressThinkingEnabled = true;
+  bool get compressThinkingEnabled => _compressThinkingEnabled;
+  Future<void> setCompressThinkingEnabled(bool enabled) async {
+    if (_compressThinkingEnabled == enabled) return;
+    _compressThinkingEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_compressThinkingEnabledKey, enabled);
+  }
+
+  Future<void> resetCompressThinkingEnabled() async =>
+      setCompressThinkingEnabled(true);
+
+  int? compressThinkingBudgetFor(int? assistantBudget) {
+    if (!_compressThinkingEnabled) return 0;
+    return assistantBudget ?? _thinkingBudget;
+  }
+
+  // Translate thinking toggle.
+  bool _translateThinkingEnabled = true;
+  bool get translateThinkingEnabled => _translateThinkingEnabled;
+  Future<void> setTranslateThinkingEnabled(bool enabled) async {
+    if (_translateThinkingEnabled == enabled) return;
+    _translateThinkingEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_translateThinkingEnabledKey, enabled);
+  }
+
+  Future<void> resetTranslateThinkingEnabled() async =>
+      setTranslateThinkingEnabled(true);
+
+  int? translateThinkingBudgetFor(int? assistantBudget) {
+    if (!_translateThinkingEnabled) return 0;
+    return assistantBudget ?? _thinkingBudget;
+  }
+
+  // OCR thinking toggle.
+  bool _ocrThinkingEnabled = true;
+  bool get ocrThinkingEnabled => _ocrThinkingEnabled;
+  Future<void> setOcrThinkingEnabled(bool enabled) async {
+    if (_ocrThinkingEnabled == enabled) return;
+    _ocrThinkingEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_ocrThinkingEnabledKey, enabled);
+  }
+
+  Future<void> resetOcrThinkingEnabled() async => setOcrThinkingEnabled(true);
+
+  int? ocrThinkingBudgetFor(int? assistantBudget) {
+    if (!_ocrThinkingEnabled) return 0;
+    return assistantBudget ?? _thinkingBudget;
+  }
+
   // Display settings: user avatar and model icon visibility
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
@@ -4329,6 +4440,11 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._ocrEnabled = _ocrEnabled;
     copy._thinkingBudget = _thinkingBudget;
     copy._titleGenerationThinkingEnabled = _titleGenerationThinkingEnabled;
+    copy._summaryThinkingEnabled = _summaryThinkingEnabled;
+    copy._suggestionThinkingEnabled = _suggestionThinkingEnabled;
+    copy._compressThinkingEnabled = _compressThinkingEnabled;
+    copy._translateThinkingEnabled = _translateThinkingEnabled;
+    copy._ocrThinkingEnabled = _ocrThinkingEnabled;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;

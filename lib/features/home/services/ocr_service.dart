@@ -102,7 +102,7 @@ class OcrService {
       modelId: model,
       messages: messages,
       userMediaPaths: imagePaths,
-      thinkingBudget: null,
+      thinkingBudget: settings.ocrThinkingBudgetFor(null),
       temperature: 0.0,
       topP: null,
       maxTokens: null,

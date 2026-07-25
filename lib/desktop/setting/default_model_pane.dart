@@ -317,9 +317,11 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _TitleThinkingSwitchRow(
-                        settings: sp,
-                        l10n: l10n,
+                      _ModelThinkingSwitchRow(
+                        value: sp.titleGenerationThinkingEnabled,
+                        onChanged: sp.setTitleGenerationThinkingEnabled,
+                        label: l10n.titleModelThinkingTitle,
+                        semanticLabel: l10n.titleModelThinkingTitle,
                         cs: cs,
                         trailing: _SmallIconBtn(
                           icon: lucide.Lucide.X,
@@ -448,24 +450,18 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
+                  _ModelThinkingSwitchRow(
+                    value: sp.translateThinkingEnabled,
+                    onChanged: sp.setTranslateThinkingEnabled,
+                    label: l10n.modelThinkingTitle,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    cs: cs,
+                    trailing: _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
@@ -480,6 +476,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetTranslatePrompt();
+                          await sp.resetTranslateThinkingEnabled();
                           ctrl.text = sp.translatePrompt;
                         },
                       ),
@@ -541,24 +538,18 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
+                  _ModelThinkingSwitchRow(
+                    value: sp.ocrThinkingEnabled,
+                    onChanged: sp.setOcrThinkingEnabled,
+                    label: l10n.modelThinkingTitle,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    cs: cs,
+                    trailing: _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
@@ -573,6 +564,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetOcrPrompt();
+                          await sp.resetOcrThinkingEnabled();
                           ctrl.text = sp.ocrPrompt;
                         },
                       ),
@@ -623,24 +615,18 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
+                  _ModelThinkingSwitchRow(
+                    value: sp.summaryThinkingEnabled,
+                    onChanged: sp.setSummaryThinkingEnabled,
+                    label: l10n.modelThinkingTitle,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    cs: cs,
+                    trailing: _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
@@ -655,6 +641,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetSummaryPrompt();
+                          await sp.resetSummaryThinkingEnabled();
                           ctrl.text = sp.summaryPrompt;
                         },
                       ),
@@ -716,24 +703,18 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
+                  _ModelThinkingSwitchRow(
+                    value: sp.compressThinkingEnabled,
+                    onChanged: sp.setCompressThinkingEnabled,
+                    label: l10n.modelThinkingTitle,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    cs: cs,
+                    trailing: _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
@@ -748,6 +729,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetCompressPrompt();
+                          await sp.resetCompressThinkingEnabled();
                           ctrl.text = sp.compressPrompt;
                         },
                       ),
@@ -806,24 +788,18 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
-                      ),
-                    ],
+                  _ModelThinkingSwitchRow(
+                    value: sp.suggestionThinkingEnabled,
+                    onChanged: sp.setSuggestionThinkingEnabled,
+                    label: l10n.modelThinkingTitle,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    cs: cs,
+                    trailing: _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
@@ -838,6 +814,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetSuggestionPrompt();
+                          await sp.resetSuggestionThinkingEnabled();
                           ctrl.text = sp.suggestionPrompt;
                         },
                       ),
@@ -1058,23 +1035,25 @@ class _ModelCardState extends State<_ModelCard> {
   }
 }
 
-class _TitleThinkingSwitchRow extends StatelessWidget {
-  const _TitleThinkingSwitchRow({
-    required this.settings,
-    required this.l10n,
+class _ModelThinkingSwitchRow extends StatelessWidget {
+  const _ModelThinkingSwitchRow({
+    required this.value,
+    required this.onChanged,
+    required this.label,
+    required this.semanticLabel,
     required this.cs,
     required this.trailing,
   });
 
-  final SettingsProvider settings;
-  final AppLocalizations l10n;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final String label;
+  final String semanticLabel;
   final ColorScheme cs;
   final Widget trailing;
 
   @override
   Widget build(BuildContext context) {
-    final value = settings.titleGenerationThinkingEnabled;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1083,7 +1062,7 @@ class _TitleThinkingSwitchRow extends StatelessWidget {
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => settings.setTitleGenerationThinkingEnabled(!value),
+              onTap: () => onChanged(!value),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
@@ -1091,7 +1070,7 @@ class _TitleThinkingSwitchRow extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        l10n.titleModelThinkingTitle,
+                        label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1105,8 +1084,8 @@ class _TitleThinkingSwitchRow extends StatelessWidget {
                     IosSwitch(
                       value: value,
                       hitTestSize: 36,
-                      semanticLabel: l10n.titleModelThinkingTitle,
-                      onChanged: settings.setTitleGenerationThinkingEnabled,
+                      semanticLabel: semanticLabel,
+                      onChanged: onChanged,
                     ),
                   ],
                 ),

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.1.4] - 2026-07-25
+
+### Added
+
+- Batch select/delete/move conversations (#82)
+- Custom theme color (#107)
+- Configurable MCP heartbeat interval to avoid 429 rate limit (#108)
+- Desktop markdown table toolbar with multi-format copy — image, TSV (for pasting into Excel), Markdown (#109)
+- Configurable Grok reasoning effort for Web Search (#114)
+- Model capability support: Sonnet/Opus 5, Gemini 3.6 Flash & 3.5 Flash Lite, Grok 4.5, Muse Spark 1.1 (#113)
+
+### Fixed
+
+- Restore legacy SSE compatibility for MCP servers (#110)
+- Ensure Gemini tool call ID consistency (#111)
+- Preserve provider reasoning effort/detail signatures across streaming (#112)
+
 ## [2.1.3] - 2026-07-25
 
 ### Added

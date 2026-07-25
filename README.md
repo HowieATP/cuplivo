@@ -52,13 +52,19 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 8. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-9. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; added Kimi K3 with max reasoning and both naming variants; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
+9. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
 
-10. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+10. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-11. **Truncated response toast** — Shows a toast notification when a response is cut short due to hitting the max_tokens limit or exceeding the context window, so you always know why a reply ended abruptly.
+11. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
-12. **Additional fixes across the repo**
+12. **Truncated response toast** — Shows a toast notification when a response is cut short due to hitting the max_tokens limit or exceeding the context window, so you always know why a reply ended abruptly.
+
+13. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+
+14. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+
+15. **Additional fixes across the repo**
     - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)

@@ -1061,6 +1061,52 @@
       }
     }
   },
+  "sideDrawerMenuBatchSelect": "Select Multiple",
+  "sideDrawerBatchSelectedCount": "{count} selected",
+  "@sideDrawerBatchSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerBatchDeleteConfirm": "Delete {count} conversations?",
+  "@sideDrawerBatchDeleteConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerBatchDeleteSuccess": "Deleted {count} conversations",
+  "@sideDrawerBatchDeleteSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerBatchMoveSuccess": "Moved {count} conversations",
+  "@sideDrawerBatchMoveSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerBatchPartialFailure": "{success} succeeded, {failed} failed",
+  "@sideDrawerBatchPartialFailure": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerSelectAll": "Select All",
+  "sideDrawerDeselectAll": "Deselect All",
   "sideDrawerRenameHint": "Enter new name",
   "sideDrawerCancel": "Cancel",
   "sideDrawerOK": "OK",

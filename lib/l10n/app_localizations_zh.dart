@@ -4100,6 +4100,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
+  String get themeSettingsPageCustomDynamicTitle => '自定义动态色';
+
+  @override
+  String get themeSettingsPageSeedColorLabel => '种子颜色';
+
+  @override
   String get ttsServicesPageBackButton => '返回';
 
   @override
@@ -9891,6 +9897,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
+  String get themeSettingsPageCustomDynamicTitle => '自定义动态色';
+
+  @override
+  String get themeSettingsPageSeedColorLabel => '种子颜色';
+
+  @override
   String get ttsServicesPageBackButton => '返回';
 
   @override
@@ -15678,6 +15690,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
+
+  @override
+  String get themeSettingsPageCustomDynamicTitle => '自訂動態色';
+
+  @override
+  String get themeSettingsPageSeedColorLabel => '種子顏色';
 
   @override
   String get ttsServicesPageBackButton => '返回';

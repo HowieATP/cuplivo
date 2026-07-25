@@ -52,12 +52,18 @@ void main() {
       expect(settings.providersOrder.take(3), ['OpenAI', 'Zhipu AI', 'Grok']);
     });
 
-    test('latest GLM and Kimi model ids infer expected capabilities', () {
+    test('latest model ids infer only their documented capabilities', () {
       final glm = ModelRegistry.infer(
         ModelInfo(id: 'glm-5.2', displayName: 'glm-5.2'),
       );
-      final kimi = ModelRegistry.infer(
+      final kimiK2 = ModelRegistry.infer(
         ModelInfo(id: 'kimi-k2.7-code', displayName: 'kimi-k2.7-code'),
+      );
+      final kimiK3 = ModelRegistry.infer(
+        ModelInfo(id: 'kimi-k3', displayName: 'kimi-k3'),
+      );
+      final muse = ModelRegistry.infer(
+        ModelInfo(id: 'muse-spark-1.1', displayName: 'muse-spark-1.1'),
       );
 
       expect(glm.input, const [Modality.text]);
@@ -66,26 +72,52 @@ void main() {
         glm.abilities,
         containsAll([ModelAbility.tool, ModelAbility.reasoning]),
       );
-      expect(kimi.input, contains(Modality.image));
-      expect(kimi.output, const [Modality.text]);
-      expect(
-        kimi.abilities,
-        containsAll([ModelAbility.tool, ModelAbility.reasoning]),
-      );
-    });
-
-    test('Kimi K3 model ids infer expected capabilities', () {
-      for (final id in const ['kimi-k3', 'k3']) {
-        final m = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-        expect(m.input, contains(Modality.image), reason: '$id vision');
-        expect(m.output, const [Modality.text], reason: '$id output');
+      for (final model in [kimiK2, kimiK3, muse]) {
+        expect(model.input, contains(Modality.image));
+        expect(model.output, const [Modality.text]);
         expect(
-          m.abilities,
+          model.abilities,
           containsAll([ModelAbility.tool, ModelAbility.reasoning]),
-          reason: '$id abilities',
         );
       }
+      expect(kimiK2.id, 'kimi-k2.7-code');
+      expect(kimiK3.id, 'kimi-k3');
+      expect(muse.id, 'muse-spark-1.1');
     });
+
+    test(
+      'OpenAI-compatible latest models expose documented effort caps',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+
+        expect(
+          settings.supportsXhighReasoning('OpenAI', 'gpt-5.6-sol'),
+          isTrue,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-5.6-sol'), isTrue);
+        expect(
+          settings.supportsXhighReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
+          isTrue,
+        );
+        expect(
+          settings.supportsMaxReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
+          isTrue,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'kimi-k3'), isTrue);
+        expect(
+          settings.supportsMaxReasoning('OpenRouter', 'moonshotai/kimi-k3'),
+          isTrue,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
+        expect(
+          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
+          isFalse,
+        );
+      },
+    );
 
     test('OpenRouter can be routed through Anthropic format explicitly', () {
       final cfg = ProviderConfig(
@@ -168,6 +200,51 @@ void main() {
       ]);
     });
 
+    test(
+      'Claude latest models expose xhigh and max reasoning without presets',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+        await settings.setProviderConfig(
+          'Claude',
+          ProviderConfig(
+            id: 'Claude',
+            enabled: true,
+            name: 'Claude',
+            apiKey: 'test-key',
+            baseUrl: 'https://api.anthropic.com/v1',
+            providerType: ProviderKind.claude,
+            models: const [
+              'claude-fable-5',
+              'claude-mythos-5',
+              'claude-opus-4-8',
+              'claude-opus-5',
+              'claude-sonnet-5',
+            ],
+          ),
+        );
+
+        for (final model in const [
+          'claude-fable-5',
+          'claude-mythos-5',
+          'claude-opus-4-8',
+          'claude-opus-5',
+          'claude-sonnet-5',
+        ]) {
+          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
+          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
+        }
+        expect(settings.getProviderConfig('Claude').models, [
+          'claude-fable-5',
+          'claude-mythos-5',
+          'claude-opus-4-8',
+          'claude-opus-5',
+          'claude-sonnet-5',
+        ]);
+      },
+    );
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
       SharedPreferences.setMockInitialValues({});
       final settings = SettingsProvider();

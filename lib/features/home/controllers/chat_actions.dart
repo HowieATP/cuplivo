@@ -1183,6 +1183,15 @@ class ChatActions {
           )
         : '';
 
+    // Persist vendor reasoning details (may carry thinking signatures) so
+    // they can be echoed back on subsequent turns.
+    if (chunk.reasoningDetails != null) {
+      streamController.setReasoningDetails(
+        state.messageId,
+        chunk.reasoningDetails,
+      );
+    }
+
     // Handle reasoning
     if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
       await _handleReasoningChunk(chunk, state);
@@ -1320,6 +1329,7 @@ class ChatActions {
               contentSplitOffsets: state.contentSplitOffsets,
               reasoningCountAtSplit: state.reasoningCountAtSplit,
               toolCountAtSplit: state.toolCountAtSplit,
+              reasoningDetails: streamController.reasoningDetails[messageId],
             ),
       );
     }
@@ -1852,6 +1862,8 @@ class ChatActions {
                 toolCountAtSplit: streamController
                     .getContentSplitData(streaming.id)
                     ?.toolCounts,
+                reasoningDetails:
+                    streamController.reasoningDetails[streaming.id],
               ),
         );
       } else if (streamController.getContentSplitData(streaming.id) != null) {
@@ -1864,6 +1876,8 @@ class ChatActions {
                 contentSplitOffsets: splits.offsets,
                 reasoningCountAtSplit: splits.reasoningCounts,
                 toolCountAtSplit: splits.toolCounts,
+                reasoningDetails:
+                    streamController.reasoningDetails[streaming.id],
               ),
         );
       }

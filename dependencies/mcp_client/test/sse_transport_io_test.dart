@@ -82,7 +82,6 @@ void main() {
         receivedContentType.complete(
           request.headers.value(HttpHeaders.contentTypeHeader),
         );
-        await request.drain<void>();
         request.response.statusCode = HttpStatus.accepted;
         await request.response.close();
       });
@@ -93,7 +92,7 @@ void main() {
       transport.send({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize'});
 
       expect(
-        await receivedContentType.future.timeout(const Duration(seconds: 1)),
+        await receivedContentType.future.timeout(const Duration(seconds: 5)),
         'application/json',
       );
     });

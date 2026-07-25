@@ -160,7 +160,8 @@ Map<String, dynamic>? _googleFunctionCallPartFromToolCall(Map toolCall) {
     if (google is Map) {
       final part = google['part'];
       if (part is Map && part['functionCall'] is Map) {
-        return part.cast<String, dynamic>();
+        // Mutable copy: callers may need to backfill a thought signature.
+        return Map<String, dynamic>.from(part);
       }
     }
   }
@@ -180,6 +181,25 @@ Map<String, dynamic>? _googleFunctionCallPartFromToolCall(Map toolCall) {
   final id = (toolCall['id'] ?? '').toString();
   if (id.isNotEmpty) part['id'] = id;
   return part;
+}
+
+/// Gemini 3 validates that the first functionCall part of a replayed model
+/// turn carries a thought signature; a missing one fails the whole request
+/// with "Function call is missing a thought_signature in functionCall parts".
+/// When the original signature was not persisted (legacy history, non-streaming
+/// responses), fall back to the documented placeholder so old conversations
+/// keep working.
+void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
+  for (final part in parts) {
+    if (part['functionCall'] is! Map) continue;
+    final hasSig =
+        part.containsKey('thoughtSignature') ||
+        part.containsKey('thought_signature');
+    if (!hasSig) {
+      part['thoughtSignature'] = _geminiDummyThoughtSignature;
+    }
+    return; // Only the first functionCall part is validated.
+  }
 }
 
 Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
@@ -332,7 +352,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
         final parts = <Map<String, dynamic>>[];
-        final raw = (msg['content'] ?? '').toString();
+        final raw = _extractGeminiThoughtMeta(
+          (msg['content'] ?? '').toString(),
+        ).cleanedText;
         if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
           parts.add({'text': raw});
         }
@@ -340,6 +362,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           if (tc is! Map) continue;
           final part = _googleFunctionCallPartFromToolCall(tc);
           if (part != null) parts.add(part);
+        }
+        if (persistGeminiThoughtSigs) {
+          _ensureGeminiFunctionCallThoughtSig(parts);
         }
         if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
         continue;
@@ -777,6 +802,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         final part = _googleFunctionCallPartFromToolCall(tc);
         if (part != null) parts.add(part);
       }
+      if (persistGeminiThoughtSigs) _ensureGeminiFunctionCallThoughtSig(parts);
       if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
       continue;
     }

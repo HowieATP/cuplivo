@@ -128,6 +128,10 @@ class MessageBuilderService {
 
     for (final m in source) {
       String? toolContinuationReasoningContent;
+      dynamic reasoningDetails;
+      if (m.role == 'assistant') {
+        reasoningDetails = _reasoningDetailsForApi(m);
+      }
       if (includeToolMessages && m.role == 'assistant') {
         final events = chatService.getToolEvents(m.id);
         if (events.isNotEmpty) {
@@ -206,6 +210,9 @@ class MessageBuilderService {
       if (toolContinuationReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = toolContinuationReasoningContent;
       }
+      if (reasoningDetails != null) {
+        message['reasoning_details'] = reasoningDetails;
+      }
       out.add(message);
     }
 
@@ -218,6 +225,30 @@ class MessageBuilderService {
       if (candidate.id == message.id) return candidate;
     }
     return null;
+  }
+
+  /// Extract persisted vendor reasoning details (OpenRouter-style
+  /// `reasoning_details`, may carry thinking signatures) so they can be
+  /// echoed back to the provider on later turns.
+  dynamic _reasoningDetailsForApi(ChatMessage message) {
+    dynamic pick(ChatMessage candidate) {
+      final raw = (candidate.reasoningSegmentsJson ?? '').trim();
+      if (raw.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) return null;
+        final details = decoded['reasoningDetails'];
+        if (details is List && details.isNotEmpty) return details;
+      } catch (_) {}
+      return null;
+    }
+
+    final fromMessage = pick(message);
+    if (fromMessage != null) return fromMessage;
+
+    final persisted = _latestPersistedMessage(message);
+    if (persisted == null) return null;
+    return pick(persisted);
   }
 
   String _reasoningContentForToolContinuation(ChatMessage message) {

@@ -193,6 +193,9 @@ class MessageGenerationService {
     );
     await messageBuilderService.injectSkillListPrompt(apiMessages, assistantId);
 
+    // Inject time note (at the end of system message, after all other injections)
+    messageBuilderService.injectTimeNote(apiMessages, assistant);
+
     // Apply context limit and inline images
     messageBuilderService.applyContextLimit(apiMessages, assistant);
     await messageBuilderService.inlineLocalImages(apiMessages);

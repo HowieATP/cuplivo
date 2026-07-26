@@ -138,6 +138,10 @@ class AssistantRows extends Table {
   TextColumn get otherOfficeMode =>
       text().withDefault(const Constant('direct'))();
 
+  // --- Time Injection ---
+  BoolColumn get enableTimeInjection =>
+      boolean().withDefault(const Constant(false))();
+
   // --- Sort & Timestamp ---
   IntColumn get sortOrder => integer()();
   DateTimeColumn get createdAt => dateTime()();
@@ -239,7 +243,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -317,6 +321,14 @@ class AppDatabase extends _$AppDatabase {
       if (from < 8) {
         try {
           await migrator.addColumn(messageRows, messageRows.isPreset);
+        } catch (_) {}
+      }
+      if (from < 9) {
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.enableTimeInjection,
+          );
         } catch (_) {}
       }
     },

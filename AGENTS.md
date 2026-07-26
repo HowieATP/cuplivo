@@ -196,7 +196,32 @@ flutter analyze
 - Do not expand scope just because you spotted something that "could be unified". Finish the current task first, then decide whether to open a separate refactoring task.
 - When touching a path dependency, treat it as an independent module. Do not only patch the surface at the root repo level.
 
-### 3.8 Desktop Tasks: Determine Entry Layer First
+### 3.8 Tests and Self-Review Must Be Requirement-Driven
+
+- Tests must be driven by requirements, defect symptoms, or acceptance criteria -- not by chasing implementation details.
+- Before writing tests, list the minimum scenario set for this task. At minimum, explicitly cover:
+  - Happy path
+  - Boundary inputs
+  - Error or failure paths
+  - State transitions or interaction branches (if applicable)
+- When fixing bugs, write a minimal failing case first, then fix. Do not only add an after-the-fact weak-assertion test that "happens to pass".
+- Never widen public API surface, expose private internals, or distort production code responsibilities just to make tests easier to write.
+- Before completion, perform at least one self-review explicitly checking these dimensions:
+  - Maintainability: Is the code easier to read and modify than before?
+  - Performance: Any obvious extra rebuilds, IO, traversals, or allocations introduced?
+  - Security: Any input validation gaps, secret leaks, path/command injection, or permission boundary errors?
+  - Style consistency: Does it match the repo's existing naming, organization, and UI language?
+  - Documentation and comments: Does complex intent need minimal explanation?
+  - Compatibility boundary: Does it affect existing user data, config, persisted fields, import/export formats, or established interactions?
+- Compatibility is not a default-ignore item. When existing data or published behavior is involved, explicitly judge compatibility. If breaking, the delivery notes must state the breakage scope and migration path.
+
+### 3.9 Testing Constraints
+
+- Test framework: `flutter_test` only (**no mockito / mocktail**).
+- Mocking strategy: hand-write Fake/Mock classes or use the hand-written mocks inside vendored dependencies.
+- Do not expose private APIs or widen public interfaces just to make tests easier to write.
+
+### 3.10 Desktop Tasks: Determine Entry Layer First
 
 - When the task mentions desktop, Windows, macOS, Linux, tray, hotkeys, window, context menu, or desktop settings, first determine which layer the issue belongs to:
   - Top-level desktop app shell: `lib/desktop/**`
@@ -218,7 +243,7 @@ flutter analyze
 - Desktop interactions differ from mobile. For example, chat messages currently use "long-press on mobile, right-click menu on desktop". Desktop tasks must consider hover, right-click, keyboard shortcuts, window size, and title bar -- not just touch gestures.
 - If a task spans both the desktop shell and the shared content layer, state the primary landing point in the description first, then apply minimal changes in each respective layer. Do not scatter platform routing across unrelated locations.
 
-### 3.9 UI Component Reuse and Custom iOS Style Boundary
+### 3.11 UI Component Reuse and Custom iOS Style Boundary
 
 - Before adding new UI, search these directories for existing components instead of hand-rolling a new one inline:
   - `lib/shared/widgets/**`
@@ -242,7 +267,55 @@ flutter analyze
 - If Material native components must be used for semantic or framework reasons, explicitly suppress off-style default feedback and consolidate styling into shared components instead of patching it piecemeal across pages.
 - Icons, spacing, forms, dialogs, and panel styles should follow existing theme tokens and components. Do not mix multiple visual languages on the same page.
 
-### 3.10 Release: README Features Section Sync
+### 3.12 State Management
+
+- State management uses **Provider + ChangeNotifier** (no Riverpod / Bloc / GetX).
+- All providers are registered in the `MultiProvider` tree in `lib/main.dart`.
+- Read state with `context.watch<T>()`; trigger actions with `context.read<T>()`.
+- There is no DI container such as `get_it` / `injectable` -- new dependencies are added as entries in the Provider tree.
+
+### 3.13 Navigation
+
+- Navigation uses **Navigator 1.0** imperative API (`Navigator.push(MaterialPageRoute(...))`); no go_router / auto_route.
+- Desktop switches pages via the sidebar inside the `DesktopHomePage` shell, not via the Navigator route stack.
+- Route tracking is registered globally through a `RouteObserver<ModalRoute>`.
+
+### 3.14 Database & Storage
+
+- Primary database: **Drift (SQLite)**, defined in `lib/core/database/app_database.dart`, with 7 tables, version 7, and a migration strategy.
+- Code generation command: `dart run build_runner build --delete-conflicting-outputs`.
+- Access data through `ChatDatabaseRepository`; do not operate on the database connection directly.
+- Lightweight settings use `shared_preferences`.
+- ⚠️ **Assistant storage constraint** (legacy, critically important):
+  - Cuplivo has used SQLite from the start and has never used Hive.
+  - Assistant data has been **migrated from SharedPreferences to SQLite**, but residual code may still write back to SharedPreferences.
+  - **When persisting an assistant, never write back to SharedPreferences** -- it must be written to SQLite.
+  - During backup, assistants are still merged into `settings.json`; this is the only path allowed for assistants to enter the file system.
+  - Any change that writes assistants back to SharedPreferences is a data-disaster risk and must be rejected.
+
+### 3.15 Network Layer
+
+- HTTP client uses **Dio**, wrapped by `DioHttpClient` (`lib/core/services/network/dio_http_client.dart`).
+- Supports SOCKS5 proxy, CancelToken, and custom request logging.
+- All LLM API calls are orchestrated in `lib/core/services/api/chat_api_service.dart`.
+- New API calls should use `DioHttpClient`, not raw `http.get` / `dio.Dio`.
+
+### 3.16 Error Handling
+
+- Do not introduce unified error wrappers such as Result/Either. Error handling follows two modes:
+  - **Recoverable errors**: log context with `debugPrint` (import the necessary files) and continue.
+  - **Unrecoverable / reportable errors**: `throw Exception` (or a specific Exception subclass).
+- `catch (_) { /* silently ignore */ }` is forbidden -- as stated in 3.6, no silent degradation may be added.
+
+### 3.17 Feature Module Convention
+
+- Code is organized **feature-first**: `lib/features/<name>/` contains `pages/`, `widgets/`, `controllers/`, `services/` as needed.
+- Cross-feature shared logic: `lib/core/` (providers, services, models, database).
+- Cross-feature shared UI: `lib/shared/` (widgets, dialogs, responsive).
+- Desktop-specific UI/logic: `lib/desktop/` (do not mix into `lib/features/`).
+- Theme: `lib/theme/` (single source of truth).
+
+### 3.18 Release: README Features Section Sync
 
 - When creating a release that includes **new Cuplivo-specific features** or **fixes for existing bugs** (existing = bugs present in v1.1.17 and earlier; bugs introduced in the new version itself are excluded), the features section must be updated in both README files simultaneously:
   - `README.md` → ✨ **New Features** section (Cuplivo vs Kelivo differences)
@@ -250,78 +323,36 @@ flutter analyze
 - This ensures users can always see what distinguishes Cuplivo from upstream Kelivo.
 - Features items are ordered by **descending importance** (most important first). Before inserting a new item, always ask the user which two existing items it should go between, and renumber all items accordingly in both README files.
 
-### 3.11 Tests and Self-Review Must Be Requirement-Driven
+### 3.19 `copyWith` and the Null-Clear Trap
 
-- Tests must be driven by requirements, defect symptoms, or acceptance criteria -- not by chasing implementation details.
-- Before writing tests, list the minimum scenario set for this task. At minimum, explicitly cover:
-  - Happy path
-  - Boundary inputs
-  - Error or failure paths
-  - State transitions or interaction branches (if applicable)
-- When fixing bugs, write a minimal failing case first, then fix. Do not only add an after-the-fact weak-assertion test that "happens to pass".
-- Never widen public API surface, expose private internals, or distort production code responsibilities just to make tests easier to write.
-- Before completion, perform at least one self-review explicitly checking these dimensions:
-  - Maintainability: Is the code easier to read and modify than before?
-  - Performance: Any obvious extra rebuilds, IO, traversals, or allocations introduced?
-  - Security: Any input validation gaps, secret leaks, path/command injection, or permission boundary errors?
-  - Style consistency: Does it match the repo's existing naming, organization, and UI language?
-  - Documentation and comments: Does complex intent need minimal explanation?
-  - Compatibility boundary: Does it affect existing user data, config, persisted fields, import/export formats, or established interactions?
-- Compatibility is not a default-ignore item. When existing data or published behavior is involved, explicitly judge compatibility. If breaking, the delivery notes must state the breakage scope and migration path.
+- The repo uses two distinct `copyWith` patterns. Reviewers must know which one a model uses before approving any `copyWith(field: null)` call.
+  - **Sentinel pattern** (`lib/core/models/chat_message.dart:130-131`, `lib/core/providers/settings_provider.dart:4842-4843`): parameters are `Object?` with default `sentinel`; `identical(x, sentinel)` distinguishes "not passed" from "explicit null". Here `copyWith(field: null)` **clears** the field.
+  - **Plain `??` pattern** (most models, e.g. `Conversation`, `Assistant`, `WorldBookEntry`, `AssistantRegex`, `QuickPhrase`): `field ?? this.field`. Here `copyWith(field: null)` is a **no-op**, not a clear. Some models add ad-hoc `clearXxx` bool flags (e.g. `Conversation.copyWith(clearSummary: false)` at `lib/core/models/conversation.dart:75,88`) as a stopgap.
+- The trap cuts both ways:
+  - On a `??`-pattern model, `copyWith(field: null)` silently does nothing when the caller intended to clear -- the clear is lost.
+  - On a sentinel-pattern model, `copyWith(field: null)` silently clears the field when the caller intended "no change".
+- Reviewer checklist:
+  - Any `copyWith(field: null)` on a `??`-pattern model whose `field` is nullable → flag. Either the clear is lost (bug) or a `clearXxx` flag / sentinel pattern must be used.
+  - Any `copyWith(field: null)` on a sentinel-pattern model → flag unless the caller clearly intends to clear.
+  - A new model with a nullable field that callers may need to clear → prefer the sentinel pattern; avoid ad-hoc `clearXxx` flags unless used as a documented stopgap.
+  - Do not mix the two patterns within the same model.
 
-### 3.12 State Management
+### 3.20 Update Surface Completeness
 
-- 状态管理使用 **Provider + ChangeNotifier**（无 Riverpod / Bloc / GetX）。
-- 所有 Provider 在 `lib/main.dart` 的 `MultiProvider` 树中注册。
-- 读取状态用 `context.watch<T>()`，触发动作用 `context.read<T>()`。
-- 不存在 `get_it` / `injectable` 等 DI 容器——新增依赖通过在 Provider 树中添加条目完成。
-
-### 3.13 Navigation
-
-- 使用 **Navigator 1.0** 命令式导航（`Navigator.push(MaterialPageRoute(...))`），无 go_router / auto_route。
-- 桌面端在 `DesktopHomePage` shell 内使用侧边栏切换，不依赖 Navigator 路由。
-- 路由追踪通过 `RouteObserver<ModalRoute>` 全局注册。
-
-### 3.14 Database & Storage
-
-- 主数据库：**Drift (SQLite)**，定义在 `lib/core/database/app_database.dart`，含 7 张表、版本 7 及迁移策略。
-- 生成代码命令：`dart run build_runner build --delete-conflicting-outputs`。
-- 通过 `ChatDatabaseRepository` 访问数据，勿直接操作数据库连接。
-- 轻量设置使用 `shared_preferences`。
-- ⚠️ **Assistant 存储约束**（历史遗留，极其重要）：
-  - Cuplivo 从一开始就使用 SQLite，从未使用 Hive。
-  - Assistant 数据已从 SharedPreferences **迁移至 SQLite**，但仍有残留代码可能写回 SharedPreferences。
-  - **持久化 assistant 时绝不可写回 SharedPreferences**，必须写至 SQLite。
-  - 备份时仍会合并至 `settings.json`，这是唯一允许 assistant 进入文件系统的路径。
-  - 任何将 assistant 写回 SharedPreferences 的修改都是数据灾难风险，必须拒绝。
-
-### 3.15 Network Layer
-
-- HTTP 客户端使用 **Dio**，通过 `DioHttpClient`（`lib/core/services/network/dio_http_client.dart`）封装。
-- 支持 SOCKS5 代理、CancelToken、自定义请求日志。
-- 所有 LLM API 调用在 `lib/core/services/api/chat_api_service.dart` 中编排。
-- 新增 API 调用应使用 `DioHttpClient`，而非直接 `http.get` / `dio.Dio`。
-
-### 3.16 Error Handling
-
-- 不引入 Result/Either 等统一错误封装。错误处理遵循以下两种模式：
-  - **可恢复错误**：`debugPrint`（导入必要文件）记录上下文后继续。
-  - **不可恢复/应上报的错误**：`throw Exception`（或具体 Exception 子类）。
-- 禁止 `catch (_) { /* silently ignore */ }`——如 3.6 所述，不得添加静默降级。
-
-### 3.17 Testing Constraints
-
-- 测试框架：仅 `flutter_test`（**无 mockito / mocktail**）。
-- Mock 策略：手工编写 Fake/Mock 类或使用 vendored 依赖中的手工 mock。
-- 不得为方便测试而暴露私有 API 或扩大 public 接口。
-
-### 3.18 Feature Module Convention
-
-- 代码按 **feature-first** 组织：`lib/features/<name>/` 下包含 `pages/`、`widgets/`、`controllers/`、`services/`（视需要）。
-- 跨 feature 共享的逻辑：`lib/core/`（providers、services、models、database）。
-- 跨 feature 共享的 UI：`lib/shared/`（widgets、dialogs、responsive）。
-- 桌面专属 UI/逻辑：`lib/desktop/`（不混入 `lib/features/`）。
-- 主题：`lib/theme/`（单一声源）。
+- When adding a field to a model, audit every place that consumes the model and update them in the same change. Common forgotten surfaces in this repo:
+  - `copyWith` (mind which pattern the model uses, see 3.19), `toJson` / `fromJson`, custom clone / deep-copy helpers
+  - Equality: most models in `lib/core/models/` have **no** `==` / `hashCode` override (only `ModelInfo` in `model_types.dart` does). If the new field participates in identity or dedup, add or update equality explicitly; otherwise state why it is excluded.
+  - Database layer: table / column definitions in `lib/core/database/app_database.dart`, the migration strategy, the generated `*RowsCompanion.copyWith` in `app_database.g.dart` (regenerate via `dart run build_runner build --delete-conflicting-outputs`), and the `ChatDatabaseRepository` methods that read / write the field
+  - Persistence: `shared_preferences` keys when the field is settings-level (and never for assistant fields, see 3.14)
+  - Backup / import / export: `backup.dart` and the (de)serialization paths that round-trip the model to `settings.json`
+- When adding a new provider / service, register it in the `MultiProvider` tree in `lib/main.dart` and wire state management (`ChangeNotifierProvider` / `ProxyProvider` as appropriate). A provider that is constructed but not registered is invisible to the widget tree.
+- When fixing a bug in one code path, search for parallel implementations of the same pattern with `rg` and apply the same fix to all of them. Known parallel surfaces in this repo:
+  - Desktop (`lib/desktop/**`) vs mobile (`lib/features/home/**`) entry points -- a fix in one branch often requires the same fix in the other
+  - API provider implementations in `lib/core/services/api/providers/` (`openai_common.dart`, `claude_official.dart`, `google_common.dart`, `google_vertex.dart`, `google_gemini.dart`, `openai_responses.dart`, `openai_images.dart`) -- they share bug patterns and feature gaps
+  - The 4 ARB files (3.1), `CHANGELOG.md` + `CHANGELOG_CN.md` (1.4), `README.md` + `README_ZH_CN.md` features sections (3.18)
+  - Similar GitHub Actions workflow files (3.7)
+- When touching a path dependency under `dependencies/`, update that dependency's own source in the same change; do not patch only the root repo surface.
+- Trap: "I fixed it in one place" is not "done". Before marking a task complete, run `rg` for the changed identifier / pattern across the whole repo and confirm every parallel surface was updated or explicitly excluded. State any intentional exclusions in the delivery notes.
 
 ## 4. Recommended Execution Order
 

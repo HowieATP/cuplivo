@@ -1217,6 +1217,42 @@ class HomeViewModel extends ChangeNotifier {
     return remaining;
   }
 
+  /// Map a raw-space truncation index to a 0-based collapsed message index.
+  static int computeTruncCollapsedIndex({
+    required int truncRaw,
+    required List<ChatMessage> rawMessages,
+  }) {
+    if (truncRaw <= 0) return -1;
+    final seen = <String>{};
+    final int limit = truncRaw < rawMessages.length
+        ? truncRaw
+        : rawMessages.length;
+    int count = 0;
+    for (int i = 0; i < limit; i++) {
+      final gid = (rawMessages[i].groupId ?? rawMessages[i].id);
+      if (seen.add(gid)) count++;
+    }
+    return count - 1;
+  }
+
+  /// Adjust the collapsed truncation index when preset messages are folded.
+  ///
+  /// When presets are collapsed (hidden from the messages list passed to
+  /// [MessageListView]), the truncation index must shift left by [presetCount].
+  /// Returns -1 if the index falls within the hidden preset range or is
+  /// already negative.
+  static int adjustTruncIndexForPresetFolding({
+    required int truncIndex,
+    required int presetCount,
+    required bool showPresetToggle,
+    required bool presetsExpanded,
+  }) {
+    if (truncIndex < 0) return -1;
+    if (!showPresetToggle || presetsExpanded) return truncIndex;
+    final result = truncIndex - presetCount;
+    return result < 0 ? -1 : result;
+  }
+
   // ============================================================================
   // Title Generation
   // ============================================================================

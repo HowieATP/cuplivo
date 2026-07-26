@@ -1104,19 +1104,11 @@ class _HomePageState extends State<HomePage>
 
   /// Map persisted truncateIndex (raw message count) to collapsed index.
   int _computeTruncCollapsedIndex() {
-    final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
-    if (truncRaw <= 0) return -1;
-    final rawMessages = _controller.messages;
-    final seen = <String>{};
-    final int limit = truncRaw < rawMessages.length
-        ? truncRaw
-        : rawMessages.length;
-    int count = 0;
-    for (int i = 0; i < limit; i++) {
-      final gid = (rawMessages[i].groupId ?? rawMessages[i].id);
-      if (seen.add(gid)) count++;
-    }
-    return count - 1;
+    final truncRaw = _controller.chatController.loadedWindowTruncateIndex();
+    return HomeViewModel.computeTruncCollapsedIndex(
+      truncRaw: truncRaw,
+      rawMessages: _controller.messages,
+    );
   }
 
   Widget _buildPresetToggleBar(
@@ -1231,13 +1223,12 @@ class _HomePageState extends State<HomePage>
       );
     }
 
-    int truncIndex = _computeTruncCollapsedIndex();
-    if (truncIndex >= 0) {
-      if (showPresetToggle && !_presetsExpanded) {
-        truncIndex -= presetCount;
-      }
-      truncIndex += 1; // headerWidget occupies ListView index 0
-    }
+    final truncIndex = HomeViewModel.adjustTruncIndexForPresetFolding(
+      truncIndex: _computeTruncCollapsedIndex(),
+      presetCount: presetCount,
+      showPresetToggle: showPresetToggle,
+      presetsExpanded: _presetsExpanded,
+    );
 
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,

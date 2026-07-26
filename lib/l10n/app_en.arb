@@ -1763,6 +1763,51 @@
   "@displaySettingsPageEnableImageCropperTitle": {},
   "displaySettingsPageEnableImageCropperSubtitle": "Crop images after selecting from gallery or camera",
   "@displaySettingsPageEnableImageCropperSubtitle": {},
+  "oneClickCompressSectionTitle": "Image Compression",
+  "@oneClickCompressSectionTitle": {
+    "description": "Section title for one-click image compression settings"
+  },
+  "oneClickCompressEnabledTitle": "One-Click Compress",
+  "@oneClickCompressEnabledTitle": {
+    "description": "Toggle label for enabling one-click image compression"
+  },
+  "oneClickCompressEnabledSubtitle": "Quickly compress all images with preset settings",
+  "@oneClickCompressEnabledSubtitle": {
+    "description": "Subtitle for the one-click compress toggle"
+  },
+  "oneClickCompressMaxLongEdgeTitle": "Max Long Edge",
+  "@oneClickCompressMaxLongEdgeTitle": {
+    "description": "Label for the max long edge slider"
+  },
+  "oneClickCompressQualityTitle": "Quality",
+  "@oneClickCompressQualityTitle": {
+    "description": "Label for the compression quality slider"
+  },
+  "oneClickCompressAlwaysJpgTitle": "Always Output JPEG",
+  "@oneClickCompressAlwaysJpgTitle": {
+    "description": "Toggle label for forcing JPEG output"
+  },
+  "oneClickCompressAlwaysJpgSubtitle": "Convert PNGs with transparency to JPEG (white background)",
+  "@oneClickCompressAlwaysJpgSubtitle": {
+    "description": "Subtitle for the always-JPEG toggle"
+  },
+  "oneClickCompressTooltip": "Compress all images",
+  "@oneClickCompressTooltip": {
+    "description": "Tooltip for the one-click compress button"
+  },
+  "oneClickCompressResult": "Compressed {count} images, saved {saved} (-{pct}%)",
+  "@oneClickCompressResult": {
+    "description": "SnackBar message after one-click compression showing savings",
+    "placeholders": {
+      "count": { "type": "int" },
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "oneClickCompressNone": "No compression needed",
+  "@oneClickCompressNone": {
+    "description": "SnackBar message when all images were skipped during one-click compression"
+  },
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep sidebar open when selecting assistant",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Keep sidebar open when selecting topic",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",

@@ -102,6 +102,24 @@
 - **UI**: File size shown as gradient overlay at bottom of each 64×64 thumbnail, with `Lucide.ImageDown` icon. Tappable → opens dialog. `_imageSizes` cache maintained alongside `_images` to avoid repeated disk reads.
 - **Compression progress**: Dialog buttons show loading spinner while compressing. Single "压缩" or "全部压缩" (后者仅在 totalImageCount > 1 时可用).
 
+### One-Click Compression (Quick Compress)
+
+- **Purpose**: Shorten the discovery path for image compression. Eliminates the per-image "tap → adjust params → compress" flow for the common case.
+- **Settings** (stored in `SettingsProvider`, SharedPreferences):
+  - `oneClickCompressEnabled` (bool, default `true`): gates the button and all behavior below.
+  - `oneClickCompressMaxLongEdge` (int, default `1536`, range 768–4096, step 256): if an image's long edge ≤ this value, skip entirely (no decode, no re-encode). Rationale: Google Gemini splits images into 768×768 tiles; 2×768 = 1536 minimizes token usage.
+  - `oneClickCompressQuality` (int, default `75`, range 50–95, step 5): JPEG quality for re-encoding.
+  - `oneClickCompressAlwaysJpg` (bool, default `false`): when true, flatten alpha PNGs to JPEG (white background, non-configurable). When false, alpha PNGs are re-encoded as PNG (preserving transparency).
+- **Settings UI**: New section card in Display & Behavior settings (mobile: `display_settings_page.dart`, desktop: `display_pane.dart`), placed after the image cropper toggle. Enabled toggle gates visibility of the other 3 rows (hidden when disabled). Long-edge and quality are sliders with trailing value labels.
+- **Button**: Trailing item in the image preview strip (`ListView`), same 64×64 slot as thumbnails. Icon: `Lucide.Zap`. Tooltip: localized `oneClickCompressTooltip`. Visible when `_images.isNotEmpty && oneClickCompressEnabled && !_oneClickCompressing && !_oneClickCompressDone`.
+- **Lifecycle**:
+  - Tap → button slot becomes `CupertinoActivityIndicator` (64×64), send button disabled, entire strip interaction-locked (no ✕ remove, no size-overlay tap).
+  - Iterates ALL `_images` through `ImageCompressor.compressIfNeeded()` with settings params (`maxDimension` = longEdge setting, `quality` = quality setting, `keepPng` = `!alwaysJpg || hasRealAlpha`).
+  - Already-compressed images are naturally skipped (longEdge ≤ threshold after first pass). No separate tracking set.
+  - On completion: if ≥1 image compressed → aggregate snackbar "已压缩 N 张，节省 X MB"; if zero → "无需压缩". Button vanishes (`_oneClickCompressDone = true`).
+  - `_oneClickCompressDone` resets to `false` in `_addImages` (new image arrives → button reappears).
+- **Relationship to per-image dialog**: Coexists. The dialog remains available for manual per-image control (full 30–100 quality, arbitrary dimension, explicit format choice). One-click is the fast path; dialog is the precision path.
+
 ## Skill System
 
 ### Core Concept

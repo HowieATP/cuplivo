@@ -2086,6 +2086,7 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     return Scaffold(
@@ -2278,6 +2279,238 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setEnterToSendOnMobile(v),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _iosSectionCard(
+            children: [
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Zap,
+                label: l10n.oneClickCompressEnabledTitle,
+                subtitle: l10n.oneClickCompressEnabledSubtitle,
+                value: sp.oneClickCompressEnabled,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setOneClickCompressEnabled(v),
+              ),
+              if (sp.oneClickCompressEnabled) ...[
+                _iosDivider(context),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Lucide.Maximize, size: 20, color: cs.primary),
+                          const SizedBox(width: 12),
+                          Text(
+                            l10n.oneClickCompressMaxLongEdgeTitle,
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontSize: 15,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${sp.oneClickCompressMaxLongEdge}px',
+                            style: TextStyle(
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SfSliderTheme(
+                        data: SfSliderThemeData(
+                          activeTrackHeight: 8,
+                          inactiveTrackHeight: 8,
+                          overlayRadius: 14,
+                          activeTrackColor: cs.primary,
+                          inactiveTrackColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.25 : 0.20,
+                          ),
+                          tooltipBackgroundColor: cs.primary,
+                          tooltipTextStyle: TextStyle(
+                            color: cs.onPrimary,
+                            fontWeight: AppFontWeights.semibold,
+                          ),
+                          activeTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.45 : 0.35,
+                          ),
+                          inactiveTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.30 : 0.25,
+                          ),
+                          activeMinorTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.34 : 0.28,
+                          ),
+                          inactiveMinorTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.24 : 0.20,
+                          ),
+                        ),
+                        child: SfSlider(
+                          value: sp.oneClickCompressMaxLongEdge.toDouble(),
+                          min: 768,
+                          max: 4096,
+                          stepSize: 256,
+                          showTicks: true,
+                          showLabels: true,
+                          interval: 1024,
+                          minorTicksPerInterval: 3,
+                          enableTooltip: true,
+                          shouldAlwaysShowTooltip: false,
+                          tooltipShape: const SfPaddleTooltipShape(),
+                          labelFormatterCallback: (value, text) =>
+                              '${value.toInt()}px',
+                          thumbIcon: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: isDark
+                                  ? []
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                            ),
+                          ),
+                          onChanged: (v) => context
+                              .read<SettingsProvider>()
+                              .setOneClickCompressMaxLongEdge(
+                                (v as double).round(),
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _iosDivider(context),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Lucide.ImageDown, size: 20, color: cs.primary),
+                          const SizedBox(width: 12),
+                          Text(
+                            l10n.oneClickCompressQualityTitle,
+                            style: TextStyle(
+                              color: cs.onSurface,
+                              fontSize: 15,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${sp.oneClickCompressQuality}%',
+                            style: TextStyle(
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SfSliderTheme(
+                        data: SfSliderThemeData(
+                          activeTrackHeight: 8,
+                          inactiveTrackHeight: 8,
+                          overlayRadius: 14,
+                          activeTrackColor: cs.primary,
+                          inactiveTrackColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.25 : 0.20,
+                          ),
+                          tooltipBackgroundColor: cs.primary,
+                          tooltipTextStyle: TextStyle(
+                            color: cs.onPrimary,
+                            fontWeight: AppFontWeights.semibold,
+                          ),
+                          activeTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.45 : 0.35,
+                          ),
+                          inactiveTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.30 : 0.25,
+                          ),
+                          activeMinorTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.34 : 0.28,
+                          ),
+                          inactiveMinorTickColor: cs.onSurface.withValues(
+                            alpha: isDark ? 0.24 : 0.20,
+                          ),
+                        ),
+                        child: SfSlider(
+                          value: sp.oneClickCompressQuality.toDouble(),
+                          min: 50,
+                          max: 95,
+                          stepSize: 5,
+                          showTicks: true,
+                          showLabels: true,
+                          interval: 10,
+                          minorTicksPerInterval: 1,
+                          enableTooltip: true,
+                          shouldAlwaysShowTooltip: false,
+                          tooltipShape: const SfPaddleTooltipShape(),
+                          labelFormatterCallback: (value, text) =>
+                              '${value.toInt()}%',
+                          thumbIcon: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: isDark
+                                  ? []
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                            ),
+                          ),
+                          onChanged: (v) => context
+                              .read<SettingsProvider>()
+                              .setOneClickCompressQuality(
+                                (v as double).round(),
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _iosDivider(context),
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Image,
+                  label: l10n.oneClickCompressAlwaysJpgTitle,
+                  subtitle: l10n.oneClickCompressAlwaysJpgSubtitle,
+                  value: sp.oneClickCompressAlwaysJpg,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setOneClickCompressAlwaysJpg(v),
+                ),
+              ],
             ],
           ),
         ],

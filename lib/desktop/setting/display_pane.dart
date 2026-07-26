@@ -146,6 +146,19 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowFlutterLogging(),
                 ],
               ),
+              const SizedBox(height: 16),
+              _SettingsCard(
+                title: l10n.oneClickCompressSectionTitle,
+                children: const [
+                  _ToggleRowOneClickCompressEnabled(),
+                  _RowDivider(),
+                  _OneClickCompressLongEdgeRow(),
+                  _RowDivider(),
+                  _OneClickCompressQualityRow(),
+                  _RowDivider(),
+                  _ToggleRowOneClickCompressAlwaysJpg(),
+                ],
+              ),
             ],
           ),
         ),
@@ -3315,6 +3328,145 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToggleRowOneClickCompressEnabled extends StatelessWidget {
+  const _ToggleRowOneClickCompressEnabled();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.oneClickCompressEnabledTitle,
+      value: sp.oneClickCompressEnabled,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setOneClickCompressEnabled(v),
+    );
+  }
+}
+
+class _OneClickCompressLongEdgeRow extends StatelessWidget {
+  const _OneClickCompressLongEdgeRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final enabled = sp.oneClickCompressEnabled;
+    final val = sp.oneClickCompressMaxLongEdge;
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: _LabeledRow(
+          label: l10n.oneClickCompressMaxLongEdgeTitle,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 160,
+                child: Slider(
+                  value: val.toDouble(),
+                  min: 768,
+                  max: 4096,
+                  divisions: 13,
+                  label: '${val}px',
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setOneClickCompressMaxLongEdge(v.round()),
+                ),
+              ),
+              SizedBox(
+                width: 48,
+                child: Text(
+                  '${val}px',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                      alpha: enabled ? 0.7 : 0.35,
+                    ),
+                    fontSize: 14,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OneClickCompressQualityRow extends StatelessWidget {
+  const _OneClickCompressQualityRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final enabled = sp.oneClickCompressEnabled;
+    final val = sp.oneClickCompressQuality;
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: _LabeledRow(
+          label: l10n.oneClickCompressQualityTitle,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 160,
+                child: Slider(
+                  value: val.toDouble(),
+                  min: 50,
+                  max: 95,
+                  divisions: 9,
+                  label: '$val%',
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setOneClickCompressQuality(v.round()),
+                ),
+              ),
+              SizedBox(
+                width: 48,
+                child: Text(
+                  '$val%',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                      alpha: enabled ? 0.7 : 0.35,
+                    ),
+                    fontSize: 14,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToggleRowOneClickCompressAlwaysJpg extends StatelessWidget {
+  const _ToggleRowOneClickCompressAlwaysJpg();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final enabled = sp.oneClickCompressEnabled;
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: _ToggleRow(
+          label: l10n.oneClickCompressAlwaysJpgTitle,
+          value: sp.oneClickCompressAlwaysJpg,
+          onChanged: (v) =>
+              context.read<SettingsProvider>().setOneClickCompressAlwaysJpg(v),
         ),
       ),
     );

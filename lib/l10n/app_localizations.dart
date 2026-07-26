@@ -5405,6 +5405,12 @@ abstract class AppLocalizations {
   /// **'Enable Thinking'**
   String get titleModelThinkingTitle;
 
+  /// No description provided for @modelThinkingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Thinking'**
+  String get modelThinkingTitle;
+
   /// No description provided for @defaultModelPageSummaryModelTitle.
   ///
   /// In en, this message translates to:

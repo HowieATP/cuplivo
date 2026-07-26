@@ -4,6 +4,7 @@ import 'package:Cuplivo/theme/app_font_weights.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_switch.dart';
 
 Future<void> showOcrPromptSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -41,6 +42,27 @@ Future<void> showOcrPromptSheet(BuildContext context) async {
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.modelThinkingTitle,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  IosSwitch(
+                    value: settings.ocrThinkingEnabled,
+                    semanticLabel: l10n.modelThinkingTitle,
+                    onChanged: settings.setOcrThinkingEnabled,
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               Text(
@@ -86,6 +108,7 @@ Future<void> showOcrPromptSheet(BuildContext context) async {
                   TextButton(
                     onPressed: () async {
                       await settings.resetOcrPrompt();
+                      await settings.resetOcrThinkingEnabled();
                       controller.text = settings.ocrPrompt;
                     },
                     child: Text(l10n.defaultModelPageResetDefault),

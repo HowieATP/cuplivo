@@ -300,9 +300,11 @@ class DefaultModelPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _TitleThinkingSwitchRow(
-                      settings: settings,
-                      l10n: l10n,
+                    _ModelThinkingSwitchRow(
+                      value: settings.titleGenerationThinkingEnabled,
+                      onChanged: settings.setTitleGenerationThinkingEnabled,
+                      label: l10n.titleModelThinkingTitle,
+                      semanticLabel: l10n.titleModelThinkingTitle,
                       cs: cs,
                     ),
                     const SizedBox(height: 18),
@@ -578,6 +580,14 @@ class DefaultModelPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                _ModelThinkingSwitchRow(
+                  value: settings.translateThinkingEnabled,
+                  onChanged: settings.setTranslateThinkingEnabled,
+                  label: l10n.modelThinkingTitle,
+                  semanticLabel: l10n.modelThinkingTitle,
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
                   style: TextStyle(
@@ -621,6 +631,7 @@ class DefaultModelPage extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         await settings.resetTranslatePrompt();
+                        await settings.resetTranslateThinkingEnabled();
                         controller.text = settings.translatePrompt;
                       },
                       child: Text(l10n.defaultModelPageResetDefault),
@@ -693,6 +704,14 @@ class DefaultModelPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                _ModelThinkingSwitchRow(
+                  value: settings.summaryThinkingEnabled,
+                  onChanged: settings.setSummaryThinkingEnabled,
+                  label: l10n.modelThinkingTitle,
+                  semanticLabel: l10n.modelThinkingTitle,
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
                   style: TextStyle(
@@ -736,6 +755,7 @@ class DefaultModelPage extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         await settings.resetSummaryPrompt();
+                        await settings.resetSummaryThinkingEnabled();
                         controller.text = settings.summaryPrompt;
                       },
                       child: Text(l10n.defaultModelPageResetDefault),
@@ -806,6 +826,14 @@ class DefaultModelPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                _ModelThinkingSwitchRow(
+                  value: settings.compressThinkingEnabled,
+                  onChanged: settings.setCompressThinkingEnabled,
+                  label: l10n.modelThinkingTitle,
+                  semanticLabel: l10n.modelThinkingTitle,
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
                   style: TextStyle(
@@ -849,6 +877,7 @@ class DefaultModelPage extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         await settings.resetCompressPrompt();
+                        await settings.resetCompressThinkingEnabled();
                         controller.text = settings.compressPrompt;
                       },
                       child: Text(l10n.defaultModelPageResetDefault),
@@ -918,6 +947,14 @@ class DefaultModelPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                _ModelThinkingSwitchRow(
+                  value: settings.suggestionThinkingEnabled,
+                  onChanged: settings.setSuggestionThinkingEnabled,
+                  label: l10n.modelThinkingTitle,
+                  semanticLabel: l10n.modelThinkingTitle,
+                  cs: cs,
+                ),
+                const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
                   style: TextStyle(
@@ -961,6 +998,7 @@ class DefaultModelPage extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         await settings.resetSuggestionPrompt();
+                        await settings.resetSuggestionThinkingEnabled();
                         controller.text = settings.suggestionPrompt;
                       },
                       child: Text(l10n.defaultModelPageResetDefault),
@@ -1235,22 +1273,25 @@ class _BrandAvatar extends StatelessWidget {
   }
 }
 
-class _TitleThinkingSwitchRow extends StatelessWidget {
-  const _TitleThinkingSwitchRow({
-    required this.settings,
-    required this.l10n,
+class _ModelThinkingSwitchRow extends StatelessWidget {
+  const _ModelThinkingSwitchRow({
+    required this.value,
+    required this.onChanged,
+    required this.label,
+    required this.semanticLabel,
     required this.cs,
   });
 
-  final SettingsProvider settings;
-  final AppLocalizations l10n;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final String label;
+  final String semanticLabel;
   final ColorScheme cs;
 
   @override
   Widget build(BuildContext context) {
-    final value = settings.titleGenerationThinkingEnabled;
     return _TactileRow(
-      onTap: () => settings.setTitleGenerationThinkingEnabled(!value),
+      onTap: () => onChanged(!value),
       builder: (_) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1259,7 +1300,7 @@ class _TitleThinkingSwitchRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  l10n.titleModelThinkingTitle,
+                  label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1272,8 +1313,8 @@ class _TitleThinkingSwitchRow extends StatelessWidget {
               const SizedBox(width: 16),
               IosSwitch(
                 value: value,
-                semanticLabel: l10n.titleModelThinkingTitle,
-                onChanged: settings.setTitleGenerationThinkingEnabled,
+                semanticLabel: semanticLabel,
+                onChanged: onChanged,
               ),
             ],
           ),

@@ -2884,6 +2884,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get titleModelThinkingTitle => 'Enable Thinking';
 
   @override
+  String get modelThinkingTitle => 'Enable Thinking';
+
+  @override
   String get defaultModelPageSummaryModelTitle => 'Summary Model';
 
   @override

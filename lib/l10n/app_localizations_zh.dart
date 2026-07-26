@@ -2786,6 +2786,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get titleModelThinkingTitle => '是否开启思考';
 
   @override
+  String get modelThinkingTitle => '是否开启思考';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -8600,6 +8603,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get titleModelThinkingTitle => '是否开启思考';
 
   @override
+  String get modelThinkingTitle => '是否开启思考';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -14411,6 +14417,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
+
+  @override
+  String get modelThinkingTitle => '是否開啟思考';
 
   @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';

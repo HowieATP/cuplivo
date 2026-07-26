@@ -111,6 +111,9 @@ class TranslationService {
 
       // 创建翻译请求
       final provider = settings.getProviderConfig(translateProvider);
+      final budget = settings.translateThinkingBudgetFor(
+        assistant?.thinkingBudget,
+      );
 
       final translationStream = ChatApiService.sendMessageStream(
         config: provider,
@@ -118,6 +121,7 @@ class TranslationService {
         messages: [
           {'role': 'user', 'content': prompt},
         ],
+        thinkingBudget: budget,
       );
 
       final buffer = StringBuffer();

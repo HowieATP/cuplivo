@@ -1015,6 +1015,9 @@ class HomeViewModel extends ChangeNotifier {
     if (provKey == null || mdlId == null) return 'no_model';
 
     final cfg = settings.getProviderConfig(provKey);
+    final budget = settings.compressThinkingBudgetFor(
+      assistant?.thinkingBudget,
+    );
 
     // Build compression prompt from settings template
     final prompt = settings.compressPrompt
@@ -1026,6 +1029,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
+        thinkingBudget: budget,
       )).trim();
 
       if (summary.isEmpty) return 'empty_summary';
@@ -1370,7 +1374,7 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final budget = settings.summaryThinkingBudgetFor(assistant?.thinkingBudget);
 
     // Only generate summary if assistant has recent chats reference enabled
     if (assistant?.enableRecentChatsReference != true) return;
@@ -1509,7 +1513,9 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final budget = settings.suggestionThinkingBudgetFor(
+      assistant?.thinkingBudget,
+    );
 
     try {
       await _chatService.clearConversationSuggestions(conversationId);

@@ -2310,6 +2310,25 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void insertQuote(String text) {
+    final lines = text.split('\n').map((line) => '> $line').join('\n');
+    final quoted = '$lines\n\n';
+
+    final currentText = _inputController.text;
+    final cursor = _inputController.selection.start;
+    final insertPos = (cursor >= 0 && cursor <= currentText.length)
+        ? cursor
+        : currentText.length;
+    final newText = currentText.replaceRange(insertPos, insertPos, quoted);
+    _inputController.value = _inputController.value.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: insertPos + quoted.length),
+      composing: TextRange.empty,
+    );
+    _inputFocus.requestFocus();
+    notifyListeners();
+  }
+
   // ============================================================================
   // Public Methods - File Upload
   // ============================================================================

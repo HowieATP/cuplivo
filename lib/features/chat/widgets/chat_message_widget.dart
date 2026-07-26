@@ -25,6 +25,7 @@ import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
+import '../../../utils/markdown_subsequence_match.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
@@ -713,6 +714,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
+  final ValueChanged<String>? onQuoteSelection;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
 
@@ -757,6 +759,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
+    this.onQuoteSelection,
     this.onRecoveredAskUserAnswer,
   });
 
@@ -768,6 +771,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
+  String? _selectedPlainText;
   // Local expand state for inline <think> card (defaults to expanded)
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
@@ -1908,6 +1912,76 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return RepaintBoundary(
       child: SelectionArea(
         key: ValueKey('assistant_${widget.message.id}'),
+        onSelectionChanged: (selection) {
+          _selectedPlainText = selection?.plainText;
+        },
+        contextMenuBuilder: (context, selectableRegionState) {
+          final defaultItems = selectableRegionState.contextMenuButtonItems
+              .where((item) => item.type != ContextMenuButtonType.copy)
+              .toList();
+          if (widget.message.isStreaming) {
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: selectableRegionState.contextMenuAnchors,
+              buttonItems: <ContextMenuButtonItem>[
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(
+                    context,
+                  )!.chatMessageWidgetCopyAsPlainText,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    Clipboard.setData(ClipboardData(text: selected));
+                  },
+                ),
+                ...defaultItems,
+              ],
+            );
+          }
+          return AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: selectableRegionState.contextMenuAnchors,
+            buttonItems: <ContextMenuButtonItem>[
+              ContextMenuButtonItem(
+                label: AppLocalizations.of(
+                  context,
+                )!.chatMessageWidgetCopyAsMarkdown,
+                onPressed: () {
+                  final selected = _selectedPlainText;
+                  if (selected == null || selected.trim().isEmpty) return;
+                  ContextMenuController.removeAny();
+                  selectableRegionState.clearSelection();
+                  final matched = subsequenceMatch(visualContent, selected);
+                  Clipboard.setData(ClipboardData(text: matched ?? selected));
+                },
+              ),
+              ContextMenuButtonItem(
+                label: AppLocalizations.of(
+                  context,
+                )!.chatMessageWidgetCopyAsPlainText,
+                onPressed: () {
+                  final selected = _selectedPlainText;
+                  if (selected == null || selected.trim().isEmpty) return;
+                  ContextMenuController.removeAny();
+                  selectableRegionState.clearSelection();
+                  Clipboard.setData(ClipboardData(text: selected));
+                },
+              ),
+              if (widget.onQuoteSelection != null)
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(context)!.chatMessageWidgetQuote,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    widget.onQuoteSelection!.call(selected);
+                  },
+                ),
+              ...defaultItems,
+            ],
+          );
+        },
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,

@@ -11161,6 +11161,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'context window exceeded'**
   String get truncationReasonContextExceeded;
+
+  /// No description provided for @chatMessageWidgetCopyAsMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as Markdown'**
+  String get chatMessageWidgetCopyAsMarkdown;
+
+  /// No description provided for @chatMessageWidgetCopyAsPlainText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as Plain Text'**
+  String get chatMessageWidgetCopyAsPlainText;
+
+  /// No description provided for @chatMessageWidgetQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get chatMessageWidgetQuote;
 }
 
 class _AppLocalizationsDelegate

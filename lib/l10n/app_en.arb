@@ -2944,5 +2944,8 @@
     }
   },
   "truncationReasonMaxTokens": "output length limit",
-  "truncationReasonContextExceeded": "context window exceeded"
+  "truncationReasonContextExceeded": "context window exceeded",
+  "chatMessageWidgetCopyAsMarkdown": "Copy as Markdown",
+  "chatMessageWidgetCopyAsPlainText": "Copy as Plain Text",
+  "chatMessageWidgetQuote": "Quote"
 }

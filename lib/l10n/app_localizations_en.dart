@@ -6064,4 +6064,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get truncationReasonContextExceeded => 'context window exceeded';
+
+  @override
+  String get chatMessageWidgetCopyAsMarkdown => 'Copy as Markdown';
+
+  @override
+  String get chatMessageWidgetCopyAsPlainText => 'Copy as Plain Text';
+
+  @override
+  String get chatMessageWidgetQuote => 'Quote';
 }

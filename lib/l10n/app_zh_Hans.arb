@@ -2376,5 +2376,8 @@
     }
   },
   "truncationReasonMaxTokens": "输出长度限制",
-  "truncationReasonContextExceeded": "上下文窗口超限"
+  "truncationReasonContextExceeded": "上下文窗口超限",
+  "chatMessageWidgetCopyAsMarkdown": "复制为 Markdown",
+  "chatMessageWidgetCopyAsPlainText": "复制为纯文本",
+  "chatMessageWidgetQuote": "引用"
 }

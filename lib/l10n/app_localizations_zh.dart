@@ -5816,6 +5816,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get truncationReasonContextExceeded => '上下文窗口超限';
+
+  @override
+  String get chatMessageWidgetCopyAsMarkdown => '复制为 Markdown';
+
+  @override
+  String get chatMessageWidgetCopyAsPlainText => '复制为纯文本';
+
+  @override
+  String get chatMessageWidgetQuote => '引用';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11630,6 +11639,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get truncationReasonContextExceeded => '上下文窗口超限';
+
+  @override
+  String get chatMessageWidgetCopyAsMarkdown => '复制为 Markdown';
+
+  @override
+  String get chatMessageWidgetCopyAsPlainText => '复制为纯文本';
+
+  @override
+  String get chatMessageWidgetQuote => '引用';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -17444,4 +17462,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get truncationReasonContextExceeded => '上下文窗口超限';
+
+  @override
+  String get chatMessageWidgetCopyAsMarkdown => '複製為 Markdown';
+
+  @override
+  String get chatMessageWidgetCopyAsPlainText => '複製為純文字';
+
+  @override
+  String get chatMessageWidgetQuote => '引用';
 }

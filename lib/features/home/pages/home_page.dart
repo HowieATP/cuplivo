@@ -1304,6 +1304,7 @@ class _HomePageState extends State<HomePage>
       ),
       onSpeakMessage: (message) => _controller.speakMessage(message),
       onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
+      onQuoteSelection: (text) => _controller.insertQuote(text),
       onRecoveredAskUserAnswer: (message, part, result) =>
           _controller.submitRecoveredAskUserAnswer(message, part, result),
       onToggleSelection: (messageId, selected) {

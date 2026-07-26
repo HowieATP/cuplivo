@@ -29,6 +29,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import 'multi_key_manager_page.dart';
 import 'provider_balance_page.dart';
 import 'provider_network_page.dart';
+import 'provider_custom_request_page.dart';
 import '../../../core/services/haptics.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../provider/widgets/provider_avatar.dart';
@@ -1168,6 +1169,56 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           Expanded(
                             child: Text(
                               l10n.providerDetailPageNetworkTab,
+                              style: TextStyle(fontSize: 15, color: c),
+                            ),
+                          ),
+                          Icon(Lucide.ChevronRight, size: 16, color: c),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            _TactileRow(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ProviderCustomRequestPage(
+                      providerKey: widget.keyName,
+                      providerDisplayName: widget.displayName,
+                    ),
+                  ),
+                );
+              },
+              builder: (pressed) {
+                final cs2 = Theme.of(context).colorScheme;
+                final base = cs2.onSurface;
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final target = pressed
+                    ? (Color.lerp(
+                            base,
+                            isDark ? Colors.black : Colors.white,
+                            0.55,
+                          ) ??
+                          base)
+                    : base;
+                return TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: target),
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, color, _) {
+                    final c = color ?? base;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.providerCustomRequestTitle,
                               style: TextStyle(fontSize: 15, color: c),
                             ),
                           ),

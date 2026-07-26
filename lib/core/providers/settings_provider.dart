@@ -4831,6 +4831,8 @@ class ProviderConfig {
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
+  final List<Map<String, String>> customHeaders;
+  final List<Map<String, String>> customBody;
 
   static const String claudePromptCachingTtl5m = '5m';
   static const String claudePromptCachingTtl1h = '1h';
@@ -4895,6 +4897,8 @@ class ProviderConfig {
     this.balanceResultPath,
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
+    this.customHeaders = const [],
+    this.customBody = const [],
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4932,6 +4936,8 @@ class ProviderConfig {
     String? balanceResultPath,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
+    List<Map<String, String>>? customHeaders,
+    List<Map<String, String>>? customBody,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4971,6 +4977,8 @@ class ProviderConfig {
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
         claudePromptCachingTtl ?? this.claudePromptCachingTtl,
+    customHeaders: customHeaders ?? this.customHeaders,
+    customBody: customBody ?? this.customBody,
   );
 
   Map<String, dynamic> toJson() => {
@@ -5007,6 +5015,8 @@ class ProviderConfig {
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
     ),
+    'customHeaders': customHeaders.isEmpty ? null : customHeaders,
+    'customBody': customBody.isEmpty ? null : customBody,
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -5060,6 +5070,24 @@ class ProviderConfig {
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(
       json['claudePromptCachingTtl'] as String?,
     ),
+    customHeaders:
+        (json['customHeaders'] as List?)?.map((e) {
+          final m = e as Map? ?? {};
+          return <String, String>{
+            'name': m['name']?.toString() ?? '',
+            'value': m['value']?.toString() ?? '',
+          };
+        }).toList() ??
+        const [],
+    customBody:
+        (json['customBody'] as List?)?.map((e) {
+          final m = e as Map? ?? {};
+          return <String, String>{
+            'key': m['key']?.toString() ?? '',
+            'value': m['value']?.toString() ?? '',
+          };
+        }).toList() ??
+        const [],
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {

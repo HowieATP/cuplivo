@@ -961,6 +961,7 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _proxyUserCtrl = TextEditingController();
   final TextEditingController _proxyPassCtrl = TextEditingController();
   bool _balanceLoading = false;
+  bool _customRequestExpanded = false;
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
@@ -3441,6 +3442,44 @@ class _DesktopProviderDetailPaneState
                                 ),
                               ),
                               crossFadeState: proxyEnabledNow
+                                  ? CrossFadeState.showSecond
+                                  : CrossFadeState.showFirst,
+                              duration: const Duration(milliseconds: 180),
+                              sizeCurve: Curves.easeOutCubic,
+                            ),
+                            // 6) Provider-level custom request inline
+                            _CustomRequestHeaderRow(
+                              expanded: _customRequestExpanded,
+                              onTap: () => setState(
+                                () => _customRequestExpanded =
+                                    !_customRequestExpanded,
+                              ),
+                            ),
+                            AnimatedCrossFade(
+                              firstChild: const SizedBox.shrink(),
+                              secondChild: Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _DesktopCustomRequestSection(
+                                      providerKey: widget.providerKey,
+                                      displayName: widget.displayName,
+                                      mode: KeyMode.header,
+                                      entries: cfgNow.customHeaders,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _DesktopCustomRequestSection(
+                                      providerKey: widget.providerKey,
+                                      displayName: widget.displayName,
+                                      mode: KeyMode.body,
+                                      entries: cfgNow.customBody,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              crossFadeState: _customRequestExpanded
                                   ? CrossFadeState.showSecond
                                   : CrossFadeState.showFirst,
                               duration: const Duration(milliseconds: 180),
@@ -6921,6 +6960,107 @@ class _ModelRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Desktop collapsible header row for the custom request section.
+class _CustomRequestHeaderRow extends StatelessWidget {
+  const _CustomRequestHeaderRow({required this.expanded, required this.onTap});
+
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.providerCustomRequestTitle,
+                style: TextStyle(fontSize: 13, color: cs.onSurface),
+              ),
+            ),
+            Icon(
+              expanded ? lucide.Lucide.ChevronDown : lucide.Lucide.ChevronRight,
+              size: 14,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop inline custom request editor section (Headers or Body).
+class _DesktopCustomRequestSection extends StatelessWidget {
+  const _DesktopCustomRequestSection({
+    required this.providerKey,
+    required this.displayName,
+    required this.mode,
+    required this.entries,
+  });
+
+  final String providerKey;
+  final String displayName;
+  final KeyMode mode;
+  final List<Map<String, String>> entries;
+
+  Future<void> _save(
+    BuildContext context,
+    List<Map<String, String>> updated,
+  ) async {
+    final sp = context.read<SettingsProvider>();
+    final old = sp.getProviderConfig(providerKey, defaultName: displayName);
+    await sp.setProviderConfig(
+      providerKey,
+      mode == KeyMode.header
+          ? old.copyWith(customHeaders: updated.isEmpty ? const [] : updated)
+          : old.copyWith(customBody: updated.isEmpty ? const [] : updated),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return CustomKeyValueEditor(
+      title: mode == KeyMode.header
+          ? l10n.providerCustomRequestHeaders
+          : l10n.providerCustomRequestBody,
+      keyMode: mode,
+      showCard: false,
+      entries: entries,
+      onAdd: () {
+        final updated = List<Map<String, String>>.from(entries);
+        updated.add(
+          mode == KeyMode.header
+              ? {'name': '', 'value': ''}
+              : {'key': '', 'value': ''},
+        );
+        _save(context, updated);
+      },
+      onRemove: (index) {
+        if (index < 0 || index >= entries.length) return;
+        final updated = List<Map<String, String>>.from(entries);
+        updated.removeAt(index);
+        _save(context, updated);
+      },
+      onUpdate: (index, key, value) {
+        if (index < 0 || index >= entries.length) return;
+        final updated = List<Map<String, String>>.from(entries);
+        updated[index] = mode == KeyMode.header
+            ? {'name': key, 'value': value}
+            : {'key': key, 'value': value};
+        _save(context, updated);
+      },
     );
   }
 }

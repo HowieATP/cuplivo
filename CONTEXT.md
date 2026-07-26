@@ -187,6 +187,17 @@
 > **Dev:** "A user pasted a long workflow prompt into InstructionInjection expecting the model to use it only when working on that specific task. Should this be a Skill instead?"
 > **Domain expert:** "Correct. InstructionInjection always injects into every system prompt — it's `memory 'injection'` mode. The model gets that prompt unconditionally, even for unrelated queries. Skill only exposes its name and description in `<available_skills>`; the model reads the full body only when it calls `load_skill`. This way the instruction stays out of context until it's actually needed."
 
+## Custom Request Layers (Headers & Body)
+
+- **4-layer merge order** (last wins on key collision):
+  1. `providerDefaultHeaders` — hardcoded per provider type (e.g. OpenRouter `X-Title`)
+  2. **Provider-level** — `ProviderConfig.customHeaders` / `.customBody` (applies to all models under the provider)
+  3. **Model-level** — `ProviderConfig.modelOverrides[modelId]['headers']` / `['body']` (per-model override)
+  4. **Assistant-level** — `Assistant.customHeaders` / `.customBody` (per-assistant, passed as `extraHeaders`/`extraBody`)
+- **Merge semantics**: Shallow (`Map.addAll`). A later layer replaces the entire value for a colliding top-level key. Deep/nested merge is NOT supported (upstream issue Chevey339/kelivo#804).
+- **Data format**: `List<Map<String, String>>` — headers use `{name, value}` keys; body uses `{key, value}` keys. Consistent across all layers.
+- **No guardrails**: Users may set any header key (including `Authorization`, `Content-Type`). Power-user responsibility.
+
 ### Flagged Ambiguities
 
 - "skill" was used interchangeably to mean both "a set of instructions loaded from disk" and "an individual step in a model's reasoning process" — resolved: the former is **Skill** (capitalized, bounded in the codebase), the latter falls under general LLM domain language and is not part of Cuplivo's domain model.

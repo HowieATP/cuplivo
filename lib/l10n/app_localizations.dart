@@ -2573,6 +2573,42 @@ abstract class AppLocalizations {
   /// **'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.'**
   String get assistantEditMemoryVariableHint;
 
+  /// No description provided for @assistantEditTimeInjectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart Time Injection'**
+  String get assistantEditTimeInjectionTitle;
+
+  /// No description provided for @assistantEditTimeInjectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Append timestamp after each user message. Cache-friendly. Bypasses message template.'**
+  String get assistantEditTimeInjectionDescription;
+
+  /// No description provided for @assistantEditTimeInjectionWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volatile Variables Detected'**
+  String get assistantEditTimeInjectionWarningTitle;
+
+  /// No description provided for @assistantEditTimeInjectionWarningContent.
+  ///
+  /// In en, this message translates to:
+  /// **'For optimal cache results, consider removing the following volatile variables:'**
+  String get assistantEditTimeInjectionWarningContent;
+
+  /// No description provided for @assistantEditTimeInjectionTemplateDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Message template is disabled when Smart Time Injection is active.'**
+  String get assistantEditTimeInjectionTemplateDisabled;
+
+  /// No description provided for @assistantEditMemoryRecordPromptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory Record Prompt'**
+  String get assistantEditMemoryRecordPromptLabel;
+
   /// No description provided for @assistantEditMessageTemplateTitle.
   ///
   /// In en, this message translates to:

@@ -1339,6 +1339,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.';
 
   @override
+  String get assistantEditTimeInjectionTitle => 'Smart Time Injection';
+
+  @override
+  String get assistantEditTimeInjectionDescription =>
+      'Append timestamp after each user message. Cache-friendly. Bypasses message template.';
+
+  @override
+  String get assistantEditTimeInjectionWarningTitle =>
+      'Volatile Variables Detected';
+
+  @override
+  String get assistantEditTimeInjectionWarningContent =>
+      'For optimal cache results, consider removing the following volatile variables:';
+
+  @override
+  String get assistantEditTimeInjectionTemplateDisabled =>
+      'Message template is disabled when Smart Time Injection is active.';
+
+  @override
+  String get assistantEditMemoryRecordPromptLabel => 'Memory Record Prompt';
+
+  @override
   String get assistantEditMessageTemplateTitle => 'Message Template';
 
   @override

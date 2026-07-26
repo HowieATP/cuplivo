@@ -86,6 +86,8 @@ Do **not** store sensitive information, including:
   final String docxMode;
   final String pdfMode;
   final String otherOfficeMode;
+  // Time injection
+  final bool enableTimeInjection;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -127,6 +129,7 @@ Do **not** store sensitive information, including:
     this.docxMode = 'extract',
     this.pdfMode = 'extract',
     this.otherOfficeMode = 'direct',
+    this.enableTimeInjection = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? DateTime.now(),
@@ -171,6 +174,7 @@ Do **not** store sensitive information, including:
     String? docxMode,
     String? pdfMode,
     String? otherOfficeMode,
+    bool? enableTimeInjection,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearChatModel = false,
@@ -228,6 +232,7 @@ Do **not** store sensitive information, including:
       docxMode: docxMode ?? this.docxMode,
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+      enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -271,6 +276,7 @@ Do **not** store sensitive information, including:
     'docxMode': docxMode,
     'pdfMode': pdfMode,
     'otherOfficeMode': otherOfficeMode,
+    'enableTimeInjection': enableTimeInjection,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -371,6 +377,7 @@ Do **not** store sensitive information, including:
     docxMode: (json['docxMode'] as String?) ?? 'extract',
     pdfMode: (json['pdfMode'] as String?) ?? 'extract',
     otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',
+    enableTimeInjection: json['enableTimeInjection'] as bool? ?? false,
     createdAt: json['createdAt'] != null
         ? DateTime.parse(json['createdAt'] as String)
         : DateTime.now(),

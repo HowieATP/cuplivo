@@ -164,6 +164,16 @@
 - **Skill vs WorldBook**: **WorldBook** entries are triggered by keyword/regex matching against conversation context and injected at specific positions (after system prompt, top of chat, bottom of chat, at depth). **Skill** has no keyword triggering — the model decides based on the `<available_skills>` descriptions.
 - **Skill vs LocalTool/MCP**: **LocalTool** and **MCP** are executable tools: model calls them → something happens (read clipboard, execute code). **Skill**'s `load_skill` is a "knowledge tool": model calls it → receives instruction text → nothing executes. Same tool dispatch pathway, different semantics.
 
+## Time Injection (Cache-Aware)
+
+- **Time Injection**: A per-assistant feature (`Assistant.enableTimeInjection`, default off) that appends a timestamp to every user message in the API payload at build time. Ephemeral — never persisted to DB, never shown in chat UI. The timestamp is derived from the message's immutable `ChatMessage.timestamp`, so historical messages produce byte-identical output across requests on a device with a stable timezone, preserving the LLM provider's prompt cache prefix. Note: the timestamp uses device-local time without a UTC offset; if the device timezone changes, historical timestamps resolve to different local components and the cache prefix will invalidate.
+- **`<time-note>`**: A hardcoded English model instruction appended at the very end of the assembled system message (after all other injections). Tells the model that timestamps follow each user message. Static content — does not invalidate cache.
+- **Timestamp format**: `\n\n(Mon 25-07-26 14:03:22)` — abbreviated English day name, compact date with hyphens, local time (device timezone, no UTC offset). Appended after all other user message processing (markers, doc extraction, OCR, regex transforms).
+- **Message template bypass**: When enabled, `applyMessageTemplate()` is skipped entirely. The two features are mutually exclusive by design — the template's `{{ time }}`/`{{ date }}` variables use volatile `DateTime.now()` and would defeat the cache goal.
+- **Preset messages**: Excluded (`isPreset` check). Canned conversation starters are structural scaffolding, not real temporal events.
+- **Volatile variable warning**: On toggle-on, a one-time dialog scans `assistant.systemPrompt` for `{cur_date}`, `{cur_time}`, `{cur_datetime}` and `assistant.memoryRecordPrompt` for `{current_hour}`, `{current_date}`, `{current_datetime}`. Lists only variables actually present. Skipped entirely if none found. Informational only — no enforcement.
+- **Delta** (deferred): A "since last message" duration suffix was considered but deferred. If added later, it would also be derived from stored timestamps (cache-stable).
+
 ### Example Dialogue
 
 > **Dev:** "A user pasted a long workflow prompt into InstructionInjection expecting the model to use it only when working on that specific task. Should this be a Skill instead?"

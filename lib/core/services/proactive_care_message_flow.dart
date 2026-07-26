@@ -627,6 +627,7 @@ class ProactiveCareHeadlessChatStore {
       'presetMessages': jsonDecode(row['preset_messages_json'] as String),
       'regexRules': jsonDecode(row['regex_rules_json'] as String),
       'enableProactiveCare': (row['enable_proactive_care'] as int) != 0,
+      'enableTimeInjection': (row['enable_time_injection'] as int) != 0,
       'proactiveCareNextMessageAt': _dateTimeFromSqlNullable(
         row['proactive_care_next_message_at'],
       )?.toIso8601String(),

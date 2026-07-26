@@ -364,6 +364,13 @@ class ChatActions {
       return true;
     }
 
+    // buildApiMessages output carries internal `_`-prefixed keys
+    // (_isPresetKey, _timestampKey). Safe to use here because
+    // apiMessagesContainAudioAttachments only inspects 'content' and never
+    // forwards the list to a provider. If this consumer is ever changed to
+    // forward messages to a provider, route through
+    // processUserMessagesForApi first. See the contract on
+    // MessageBuilderService.buildApiMessages.
     final apiMessages = messageGenerationService.messageBuilderService
         .buildApiMessages(
           messages: messages,

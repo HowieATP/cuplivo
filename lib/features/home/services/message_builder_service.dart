@@ -40,6 +40,11 @@ import '../../../utils/markdown_media_sanitizer.dart';
 /// - Inlining local images for model context
 class MessageBuilderService {
   static const String internalMediaPathsKey = multimodalInternalMediaPathsKey;
+  static const String _isPresetKey = '_isPreset';
+  static const String _timestampKey = '_timestamp';
+
+  static const String _timeNote =
+      '<time-note>A timestamp will be injected by the system after every user message. Just keep it in mind, and don\'t mention it when irrelevant.</time-note>';
 
   MessageBuilderService({
     required this.chatService,
@@ -108,6 +113,15 @@ class MessageBuilderService {
   /// Build API messages list from current conversation state.
   ///
   /// Applies truncation, version collapsing, and strips [image:] / [file:] markers.
+  ///
+  /// Contract: this returns an *intermediate* list. Every user message carries
+  /// internal metadata keys ([_isPresetKey], [_timestampKey]) consumed downstream
+  /// by [processUserMessagesForApi] to inject timestamps and skip presets.
+  /// These keys are stripped before reaching the provider *only* inside
+  /// [processUserMessagesForApi]. Do NOT forward the output of this method
+  /// directly to an LLM provider — always pass it through
+  /// [processUserMessagesForApi] first, otherwise the `_`-prefixed internal keys
+  /// will leak into the request payload.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -203,10 +217,15 @@ class MessageBuilderService {
         content = geminiThoughtSignatureHandler!(m, content);
       }
       if (content.isEmpty) continue;
+      final isUser = m.role != 'assistant';
       final message = <String, dynamic>{
-        'role': m.role == 'assistant' ? 'assistant' : 'user',
+        'role': isUser ? 'user' : 'assistant',
         'content': content,
       };
+      if (isUser) {
+        message[_isPresetKey] = m.isPreset;
+        message[_timestampKey] = m.timestamp.toIso8601String();
+      }
       if (toolContinuationReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = toolContinuationReasoningContent;
       }
@@ -358,6 +377,11 @@ class MessageBuilderService {
   /// Process user messages in apiMessages: extract documents, apply OCR, inject file prompts.
   ///
   /// Returns the image paths from the last user message (for API call).
+  ///
+  /// Boundary: this is the sole point where internal `_`-prefixed keys
+  /// ([_isPresetKey], [_timestampKey]) attached by [buildApiMessages] are
+  /// consumed and stripped. After this method returns, the list is safe to send
+  /// to a provider.
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
@@ -542,10 +566,27 @@ class MessageBuilderService {
       }
 
       apiMessages[i]['content'] = merged.isEmpty ? cleanedUser : merged;
+
+      // Append timestamp when time injection is enabled (skip presets)
+      if (assistant?.enableTimeInjection == true &&
+          apiMessages[i][_isPresetKey] != true) {
+        final tsStr = apiMessages[i][_timestampKey] as String?;
+        if (tsStr != null) {
+          final ts = DateTime.tryParse(tsStr);
+          if (ts != null) {
+            apiMessages[i]['content'] =
+                '${apiMessages[i]['content']}\n\n(${_formatTimestamp(ts)})';
+          }
+        }
+      }
+      // Strip internal metadata keys after consumption so they never leak to
+      // the provider. Both keys are only read above; remove unconditionally.
+      apiMessages[i].remove(_isPresetKey);
+      apiMessages[i].remove(_timestampKey);
     }
 
-    // Apply message template to last user message
-    if (lastUserIdx != -1) {
+    // Apply message template to last user message (skipped when time injection active)
+    if (lastUserIdx != -1 && (assistant?.enableTimeInjection != true)) {
       final userText = (apiMessages[lastUserIdx]['content'] ?? '').toString();
       final templ =
           (assistant?.messageTemplate ?? '{{ message }}').trim().isEmpty
@@ -694,6 +735,27 @@ These memories are automatically included in future conversation contexts within
         '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}';
+  }
+
+  static String _formatTimestamp(DateTime dt) {
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return '${weekdays[dt.weekday % 7]} '
+        '${(dt.year % 100).toString().padLeft(2, '0')}-'
+        '${dt.month.toString().padLeft(2, '0')}-'
+        '${dt.day.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}:'
+        '${dt.second.toString().padLeft(2, '0')}';
+  }
+
+  /// Inject `<time-note>` into the system message when time injection is enabled.
+  void injectTimeNote(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant,
+  ) {
+    if (assistant?.enableTimeInjection == true) {
+      _appendToSystemMessage(apiMessages, _timeNote);
+    }
   }
 
   /// Inject search tool usage prompt into apiMessages.

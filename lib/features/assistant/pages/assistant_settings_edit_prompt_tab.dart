@@ -201,6 +201,82 @@ class _PromptTabState extends State<_PromptTab> {
     await _applySystemPromptChange(next);
   }
 
+  void _showTimeInjectionWarning(Assistant a) {
+    final systemPromptVars = <String>[];
+    for (final v in [
+      '{cur_date}',
+      '{cur_time}',
+      '{cur_datetime}',
+      '{battery_level}',
+    ]) {
+      if (a.systemPrompt.contains(v)) systemPromptVars.add(v);
+    }
+    final memoryPromptVars = <String>[];
+    for (final v in [
+      '{current_hour}',
+      '{current_date}',
+      '{current_datetime}',
+    ]) {
+      if (a.memoryRecordPrompt.contains(v)) memoryPromptVars.add(v);
+    }
+    if (systemPromptVars.isEmpty && memoryPromptVars.isEmpty) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.assistantEditTimeInjectionWarningTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.assistantEditTimeInjectionWarningContent),
+            const SizedBox(height: 12),
+            if (systemPromptVars.isNotEmpty) ...[
+              Text(
+                l10n.assistantEditSystemPromptTitle,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                systemPromptVars.join(', '),
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (memoryPromptVars.isNotEmpty) ...[
+              Text(
+                l10n.assistantEditMemoryRecordPromptLabel,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: cs.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                memoryPromptVars.join(', '),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -338,6 +414,58 @@ class _PromptTabState extends State<_PromptTab> {
       ),
     );
 
+    // Time Injection Card
+    final timeInjectionCard = Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.assistantEditTimeInjectionTitle,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.emphasis,
+                    ),
+                  ),
+                ),
+                IosSwitch(
+                  value: a.enableTimeInjection,
+                  onChanged: (v) async {
+                    await ap.updateAssistant(
+                      a.copyWith(enableTimeInjection: v),
+                    );
+                    if (v) {
+                      _showTimeInjectionWarning(
+                        ap.getById(widget.assistantId) ?? a,
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            if (a.enableTimeInjection) ...[
+              const SizedBox(height: 6),
+              Text(
+                l10n.assistantEditTimeInjectionDescription,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
     // Template Card with preview (no border, iOS style)
     final tmplCard = Container(
       decoration: BoxDecoration(
@@ -360,6 +488,7 @@ class _PromptTabState extends State<_PromptTab> {
             TextField(
               controller: _tmplCtrl,
               focusNode: _tmplFocus,
+              enabled: !a.enableTimeInjection,
               maxLines: 4,
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
@@ -395,22 +524,41 @@ class _PromptTabState extends State<_PromptTab> {
               ),
             ),
             const SizedBox(height: 4),
-            _VarExplainList(
-              items: [
-                (l10n.assistantEditVariableRole, '{{ role }}'),
-                (l10n.assistantEditVariableMessage, '{{ message }}'),
-                (l10n.assistantEditVariableTime, '{{ time }}'),
-                (l10n.assistantEditVariableDate, '{{ date }}'),
-              ],
-              onTapVar: (v) {
-                _insertAtCursor(_tmplCtrl, v);
-                context.read<AssistantProvider>().updateAssistant(
-                  a.copyWith(messageTemplate: _tmplCtrl.text),
-                );
-                // Restore focus to the input to keep cursor active
-                Future.microtask(() => _tmplFocus.requestFocus());
-              },
+            Opacity(
+              opacity: a.enableTimeInjection ? 0.5 : 1.0,
+              child: _VarExplainList(
+                items: [
+                  (l10n.assistantEditVariableRole, '{{ role }}'),
+                  (l10n.assistantEditVariableMessage, '{{ message }}'),
+                  (l10n.assistantEditVariableTime, '{{ time }}'),
+                  (l10n.assistantEditVariableDate, '{{ date }}'),
+                ],
+                onTapVar: a.enableTimeInjection
+                    ? (_) {}
+                    : (v) {
+                        _insertAtCursor(_tmplCtrl, v);
+                        context.read<AssistantProvider>().updateAssistant(
+                          a.copyWith(messageTemplate: _tmplCtrl.text),
+                        );
+                        Future.microtask(() => _tmplFocus.requestFocus());
+                      },
+              ),
             ),
+
+            if (a.enableTimeInjection) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  l10n.assistantEditTimeInjectionTemplateDisabled,
+                  style: TextStyle(fontSize: 12, color: cs.primary),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 12),
             Text(
@@ -776,6 +924,8 @@ class _PromptTabState extends State<_PromptTab> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       children: [
         sysCard,
+        const SizedBox(height: 12),
+        timeInjectionCard,
         const SizedBox(height: 12),
         tmplCard,
         const SizedBox(height: 12),

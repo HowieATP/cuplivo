@@ -14,6 +14,7 @@
   - `dependencies/flutter_tts`
   - `dependencies/flutter-permission-handler/permission_handler_windows`
 - The package name is `Cuplivo`. Existing imports use `package:Cuplivo/...` everywhere. Do not "normalize" the package name.
+- Mirror constraint: `ProactiveCareMessageFlow._assistantFromRow` explicitly mirrors `ChatDatabaseRepository._assistantFromRow` over the same Drift `AssistantRow` columns. When adding or removing fields in one mapper, apply the identical change to the other.
 
 ### 1.2 l10n
 

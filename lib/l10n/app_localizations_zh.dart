@@ -1292,6 +1292,27 @@ class AppLocalizationsZh extends AppLocalizations {
       '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
 
   @override
+  String get assistantEditTimeInjectionTitle => '智能时间注入';
+
+  @override
+  String get assistantEditTimeInjectionDescription =>
+      '在每条用户消息后追加时间戳。缓存友好。自动绕过聊天内容模板。';
+
+  @override
+  String get assistantEditTimeInjectionWarningTitle => '检测到易变变量';
+
+  @override
+  String get assistantEditTimeInjectionWarningContent =>
+      '为获得最佳缓存效果，建议移除以下易变变量：';
+
+  @override
+  String get assistantEditTimeInjectionTemplateDisabled =>
+      '智能时间注入开启时自动禁用聊天内容模板。';
+
+  @override
+  String get assistantEditMemoryRecordPromptLabel => '记忆提示词';
+
+  @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
@@ -7106,6 +7127,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
 
   @override
+  String get assistantEditTimeInjectionTitle => '智能时间注入';
+
+  @override
+  String get assistantEditTimeInjectionDescription =>
+      '在每条用户消息后追加时间戳。缓存友好。自动绕过聊天内容模板。';
+
+  @override
+  String get assistantEditTimeInjectionWarningTitle => '检测到易变变量';
+
+  @override
+  String get assistantEditTimeInjectionWarningContent =>
+      '为获得最佳缓存效果，建议移除以下易变变量：';
+
+  @override
+  String get assistantEditTimeInjectionTemplateDisabled =>
+      '智能时间注入开启时自动禁用聊天内容模板。';
+
+  @override
+  String get assistantEditMemoryRecordPromptLabel => '记忆提示词';
+
+  @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
@@ -12918,6 +12960,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditMemoryVariableHint =>
       '包含時間變數會降低快取命中率。請根據需求平衡時間精度，也可以刪去變數，在訊息範本中插入訊息發送時間。';
+
+  @override
+  String get assistantEditTimeInjectionTitle => '智能時間注入';
+
+  @override
+  String get assistantEditTimeInjectionDescription =>
+      '在每條使用者訊息後追加時間戳記。快取友好。自動繞過聊天內容範本。';
+
+  @override
+  String get assistantEditTimeInjectionWarningTitle => '偵測到易變變數';
+
+  @override
+  String get assistantEditTimeInjectionWarningContent =>
+      '為獲得最佳快取效果，建議移除以下易變變數：';
+
+  @override
+  String get assistantEditTimeInjectionTemplateDisabled =>
+      '智能時間注入開啟時自動停用聊天內容範本。';
+
+  @override
+  String get assistantEditMemoryRecordPromptLabel => '記憶提示詞';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天內容範本';

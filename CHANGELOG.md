@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.2.0] - 2026-07-26
+
+### Added
+
+- **Cache-friendly smart time injection**: injects the corresponding send time at each message (#121)
+- **One-click image compression**: automatically compress images on send, no need to manually adjust each one (#119)
+- **Preset messages enhancement**: preset messages can be collapsed; block new conversations when only preset messages exist (#116)
+- **Provider-level custom Headers/Body**: each provider can attach custom request headers and body fields (#120)
+- **Enhanced assistant message direct copy**: naive subsequence Markdown copy + quote (#122)
+- Thinking toggles for summary/suggestion/compress/translate/OCR models (#117)
+
+### Changed
+
+- Refactor built-in Fetch MCP: merged into a single tool with enhanced token control (#115)
+
 ## [2.1.4] - 2026-07-25
 
 ### Added

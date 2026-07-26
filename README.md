@@ -41,30 +41,34 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 4. **Skills** — GitHub import from public repositories, and auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups.
 
-5. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
-   - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
-   - *Note*: Ideal for high-resolution captures and low-detail tasks.
+5. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
+   - *Tip*: For best cache performance, disable Recent Chats Reference, switch to On Demand mode, and enable time injection.
 
-6. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
-   - *Tip*: For best cache performance, disable Recent Chats Reference and switch to On Demand mode.
+6. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
 
-7. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
+7. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-8. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+8. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
 
-9. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
+9. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
 
-10. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
+10. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
 
-11. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+11. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-12. **Truncated response toast** — Shows a toast notification when a response is cut short due to hitting the max_tokens limit or exceeding the context window, so you always know why a reply ended abruptly.
+12. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
-13. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+13. **Truncated response toast** — Shows a toast notification when a response is cut short due to hitting the max_tokens limit or exceeding the context window, so you always know why a reply ended abruptly.
 
-14. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+14. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
 
-15. **Additional fixes across the repo**
+15. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+
+16. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+
+17. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+
+18. **Additional fixes across the repo**
     - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)

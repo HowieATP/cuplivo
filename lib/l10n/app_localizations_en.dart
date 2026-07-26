@@ -4069,6 +4069,40 @@ class AppLocalizationsEn extends AppLocalizations {
       'Crop images after selecting from gallery or camera';
 
   @override
+  String get oneClickCompressSectionTitle => 'Image Compression';
+
+  @override
+  String get oneClickCompressEnabledTitle => 'One-Click Compress';
+
+  @override
+  String get oneClickCompressEnabledSubtitle =>
+      'Quickly compress all images with preset settings';
+
+  @override
+  String get oneClickCompressMaxLongEdgeTitle => 'Max Long Edge';
+
+  @override
+  String get oneClickCompressQualityTitle => 'Quality';
+
+  @override
+  String get oneClickCompressAlwaysJpgTitle => 'Always Output JPEG';
+
+  @override
+  String get oneClickCompressAlwaysJpgSubtitle =>
+      'Convert PNGs with transparency to JPEG (white background)';
+
+  @override
+  String get oneClickCompressTooltip => 'Compress all images';
+
+  @override
+  String oneClickCompressResult(int count, String saved, String pct) {
+    return 'Compressed $count images, saved $saved (-$pct%)';
+  }
+
+  @override
+  String get oneClickCompressNone => 'No compression needed';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       'Keep sidebar open when selecting assistant';
 

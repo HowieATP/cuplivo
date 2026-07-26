@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
@@ -186,6 +187,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
+  bool _oneClickCompressing = false;
+  bool _oneClickCompressDone = false;
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
@@ -303,6 +306,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
     setState(() {
+      _oneClickCompressDone = false;
       for (final p in paths) {
         if (_images.contains(p)) continue;
         _images.add(p);
@@ -479,23 +483,24 @@ class _ChatInputBarState extends State<ChatInputBar>
     _maybeShowCompressionResult(context, origBytes, _imageSizes[newPath] ?? 0);
   }
 
-  Future<void> _compressAll(CompressionConfig config) async {
-    int totalOrig = 0, totalNew = 0;
-    final snapshot = List<String>.of(_images);
+  /// Shared iteration: snapshot images, call [compressFile] per image, apply
+  /// results in setState, return aggregate stats. Handles !mounted guards.
+  Future<({int saved, int totalOrig, int compressedCount})> _compressImages({
+    required Future<String> Function(String oldPath) compressFile,
+  }) async {
+    int compressedCount = 0;
     final results = <({String oldPath, String newPath, int origBytes})>[];
+    final snapshot = List<String>.of(_images);
     for (final oldPath in snapshot) {
       if (!_images.contains(oldPath)) continue;
       final origBytes = _imageSizes[oldPath] ?? 0;
-      final newPath = await ImageCompressor.compressIfNeeded(
-        oldPath,
-        enabled: true,
-        quality: config.quality,
-        maxDimension: config.maxDimension,
-        keepPng: config.keepPng,
-      );
-      if (!mounted) return;
+      final newPath = await compressFile(oldPath);
+      if (!mounted) return (saved: 0, totalOrig: 0, compressedCount: 0);
+      if (newPath != oldPath) compressedCount++;
       results.add((oldPath: oldPath, newPath: newPath, origBytes: origBytes));
     }
+    if (!mounted) return (saved: 0, totalOrig: 0, compressedCount: 0);
+    int totalOrig = 0, totalNew = 0;
     setState(() {
       for (final r in results) {
         final newBytes = _applyCompressionResult(r.oldPath, r.newPath);
@@ -503,18 +508,88 @@ class _ChatInputBarState extends State<ChatInputBar>
         totalNew += newBytes;
       }
     });
-    if (!mounted) return;
     final saved = totalOrig - totalNew;
-    if (saved > 0 && totalOrig > 0) {
-      final pct = (saved * 100 / totalOrig).round();
+    return (
+      saved: saved > 0 ? saved : 0,
+      totalOrig: totalOrig,
+      compressedCount: compressedCount,
+    );
+  }
+
+  Future<void> _compressAll(CompressionConfig config) async {
+    final r = await _compressImages(
+      compressFile: (oldPath) => ImageCompressor.compressIfNeeded(
+        oldPath,
+        enabled: true,
+        quality: config.quality,
+        maxDimension: config.maxDimension,
+        keepPng: config.keepPng,
+      ),
+    );
+    if (!mounted) return;
+    if (r.saved > 0 && r.totalOrig > 0) {
+      final pct = (r.saved * 100 / r.totalOrig).round();
       final l10n = AppLocalizations.of(context);
       if (l10n != null) {
         showAppSnackBar(
           context,
-          message: l10n.imageCompressionBatchResult(formatBytes(saved), '$pct'),
+          message: l10n.imageCompressionBatchResult(
+            formatBytes(r.saved),
+            '$pct',
+          ),
           type: NotificationType.success,
         );
       }
+    }
+  }
+
+  Future<void> _oneClickCompressAll() async {
+    setState(() => _oneClickCompressDone = false);
+    final sp = context.read<SettingsProvider>();
+    final quality = sp.oneClickCompressQuality;
+    final maxDimension = sp.oneClickCompressMaxLongEdge;
+    final alwaysJpg = sp.oneClickCompressAlwaysJpg;
+
+    final r = await _compressImages(
+      compressFile: (oldPath) async {
+        bool keepPng = false;
+        final ext = p.extension(oldPath).toLowerCase();
+        if (!alwaysJpg && ext == '.png' && await _pngHasAlpha(oldPath)) {
+          keepPng = true;
+        }
+        return ImageCompressor.compressIfNeeded(
+          oldPath,
+          enabled: true,
+          quality: quality,
+          maxDimension: maxDimension,
+          keepPng: keepPng,
+        );
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _oneClickCompressing = false;
+      _oneClickCompressDone = true;
+    });
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return;
+    if (r.compressedCount > 0 && r.saved > 0) {
+      final pct = r.totalOrig > 0 ? (r.saved * 100 / r.totalOrig).round() : 0;
+      showAppSnackBar(
+        context,
+        message: l10n.oneClickCompressResult(
+          r.compressedCount,
+          formatBytes(r.saved),
+          '$pct',
+        ),
+        type: NotificationType.success,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: l10n.oneClickCompressNone,
+        type: NotificationType.info,
+      );
     }
   }
 
@@ -611,6 +686,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   Future<void> _handleSend() async {
     if (_isSubmitting) return;
+    if (_oneClickCompressing) return;
     final text = _controller.text.trim();
     if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
     _isSubmitting = true;
@@ -1813,113 +1889,126 @@ class _ChatInputBarState extends State<ChatInputBar>
               height: _imagePreviewHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _images.length,
+                itemCount:
+                    _images.length +
+                    (!_oneClickCompressDone &&
+                            context
+                                .read<SettingsProvider>()
+                                .oneClickCompressEnabled
+                        ? 1
+                        : 0),
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, idx) {
+                  if (idx == _images.length) {
+                    return _buildOneClickCompressTrailing(isDark);
+                  }
                   final path = _images[idx];
                   final size = _imageSizes[path] ?? 0;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: previewBorder, width: 1),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(9),
-                          child: Image.file(
-                            File(path),
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                  return IgnorePointer(
+                    ignoring: _oneClickCompressing,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: previewBorder, width: 1),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: Image.file(
+                              File(path),
                               width: 64,
                               height: 64,
-                              color: previewFill,
-                              child: Icon(
-                                Icons.broken_image,
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.45,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 64,
+                                height: 64,
+                                color: previewFill,
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.45,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      // File size overlay — tappable to open compression dialog
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: () => _openCompressionDialog(idx),
-                          child: Container(
-                            height: 18,
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(9),
-                                bottomRight: Radius.circular(9),
+                        // File size overlay — tappable to open compression dialog
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () => _openCompressionDialog(idx),
+                            child: Container(
+                              height: 18,
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(9),
+                                  bottomRight: Radius.circular(9),
+                                ),
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.55),
+                                    Colors.transparent,
+                                  ],
+                                ),
                               ),
-                              gradient: LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.55),
-                                  Colors.transparent,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Lucide.ImageDown,
+                                    size: 10,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    formatBytes(size),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Lucide.ImageDown,
-                                  size: 10,
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  formatBytes(size),
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                          ),
+                        ),
+                        Positioned(
+                          right: 4,
+                          top: 4,
+                          child: IosCardPress(
+                            key: ValueKey('chat-input-image-remove:$idx'),
+                            haptics: false,
+                            baseColor: isDark
+                                ? Colors.black.withValues(alpha: 0.50)
+                                : Colors.black.withValues(alpha: 0.46),
+                            pressedScale: 0.94,
+                            borderRadius: BorderRadius.circular(
+                              _imageRemoveButtonSize / 2,
+                            ),
+                            padding: EdgeInsets.zero,
+                            duration: const Duration(milliseconds: 140),
+                            onTap: () => _removeImageAt(idx),
+                            child: const SizedBox(
+                              width: _imageRemoveButtonSize,
+                              height: _imageRemoveButtonSize,
+                              child: Icon(
+                                Icons.close,
+                                size: 11,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        top: 4,
-                        child: IosCardPress(
-                          key: ValueKey('chat-input-image-remove:$idx'),
-                          haptics: false,
-                          baseColor: isDark
-                              ? Colors.black.withValues(alpha: 0.50)
-                              : Colors.black.withValues(alpha: 0.46),
-                          pressedScale: 0.94,
-                          borderRadius: BorderRadius.circular(
-                            _imageRemoveButtonSize / 2,
-                          ),
-                          padding: EdgeInsets.zero,
-                          duration: const Duration(milliseconds: 140),
-                          onTap: () => _removeImageAt(idx),
-                          child: const SizedBox(
-                            width: _imageRemoveButtonSize,
-                            height: _imageRemoveButtonSize,
-                            child: Icon(
-                              Icons.close,
-                              size: 11,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1986,6 +2075,76 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Cheap PNG alpha detection via IHDR color type byte (offset 25).
+  /// Returns true for color types 4 (grayscale+alpha) and 6 (RGBA).
+  /// Avoids a full image decode just to check transparency.
+  Future<bool> _pngHasAlpha(String path) async {
+    try {
+      final file = await File(path).open(mode: FileMode.read);
+      try {
+        await file.setPosition(25);
+        final colorType = await file.readByte();
+        return colorType == 4 || colorType == 6;
+      } finally {
+        await file.close();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Widget _buildOneClickCompressTrailing(bool isDark) {
+    final theme = Theme.of(context);
+    if (_oneClickCompressing) {
+      return Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.10)
+                : theme.colorScheme.outline.withValues(alpha: 0.13),
+            width: 1,
+          ),
+        ),
+        child: const Center(child: CupertinoActivityIndicator(radius: 10)),
+      );
+    }
+    return Tooltip(
+      message: AppLocalizations.of(context)!.oneClickCompressTooltip,
+      child: IosCardPress(
+        haptics: false,
+        borderRadius: BorderRadius.circular(10),
+        baseColor: Colors.transparent,
+        pressedScale: 0.94,
+        duration: const Duration(milliseconds: 140),
+        onTap: () {
+          setState(() => _oneClickCompressing = true);
+          unawaited(_oneClickCompressAll());
+        },
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : theme.colorScheme.outline.withValues(alpha: 0.13),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            Lucide.Zap,
+            size: 22,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
       ),
     );
   }
@@ -2319,8 +2478,11 @@ class _ChatInputBarState extends State<ChatInputBar>
                                     _CompactSendButton(
                                       enabled:
                                           (hasText || hasImages || hasDocs) &&
-                                          !widget.loading,
-                                      loading: widget.loading,
+                                          !widget.loading &&
+                                          !_oneClickCompressing,
+                                      loading:
+                                          widget.loading ||
+                                          _oneClickCompressing,
                                       onSend: _handleSend,
                                       onStop: widget.loading
                                           ? widget.onStop

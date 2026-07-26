@@ -3915,6 +3915,38 @@ class AppLocalizationsZh extends AppLocalizations {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get oneClickCompressSectionTitle => '图片压缩';
+
+  @override
+  String get oneClickCompressEnabledTitle => '一键压缩';
+
+  @override
+  String get oneClickCompressEnabledSubtitle => '使用预设设置快速压缩所有图片';
+
+  @override
+  String get oneClickCompressMaxLongEdgeTitle => '最大长边';
+
+  @override
+  String get oneClickCompressQualityTitle => '质量';
+
+  @override
+  String get oneClickCompressAlwaysJpgTitle => '始终输出 JPEG';
+
+  @override
+  String get oneClickCompressAlwaysJpgSubtitle => '将带透明度的 PNG 转为 JPEG（白色背景）';
+
+  @override
+  String get oneClickCompressTooltip => '压缩所有图片';
+
+  @override
+  String oneClickCompressResult(int count, String saved, String pct) {
+    return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
+  }
+
+  @override
+  String get oneClickCompressNone => '无需压缩';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -9732,6 +9764,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get oneClickCompressSectionTitle => '图片压缩';
+
+  @override
+  String get oneClickCompressEnabledTitle => '一键压缩';
+
+  @override
+  String get oneClickCompressEnabledSubtitle => '使用预设设置快速压缩所有图片';
+
+  @override
+  String get oneClickCompressMaxLongEdgeTitle => '最大长边';
+
+  @override
+  String get oneClickCompressQualityTitle => '质量';
+
+  @override
+  String get oneClickCompressAlwaysJpgTitle => '始终输出 JPEG';
+
+  @override
+  String get oneClickCompressAlwaysJpgSubtitle => '将带透明度的 PNG 转为 JPEG（白色背景）';
+
+  @override
+  String get oneClickCompressTooltip => '压缩所有图片';
+
+  @override
+  String oneClickCompressResult(int count, String saved, String pct) {
+    return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
+  }
+
+  @override
+  String get oneClickCompressNone => '无需压缩';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -15545,6 +15609,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableImageCropperSubtitle =>
       '從相簿或相機選擇圖片後，允許裁剪圖片';
+
+  @override
+  String get oneClickCompressSectionTitle => '圖片壓縮';
+
+  @override
+  String get oneClickCompressEnabledTitle => '一鍵壓縮';
+
+  @override
+  String get oneClickCompressEnabledSubtitle => '使用預設設定快速壓縮所有圖片';
+
+  @override
+  String get oneClickCompressMaxLongEdgeTitle => '最大長邊';
+
+  @override
+  String get oneClickCompressQualityTitle => '品質';
+
+  @override
+  String get oneClickCompressAlwaysJpgTitle => '始終輸出 JPEG';
+
+  @override
+  String get oneClickCompressAlwaysJpgSubtitle => '將帶透明度的 PNG 轉為 JPEG（白色背景）';
+
+  @override
+  String get oneClickCompressTooltip => '壓縮所有圖片';
+
+  @override
+  String oneClickCompressResult(int count, String saved, String pct) {
+    return '壓縮了 $count 張圖片，節省了 $saved (-$pct%)';
+  }
+
+  @override
+  String get oneClickCompressNone => '無需壓縮';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>

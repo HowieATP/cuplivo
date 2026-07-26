@@ -1361,6 +1361,23 @@
   "chainOfThoughtCollapse": "收起",
   "displaySettingsPageShowChatListDateTitle": "顯示對話列表日期",
   "displaySettingsPageShowChatListDateSubtitle": "在左側對話列表中顯示日期分組標籤",
+  "oneClickCompressSectionTitle": "圖片壓縮",
+  "oneClickCompressEnabledTitle": "一鍵壓縮",
+  "oneClickCompressEnabledSubtitle": "使用預設設定快速壓縮所有圖片",
+  "oneClickCompressMaxLongEdgeTitle": "最大長邊",
+  "oneClickCompressQualityTitle": "品質",
+  "oneClickCompressAlwaysJpgTitle": "始終輸出 JPEG",
+  "oneClickCompressAlwaysJpgSubtitle": "將帶透明度的 PNG 轉為 JPEG（白色背景）",
+  "oneClickCompressTooltip": "壓縮所有圖片",
+  "oneClickCompressResult": "壓縮了 {count} 張圖片，節省了 {saved} (-{pct}%)",
+  "@oneClickCompressResult": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "oneClickCompressNone": "無需壓縮",
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "點選助手時不自動關閉側邊欄",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "點選話題時不自動關閉側邊欄",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "關閉側邊欄時不折疊助手列表",

@@ -7550,6 +7550,66 @@ abstract class AppLocalizations {
   /// **'Crop images after selecting from gallery or camera'**
   String get displaySettingsPageEnableImageCropperSubtitle;
 
+  /// Section title for one-click image compression settings
+  ///
+  /// In en, this message translates to:
+  /// **'Image Compression'**
+  String get oneClickCompressSectionTitle;
+
+  /// Toggle label for enabling one-click image compression
+  ///
+  /// In en, this message translates to:
+  /// **'One-Click Compress'**
+  String get oneClickCompressEnabledTitle;
+
+  /// Subtitle for the one-click compress toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Quickly compress all images with preset settings'**
+  String get oneClickCompressEnabledSubtitle;
+
+  /// Label for the max long edge slider
+  ///
+  /// In en, this message translates to:
+  /// **'Max Long Edge'**
+  String get oneClickCompressMaxLongEdgeTitle;
+
+  /// Label for the compression quality slider
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get oneClickCompressQualityTitle;
+
+  /// Toggle label for forcing JPEG output
+  ///
+  /// In en, this message translates to:
+  /// **'Always Output JPEG'**
+  String get oneClickCompressAlwaysJpgTitle;
+
+  /// Subtitle for the always-JPEG toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Convert PNGs with transparency to JPEG (white background)'**
+  String get oneClickCompressAlwaysJpgSubtitle;
+
+  /// Tooltip for the one-click compress button
+  ///
+  /// In en, this message translates to:
+  /// **'Compress all images'**
+  String get oneClickCompressTooltip;
+
+  /// SnackBar message after one-click compression showing savings
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed {count} images, saved {saved} (-{pct}%)'**
+  String oneClickCompressResult(int count, String saved, String pct);
+
+  /// SnackBar message when all images were skipped during one-click compression
+  ///
+  /// In en, this message translates to:
+  /// **'No compression needed'**
+  String get oneClickCompressNone;
+
   /// No description provided for @displaySettingsPageKeepSidebarOpenOnAssistantTapTitle.
   ///
   /// In en, this message translates to:

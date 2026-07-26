@@ -206,6 +206,14 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowChatListDateKey =
       'display_show_chat_list_date_v1';
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
+  static const String _oneClickCompressEnabledKey =
+      'one_click_compress_enabled_v1';
+  static const String _oneClickCompressMaxLongEdgeKey =
+      'one_click_compress_max_long_edge_v1';
+  static const String _oneClickCompressQualityKey =
+      'one_click_compress_quality_v1';
+  static const String _oneClickCompressAlwaysJpgKey =
+      'one_click_compress_always_jpg_v1';
   static const String _displayMobileCodeBlockWrapKey =
       'display_mobile_code_block_wrap_v1';
   static const String _displayAutoCollapseCodeBlockKey =
@@ -1098,6 +1106,13 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
+    _oneClickCompressEnabled =
+        prefs.getBool(_oneClickCompressEnabledKey) ?? true;
+    _oneClickCompressMaxLongEdge =
+        prefs.getInt(_oneClickCompressMaxLongEdgeKey) ?? 1536;
+    _oneClickCompressQuality = prefs.getInt(_oneClickCompressQualityKey) ?? 75;
+    _oneClickCompressAlwaysJpg =
+        prefs.getBool(_oneClickCompressAlwaysJpgKey) ?? false;
     _mobileCodeBlockWrap =
         prefs.getBool(_displayMobileCodeBlockWrapKey) ?? false;
     _autoCollapseCodeBlock =
@@ -4060,6 +4075,49 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_imageCropperEnabledKey, v);
+  }
+
+  // Image: one-click compression (quick compress)
+  bool _oneClickCompressEnabled = true;
+  bool get oneClickCompressEnabled => _oneClickCompressEnabled;
+  Future<void> setOneClickCompressEnabled(bool v) async {
+    if (_oneClickCompressEnabled == v) return;
+    _oneClickCompressEnabled = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_oneClickCompressEnabledKey, v);
+  }
+
+  int _oneClickCompressMaxLongEdge = 1536;
+  int get oneClickCompressMaxLongEdge => _oneClickCompressMaxLongEdge;
+  Future<void> setOneClickCompressMaxLongEdge(int v) async {
+    final clamped = v.clamp(768, 4096);
+    if (_oneClickCompressMaxLongEdge == clamped) return;
+    _oneClickCompressMaxLongEdge = clamped;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_oneClickCompressMaxLongEdgeKey, clamped);
+  }
+
+  int _oneClickCompressQuality = 75;
+  int get oneClickCompressQuality => _oneClickCompressQuality;
+  Future<void> setOneClickCompressQuality(int v) async {
+    final clamped = v.clamp(50, 95);
+    if (_oneClickCompressQuality == clamped) return;
+    _oneClickCompressQuality = clamped;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_oneClickCompressQualityKey, clamped);
+  }
+
+  bool _oneClickCompressAlwaysJpg = false;
+  bool get oneClickCompressAlwaysJpg => _oneClickCompressAlwaysJpg;
+  Future<void> setOneClickCompressAlwaysJpg(bool v) async {
+    if (_oneClickCompressAlwaysJpg == v) return;
+    _oneClickCompressAlwaysJpg = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_oneClickCompressAlwaysJpgKey, v);
   }
 
   // Display: mobile code block word wrap

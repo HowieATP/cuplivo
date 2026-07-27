@@ -9920,6 +9920,18 @@ abstract class AppLocalizations {
   /// **'Request Body'**
   String get logViewerSectionRequestBody;
 
+  /// No description provided for @logViewerBeautifyToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Beautify'**
+  String get logViewerBeautifyToggle;
+
+  /// No description provided for @logViewerRequestConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration'**
+  String get logViewerRequestConfig;
+
   /// No description provided for @logViewerSectionResponseHeaders.
   ///
   /// In en, this message translates to:

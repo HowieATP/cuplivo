@@ -1882,6 +1882,8 @@
   "logViewerSectionParameters": "参数",
   "logViewerSectionRequestHeaders": "请求头",
   "logViewerSectionRequestBody": "请求体",
+  "logViewerBeautifyToggle": "美化显示",
+  "logViewerRequestConfig": "配置参数",
   "logViewerSectionResponseHeaders": "响应头",
   "logViewerSectionResponseBody": "响应体",
   "logViewerSectionWarnings": "警告",

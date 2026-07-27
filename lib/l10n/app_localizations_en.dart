@@ -5373,6 +5373,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logViewerSectionRequestBody => 'Request Body';
 
   @override
+  String get logViewerBeautifyToggle => 'Beautify';
+
+  @override
+  String get logViewerRequestConfig => 'Configuration';
+
+  @override
   String get logViewerSectionResponseHeaders => 'Response Headers';
 
   @override

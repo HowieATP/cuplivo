@@ -2298,6 +2298,8 @@
   "logViewerSectionParameters": "Parameters",
   "logViewerSectionRequestHeaders": "Request Headers",
   "logViewerSectionRequestBody": "Request Body",
+  "logViewerBeautifyToggle": "Beautify",
+  "logViewerRequestConfig": "Configuration",
   "logViewerSectionResponseHeaders": "Response Headers",
   "logViewerSectionResponseBody": "Response Body",
   "logViewerSectionWarnings": "Warnings",

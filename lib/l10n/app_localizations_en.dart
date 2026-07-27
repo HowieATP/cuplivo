@@ -6141,4 +6141,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetQuote => 'Quote';
+
+  @override
+  String get chatMessageWidgetSpeak => 'Speak';
 }

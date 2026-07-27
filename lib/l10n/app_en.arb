@@ -2953,5 +2953,6 @@
   "truncationReasonContextExceeded": "context window exceeded",
   "chatMessageWidgetCopyAsMarkdown": "Copy as Markdown",
   "chatMessageWidgetCopyAsPlainText": "Copy as Plain Text",
-  "chatMessageWidgetQuote": "Quote"
+  "chatMessageWidgetQuote": "Quote",
+  "chatMessageWidgetSpeak": "Speak"
 }

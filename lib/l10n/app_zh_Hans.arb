@@ -2406,5 +2406,6 @@
   "truncationReasonContextExceeded": "上下文窗口超限",
   "chatMessageWidgetCopyAsMarkdown": "复制为 Markdown",
   "chatMessageWidgetCopyAsPlainText": "复制为纯文本",
-  "chatMessageWidgetQuote": "引用"
+  "chatMessageWidgetQuote": "引用",
+  "chatMessageWidgetSpeak": "朗读"
 }

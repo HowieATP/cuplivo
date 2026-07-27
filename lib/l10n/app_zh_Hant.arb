@@ -1375,6 +1375,7 @@
   "oneClickCompressAlwaysJpgTitle": "始終輸出 JPEG",
   "oneClickCompressAlwaysJpgSubtitle": "將帶透明度的 PNG 轉為 JPEG（白色背景）",
   "oneClickCompressTooltip": "壓縮所有圖片",
+  "oneClickCompressConfirmPrompt": "再次點擊確認壓縮",
   "oneClickCompressResult": "壓縮了 {count} 張圖片，節省了 {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "placeholders": {

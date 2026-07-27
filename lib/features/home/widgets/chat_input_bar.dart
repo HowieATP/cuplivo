@@ -189,6 +189,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool _isSubmitting = false;
   bool _oneClickCompressing = false;
   bool _oneClickCompressDone = false;
+  bool _oneClickConfirming = false;
+  Timer? _confirmTimer;
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
@@ -307,6 +309,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (paths.isEmpty) return;
     setState(() {
       _oneClickCompressDone = false;
+      _confirmTimer?.cancel();
+      _oneClickConfirming = false;
       for (final p in paths) {
         if (_images.contains(p)) continue;
         _images.add(p);
@@ -488,7 +492,6 @@ class _ChatInputBarState extends State<ChatInputBar>
   Future<({int saved, int totalOrig, int compressedCount})> _compressImages({
     required Future<String> Function(String oldPath) compressFile,
   }) async {
-    int compressedCount = 0;
     final results = <({String oldPath, String newPath, int origBytes})>[];
     final snapshot = List<String>.of(_images);
     for (final oldPath in snapshot) {
@@ -496,16 +499,16 @@ class _ChatInputBarState extends State<ChatInputBar>
       final origBytes = _imageSizes[oldPath] ?? 0;
       final newPath = await compressFile(oldPath);
       if (!mounted) return (saved: 0, totalOrig: 0, compressedCount: 0);
-      if (newPath != oldPath) compressedCount++;
       results.add((oldPath: oldPath, newPath: newPath, origBytes: origBytes));
     }
     if (!mounted) return (saved: 0, totalOrig: 0, compressedCount: 0);
-    int totalOrig = 0, totalNew = 0;
+    int totalOrig = 0, totalNew = 0, compressedCount = 0;
     setState(() {
       for (final r in results) {
         final newBytes = _applyCompressionResult(r.oldPath, r.newPath);
         totalOrig += r.origBytes;
         totalNew += newBytes;
+        if (r.origBytes > 0 && newBytes < r.origBytes) compressedCount++;
       }
     });
     final saved = totalOrig - totalNew;
@@ -570,10 +573,11 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {
       _oneClickCompressing = false;
       _oneClickCompressDone = true;
+      _oneClickConfirming = false;
     });
     final l10n = AppLocalizations.of(context);
     if (l10n == null) return;
-    if (r.compressedCount > 0 && r.saved > 0) {
+    if (r.saved > 0) {
       final pct = r.totalOrig > 0 ? (r.saved * 100 / r.totalOrig).round() : 0;
       showAppSnackBar(
         context,
@@ -2097,8 +2101,23 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
+  void _onOneClickTap() {
+    if (_oneClickConfirming) {
+      _confirmTimer?.cancel();
+      _oneClickConfirming = false;
+      setState(() => _oneClickCompressing = true);
+      unawaited(_oneClickCompressAll());
+    } else {
+      setState(() => _oneClickConfirming = true);
+      _confirmTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _oneClickConfirming = false);
+      });
+    }
+  }
+
   Widget _buildOneClickCompressTrailing(bool isDark) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     if (_oneClickCompressing) {
       return Container(
         width: 64,
@@ -2115,18 +2134,48 @@ class _ChatInputBarState extends State<ChatInputBar>
         child: const Center(child: CupertinoActivityIndicator(radius: 10)),
       );
     }
+    if (_oneClickConfirming) {
+      return GestureDetector(
+        onTap: _onOneClickTap,
+        child: Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : theme.colorScheme.outline.withValues(alpha: 0.13),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Text(
+                l10n.oneClickCompressConfirmPrompt,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Tooltip(
-      message: AppLocalizations.of(context)!.oneClickCompressTooltip,
+      message: l10n.oneClickCompressTooltip,
       child: IosCardPress(
         haptics: false,
         borderRadius: BorderRadius.circular(10),
         baseColor: Colors.transparent,
         pressedScale: 0.94,
         duration: const Duration(milliseconds: 140),
-        onTap: () {
-          setState(() => _oneClickCompressing = true);
-          unawaited(_oneClickCompressAll());
-        },
+        onTap: _onOneClickTap,
         child: Container(
           width: 64,
           height: 64,
@@ -2480,9 +2529,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           (hasText || hasImages || hasDocs) &&
                                           !widget.loading &&
                                           !_oneClickCompressing,
-                                      loading:
-                                          widget.loading ||
-                                          _oneClickCompressing,
+                                      loading: widget.loading,
                                       onSend: _handleSend,
                                       onStop: widget.loading
                                           ? widget.onStop

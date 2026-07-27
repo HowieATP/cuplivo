@@ -4126,6 +4126,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oneClickCompressTooltip => 'Compress all images';
 
   @override
+  String get oneClickCompressConfirmPrompt => 'Tap again to compress';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return 'Compressed $count images, saved $saved (-$pct%)';
   }

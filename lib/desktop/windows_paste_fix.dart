@@ -70,8 +70,15 @@ class WindowsPasteFix {
 
   @visibleForTesting
   KeyData? rewrite(KeyData data) {
-    // Swallow all-zero garbage events that occur during focus transitions.
-    if (data.physical == 0 && data.logical == 0) return null;
+    // All-zero KeyData events are transit-mode probes sent by the Flutter
+    // engine. They must reach the framework's handleKeyData so that
+    // _transitMode is inferred as keyDataThenRawKeyData. Swallowing them
+    // here leaves _transitMode null, letting the raw channel set it to
+    // rawKeyData — after which every real KeyData forwarded by this
+    // wrapper hits the assertion:
+    //   'Should never encounter KeyData when transitMode is rawKeyData.'
+    // Pass them through unchanged.
+    if (data.physical == 0 && data.logical == 0) return data;
 
     // Normal hardware keys: pass through, reset state machine.
     if (data.physical != _junkPhysical) {

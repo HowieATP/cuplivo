@@ -2,8 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 
+import '../../../core/models/file_reference.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -13,6 +18,8 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/format.dart';
 import '../../../utils/platform_utils.dart';
+import '../../../utils/app_directories.dart';
+import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
 import '../../../theme/app_font_weights.dart';
@@ -1320,8 +1327,53 @@ class _UploadManagerState extends State<_UploadManager> {
   bool _loading = false;
   List<StorageFileEntry> _entries = const <StorageFileEntry>[];
   final Set<String> _selected = <String>{};
+  bool _bySize = false;
+  bool _descending = true;
+  Map<String, List<FileReference>>? _refs;
+  bool _computing = false;
+  bool _showOrphansOnly = false;
+  String? _imagesDirPath;
 
   bool get _selectMode => _selected.isNotEmpty;
+
+  bool _isAiGenerated(String diskPath) {
+    final imagesDir = _imagesDirPath;
+    if (imagesDir == null || imagesDir.isEmpty) return false;
+    return p.isWithin(canonicalizePath(imagesDir), canonicalizePath(diskPath));
+  }
+
+  int get _orphanCount {
+    final refs = _refs;
+    if (refs == null) return 0;
+    return _entries
+        .where((e) => !_isAiGenerated(e.path) && _refCountFor(e.path) == 0)
+        .length;
+  }
+
+  List<StorageFileEntry> get _displayEntries {
+    var list = _showOrphansOnly && _refs != null
+        ? _entries
+              .where(
+                (e) => !_isAiGenerated(e.path) && _refCountFor(e.path) == 0,
+              )
+              .toList()
+        : _entries.toList();
+    final cmp = _bySize
+        ? ((a, b) => a.bytes.compareTo(b.bytes))
+        : ((a, b) => a.modifiedAt.compareTo(b.modifiedAt));
+    list.sort((a, b) {
+      final r = cmp(a, b);
+      if (r != 0) return _descending ? -r : r;
+      return a.name.compareTo(b.name); // tie-break
+    });
+    return list;
+  }
+
+  int _refCountFor(String diskPath) {
+    final refs = _refs;
+    if (refs == null) return 0;
+    return refs[canonicalizePath(diskPath)]?.length ?? 0;
+  }
 
   @override
   void initState() {
@@ -1333,11 +1385,14 @@ class _UploadManagerState extends State<_UploadManager> {
   void didUpdateWidget(covariant _UploadManager oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.images != widget.images) {
-      // When switching between Images <-> Files on desktop, ensure we reload with the new filter.
       setState(() {
         _selected.clear();
         _entries = const <StorageFileEntry>[];
         _loading = false;
+        _refs = null;
+        _showOrphansOnly = false;
+        _bySize = false;
+        _descending = true;
       });
       _load();
     }
@@ -1350,14 +1405,28 @@ class _UploadManagerState extends State<_UploadManager> {
       final list = await StorageUsageService.listUploadEntries(
         images: widget.images,
       );
+      final imagesDir = await AppDirectories.getImagesDirectory();
       if (!mounted) return;
       setState(() {
         _entries = list;
+        _imagesDirPath = imagesDir.path;
         final paths = _entries.map((e) => e.path).toSet();
         _selected.removeWhere((p) => !paths.contains(p));
       });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _computeRefs() async {
+    if (_computing) return;
+    setState(() => _computing = true);
+    try {
+      final refs = await context.read<ChatService>().computeFileReferences();
+      if (!mounted) return;
+      setState(() => _refs = refs);
+    } finally {
+      if (mounted) setState(() => _computing = false);
     }
   }
 
@@ -1375,7 +1444,7 @@ class _UploadManagerState extends State<_UploadManager> {
     setState(() {
       _selected
         ..clear()
-        ..addAll(_entries.map((e) => e.path));
+        ..addAll(_displayEntries.map((e) => e.path));
     });
   }
 
@@ -1387,12 +1456,19 @@ class _UploadManagerState extends State<_UploadManager> {
     if (_selected.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
     final count = _selected.length;
+    final refCount = _refs != null
+        ? _selected.where((p) => _refCountFor(p) > 0).length
+        : 0;
+    final hasRefs = refCount > 0;
+    final content = hasRefs
+        ? '${l10n.storageSpaceDeleteUploadsConfirmMessage(count)}\n\n${l10n.storageSpaceDeleteRefWarning(refCount)}'
+        : l10n.storageSpaceDeleteSimpleConfirm(count);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           title: Text(l10n.storageSpaceDeleteConfirmTitle),
-          content: Text(l10n.storageSpaceDeleteUploadsConfirmMessage(count)),
+          content: Text(content),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -1425,7 +1501,7 @@ class _UploadManagerState extends State<_UploadManager> {
   }
 
   Future<void> _openImageViewer(int initialIndex) async {
-    final images = _entries.map((e) => e.path).toList(growable: false);
+    final images = _displayEntries.map((e) => e.path).toList(growable: false);
     final route = PlatformUtils.isDesktopTarget
         ? PageRouteBuilder(
             pageBuilder: (_, __, ___) =>
@@ -1470,28 +1546,178 @@ class _UploadManagerState extends State<_UploadManager> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  void _locateReferences(List<FileReference> refs) {
+    if (refs.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
-
-    if (_loading && _entries.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_entries.isEmpty) {
-      return Center(
-        child: Text(
-          l10n.storageSpaceNoUploads,
-          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
-        ),
+    final isDesktop = PlatformUtils.isDesktopTarget;
+    if (isDesktop) {
+      MessageLocateBus.instance.fire(
+        conversationId: refs.first.conversationId,
+        messageId: refs.first.messageId,
       );
+      return;
     }
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Text(
+                  l10n.storageSpaceLocateTitle,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+              ),
+              ...refs.map(
+                (ref) => ListTile(
+                  title: Text(
+                    ref.conversationTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: ref.preview.isNotEmpty
+                      ? Text(
+                          ref.preview,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.of(ctx).maybePop();
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).maybePop();
+                    }
+                    MessageLocateBus.instance.fire(
+                      conversationId: ref.conversationId,
+                      messageId: ref.messageId,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-    final actions = Wrap(
+  Widget _buildSortSegment(ColorScheme cs) {
+    final border = cs.onSurface.withValues(alpha: 0.12);
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _sortCell(
+            label: _bySize
+                ? '${_descending ? '↓' : '↑'} ${l10n.storageSpaceSortBySize}'
+                : l10n.storageSpaceSortBySize,
+            active: _bySize,
+            cs: cs,
+            onTap: () => setState(() {
+              if (_bySize) {
+                _descending = !_descending;
+              } else {
+                _bySize = true;
+                _descending = true;
+              }
+            }),
+          ),
+          Container(width: 1, height: 20, color: border),
+          _sortCell(
+            label: !_bySize
+                ? '${_descending ? '↓' : '↑'} ${l10n.storageSpaceSortByTime}'
+                : l10n.storageSpaceSortByTime,
+            active: !_bySize,
+            cs: cs,
+            onTap: () => setState(() {
+              if (!_bySize) {
+                _descending = !_descending;
+              } else {
+                _bySize = false;
+                _descending = true;
+              }
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _togglePill(
+    ColorScheme cs,
+    String label,
+    bool selected,
+    VoidCallback onTap,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selBg = isDark
+        ? cs.primary.withValues(alpha: 0.20)
+        : cs.primary.withValues(alpha: 0.12);
+    final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? selBg : baseBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? cs.primary.withValues(alpha: 0.35)
+                : cs.outlineVariant.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.82),
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActions(ColorScheme cs, AppLocalizations l10n) {
+    return Wrap(
       spacing: 10,
       runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        _buildSortSegment(cs),
+        if (_refs != null && _orphanCount > 0)
+          _togglePill(
+            cs,
+            l10n.storageSpaceShowOrphansOnly,
+            _showOrphansOnly,
+            () => setState(() => _showOrphansOnly = !_showOrphansOnly),
+          )
+        else if (_refs == null)
+          IosTileButton(
+            label: l10n.storageSpaceComputeRefs,
+            icon: _computing ? Icons.hourglass_empty : Lucide.Search,
+            backgroundColor: cs.primary,
+            enabled: !_computing,
+            onTap: () {
+              _computeRefs();
+            },
+          ),
         IosTileButton(
           label: _selectMode
               ? l10n.storageSpaceClearSelection
@@ -1509,6 +1735,28 @@ class _UploadManagerState extends State<_UploadManager> {
         ),
       ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final display = _displayEntries;
+
+    if (_loading && _entries.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_entries.isEmpty) {
+      return Center(
+        child: Text(
+          l10n.storageSpaceNoUploads,
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+        ),
+      );
+    }
+
+    final actions = _buildActions(cs, l10n);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1524,7 +1772,7 @@ class _UploadManagerState extends State<_UploadManager> {
                   child: Text(
                     _selectMode
                         ? l10n.storageSpaceSelectedCount(_selected.length)
-                        : l10n.storageSpaceUploadsCount(_entries.length),
+                        : l10n.storageSpaceUploadsCount(display.length),
                     style: TextStyle(
                       fontSize: 12.5,
                       color: cs.onSurface.withValues(alpha: 0.65),
@@ -1532,6 +1780,32 @@ class _UploadManagerState extends State<_UploadManager> {
                   ),
                 ),
               ),
+              if (_refs != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Lucide.TriangleAlert,
+                          size: 13,
+                          color: cs.onSurface.withValues(alpha: 0.55),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            l10n.storageSpaceMarkdownRefLimitation,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: cs.onSurface.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               if (widget.images)
                 SliverPadding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -1544,11 +1818,17 @@ class _UploadManagerState extends State<_UploadManager> {
                           childAspectRatio: 1,
                         ),
                     delegate: SliverChildBuilderDelegate((context, index) {
-                      final e = _entries[index];
+                      final e = display[index];
                       final selected = _selected.contains(e.path);
+                      final rc = _refCountFor(e.path);
+                      final aiGen = _isAiGenerated(e.path);
                       return _ImageTile(
                         path: e.path,
+                        bytes: e.bytes,
                         selected: selected,
+                        refCount: _refs != null ? rc : null,
+                        isAiGenerated: aiGen,
+                        fmtBytes: widget.fmtBytes,
                         onToggle: () => _toggleSelect(e.path),
                         onTap: () {
                           if (_selectMode) {
@@ -1558,20 +1838,29 @@ class _UploadManagerState extends State<_UploadManager> {
                           }
                         },
                         onLongPress: () => _toggleSelect(e.path),
+                        onRefCountTap: _refs != null && rc > 0 && !aiGen
+                            ? () => _locateReferences(
+                                _refs![canonicalizePath(e.path)]!,
+                              )
+                            : null,
                       );
-                    }, childCount: _entries.length),
+                    }, childCount: display.length),
                   ),
                 )
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final e = _entries[index];
+                    final e = display[index];
                     final selected = _selected.contains(e.path);
+                    final rc = _refCountFor(e.path);
+                    final aiGen = _isAiGenerated(e.path);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _FileRow(
                         entry: e,
                         selected: selected,
+                        refCount: _refs != null ? rc : null,
+                        isAiGenerated: aiGen,
                         fmtBytes: widget.fmtBytes,
                         onTap: () {
                           if (_selectMode) {
@@ -1582,9 +1871,14 @@ class _UploadManagerState extends State<_UploadManager> {
                         },
                         onLongPress: () => _toggleSelect(e.path),
                         onToggle: () => _toggleSelect(e.path),
+                        onRefCountTap: _refs != null && rc > 0 && !aiGen
+                            ? () => _locateReferences(
+                                _refs![canonicalizePath(e.path)]!,
+                              )
+                            : null,
                       ),
                     );
-                  }, childCount: _entries.length),
+                  }, childCount: display.length),
                 ),
             ],
           ),
@@ -1594,20 +1888,53 @@ class _UploadManagerState extends State<_UploadManager> {
   }
 }
 
+Widget _sortCell({
+  required String label,
+  required bool active,
+  required ColorScheme cs,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      color: active ? cs.primary.withValues(alpha: 0.12) : Colors.transparent,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: active ? AppFontWeights.semibold : AppFontWeights.regular,
+          color: active ? cs.primary : cs.onSurface.withValues(alpha: 0.75),
+        ),
+      ),
+    ),
+  );
+}
+
 class _ImageTile extends StatelessWidget {
   const _ImageTile({
     required this.path,
+    required this.bytes,
     required this.selected,
+    required this.refCount,
+    required this.isAiGenerated,
+    required this.fmtBytes,
     required this.onToggle,
     required this.onTap,
     required this.onLongPress,
+    this.onRefCountTap,
   });
 
   final String path;
+  final int bytes;
   final bool selected;
+  final int? refCount;
+  final bool isAiGenerated;
+  final String Function(int) fmtBytes;
   final VoidCallback onToggle;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onRefCountTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1658,6 +1985,77 @@ class _ImageTile extends StatelessWidget {
                     );
                   },
                 ),
+                // Size overlay (eager — always visible)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 22,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.55),
+                        ],
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      fmtBytes(bytes),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: AppFontWeights.semibold,
+                        color: Colors.white.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ),
+                ),
+                // refCount / AI-generated badge (on-demand — appears after compute)
+                if (refCount != null || isAiGenerated)
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: GestureDetector(
+                      onTap: refCount != null && refCount! > 0 && !isAiGenerated
+                          ? onRefCountTap
+                          : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isAiGenerated
+                              ? const Color(0xFF8B5CF6).withValues(alpha: 0.85)
+                              : refCount! > 0
+                              ? cs.primary.withValues(alpha: 0.85)
+                              : cs.onSurface.withValues(alpha: 0.50),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isAiGenerated
+                              ? AppLocalizations.of(
+                                  context,
+                                )!.storageSpaceAiGenerated
+                              : refCount! > 0
+                              ? '×${refCount!}'
+                              : AppLocalizations.of(
+                                  context,
+                                )!.storageSpaceRefNone,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: AppFontWeights.semibold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Checkbox (top-right)
                 Positioned(
                   top: 6,
                   right: 6,
@@ -1686,21 +2084,28 @@ class _FileRow extends StatelessWidget {
     required this.entry,
     required this.selected,
     required this.fmtBytes,
+    this.refCount,
+    this.isAiGenerated = false,
     required this.onTap,
     required this.onLongPress,
     required this.onToggle,
+    this.onRefCountTap,
   });
 
   final StorageFileEntry entry;
   final bool selected;
   final String Function(int) fmtBytes;
+  final int? refCount;
+  final bool isAiGenerated;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onToggle;
+  final VoidCallback? onRefCountTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final border = cs.onSurface.withValues(alpha: 0.08);
 
     return Container(
@@ -1761,6 +2166,45 @@ class _FileRow extends StatelessWidget {
                 ],
               ),
             ),
+            // refCount / AI-generated label (on-demand)
+            if (refCount != null || isAiGenerated) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: refCount != null && refCount! > 0 && !isAiGenerated
+                    ? onRefCountTap
+                    : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isAiGenerated
+                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
+                        : refCount! > 0
+                        ? cs.primary.withValues(alpha: 0.12)
+                        : cs.onSurface.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isAiGenerated
+                        ? l10n.storageSpaceAiGenerated
+                        : refCount! > 0
+                        ? l10n.storageSpaceRefCount(refCount!)
+                        : l10n.storageSpaceRefNone,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: AppFontWeights.semibold,
+                      color: isAiGenerated
+                          ? const Color(0xFF8B5CF6)
+                          : refCount! > 0
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.50),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

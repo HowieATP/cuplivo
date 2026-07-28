@@ -119,6 +119,14 @@
   "storageSpaceClearLogsButton": "Clear Logs",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
+  "storageSpaceDeleteSimpleConfirm": "Delete {count} items?",
+  "@storageSpaceDeleteSimpleConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
   "@storageSpaceDeleteUploadsConfirmMessage": {
     "placeholders": {
@@ -154,6 +162,30 @@
       }
     }
   },
+  "storageSpaceSortBySize": "By size",
+  "storageSpaceSortByTime": "By date",
+  "storageSpaceRefCount": "{count} refs",
+  "@storageSpaceRefCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceRefNone": "No refs",
+  "storageSpaceShowOrphansOnly": "Orphans only",
+  "storageSpaceComputeRefs": "Compute refs",
+  "storageSpaceLocateTitle": "Referenced by",
+  "storageSpaceDeleteRefWarning": "{count} files are referenced by messages — deleting will break their display",
+  "@storageSpaceDeleteRefWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceAiGenerated": "AI generated",
+  "storageSpaceMarkdownRefLimitation": "Note: Markdown-referenced local images are not counted. AI-generated images show as 'AI generated' — do not delete them.",
   "settingsPageAboutSection": "About",
   "settingsPageAbout": "About",
   "settingsPageStatistics": "Statistics",

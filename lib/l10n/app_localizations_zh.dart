@@ -227,6 +227,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '删除 $count 个项目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
   }
@@ -254,6 +259,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按时间';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 处引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '无引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看无引用';
+
+  @override
+  String get storageSpaceComputeRefs => '计算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此文件的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '注：不统计 Markdown 格式引用的本地图片。images/ 下的 AI 生成图片显示为「AI 生成」——请勿误删。';
 
   @override
   String get settingsPageAboutSection => '关于';
@@ -6124,6 +6164,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '删除 $count 个项目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
   }
@@ -6151,6 +6196,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按时间';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 处引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '无引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看无引用';
+
+  @override
+  String get storageSpaceComputeRefs => '计算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此文件的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '注：不统计 Markdown 格式引用的本地图片。images/ 下的 AI 生成图片显示为「AI 生成」——请勿误删。';
 
   @override
   String get settingsPageAboutSection => '关于';
@@ -12021,6 +12101,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceDeleteConfirmTitle => '確認刪除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '刪除 $count 個項目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '刪除 $count 個項目？刪除後聊天記錄中的附件可能無法開啟。';
   }
@@ -12048,6 +12133,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 項';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按時間';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 處引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '無引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看無引用';
+
+  @override
+  String get storageSpaceComputeRefs => '計算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此檔案的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 個檔案被訊息引用——刪除後將無法顯示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '註：不統計 Markdown 格式引用的本地圖片。images/ 下的 AI 生成圖片顯示為「AI 生成」——請勿誤刪。';
 
   @override
   String get settingsPageAboutSection => '關於';

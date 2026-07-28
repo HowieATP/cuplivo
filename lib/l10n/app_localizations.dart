@@ -11299,6 +11299,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quote'**
   String get chatMessageWidgetQuote;
+
+  /// No description provided for @chatMessageWidgetSpeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Speak'**
+  String get chatMessageWidgetSpeak;
 }
 
 class _AppLocalizationsDelegate

@@ -5939,6 +5939,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗读';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11876,6 +11879,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗读';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -17813,4 +17819,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗讀';
 }

@@ -72,10 +72,24 @@ void main() {
     });
   });
 
-  group('all-zero garbage events', () {
-    test('swallows all-zero event', () {
+  group('all-zero transit-mode probe events', () {
+    // The Flutter engine sends all-zero KeyData events as transit-mode
+    // probes. They MUST reach the framework's handleKeyData so that
+    // _transitMode is inferred as keyDataThenRawKeyData. Swallowing them
+    // here leaves _transitMode null, the raw channel then sets it to
+    // rawKeyData, and every subsequent real KeyData hits the assertion:
+    //   'Should never encounter KeyData when transitMode is rawKeyData.'
+    test('passes all-zero probe through unchanged', () {
       final key = makeKey(type: KeyEventType.down, physical: 0, logical: 0);
-      expect(fix.rewrite(key), isNull);
+      expect(fix.rewrite(key), same(key));
+    });
+
+    test('all-zero probe does not reset Win+V mid-sequence state', () {
+      fix.rewrite(ctrlDown(synthesized: false));
+      // Probe arrives mid-sequence (e.g. focus shift); must not break state.
+      fix.rewrite(makeKey(type: KeyEventType.down, physical: 0, logical: 0));
+      // Sequence should still continue at step 1 → expect Ctrl↑ swallow.
+      expect(fix.rewrite(ctrlUp(synthesized: true)), isNull);
     });
   });
 

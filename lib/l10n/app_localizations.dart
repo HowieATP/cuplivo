@@ -508,6 +508,12 @@ abstract class AppLocalizations {
   /// **'Confirm deletion'**
   String get storageSpaceDeleteConfirmTitle;
 
+  /// No description provided for @storageSpaceDeleteSimpleConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} items?'**
+  String storageSpaceDeleteSimpleConfirm(int count);
+
   /// No description provided for @storageSpaceDeleteUploadsConfirmMessage.
   ///
   /// In en, this message translates to:
@@ -549,6 +555,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} items'**
   String storageSpaceUploadsCount(int count);
+
+  /// No description provided for @storageSpaceSortBySize.
+  ///
+  /// In en, this message translates to:
+  /// **'By size'**
+  String get storageSpaceSortBySize;
+
+  /// No description provided for @storageSpaceSortByTime.
+  ///
+  /// In en, this message translates to:
+  /// **'By date'**
+  String get storageSpaceSortByTime;
+
+  /// No description provided for @storageSpaceRefCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} refs'**
+  String storageSpaceRefCount(int count);
+
+  /// No description provided for @storageSpaceRefNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No refs'**
+  String get storageSpaceRefNone;
+
+  /// No description provided for @storageSpaceShowOrphansOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Orphans only'**
+  String get storageSpaceShowOrphansOnly;
+
+  /// No description provided for @storageSpaceComputeRefs.
+  ///
+  /// In en, this message translates to:
+  /// **'Compute refs'**
+  String get storageSpaceComputeRefs;
+
+  /// No description provided for @storageSpaceLocateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Referenced by'**
+  String get storageSpaceLocateTitle;
+
+  /// No description provided for @storageSpaceDeleteRefWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files are referenced by messages — deleting will break their display'**
+  String storageSpaceDeleteRefWarning(int count);
+
+  /// No description provided for @storageSpaceAiGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'AI generated'**
+  String get storageSpaceAiGenerated;
+
+  /// No description provided for @storageSpaceMarkdownRefLimitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: Markdown-referenced local images are not counted. AI-generated images show as \'AI generated\' — do not delete them.'**
+  String get storageSpaceMarkdownRefLimitation;
 
   /// No description provided for @settingsPageAboutSection.
   ///

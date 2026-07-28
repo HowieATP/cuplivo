@@ -9,6 +9,7 @@ import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
 import '../l10n/app_localizations.dart';
+import '../core/services/storage/message_locate_bus.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'hotkeys/hotkey_event_bus.dart';
@@ -38,6 +39,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
+  StreamSubscription<MessageLocateTarget>? _locateSub;
 
   @override
   void initState() {
@@ -156,6 +158,14 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
           break;
       }
+    });
+    _locateSub = MessageLocateBus.instance.stream.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _tabIndex = 0;
+        _globalSearchActive = false;
+      });
+      ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
     });
   }
 
@@ -296,6 +306,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     } catch (_) {}
     try {
       _settingsNavSub?.cancel();
+    } catch (_) {}
+    try {
+      _locateSub?.cancel();
     } catch (_) {}
     super.dispose();
   }

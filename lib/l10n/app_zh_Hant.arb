@@ -1881,6 +1881,8 @@
   "logViewerSectionParameters": "參數",
   "logViewerSectionRequestHeaders": "請求標頭",
   "logViewerSectionRequestBody": "請求本文",
+  "logViewerBeautifyToggle": "美化顯示",
+  "logViewerRequestConfig": "設定參數",
   "logViewerSectionResponseHeaders": "回應標頭",
   "logViewerSectionResponseBody": "回應本文",
   "logViewerSectionWarnings": "警告",

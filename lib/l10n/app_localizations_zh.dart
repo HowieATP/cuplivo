@@ -5161,6 +5161,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get logViewerSectionRequestBody => '请求体';
 
   @override
+  String get logViewerBeautifyToggle => '美化显示';
+
+  @override
+  String get logViewerRequestConfig => '配置参数';
+
+  @override
   String get logViewerSectionResponseHeaders => '响应头';
 
   @override
@@ -11049,6 +11055,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get logViewerSectionRequestBody => '请求体';
 
   @override
+  String get logViewerBeautifyToggle => '美化显示';
+
+  @override
+  String get logViewerRequestConfig => '配置参数';
+
+  @override
   String get logViewerSectionResponseHeaders => '响应头';
 
   @override
@@ -16935,6 +16947,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logViewerSectionRequestBody => '請求本文';
+
+  @override
+  String get logViewerBeautifyToggle => '美化顯示';
+
+  @override
+  String get logViewerRequestConfig => '設定參數';
 
   @override
   String get logViewerSectionResponseHeaders => '回應標頭';

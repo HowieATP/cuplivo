@@ -7652,6 +7652,12 @@ abstract class AppLocalizations {
   /// **'Compress all images'**
   String get oneClickCompressTooltip;
 
+  /// Shown inside the one-click compress slot after first tap; asking user to tap again to confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to compress'**
+  String get oneClickCompressConfirmPrompt;
+
   /// SnackBar message after one-click compression showing savings
   ///
   /// In en, this message translates to:

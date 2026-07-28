@@ -1805,6 +1805,10 @@
   "@oneClickCompressTooltip": {
     "description": "Tooltip for the one-click compress button"
   },
+  "oneClickCompressConfirmPrompt": "Tap again to compress",
+  "@oneClickCompressConfirmPrompt": {
+    "description": "Shown inside the one-click compress slot after first tap; asking user to tap again to confirm"
+  },
   "oneClickCompressResult": "Compressed {count} images, saved {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "description": "SnackBar message after one-click compression showing savings",

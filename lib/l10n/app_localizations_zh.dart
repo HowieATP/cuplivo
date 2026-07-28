@@ -3969,6 +3969,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oneClickCompressTooltip => '压缩所有图片';
 
   @override
+  String get oneClickCompressConfirmPrompt => '再次点击确认压缩';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
   }
@@ -9863,6 +9866,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get oneClickCompressTooltip => '压缩所有图片';
 
   @override
+  String get oneClickCompressConfirmPrompt => '再次点击确认压缩';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
   }
@@ -15753,6 +15759,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oneClickCompressTooltip => '壓縮所有圖片';
+
+  @override
+  String get oneClickCompressConfirmPrompt => '再次點擊確認壓縮';
 
   @override
   String oneClickCompressResult(int count, String saved, String pct) {

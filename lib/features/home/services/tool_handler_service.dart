@@ -23,6 +23,20 @@ import 'tool_approval_service.dart';
 /// - MCP 工具
 /// - Memory 工具 (create/edit/delete)
 /// - Search 工具
+enum CollisionSource { builtin, mcpVsMcp }
+
+class ToolNameCollision {
+  final String toolName;
+  final CollisionSource source;
+  final List<McpServerConfig> servers;
+
+  const ToolNameCollision({
+    required this.toolName,
+    required this.source,
+    required this.servers,
+  });
+}
+
 class ToolHandlerService {
   ToolHandlerService({required this.contextProvider});
 
@@ -172,6 +186,116 @@ class ToolHandlerService {
   }
 
   // ============================================================================
+  // Collision Detection & Prefix Validation
+  // ============================================================================
+
+  static final RegExp _prefixPattern = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]{0,15}$');
+
+  /// Validate a tool prefix string.
+  ///
+  /// Returns null if valid, or a localization key string if invalid.
+  static String? validateToolPrefix(String prefix, McpServerConfig server) {
+    if (prefix.isEmpty) return null;
+    if (!_prefixPattern.hasMatch(prefix)) {
+      return 'prefixFormatInvalid';
+    }
+    final maxToolLen = server.tools.isEmpty
+        ? 0
+        : server.tools
+              .map((t) => t.name.length)
+              .reduce((a, b) => a > b ? a : b);
+    if (prefix.length + 1 + maxToolLen > 64) {
+      return 'prefixTooLong';
+    }
+    return null;
+  }
+
+  static Set<String> _getBuiltinToolNames(Assistant? assistant) {
+    final names = <String>{};
+    if (assistant == null) return names;
+    if (assistant.searchEnabled == true) {
+      names.add(SearchToolService.toolName);
+    }
+    if (assistant.enableMemory == true) {
+      names.add('create_memory');
+      names.add('edit_memory');
+      names.add('delete_memory');
+      if (assistant.memoryMode == 'tool') {
+        names.add('read_memory');
+      }
+    }
+    for (final id in assistant.localToolIds) {
+      names.add(id);
+    }
+    if (assistant.skillIds.isNotEmpty) {
+      names.add(LocalToolNames.loadSkill);
+      names.add(LocalToolNames.readSkillFile);
+    }
+    return names;
+  }
+
+  /// Detect tool name collisions for the given assistant.
+  ///
+  /// Returns a list of [ToolNameCollision] objects describing each collision.
+  /// Empty list means no collisions — safe to send.
+  static List<ToolNameCollision> detectToolNameCollisions({
+    required McpProvider mcp,
+    required Assistant? assistant,
+  }) {
+    final collisions = <ToolNameCollision>[];
+    if (assistant == null) return collisions;
+
+    final builtinNames = _getBuiltinToolNames(assistant);
+    final selectedIds = assistant.mcpServerIds.toSet();
+    final boundServers = mcp.connectedServers
+        .where((s) => selectedIds.contains(s.id) && s.enabled)
+        .toList();
+
+    // Group MCP tools by effective (after-prefix) name
+    final effectiveToServers = <String, List<McpServerConfig>>{};
+    for (final server in boundServers) {
+      for (final tool in server.tools.where((t) => t.enabled)) {
+        final effective = server.toolPrefix.isNotEmpty
+            ? '${server.toolPrefix}_${tool.name}'
+            : tool.name;
+        effectiveToServers.putIfAbsent(effective, () => []).add(server);
+      }
+    }
+
+    for (final entry in effectiveToServers.entries) {
+      final effectiveName = entry.key;
+      final servers = entry.value;
+
+      // MCP-vs-built-in: effective name matches a built-in (only happens when
+      // all contributing servers have no prefix, since prefixed names like
+      // "mem_create_memory" won't appear in builtinNames)
+      if (builtinNames.contains(effectiveName)) {
+        collisions.add(
+          ToolNameCollision(
+            toolName: effectiveName,
+            source: CollisionSource.builtin,
+            servers: servers,
+          ),
+        );
+        continue; // skip MCP-vs-MCP check; builtin collision is the main issue
+      }
+
+      // MCP-vs-MCP: same effective name across multiple servers
+      if (servers.length > 1) {
+        collisions.add(
+          ToolNameCollision(
+            toolName: effectiveName,
+            source: CollisionSource.mcpVsMcp,
+            servers: servers,
+          ),
+        );
+      }
+    }
+
+    return collisions;
+  }
+
+  // ============================================================================
   // Tool Definitions Builder
   // ============================================================================
 
@@ -317,14 +441,15 @@ class ToolHandlerService {
     if (!supportsTools) return [];
 
     final mcp = contextProvider.read<McpProvider>();
-    final toolSvc = contextProvider.read<McpToolService>();
-    final tools = toolSvc.listAvailableToolsForAssistant(
-      mcp,
-      contextProvider.read<AssistantProvider>(),
-      assistant?.id,
-    );
-
-    if (tools.isEmpty) return [];
+    final assistantProvider = contextProvider.read<AssistantProvider>();
+    final a = (assistant?.id != null)
+        ? assistantProvider.getById(assistant!.id)
+        : assistantProvider.currentAssistant;
+    final selectedIds = (a?.mcpServerIds ?? const <String>[]).toSet();
+    final boundServers = mcp.connectedServers
+        .where((s) => selectedIds.contains(s.id) && s.enabled)
+        .toList();
+    if (boundServers.isEmpty) return [];
 
     final providerCfg = settings.getProviderConfig(providerKey);
     final providerKind = ProviderConfig.classify(
@@ -332,36 +457,45 @@ class ToolHandlerService {
       explicitType: providerCfg.providerType,
     );
 
-    return tools.map((t) {
-      Map<String, dynamic> baseSchema;
-      if (t.schema != null && t.schema!.isNotEmpty) {
-        baseSchema = Map<String, dynamic>.from(t.schema!);
-      } else {
-        final props = <String, dynamic>{
-          for (final p in t.params) p.name: {'type': (p.type ?? 'string')},
-        };
-        final required = [
-          for (final p in t.params.where((e) => e.required)) p.name,
-        ];
-        baseSchema = {
-          'type': 'object',
-          'properties': props,
-          if (required.isNotEmpty) 'required': required,
-        };
+    final results = <Map<String, dynamic>>[];
+    for (final server in boundServers) {
+      for (final tool in server.tools.where((t) => t.enabled)) {
+        final effectiveName = server.toolPrefix.isNotEmpty
+            ? '${server.toolPrefix}_${tool.name}'
+            : tool.name;
+
+        Map<String, dynamic> baseSchema;
+        if (tool.schema != null && tool.schema!.isNotEmpty) {
+          baseSchema = Map<String, dynamic>.from(tool.schema!);
+        } else {
+          final props = <String, dynamic>{
+            for (final p in tool.params) p.name: {'type': (p.type ?? 'string')},
+          };
+          final required = [
+            for (final p in tool.params.where((e) => e.required)) p.name,
+          ];
+          baseSchema = {
+            'type': 'object',
+            'properties': props,
+            if (required.isNotEmpty) 'required': required,
+          };
+        }
+        final sanitized = sanitizeToolParametersForProvider(
+          baseSchema,
+          providerKind,
+        );
+        results.add({
+          'type': 'function',
+          'function': {
+            'name': effectiveName,
+            if ((tool.description ?? '').isNotEmpty)
+              'description': tool.description,
+            'parameters': sanitized,
+          },
+        });
       }
-      final sanitized = sanitizeToolParametersForProvider(
-        baseSchema,
-        providerKind,
-      );
-      return {
-        'type': 'function',
-        'function': {
-          'name': t.name,
-          if ((t.description ?? '').isNotEmpty) 'description': t.description,
-          'parameters': sanitized,
-        },
-      };
-    }).toList();
+    }
+    return results;
   }
 
   // ============================================================================
@@ -389,6 +523,64 @@ class ToolHandlerService {
 
     return (name, args, {toolCallId}) async {
       try {
+        // Resolve MCP prefix — longest-prefix-first to avoid ambiguity
+        // (e.g. prefix "ab" must win over "a" for tool "ab_tool").
+        // Only consider servers bound to this assistant.
+        String resolvedName = name;
+        McpServerConfig? mcpServer;
+        bool hasMcpPrefix = false;
+        final boundIds = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+        final prefixedServers =
+            mcp.connectedServers
+                .where(
+                  (s) => s.toolPrefix.isNotEmpty && boundIds.contains(s.id),
+                )
+                .toList()
+              ..sort(
+                (a, b) => b.toolPrefix.length.compareTo(a.toolPrefix.length),
+              );
+        for (final s in prefixedServers) {
+          final prefixWithSep = '${s.toolPrefix}_';
+          if (name.startsWith(prefixWithSep)) {
+            resolvedName = name.substring(prefixWithSep.length);
+            mcpServer = s;
+            hasMcpPrefix = true;
+            break;
+          }
+        }
+
+        // If the tool name has a known MCP prefix, bypass built-in tools
+        // and route directly to that MCP server
+        if (hasMcpPrefix) {
+          // Approval gate (using original unprefixed name)
+          if (approvalService != null && mcp.toolNeedsApproval(resolvedName)) {
+            final callId =
+                '${resolvedName}_${DateTime.now().microsecondsSinceEpoch}';
+            final result = await approvalService.requestApproval(
+              toolCallId: callId,
+              toolName: resolvedName,
+              arguments: args,
+            );
+            if (!result.approved) {
+              return _toolError(
+                error: 'approval_denied',
+                message: result.denyReason ?? 'User denied the tool call',
+                tool: resolvedName,
+              );
+            }
+          }
+
+          final text = await toolSvc.callToolTextForAssistant(
+            mcp,
+            assistantProvider,
+            assistantId: assistant?.id,
+            toolName: resolvedName,
+            arguments: args,
+            targetServerId: mcpServer!.id,
+          );
+          return text;
+        }
+
         // Search tool
         if (name == SearchToolService.toolName &&
             assistant?.searchEnabled == true) {
@@ -475,7 +667,7 @@ class ToolHandlerService {
           }
         }
 
-        // MCP tools
+        // MCP tools (unprefixed fallback)
         final text = await toolSvc.callToolTextForAssistant(
           mcp,
           assistantProvider,

@@ -2835,6 +2835,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetUrlRequired => '请输入服务器地址';
 
   @override
+  String get mcpServerEditSheetToolPrefixLabel => '工具前缀';
+
+  @override
+  String get mcpServerEditSheetToolPrefixHint => '可选，用于区分同名工具';
+
+  @override
   String get defaultModelPageBackTooltip => '返回';
 
   @override
@@ -5459,6 +5465,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpToolNeedsApproval => '需要审批';
+
+  @override
+  String get mcpToolCollisionTitle => '工具名称冲突';
+
+  @override
+  String get mcpToolCollisionDescription => '以下工具存在名称冲突，请解决后再发送';
+
+  @override
+  String get mcpToolCollisionBuiltinDesc => '与内置工具同名';
+
+  @override
+  String get mcpToolCollisionMcpDesc => '多个 MCP 服务器中存在同名工具';
+
+  @override
+  String get mcpToolCollisionDisableBuiltin => '禁用内置工具';
+
+  @override
+  String get mcpToolCollisionServerPrefix => '为服务器添加前缀';
+
+  @override
+  String get mcpToolCollisionPrefixHint => '输入前缀';
+
+  @override
+  String get mcpToolCollisionPrefixError => '前缀格式无效';
+
+  @override
+  String get mcpToolCollisionConfirm => '继续发送';
+
+  @override
+  String get mcpToolCollisionCancel => '取消发送';
+
+  @override
+  String get mcpToolCollisionUnbindHint => '将从此助手取消绑定该服务器';
 
   @override
   String get toolApprovalPending => '等待审批';
@@ -8792,6 +8831,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetUrlRequired => '请输入服务器地址';
 
   @override
+  String get mcpServerEditSheetToolPrefixLabel => '工具前缀';
+
+  @override
+  String get mcpServerEditSheetToolPrefixHint => '可选，用于区分同名工具';
+
+  @override
   String get defaultModelPageBackTooltip => '返回';
 
   @override
@@ -11416,6 +11461,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpToolNeedsApproval => '需要审批';
+
+  @override
+  String get mcpToolCollisionTitle => '工具名称冲突';
+
+  @override
+  String get mcpToolCollisionDescription => '以下工具存在名称冲突，请解决后再发送';
+
+  @override
+  String get mcpToolCollisionBuiltinDesc => '与内置工具同名';
+
+  @override
+  String get mcpToolCollisionMcpDesc => '多个 MCP 服务器中存在同名工具';
+
+  @override
+  String get mcpToolCollisionDisableBuiltin => '禁用内置工具';
+
+  @override
+  String get mcpToolCollisionServerPrefix => '为服务器添加前缀';
+
+  @override
+  String get mcpToolCollisionPrefixHint => '输入前缀';
+
+  @override
+  String get mcpToolCollisionPrefixError => '前缀格式无效';
+
+  @override
+  String get mcpToolCollisionConfirm => '继续发送';
+
+  @override
+  String get mcpToolCollisionCancel => '取消发送';
+
+  @override
+  String get mcpToolCollisionUnbindHint => '将从此助手取消绑定该服务器';
 
   @override
   String get toolApprovalPending => '等待审批';
@@ -14748,6 +14826,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpServerEditSheetUrlRequired => '請輸入伺服器地址';
 
   @override
+  String get mcpServerEditSheetToolPrefixLabel => '工具前綴';
+
+  @override
+  String get mcpServerEditSheetToolPrefixHint => '可選，用於區分同名工具';
+
+  @override
   String get defaultModelPageBackTooltip => '返回';
 
   @override
@@ -17373,6 +17457,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpToolNeedsApproval => '需要審批';
+
+  @override
+  String get mcpToolCollisionTitle => '工具名稱衝突';
+
+  @override
+  String get mcpToolCollisionDescription => '以下工具存在名稱衝突，請解決後再發送';
+
+  @override
+  String get mcpToolCollisionBuiltinDesc => '與內置工具同名';
+
+  @override
+  String get mcpToolCollisionMcpDesc => '多個 MCP 伺服器中有同名工具';
+
+  @override
+  String get mcpToolCollisionDisableBuiltin => '停用內置工具';
+
+  @override
+  String get mcpToolCollisionServerPrefix => '為伺服器添加前綴';
+
+  @override
+  String get mcpToolCollisionPrefixHint => '輸入前綴';
+
+  @override
+  String get mcpToolCollisionPrefixError => '前綴格式無效';
+
+  @override
+  String get mcpToolCollisionConfirm => '繼續發送';
+
+  @override
+  String get mcpToolCollisionCancel => '取消發送';
+
+  @override
+  String get mcpToolCollisionUnbindHint => '將從此助手取消綁定該伺服器';
 
   @override
   String get toolApprovalPending => '等待審批';

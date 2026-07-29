@@ -58,6 +58,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   final _argsCtrl = TextEditingController(); // space-separated args
   final _cwdCtrl = TextEditingController();
   final List<_HeaderEntry> _env = [];
+  final _toolPrefixCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -69,6 +70,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       _transport = server.transport;
       _urlCtrl.text = server.url;
       _heartbeatIntervalSeconds = server.heartbeatIntervalSeconds ?? 12;
+      _toolPrefixCtrl.text = server.toolPrefix;
       server.headers.forEach((k, v) {
         _headers.add(
           _HeaderEntry(
@@ -107,6 +109,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     for (final e in _env) {
       e.dispose();
     }
+    _toolPrefixCtrl.dispose();
     super.dispose();
   }
 
@@ -155,6 +158,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             e.key.text.trim(): e.value.text.trim(),
       };
       final cwd = _cwdCtrl.text.trim();
+      final toolPrefix = _toolPrefixCtrl.text.trim();
       if (isEdit) {
         final old = mcp.getById(widget.serverId!)!;
         final clearing = cwd.isEmpty;
@@ -172,6 +176,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             clearWorkingDirectory: clearing,
             heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
             clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
+            toolPrefix: toolPrefix,
           ),
         );
       } else {
@@ -186,6 +191,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
               ? null
               : _heartbeatIntervalSeconds,
+          toolPrefix: toolPrefix,
         );
       }
     } else {
@@ -198,6 +204,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         );
         return;
       }
+      final toolPrefix = _toolPrefixCtrl.text.trim();
       if (isEdit) {
         final old = mcp.getById(widget.serverId!)!;
         await mcp.updateServer(
@@ -209,6 +216,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             headers: headers,
             heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
             clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
+            toolPrefix: toolPrefix,
           ),
         );
       } else {
@@ -221,6 +229,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
               ? null
               : _heartbeatIntervalSeconds,
+          toolPrefix: toolPrefix,
         );
       }
     }
@@ -407,6 +416,15 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                 color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
+          ),
+        ],
+        if (!isBuiltin) ...[
+          const SizedBox(height: 16),
+          _labeledField(
+            label: l10n.mcpServerEditSheetToolPrefixLabel,
+            controller: _toolPrefixCtrl,
+            hint: l10n.mcpServerEditSheetToolPrefixHint,
+            bold: false,
           ),
         ],
         if (!isBuiltin && _transport == McpTransportType.stdio) ...[

@@ -5483,6 +5483,18 @@ abstract class AppLocalizations {
   /// **'Please enter server URL'**
   String get mcpServerEditSheetUrlRequired;
 
+  /// No description provided for @mcpServerEditSheetToolPrefixLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Prefix'**
+  String get mcpServerEditSheetToolPrefixLabel;
+
+  /// No description provided for @mcpServerEditSheetToolPrefixHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional, for distinguishing tools with the same name'**
+  String get mcpServerEditSheetToolPrefixHint;
+
   /// No description provided for @defaultModelPageBackTooltip.
   ///
   /// In en, this message translates to:
@@ -10477,6 +10489,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Require approval'**
   String get mcpToolNeedsApproval;
+
+  /// No description provided for @mcpToolCollisionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Name Conflict'**
+  String get mcpToolCollisionTitle;
+
+  /// No description provided for @mcpToolCollisionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The following tools have name conflicts. Resolve them before sending.'**
+  String get mcpToolCollisionDescription;
+
+  /// No description provided for @mcpToolCollisionBuiltinDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflicts with a built-in tool of this name'**
+  String get mcpToolCollisionBuiltinDesc;
+
+  /// No description provided for @mcpToolCollisionMcpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple MCP servers have a tool with this name'**
+  String get mcpToolCollisionMcpDesc;
+
+  /// No description provided for @mcpToolCollisionDisableBuiltin.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable built-in tool'**
+  String get mcpToolCollisionDisableBuiltin;
+
+  /// No description provided for @mcpToolCollisionServerPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefix for server'**
+  String get mcpToolCollisionServerPrefix;
+
+  /// No description provided for @mcpToolCollisionPrefixHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter prefix'**
+  String get mcpToolCollisionPrefixHint;
+
+  /// No description provided for @mcpToolCollisionPrefixError.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid prefix format'**
+  String get mcpToolCollisionPrefixError;
+
+  /// No description provided for @mcpToolCollisionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get mcpToolCollisionConfirm;
+
+  /// No description provided for @mcpToolCollisionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get mcpToolCollisionCancel;
+
+  /// No description provided for @mcpToolCollisionUnbindHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Will unbind this server from this assistant'**
+  String get mcpToolCollisionUnbindHint;
 
   /// No description provided for @toolApprovalPending.
   ///

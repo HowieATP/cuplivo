@@ -119,6 +119,8 @@ class McpServerConfig {
   final Map<String, String> env;
   final String? workingDirectory;
   final int? heartbeatIntervalSeconds; // null = use default (12s)
+  final String
+  toolPrefix; // optional prefix prepended to all tool names from this server
 
   McpServerConfig({
     required this.id,
@@ -133,6 +135,7 @@ class McpServerConfig {
     this.env = const {},
     this.workingDirectory,
     this.heartbeatIntervalSeconds,
+    this.toolPrefix = '',
   });
 
   McpServerConfig copyWith({
@@ -150,6 +153,7 @@ class McpServerConfig {
     bool clearWorkingDirectory = false,
     int? heartbeatIntervalSeconds,
     bool clearHeartbeatIntervalSeconds = false,
+    String? toolPrefix,
   }) => McpServerConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -167,6 +171,7 @@ class McpServerConfig {
     heartbeatIntervalSeconds: clearHeartbeatIntervalSeconds
         ? null
         : (heartbeatIntervalSeconds ?? this.heartbeatIntervalSeconds),
+    toolPrefix: toolPrefix ?? this.toolPrefix,
   );
 
   Map<String, dynamic> toJson() => {
@@ -188,6 +193,7 @@ class McpServerConfig {
       'workingDirectory': workingDirectory,
     if (heartbeatIntervalSeconds != null)
       'heartbeatIntervalSeconds': heartbeatIntervalSeconds,
+    if (toolPrefix.isNotEmpty) 'toolPrefix': toolPrefix,
   };
 
   factory McpServerConfig.fromJson(Map<String, dynamic> json) {
@@ -207,6 +213,7 @@ class McpServerConfig {
             .toList() ??
         const <McpToolConfig>[];
     final heartbeatIntervalSeconds = json['heartbeatIntervalSeconds'] as int?;
+    final toolPrefix = (json['toolPrefix'] as String?) ?? '';
     if (t == McpTransportType.stdio) {
       final argsAny = json['args'];
       final envAny = json['env'];
@@ -225,6 +232,7 @@ class McpServerConfig {
             : const <String, String>{},
         workingDirectory: (json['workingDirectory'] as String?)?.trim(),
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
+        toolPrefix: toolPrefix,
       );
     } else if (t == McpTransportType.inmemory) {
       return McpServerConfig(
@@ -234,6 +242,7 @@ class McpServerConfig {
         transport: McpTransportType.inmemory,
         tools: tools,
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
+        toolPrefix: toolPrefix,
       );
     } else {
       return McpServerConfig(
@@ -249,6 +258,7 @@ class McpServerConfig {
             )) ??
             const {},
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
+        toolPrefix: toolPrefix,
       );
     }
   }
@@ -642,6 +652,7 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> env = const <String, String>{},
     String? workingDirectory,
     int? heartbeatIntervalSeconds,
+    String toolPrefix = '',
   }) async {
     final id = const Uuid().v4();
     final cfg = McpServerConfig(
@@ -658,6 +669,7 @@ class McpProvider extends ChangeNotifier {
           ? workingDirectory!.trim()
           : null,
       heartbeatIntervalSeconds: heartbeatIntervalSeconds,
+      toolPrefix: toolPrefix,
     );
     _servers = [..._servers, cfg];
     _status[id] = McpStatus.idle;

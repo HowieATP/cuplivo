@@ -1862,6 +1862,107 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupReminderSnoozeTooltip => '稍后提醒';
 
   @override
+  String get lanSyncSectionTitle => '局域网同步';
+
+  @override
+  String get lanSyncServerMode => '开启服务';
+
+  @override
+  String get lanSyncClientMode => '连接服务';
+
+  @override
+  String get lanSyncServerRunning => '服务运行中';
+
+  @override
+  String get lanSyncServerAddress => '地址';
+
+  @override
+  String get lanSyncServerPort => '端口';
+
+  @override
+  String get lanSyncServerPin => 'PIN';
+
+  @override
+  String get lanSyncServerStop => '停止服务';
+
+  @override
+  String get lanSyncServerWaiting => '等待连接...';
+
+  @override
+  String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
+
+  @override
+  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+
+  @override
+  String get lanSyncServerDone => '交换完成，即将应用并重启。';
+
+  @override
+  String get lanSyncClientHost => '主机';
+
+  @override
+  String get lanSyncClientPort => '端口';
+
+  @override
+  String get lanSyncClientPin => 'PIN';
+
+  @override
+  String get lanSyncClientConnect => '连接';
+
+  @override
+  String get lanSyncClientConnecting => '连接中...';
+
+  @override
+  String get lanSyncClientPlanReceived => '已收到同步计划';
+
+  @override
+  String get lanSyncClientConfirm => '开始同步';
+
+  @override
+  String get lanSyncClientExchanging => '正在交换数据...';
+
+  @override
+  String get lanSyncClientDone => '同步完成，即将应用并重启。';
+
+  @override
+  String get lanSyncServerDialogTitle => '作为服务器';
+
+  @override
+  String get lanSyncClientDialogTitle => '作为客户端';
+
+  @override
+  String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
+
+  @override
+  String lanSyncPlanToSend(Object count) {
+    return '$count 个对话待发送';
+  }
+
+  @override
+  String lanSyncPlanToReceive(Object count) {
+    return '$count 个对话待接收';
+  }
+
+  @override
+  String lanSyncPlanForks(Object count) {
+    return '$count 处分叉已检测（v1 暂跳过）';
+  }
+
+  @override
+  String get lanSyncPlanNoChanges => '无待同步内容。';
+
+  @override
+  String get lanSyncErrorInvalidPin => 'PIN 错误';
+
+  @override
+  String lanSyncErrorConnection(Object error) {
+    return '连接失败：$error';
+  }
+
+  @override
+  String get lanSyncApplyAndRestart => '应用并重启';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -7858,6 +7959,107 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupReminderSnoozeTooltip => '稍后提醒';
 
   @override
+  String get lanSyncSectionTitle => '局域网同步';
+
+  @override
+  String get lanSyncServerMode => '开启服务';
+
+  @override
+  String get lanSyncClientMode => '连接服务';
+
+  @override
+  String get lanSyncServerRunning => '服务运行中';
+
+  @override
+  String get lanSyncServerAddress => '地址';
+
+  @override
+  String get lanSyncServerPort => '端口';
+
+  @override
+  String get lanSyncServerPin => 'PIN';
+
+  @override
+  String get lanSyncServerStop => '停止服务';
+
+  @override
+  String get lanSyncServerWaiting => '等待连接...';
+
+  @override
+  String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
+
+  @override
+  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+
+  @override
+  String get lanSyncServerDone => '交换完成，即将应用并重启。';
+
+  @override
+  String get lanSyncClientHost => '主机';
+
+  @override
+  String get lanSyncClientPort => '端口';
+
+  @override
+  String get lanSyncClientPin => 'PIN';
+
+  @override
+  String get lanSyncClientConnect => '连接';
+
+  @override
+  String get lanSyncClientConnecting => '连接中...';
+
+  @override
+  String get lanSyncClientPlanReceived => '已收到同步计划';
+
+  @override
+  String get lanSyncClientConfirm => '开始同步';
+
+  @override
+  String get lanSyncClientExchanging => '正在交换数据...';
+
+  @override
+  String get lanSyncClientDone => '同步完成，即将应用并重启。';
+
+  @override
+  String get lanSyncServerDialogTitle => '作为服务器';
+
+  @override
+  String get lanSyncClientDialogTitle => '作为客户端';
+
+  @override
+  String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
+
+  @override
+  String lanSyncPlanToSend(Object count) {
+    return '$count 个对话待发送';
+  }
+
+  @override
+  String lanSyncPlanToReceive(Object count) {
+    return '$count 个对话待接收';
+  }
+
+  @override
+  String lanSyncPlanForks(Object count) {
+    return '$count 处分叉已检测（v1 暂跳过）';
+  }
+
+  @override
+  String get lanSyncPlanNoChanges => '无待同步内容。';
+
+  @override
+  String get lanSyncErrorInvalidPin => 'PIN 错误';
+
+  @override
+  String lanSyncErrorConnection(Object error) {
+    return '连接失败：$error';
+  }
+
+  @override
+  String get lanSyncApplyAndRestart => '应用并重启';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -13852,6 +14054,107 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupReminderSnoozeTooltip => '稍後提醒';
+
+  @override
+  String get lanSyncSectionTitle => '區域網路同步';
+
+  @override
+  String get lanSyncServerMode => '開啟服務';
+
+  @override
+  String get lanSyncClientMode => '連接服務';
+
+  @override
+  String get lanSyncServerRunning => '服務運行中';
+
+  @override
+  String get lanSyncServerAddress => '位址';
+
+  @override
+  String get lanSyncServerPort => '連接埠';
+
+  @override
+  String get lanSyncServerPin => 'PIN';
+
+  @override
+  String get lanSyncServerStop => '停止服務';
+
+  @override
+  String get lanSyncServerWaiting => '等待連接...';
+
+  @override
+  String get lanSyncServerPlanSent => '同步計畫已發送，等待接收資料...';
+
+  @override
+  String get lanSyncServerReceived => '已接收資料，正在準備回傳...';
+
+  @override
+  String get lanSyncServerDone => '交換完成，即將套用並重啟。';
+
+  @override
+  String get lanSyncClientHost => '主機';
+
+  @override
+  String get lanSyncClientPort => '連接埠';
+
+  @override
+  String get lanSyncClientPin => 'PIN';
+
+  @override
+  String get lanSyncClientConnect => '連接';
+
+  @override
+  String get lanSyncClientConnecting => '連接中...';
+
+  @override
+  String get lanSyncClientPlanReceived => '已收到同步計畫';
+
+  @override
+  String get lanSyncClientConfirm => '開始同步';
+
+  @override
+  String get lanSyncClientExchanging => '正在交換資料...';
+
+  @override
+  String get lanSyncClientDone => '同步完成，即將套用並重啟。';
+
+  @override
+  String get lanSyncServerDialogTitle => '作為伺服器';
+
+  @override
+  String get lanSyncClientDialogTitle => '作為客戶端';
+
+  @override
+  String get lanSyncSecurityNote => '同一區域網路的裝置均可連接（最低版本：v2.2.2）。';
+
+  @override
+  String lanSyncPlanToSend(Object count) {
+    return '$count 個對話待發送';
+  }
+
+  @override
+  String lanSyncPlanToReceive(Object count) {
+    return '$count 個對話待接收';
+  }
+
+  @override
+  String lanSyncPlanForks(Object count) {
+    return '$count 處分叉已偵測（v1 暫跳過）';
+  }
+
+  @override
+  String get lanSyncPlanNoChanges => '無待同步內容。';
+
+  @override
+  String get lanSyncErrorInvalidPin => 'PIN 錯誤';
+
+  @override
+  String lanSyncErrorConnection(Object error) {
+    return '連接失敗：$error';
+  }
+
+  @override
+  String get lanSyncApplyAndRestart => '套用並重啟';
 
   @override
   String get chatHistoryPageTitle => '聊天歷史';

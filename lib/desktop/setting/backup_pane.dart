@@ -21,6 +21,7 @@ import '../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../shared/dialogs/restart_required_dialog.dart';
 import '../../utils/format.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../shared/widgets/lan_sync_section.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 
@@ -340,6 +341,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
               _buildLocalBackupSliver(context, l10n, cs),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+              // LAN Sync
+              const SliverToBoxAdapter(child: LanSyncSection()),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 

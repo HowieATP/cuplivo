@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.2.1] - 2026-07-29
+
+> **ℹ️ Windows users on v2.1.3–v2.2.0 please upgrade.**
+>
+> v2.1.3 introduced Win+V support via a Flutter workaround, but it was observed to cause the input box to become unresponsive after prolonged use. This version fixes the issue.
+
+### Added
+
+- Resolve MCP tool conflicts: auto-detect same-name tools, then choose to disable or add a prefix (#133)
+- Storage space manager upgrade: sort by time/size, find unreferenced images/files, reverse-locate chat records (#128)
+- Allow saving cloud-generated TTS audio locally (#131)
+- Right-click / long-press selected assistant message text to speak it (#130)
+- Beautify request logs: make message turns in the request body more readable (#127)
+
+### Fixed
+
+- One-click compression stat fix: correctly count and display the number of compressed images, and add proper text hints to the button (#129, #125)
+- Fix input-box unresponsiveness caused by the Win+V change: pass through Flutter's probe to prevent keyboard mode regression (#135)
+
 ## [2.2.0] - 2026-07-26
 
 ### Added

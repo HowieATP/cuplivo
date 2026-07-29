@@ -44,32 +44,35 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 5. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
    - *Tip*: For best cache performance, disable Recent Chats Reference, switch to On Demand mode, and enable time injection.
 
-6. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
+6. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-7. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+7. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
 
-8. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
+8. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
 
-9. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
+9. **Storage space manager** — Sort stored files by time or size, find unreferenced images/files (orphans), and reverse-locate which chat record a stored file belongs to (#128).
 
 10. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
 
-11. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
+11. **TTS audio: save locally + speak selection** — Save cloud-generated TTS audio to a local file from the floating player (#131); right-click / long-press selected assistant message text to speak it (#130).
 
-12. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+12. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-13. **Truncated response toast** — Shows a toast notification when a response is cut short due to hitting the max_tokens limit or exceeding the context window, so you always know why a reply ended abruptly.
+13. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
-14. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+14. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
 
-15. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+15. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
 
-16. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+16. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
 
-17. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+17. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
 
-18. **Additional fixes across the repo**
+18. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+
+19. **Additional fixes across the repo**
     - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
+    - **Cross-MCP same-name tool conflicts** — Fixed: when multiple MCP servers expose tools with the same name, the collision is now detected and resolved (disable or rename) instead of causing ambiguous tool calls
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)
     - Large base64 images no longer cause regex stack overflow

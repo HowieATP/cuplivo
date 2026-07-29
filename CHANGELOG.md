@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.2] - 2026-07-29
+
+### Added
+
+- LAN sync: device-to-device chat sync over local network with a two-round-trip protocol; 4-digit PIN authentication, reuses the incremental backup zip + merge restore infrastructure, syncs chats + referenced files + missing assistants (#136)
+
 ## [2.2.1] - 2026-07-29
 
 > **ℹ️ Windows users on v2.1.3–v2.2.0 please upgrade.**

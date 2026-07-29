@@ -28,7 +28,7 @@ We are aware that the upstream Kelivo repository is undergoing a major data stor
 
 Unlike most personal-customization or single-feature forks, Cuplivo aims to add multiple features for a broader audience to try out. Some items may be removed as upstream (Kelivo) adds their counterparts.
 
-1. **Incremental backup** — Uploads only conversations, messages and related attachments since a selected date.
+1. **Incremental backup & LAN sync** — Uploads only conversations, messages and related attachments since a selected date; quickly sync two devices' state over LAN.
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
    - *Note*: Periodic full snapshots are still recommended.
 

@@ -15,6 +15,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../logs/request_body_beautifier.dart';
 import '../logs/request_log_parser.dart';
 import '../../../theme/app_font_weights.dart';
 
@@ -1078,10 +1079,26 @@ String _fmtDuration(Duration d) {
   return '${m}m ${s}s';
 }
 
-class _RequestLogDetailPage extends StatelessWidget {
+class _RequestLogDetailPage extends StatefulWidget {
   const _RequestLogDetailPage({required this.entry});
 
   final RequestLogEntry entry;
+
+  @override
+  State<_RequestLogDetailPage> createState() => _RequestLogDetailPageState();
+}
+
+class _RequestLogDetailPageState extends State<_RequestLogDetailPage> {
+  bool _beautifyBody = true;
+  BeautifiedBody? _beautified;
+
+  @override
+  void initState() {
+    super.initState();
+    _beautified = widget.entry.requestBody == null
+        ? null
+        : tryBeautify(widget.entry.requestBody!);
+  }
 
   String _prettyJson(String text) {
     final v = text.trim();
@@ -1128,6 +1145,7 @@ class _RequestLogDetailPage extends StatelessWidget {
     final cs = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
+    final entry = widget.entry;
     final uri = entry.uri;
     final url = uri?.toString() ?? (entry.rawUrl ?? '');
 
@@ -1169,6 +1187,10 @@ class _RequestLogDetailPage extends StatelessWidget {
         : ((entry.statusCode != null && entry.statusCode! >= 400)
               ? <String>['HTTP ${entry.statusCode}']
               : const <String>[]);
+
+    // Beautification toggle availability.
+    final canBeautify = _beautified != null;
+    final showBeautified = _beautifyBody && canBeautify;
 
     return Scaffold(
       appBar: AppBar(
@@ -1250,13 +1272,33 @@ class _RequestLogDetailPage extends StatelessWidget {
             _SectionCard(
               icon: Lucide.ArrowUp,
               title: l10n.logViewerSectionRequestBody,
-              trailing: IosIconButton(
-                icon: Lucide.Copy,
-                size: 18,
-                padding: const EdgeInsets.all(6),
-                onTap: () => _copy(context, reqBodyText),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IosIconButton(
+                    icon: Lucide.Sparkles,
+                    size: 18,
+                    padding: const EdgeInsets.all(6),
+                    enabled: canBeautify,
+                    onTap: canBeautify
+                        ? () => setState(() => _beautifyBody = !_beautifyBody)
+                        : null,
+                    color: showBeautified
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.78),
+                    semanticLabel: l10n.logViewerBeautifyToggle,
+                  ),
+                  IosIconButton(
+                    icon: Lucide.Copy,
+                    size: 18,
+                    padding: const EdgeInsets.all(6),
+                    onTap: () => _copy(context, reqBodyText),
+                  ),
+                ],
               ),
-              child: _CodeBlock(text: reqBodyText, tone: _CodeTone.neutral),
+              child: showBeautified && _beautified != null
+                  ? _BeautifiedBodyView(beautified: _beautified!)
+                  : _CodeBlock(text: reqBodyText, tone: _CodeTone.neutral),
             ),
           ],
           if (resHeaders != null && resHeaders.isNotEmpty) ...[
@@ -1980,6 +2022,261 @@ class _SettingTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Beautified request body rendering
+// ---------------------------------------------------------------------------
+
+/// Role color pair (light, dark).
+class _RoleColor {
+  const _RoleColor(this.label, this.light, this.dark);
+  final String label;
+  final Color light;
+  final Color dark;
+
+  Color color(bool isDark) => isDark ? dark : light;
+}
+
+const _roleColors = <TurnRole, _RoleColor>{
+  TurnRole.system: _RoleColor('SYSTEM', Color(0xFFCA8A04), Color(0xFFFACC15)),
+  TurnRole.user: _RoleColor('USER', Color(0xFF2563EB), Color(0xFF60A5FA)),
+  TurnRole.assistant: _RoleColor(
+    'ASSISTANT',
+    Color(0xFF16A34A),
+    Color(0xFF86EFAC),
+  ),
+  TurnRole.tool: _RoleColor('TOOL', Color(0xFF8B5CF6), Color(0xFFA78BFA)),
+};
+
+/// Renders a [BeautifiedBody]: colored turn blocks on top, config JSON below.
+class _BeautifiedBodyView extends StatelessWidget {
+  const _BeautifiedBodyView({required this.beautified});
+
+  final BeautifiedBody beautified;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final children = <Widget>[];
+
+    for (var i = 0; i < beautified.turns.length; i++) {
+      if (i > 0) children.add(const SizedBox(height: 8));
+      children.add(_TurnBlock(turn: beautified.turns[i]));
+    }
+
+    if (beautified.configJson.isNotEmpty) {
+      if (children.isNotEmpty) children.add(const SizedBox(height: 14));
+      children.add(_SectionLabel(text: l10n.logViewerRequestConfig));
+      children.add(const SizedBox(height: 6));
+      children.add(
+        _CodeBlock(text: beautified.configJson, tone: _CodeTone.neutral),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: AppFontWeights.heavy,
+        letterSpacing: 0.4,
+        color: cs.onSurface.withValues(alpha: 0.50),
+      ),
+    );
+  }
+}
+
+/// One conversation turn rendered with a colored left border and role label.
+class _TurnBlock extends StatelessWidget {
+  const _TurnBlock({required this.turn});
+  final BeautifiedTurn turn;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final rc = _roleColors[turn.role]!;
+    final color = rc.color(isDark);
+
+    final children = <Widget>[
+      Text(
+        rc.label,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: AppFontWeights.heavy,
+          letterSpacing: 0.5,
+          color: color,
+        ),
+      ),
+      const SizedBox(height: 6),
+    ];
+
+    for (var i = 0; i < turn.parts.length; i++) {
+      if (i > 0) children.add(const SizedBox(height: 6));
+      children.add(_buildPart(turn.parts[i], cs, isDark));
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.06 : 0.04),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(8),
+          topRight: Radius.circular(8),
+          bottomRight: Radius.circular(8),
+        ),
+        border: Border(left: BorderSide(color: color, width: 3)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildPart(TurnPart part, ColorScheme cs, bool isDark) {
+    switch (part) {
+      case TextPart(:final text):
+        return SelectableText(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.4,
+            color: cs.onSurface.withValues(alpha: 0.88),
+          ),
+        );
+      case ImagePart(:final displayLabel):
+        return SelectableText(
+          displayLabel,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: cs.onSurface.withValues(alpha: 0.60),
+          ),
+        );
+      case FilePart(:final filename):
+        return SelectableText(
+          filename,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: cs.onSurface.withValues(alpha: 0.60),
+          ),
+        );
+      case ToolCallPart(:final name, :final arguments):
+        return _LabeledContent(
+          label: 'tool_call: $name',
+          content: arguments,
+          cs: cs,
+          isDark: isDark,
+        );
+      case ToolResultPart(:final name, :final output):
+        return _LabeledContent(
+          label: 'tool_result: $name',
+          content: output,
+          cs: cs,
+          isDark: isDark,
+        );
+      case ThinkingPart(:final content):
+        return _LabeledContent(
+          label: 'thinking',
+          content: content,
+          cs: cs,
+          isDark: isDark,
+          italic: true,
+          muted: true,
+        );
+      case RedactedThinkingPart(:final byteLength):
+        return Text(
+          'redacted_thinking: $byteLength bytes',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: cs.onSurface.withValues(alpha: 0.45),
+          ),
+        );
+    }
+  }
+}
+
+/// A label + optional content block (for tool calls, tool results, thinking).
+class _LabeledContent extends StatelessWidget {
+  const _LabeledContent({
+    required this.label,
+    required this.content,
+    required this.cs,
+    required this.isDark,
+    this.italic = false,
+    this.muted = false,
+  });
+
+  final String label;
+  final String content;
+  final ColorScheme cs;
+  final bool isDark;
+  final bool italic;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    if (content.isEmpty) {
+      return Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.onSurface.withValues(alpha: muted ? 0.45 : 0.62),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.onSurface.withValues(alpha: muted ? 0.45 : 0.62),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+          decoration: BoxDecoration(
+            color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: SelectableText(
+            content,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              fontFamily: 'monospace',
+              fontStyle: italic ? FontStyle.italic : null,
+              color: cs.onSurface.withValues(alpha: muted ? 0.56 : 0.80),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

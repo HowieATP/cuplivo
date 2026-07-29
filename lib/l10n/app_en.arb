@@ -119,6 +119,14 @@
   "storageSpaceClearLogsButton": "Clear Logs",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
+  "storageSpaceDeleteSimpleConfirm": "Delete {count} items?",
+  "@storageSpaceDeleteSimpleConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
   "@storageSpaceDeleteUploadsConfirmMessage": {
     "placeholders": {
@@ -154,6 +162,30 @@
       }
     }
   },
+  "storageSpaceSortBySize": "By size",
+  "storageSpaceSortByTime": "By date",
+  "storageSpaceRefCount": "{count} refs",
+  "@storageSpaceRefCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceRefNone": "No refs",
+  "storageSpaceShowOrphansOnly": "Orphans only",
+  "storageSpaceComputeRefs": "Compute refs",
+  "storageSpaceLocateTitle": "Referenced by",
+  "storageSpaceDeleteRefWarning": "{count} files are referenced by messages — deleting will break their display",
+  "@storageSpaceDeleteRefWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceAiGenerated": "AI generated",
+  "storageSpaceMarkdownRefLimitation": "Note: Markdown-referenced local images are not counted. AI-generated images show as 'AI generated' — do not delete them.",
   "settingsPageAboutSection": "About",
   "settingsPageAbout": "About",
   "settingsPageStatistics": "Statistics",
@@ -1807,6 +1839,10 @@
   "@oneClickCompressTooltip": {
     "description": "Tooltip for the one-click compress button"
   },
+  "oneClickCompressConfirmPrompt": "Tap again to compress",
+  "@oneClickCompressConfirmPrompt": {
+    "description": "Shown inside the one-click compress slot after first tap; asking user to tap again to confirm"
+  },
   "oneClickCompressResult": "Compressed {count} images, saved {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "description": "SnackBar message after one-click compression showing savings",
@@ -1966,6 +2002,18 @@
   "ttsFloatingCloseTooltip": "Close player",
   "ttsFloatingExpandTooltip": "Expand playback controls",
   "ttsFloatingCollapseTooltip": "Collapse playback controls",
+  "ttsFloatingSaveTooltip": "Save audio",
+  "ttsSaveDialogTitle": "Save TTS audio",
+  "ttsSaveSuccess": "Audio saved successfully.",
+  "ttsSaveNothing": "No audio to save yet.",
+  "ttsSaveFailed": "Failed to save audio: {message}",
+  "@ttsSaveFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "imageViewerPageShareFailedOpenFile": "Unable to share, tried to open file: {message}",
   "@imageViewerPageShareFailedOpenFile": {
     "placeholders": {
@@ -2300,6 +2348,8 @@
   "logViewerSectionParameters": "Parameters",
   "logViewerSectionRequestHeaders": "Request Headers",
   "logViewerSectionRequestBody": "Request Body",
+  "logViewerBeautifyToggle": "Beautify",
+  "logViewerRequestConfig": "Configuration",
   "logViewerSectionResponseHeaders": "Response Headers",
   "logViewerSectionResponseBody": "Response Body",
   "logViewerSectionWarnings": "Warnings",
@@ -2966,5 +3016,6 @@
   "truncationReasonContextExceeded": "context window exceeded",
   "chatMessageWidgetCopyAsMarkdown": "Copy as Markdown",
   "chatMessageWidgetCopyAsPlainText": "Copy as Plain Text",
-  "chatMessageWidgetQuote": "Quote"
+  "chatMessageWidgetQuote": "Quote",
+  "chatMessageWidgetSpeak": "Speak"
 }

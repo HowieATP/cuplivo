@@ -31,6 +31,9 @@ class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
   TtsPlaybackState get playbackState => _state;
 
   @override
+  bool get usingNetwork => false;
+
+  @override
   Future<void> seekBackward() async {
     rewindCount++;
   }

@@ -28,6 +28,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_subsequence_match.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -772,6 +773,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
   String? _selectedPlainText;
+
+  void _speakSelectedText(String text) {
+    final settings = context.read<SettingsProvider>();
+    final mode = settings.ttsTextSelectionMode;
+    final effectiveMode = mode == TtsTextSelectionMode.outsideParentheses
+        ? mode
+        : TtsTextSelectionMode.fullText;
+    final content = TtsTextSelection.apply(text, mode: effectiveMode);
+    context.read<TtsProvider>().speak(content);
+  }
+
   // Local expand state for inline <think> card (defaults to expanded)
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
@@ -1935,6 +1947,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     Clipboard.setData(ClipboardData(text: selected));
                   },
                 ),
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(context)!.chatMessageWidgetSpeak,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    _speakSelectedText(selected);
+                  },
+                ),
                 ...defaultItems,
               ],
             );
@@ -1978,6 +2000,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     widget.onQuoteSelection!.call(selected);
                   },
                 ),
+              ContextMenuButtonItem(
+                label: AppLocalizations.of(context)!.chatMessageWidgetSpeak,
+                onPressed: () {
+                  final selected = _selectedPlainText;
+                  if (selected == null || selected.trim().isEmpty) return;
+                  ContextMenuController.removeAny();
+                  selectableRegionState.clearSelection();
+                  _speakSelectedText(selected);
+                },
+              ),
               ...defaultItems,
             ],
           );

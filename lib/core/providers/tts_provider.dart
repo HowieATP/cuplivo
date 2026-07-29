@@ -35,6 +35,7 @@ class TtsProvider extends ChangeNotifier {
   final List<TtsTextChunk> _chunks = <TtsTextChunk>[];
   final Map<int, Future<NetworkTtsResult>> _networkCache =
       <int, Future<NetworkTtsResult>>{};
+  final Map<int, NetworkTtsResult> _resolvedChunks = <int, NetworkTtsResult>{};
 
   TtsPlaybackTimeline _timeline = TtsPlaybackTimeline(const <TtsTextChunk>[]);
   TtsPlaybackState _playbackState = const TtsPlaybackState();
@@ -401,6 +402,7 @@ class TtsProvider extends ChangeNotifier {
     final session = ++_sessionId;
     _usingNetwork = networkService != null;
     _networkCache.clear();
+    _resolvedChunks.clear();
     _chunks
       ..clear()
       ..addAll(
@@ -590,6 +592,7 @@ class TtsProvider extends ChangeNotifier {
           currentChunkIndex: chunkIndex,
         );
         final result = await _networkResultFor(service, session, chunkIndex);
+        _resolvedChunks[chunkIndex] = result;
         if (session != _sessionId) break;
         if (_currentChunkIndex != chunkIndex) continue;
         final seekOffset = _pendingNetworkSeekOffset;
@@ -851,6 +854,7 @@ class TtsProvider extends ChangeNotifier {
     _usingNetwork = false;
     _networkSeekInterruptedChunk = false;
     _networkCache.clear();
+    _resolvedChunks.clear();
     final position = status == TtsPlaybackStatus.ended
         ? _timeline.estimatedDuration
         : _playbackState.position;
@@ -878,6 +882,7 @@ class TtsProvider extends ChangeNotifier {
   void _stopInternal({bool updateState = false}) {
     _chunks.clear();
     _networkCache.clear();
+    _resolvedChunks.clear();
     _currentChunkIndex = 0;
     _currentChunkTextOffset = 0;
     _currentChunkPosition = Duration.zero;
@@ -974,6 +979,97 @@ class TtsProvider extends ChangeNotifier {
       default:
         return 'mp3';
     }
+  }
+
+  Future<(Uint8List, String)?> synthesizeAllAndCollect() async {
+    if (_chunks.isEmpty || !_usingNetwork) return collectSynthesizedAudio();
+
+    final service = await _getSelectedNetworkService();
+    if (service == null) return collectSynthesizedAudio();
+
+    final session = _sessionId;
+    final futures = <Future<NetworkTtsResult>>[];
+    for (var i = 0; i < _chunks.length; i++) {
+      futures.add(_networkResultFor(service, session, i));
+    }
+
+    try {
+      final results = await Future.wait(futures);
+      for (var i = 0; i < results.length; i++) {
+        _resolvedChunks[i] = results[i];
+      }
+    } catch (e) {
+      debugPrint('[TtsProvider] synthesizeAllAndCollect partial failure: $e');
+    }
+
+    return collectSynthesizedAudio();
+  }
+
+  (Uint8List, String)? collectSynthesizedAudio() {
+    if (_resolvedChunks.isEmpty) return null;
+
+    final indices = _resolvedChunks.keys.toList()..sort();
+    if (indices.isEmpty) return null;
+
+    if (indices.length == 1) {
+      final chunk = _resolvedChunks[indices.first]!;
+      return (chunk.bytes, _extForMime(chunk.mime));
+    }
+
+    final first = _resolvedChunks[indices.first]!;
+    final isWav = _hasRiffHeader(first.bytes);
+    final ext = isWav ? 'wav' : _extForMime(first.mime);
+
+    final parts = <Uint8List>[];
+    int totalSize = 0;
+
+    for (final i in indices) {
+      final chunk = _resolvedChunks[i]!;
+      if (isWav && _hasRiffHeader(chunk.bytes)) {
+        final data = chunk.bytes.sublist(44);
+        parts.add(data);
+        totalSize += data.length;
+      } else {
+        parts.add(chunk.bytes);
+        totalSize += chunk.bytes.length;
+      }
+    }
+
+    if (totalSize == 0) return null;
+
+    if (!isWav) {
+      final result = Uint8List(totalSize);
+      int offset = 0;
+      for (final part in parts) {
+        result.setRange(offset, offset + part.length, part);
+        offset += part.length;
+      }
+      return (result, ext);
+    }
+
+    final header = Uint8List.fromList(
+      _resolvedChunks[indices.first]!.bytes.sublist(0, 44),
+    );
+    final headerData = ByteData.sublistView(header);
+    headerData.setUint32(4, 36 + totalSize, Endian.little);
+    headerData.setUint32(40, totalSize, Endian.little);
+
+    final result = Uint8List(44 + totalSize);
+    result.setRange(0, 44, header);
+    int offset = 0;
+    for (final part in parts) {
+      result.setRange(44 + offset, 44 + offset + part.length, part);
+      offset += part.length;
+    }
+    return (result, ext);
+  }
+
+  static bool _hasRiffHeader(Uint8List bytes) {
+    return bytes.lengthInBytes > 44 &&
+        bytes[0] == 0x52 && // R
+        bytes[1] == 0x49 && // I
+        bytes[2] == 0x46 && // F
+        bytes[3] == 0x46; // F
   }
 
   Future<TtsServiceOptions?> _getSelectedNetworkService() async {

@@ -24,6 +24,7 @@ import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -150,6 +151,7 @@ class HomePageController extends ChangeNotifier {
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
+  StreamSubscription<MessageLocateTarget>? _locateSub;
   ReceivePort? _proactiveCarePort;
 
   // ============================================================================
@@ -323,7 +325,17 @@ class HomePageController extends ChangeNotifier {
     _initializeProviders();
     _setupKeyboardListeners();
     _setupDesktopFeatures();
+    _setupMessageLocateBus();
     _registerProactiveCarePort();
+  }
+
+  void _setupMessageLocateBus() {
+    _locateSub = MessageLocateBus.instance.stream.listen((target) {
+      openGlobalSearchResult(
+        conversationId: target.conversationId,
+        messageId: target.messageId,
+      );
+    });
   }
 
   /// Register the main-isolate port so the alarm background isolate can
@@ -2628,6 +2640,9 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();
+    } catch (_) {}
+    try {
+      _locateSub?.cancel();
     } catch (_) {}
     _chatController.dispose();
     _streamController.dispose();

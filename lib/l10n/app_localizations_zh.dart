@@ -227,6 +227,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '删除 $count 个项目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
   }
@@ -254,6 +259,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按时间';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 处引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '无引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看无引用';
+
+  @override
+  String get storageSpaceComputeRefs => '计算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此文件的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '注：不统计 Markdown 格式引用的本地图片。images/ 下的 AI 生成图片显示为「AI 生成」——请勿误删。';
 
   @override
   String get settingsPageAboutSection => '关于';
@@ -3975,6 +4015,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get oneClickCompressTooltip => '压缩所有图片';
 
   @override
+  String get oneClickCompressConfirmPrompt => '再次点击确认压缩';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
   }
@@ -4408,6 +4451,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频保存成功';
+
+  @override
+  String get ttsSaveNothing => '暂无要保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '音频保存失败：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -5165,6 +5225,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get logViewerSectionRequestBody => '请求体';
+
+  @override
+  String get logViewerBeautifyToggle => '美化显示';
+
+  @override
+  String get logViewerRequestConfig => '配置参数';
 
   @override
   String get logViewerSectionResponseHeaders => '响应头';
@@ -5929,6 +5995,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗读';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -6154,6 +6223,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '删除 $count 个项目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
   }
@@ -6181,6 +6255,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 项';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按时间';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 处引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '无引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看无引用';
+
+  @override
+  String get storageSpaceComputeRefs => '计算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此文件的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '注：不统计 Markdown 格式引用的本地图片。images/ 下的 AI 生成图片显示为「AI 生成」——请勿误删。';
 
   @override
   String get settingsPageAboutSection => '关于';
@@ -9902,6 +10011,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get oneClickCompressTooltip => '压缩所有图片';
 
   @override
+  String get oneClickCompressConfirmPrompt => '再次点击确认压缩';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return '压缩了 $count 张图片，节省了 $saved (-$pct%)';
   }
@@ -10335,6 +10447,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频保存成功';
+
+  @override
+  String get ttsSaveNothing => '暂无要保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '音频保存失败：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -11092,6 +11221,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get logViewerSectionRequestBody => '请求体';
+
+  @override
+  String get logViewerBeautifyToggle => '美化显示';
+
+  @override
+  String get logViewerRequestConfig => '配置参数';
 
   @override
   String get logViewerSectionResponseHeaders => '响应头';
@@ -11856,6 +11991,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗读';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -12081,6 +12219,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceDeleteConfirmTitle => '確認刪除';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return '刪除 $count 個項目？';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return '刪除 $count 個項目？刪除後聊天記錄中的附件可能無法開啟。';
   }
@@ -12108,6 +12251,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String storageSpaceUploadsCount(int count) {
     return '共 $count 項';
   }
+
+  @override
+  String get storageSpaceSortBySize => '按大小';
+
+  @override
+  String get storageSpaceSortByTime => '按時間';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count 處引用';
+  }
+
+  @override
+  String get storageSpaceRefNone => '無引用';
+
+  @override
+  String get storageSpaceShowOrphansOnly => '只看無引用';
+
+  @override
+  String get storageSpaceComputeRefs => '計算引用';
+
+  @override
+  String get storageSpaceLocateTitle => '引用此檔案的消息';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '其中 $count 個檔案被訊息引用——刪除後將無法顯示';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI 生成';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      '註：不統計 Markdown 格式引用的本地圖片。images/ 下的 AI 生成圖片顯示為「AI 生成」——請勿誤刪。';
 
   @override
   String get settingsPageAboutSection => '關於';
@@ -15827,6 +16005,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get oneClickCompressTooltip => '壓縮所有圖片';
 
   @override
+  String get oneClickCompressConfirmPrompt => '再次點擊確認壓縮';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return '壓縮了 $count 張圖片，節省了 $saved (-$pct%)';
   }
@@ -16260,6 +16441,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '保存音頻';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音頻';
+
+  @override
+  String get ttsSaveSuccess => '音頻保存成功';
+
+  @override
+  String get ttsSaveNothing => '暫無要保存的音頻';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '音頻保存失敗：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -17019,6 +17217,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logViewerSectionRequestBody => '請求本文';
+
+  @override
+  String get logViewerBeautifyToggle => '美化顯示';
+
+  @override
+  String get logViewerRequestConfig => '設定參數';
 
   @override
   String get logViewerSectionResponseHeaders => '回應標頭';
@@ -17783,4 +17987,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetQuote => '引用';
+
+  @override
+  String get chatMessageWidgetSpeak => '朗讀';
 }

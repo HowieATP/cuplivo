@@ -231,6 +231,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceDeleteConfirmTitle => 'Confirm deletion';
 
   @override
+  String storageSpaceDeleteSimpleConfirm(int count) {
+    return 'Delete $count items?';
+  }
+
+  @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
     return 'Delete $count items? Attachments in chat history may become unavailable.';
   }
@@ -258,6 +263,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String storageSpaceUploadsCount(int count) {
     return '$count items';
   }
+
+  @override
+  String get storageSpaceSortBySize => 'By size';
+
+  @override
+  String get storageSpaceSortByTime => 'By date';
+
+  @override
+  String storageSpaceRefCount(int count) {
+    return '$count refs';
+  }
+
+  @override
+  String get storageSpaceRefNone => 'No refs';
+
+  @override
+  String get storageSpaceShowOrphansOnly => 'Orphans only';
+
+  @override
+  String get storageSpaceComputeRefs => 'Compute refs';
+
+  @override
+  String get storageSpaceLocateTitle => 'Referenced by';
+
+  @override
+  String storageSpaceDeleteRefWarning(int count) {
+    return '$count files are referenced by messages — deleting will break their display';
+  }
+
+  @override
+  String get storageSpaceAiGenerated => 'AI generated';
+
+  @override
+  String get storageSpaceMarkdownRefLimitation =>
+      'Note: Markdown-referenced local images are not counted. AI-generated images show as \'AI generated\' — do not delete them.';
 
   @override
   String get settingsPageAboutSection => 'About';
@@ -4133,6 +4173,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oneClickCompressTooltip => 'Compress all images';
 
   @override
+  String get oneClickCompressConfirmPrompt => 'Tap again to compress';
+
+  @override
   String oneClickCompressResult(int count, String saved, String pct) {
     return 'Compressed $count images, saved $saved (-$pct%)';
   }
@@ -4594,6 +4637,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ttsFloatingCollapseTooltip => 'Collapse playback controls';
+
+  @override
+  String get ttsFloatingSaveTooltip => 'Save audio';
+
+  @override
+  String get ttsSaveDialogTitle => 'Save TTS audio';
+
+  @override
+  String get ttsSaveSuccess => 'Audio saved successfully.';
+
+  @override
+  String get ttsSaveNothing => 'No audio to save yet.';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return 'Failed to save audio: $message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -5378,6 +5438,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logViewerSectionRequestBody => 'Request Body';
+
+  @override
+  String get logViewerBeautifyToggle => 'Beautify';
+
+  @override
+  String get logViewerRequestConfig => 'Configuration';
 
   @override
   String get logViewerSectionResponseHeaders => 'Response Headers';
@@ -6185,4 +6251,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetQuote => 'Quote';
+
+  @override
+  String get chatMessageWidgetSpeak => 'Speak';
 }

@@ -7,8 +7,10 @@ import '../../database/chat_database_repository.dart';
 import '../../models/assistant.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/file_reference.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/path_canon.dart';
 
 class ChatService extends ChangeNotifier {
   static const int defaultInitialMessageMin = 2;
@@ -603,15 +605,6 @@ class ChatService extends ChangeNotifier {
       final uploadDir = await AppDirectories.getUploadDirectory();
       if (!await uploadDir.exists()) return;
 
-      // Build the set of all referenced paths across all messages
-      String canon(String pth) {
-        // Normalize separators and resolve redundant segments to enable
-        // reliable equality checks across platforms (esp. Windows).
-        final normalized = p.normalize(pth);
-        // On Windows, paths are case-insensitive; compare in lowercase.
-        return Platform.isWindows ? normalized.toLowerCase() : normalized;
-      }
-
       final referenced = <String>{};
       for (final conversation in _conversationsCache.values) {
         final total = getMessageCount(conversation.id);
@@ -623,7 +616,7 @@ class ChatService extends ChangeNotifier {
           );
           for (final m in messages) {
             for (final pth in _extractAttachmentPaths(m.content)) {
-              referenced.add(canon(pth));
+              referenced.add(canonicalizePath(pth));
             }
           }
         }
@@ -633,7 +626,7 @@ class ChatService extends ChangeNotifier {
       final entries = uploadDir.listSync(recursive: true, followLinks: false);
       for (final ent in entries) {
         if (ent is File) {
-          final filePath = canon(ent.path);
+          final filePath = canonicalizePath(ent.path);
           if (!referenced.contains(filePath)) {
             try {
               await ent.delete();
@@ -642,6 +635,48 @@ class ChatService extends ChangeNotifier {
         }
       }
     } catch (_) {}
+  }
+
+  static String _referencePreview(String content) {
+    final stripped = content
+        .replaceAll(RegExp(r'\[image:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\[file:[^\]]+\]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return stripped.length <= 80 ? stripped : '${stripped.substring(0, 80)}…';
+  }
+
+  Future<Map<String, List<FileReference>>> computeFileReferences() async {
+    final out = <String, List<FileReference>>{};
+    var processed = 0;
+    for (final conversation in getAllConversations()) {
+      final total = getMessageCount(conversation.id);
+      for (var start = 0; start < total; start += defaultLoadedWindowMax) {
+        final messages = getMessagesRange(
+          conversation.id,
+          start: start,
+          limit: defaultLoadedWindowMax,
+        );
+        for (final m in messages) {
+          final paths = _extractAttachmentPaths(m.content);
+          if (paths.isEmpty) continue;
+          final ref = FileReference(
+            conversationId: conversation.id,
+            conversationTitle: conversation.title,
+            messageId: m.id,
+            preview: _referencePreview(m.content),
+          );
+          for (final pth in paths) {
+            (out[canonicalizePath(pth)] ??= <FileReference>[]).add(ref);
+          }
+        }
+        processed += messages.length;
+        if (processed % 240 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+    }
+    return out;
   }
 
   Future<void> restoreConversation(

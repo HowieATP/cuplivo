@@ -57,6 +57,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
   int _heartbeatIntervalSeconds = 12;
+  final _toolPrefixCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -70,6 +71,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _transport = server.transport;
       _urlCtrl.text = server.url;
       _heartbeatIntervalSeconds = server.heartbeatIntervalSeconds ?? 12;
+      _toolPrefixCtrl.text = server.toolPrefix;
       server.headers.forEach((k, v) {
         _headers.add(
           _HeaderEntry(
@@ -94,6 +96,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     for (final h in _headers) {
       h.dispose();
     }
+    _toolPrefixCtrl.dispose();
     super.dispose();
   }
 
@@ -321,6 +324,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          _inputRow(
+            label: l10n.mcpServerEditSheetToolPrefixLabel,
+            controller: _toolPrefixCtrl,
+            hint: l10n.mcpServerEditSheetToolPrefixHint,
+          ),
           const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetCustomHeadersTitle,
@@ -422,6 +431,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         if (h.key.text.trim().isNotEmpty)
           h.key.text.trim(): h.value.text.trim(),
     };
+    final toolPrefix = _toolPrefixCtrl.text.trim();
     if (isEdit) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServer(
@@ -433,6 +443,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           headers: headers,
           heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
           clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
+          toolPrefix: toolPrefix,
         ),
       );
     } else {
@@ -445,6 +456,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
             ? null
             : _heartbeatIntervalSeconds,
+        toolPrefix: toolPrefix,
       );
     }
     if (mounted) Navigator.of(context).pop();

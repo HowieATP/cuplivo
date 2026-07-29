@@ -208,6 +208,18 @@
 - **Data format**: `List<Map<String, String>>` — headers use `{name, value}` keys; body uses `{key, value}` keys. Consistent across all layers.
 - **No guardrails**: Users may set any header key (including `Authorization`, `Content-Type`). Power-user responsibility.
 
+## MCP Tool Prefix (Name Disambiguation)
+
+- **Tool Prefix**: A per-server string (`McpServerConfig.toolPrefix`) prepended to all tool names from that MCP server when building the tools array for the LLM API. Format: `{prefix}_{originalName}`. Charset: `[a-zA-Z0-9_]`, max 16 chars, no leading digit. Default: empty (no prefix). Server-level, not per-assistant.
+- **Collision**: Two tool definitions sharing the same `function.name` in a single API request. Causes the LLM API to reject the entire request (not silent shadowing). Two sources: MCP-vs-built-in (e.g. MCP `create_memory` vs built-in `create_memory`) and MCP-vs-MCP (two servers exposing the same tool name).
+- **Collision detection**: Performed at send time, scoped per-assistant (depends on which built-in tools the assistant has enabled AND which MCP servers are bound). Hard-blocks the send with a guidance dialog.
+- **Resolution dialog actions**:
+  - MCP-vs-built-in: disable the built-in for this assistant / unbind the MCP server from this assistant / add a prefix to the MCP server.
+  - MCP-vs-MCP: unbind one of the conflicting servers / add prefixes to ≥ N−1 of the N conflicting servers.
+- **Prefix validation**: At save time, checks `prefix.length + 1 + maxToolNameLength ≤ 64` (OpenAI function name limit). Rejects with inline error if overflow.
+- **UI display**: Tool-call cards show the as-called (prefixed) name. No stripping in the UI layer.
+- **Settings access**: Prefix is also editable proactively in the MCP server detail UI, independent of any collision.
+
 ### Flagged Ambiguities
 
 - "skill" was used interchangeably to mean both "a set of instructions loaded from disk" and "an individual step in a model's reasoning process" — resolved: the former is **Skill** (capitalized, bounded in the codebase), the latter falls under general LLM domain language and is not part of Cuplivo's domain model.

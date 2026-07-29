@@ -2893,6 +2893,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpServerEditSheetUrlRequired => 'Please enter server URL';
 
   @override
+  String get mcpServerEditSheetToolPrefixLabel => 'Tool Prefix';
+
+  @override
+  String get mcpServerEditSheetToolPrefixHint =>
+      'Optional, for distinguishing tools with the same name';
+
+  @override
   String get defaultModelPageBackTooltip => 'Back';
 
   @override
@@ -5611,6 +5618,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpToolNeedsApproval => 'Require approval';
+
+  @override
+  String get mcpToolCollisionTitle => 'Tool Name Conflict';
+
+  @override
+  String get mcpToolCollisionDescription =>
+      'The following tools have name conflicts. Resolve them before sending.';
+
+  @override
+  String get mcpToolCollisionBuiltinDesc =>
+      'Conflicts with a built-in tool of this name';
+
+  @override
+  String get mcpToolCollisionMcpDesc =>
+      'Multiple MCP servers have a tool with this name';
+
+  @override
+  String get mcpToolCollisionDisableBuiltin => 'Disable built-in tool';
+
+  @override
+  String get mcpToolCollisionServerPrefix => 'Prefix for server';
+
+  @override
+  String get mcpToolCollisionPrefixHint => 'Enter prefix';
+
+  @override
+  String get mcpToolCollisionPrefixError => 'Invalid prefix format';
+
+  @override
+  String get mcpToolCollisionConfirm => 'Send';
+
+  @override
+  String get mcpToolCollisionCancel => 'Cancel';
+
+  @override
+  String get mcpToolCollisionUnbindHint =>
+      'Will unbind this server from this assistant';
 
   @override
   String get toolApprovalPending => 'Waiting for approval';

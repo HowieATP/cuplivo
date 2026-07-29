@@ -48,6 +48,8 @@ import '../widgets/synthesize_task_selector.dart'
 import '../models/synthesize_task.dart' show synthesizeTasks;
 import '../services/message_pipeline.dart';
 import '../services/ask_user_interaction_service.dart';
+import '../services/tool_handler_service.dart';
+import '../../../shared/dialogs/tool_collision_dialog.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
@@ -740,6 +742,28 @@ class HomePageController extends ChangeNotifier {
           ? ChatInputSubmissionResult.sent
           : ChatInputSubmissionResult.rejected;
     } else {
+      if (!_context.mounted) return ChatInputSubmissionResult.rejected;
+      // Check for MCP tool name collisions
+      final mcp = _context.read<McpProvider>();
+      final assistant = await _context
+          .read<AssistantProvider>()
+          .getLoadedCurrentAssistant();
+      final collisions = ToolHandlerService.detectToolNameCollisions(
+        mcp: mcp,
+        assistant: assistant,
+      );
+      if (collisions.isNotEmpty) {
+        if (!_context.mounted) return ChatInputSubmissionResult.rejected;
+        final l10n = AppLocalizations.of(_context)!;
+        final resolved = await showMcpToolCollisionDialog(
+          context: _context,
+          collisions: collisions,
+          mcp: mcp,
+          assistant: assistant,
+          l10n: l10n,
+        );
+        if (!resolved) return ChatInputSubmissionResult.rejected;
+      }
       result = await _viewModel.sendMessage(input);
     }
     if (result != ChatInputSubmissionResult.rejected) {

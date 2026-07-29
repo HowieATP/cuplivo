@@ -169,6 +169,7 @@ class McpToolService extends ChangeNotifier {
     required String? assistantId,
     required String toolName,
     Map<String, dynamic> arguments = const {},
+    String? targetServerId,
   }) async {
     // try servers selected for the assistant
     final a = (assistantId != null)
@@ -177,9 +178,15 @@ class McpToolService extends ChangeNotifier {
     final selected = (a?.mcpServerIds ?? const <String>[]).toSet();
     // debugPrint('[MCP/Call/Select] assistant=${assistantId ?? a?.id ?? '(current)'} tool=$toolName selectedServers=${selected.join(',')}');
     if (selected.isEmpty) return '';
-    for (final s in mcpProvider.connectedServers.where(
+
+    var candidates = mcpProvider.connectedServers.where(
       (s) => selected.contains(s.id),
-    )) {
+    );
+    // If targetServerId is given, try only that server
+    if (targetServerId != null) {
+      candidates = candidates.where((s) => s.id == targetServerId);
+    }
+    for (final s in candidates) {
       final has = s.tools.any((t) => t.enabled && t.name == toolName);
       if (has) {
         // debugPrint('[MCP/Call/Select] using server=${s.id} name=${s.name} transport=${s.transport.name}');

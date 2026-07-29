@@ -53,6 +53,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _didCheckUpdates = false; // one-time update check flag
 
 Future<void> main() async {
@@ -417,6 +418,7 @@ class MyApp extends StatelessWidget {
               // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card≈${light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
               // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
               return MaterialApp(
+                navigatorKey: navigatorKey,
                 debugShowCheckedModeBanner: false,
                 title: 'Cuplivo',
                 // App UI language; null = follow system (respects iOS per-app language)

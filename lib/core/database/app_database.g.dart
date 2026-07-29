@@ -5594,6 +5594,725 @@ class ChatStorageMetaRowsCompanion extends UpdateCompanion<ChatStorageMetaRow> {
   }
 }
 
+class $DeletedRecordRowsTable extends DeletedRecordRows
+    with TableInfo<$DeletedRecordRowsTable, DeletedRecordRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeletedRecordRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _recoveryJsonMeta = const VerificationMeta(
+    'recoveryJson',
+  );
+  @override
+  late final GeneratedColumn<String> recoveryJson = GeneratedColumn<String>(
+    'recovery_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sizeMeta = const VerificationMeta('size');
+  @override
+  late final GeneratedColumn<int> size = GeneratedColumn<int>(
+    'size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _batchIdMeta = const VerificationMeta(
+    'batchId',
+  );
+  @override
+  late final GeneratedColumn<String> batchId = GeneratedColumn<String>(
+    'batch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    recoveryJson,
+    size,
+    createdAt,
+    batchId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deleted_record_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeletedRecordRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('recovery_json')) {
+      context.handle(
+        _recoveryJsonMeta,
+        recoveryJson.isAcceptableOrUnknown(
+          data['recovery_json']!,
+          _recoveryJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_recoveryJsonMeta);
+    }
+    if (data.containsKey('size')) {
+      context.handle(
+        _sizeMeta,
+        size.isAcceptableOrUnknown(data['size']!, _sizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sizeMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('batch_id')) {
+      context.handle(
+        _batchIdMeta,
+        batchId.isAcceptableOrUnknown(data['batch_id']!, _batchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_batchIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id, type};
+  @override
+  DeletedRecordRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeletedRecordRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      recoveryJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recovery_json'],
+      )!,
+      size: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      batchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}batch_id'],
+      )!,
+    );
+  }
+
+  @override
+  $DeletedRecordRowsTable createAlias(String alias) {
+    return $DeletedRecordRowsTable(attachedDatabase, alias);
+  }
+}
+
+class DeletedRecordRow extends DataClass
+    implements Insertable<DeletedRecordRow> {
+  final String id;
+  final String type;
+  final String recoveryJson;
+  final int size;
+  final DateTime createdAt;
+  final String batchId;
+  const DeletedRecordRow({
+    required this.id,
+    required this.type,
+    required this.recoveryJson,
+    required this.size,
+    required this.createdAt,
+    required this.batchId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['recovery_json'] = Variable<String>(recoveryJson);
+    map['size'] = Variable<int>(size);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['batch_id'] = Variable<String>(batchId);
+    return map;
+  }
+
+  DeletedRecordRowsCompanion toCompanion(bool nullToAbsent) {
+    return DeletedRecordRowsCompanion(
+      id: Value(id),
+      type: Value(type),
+      recoveryJson: Value(recoveryJson),
+      size: Value(size),
+      createdAt: Value(createdAt),
+      batchId: Value(batchId),
+    );
+  }
+
+  factory DeletedRecordRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeletedRecordRow(
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      recoveryJson: serializer.fromJson<String>(json['recoveryJson']),
+      size: serializer.fromJson<int>(json['size']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      batchId: serializer.fromJson<String>(json['batchId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'recoveryJson': serializer.toJson<String>(recoveryJson),
+      'size': serializer.toJson<int>(size),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'batchId': serializer.toJson<String>(batchId),
+    };
+  }
+
+  DeletedRecordRow copyWith({
+    String? id,
+    String? type,
+    String? recoveryJson,
+    int? size,
+    DateTime? createdAt,
+    String? batchId,
+  }) => DeletedRecordRow(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    recoveryJson: recoveryJson ?? this.recoveryJson,
+    size: size ?? this.size,
+    createdAt: createdAt ?? this.createdAt,
+    batchId: batchId ?? this.batchId,
+  );
+  DeletedRecordRow copyWithCompanion(DeletedRecordRowsCompanion data) {
+    return DeletedRecordRow(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      recoveryJson: data.recoveryJson.present
+          ? data.recoveryJson.value
+          : this.recoveryJson,
+      size: data.size.present ? data.size.value : this.size,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      batchId: data.batchId.present ? data.batchId.value : this.batchId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedRecordRow(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('recoveryJson: $recoveryJson, ')
+          ..write('size: $size, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('batchId: $batchId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, type, recoveryJson, size, createdAt, batchId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeletedRecordRow &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.recoveryJson == this.recoveryJson &&
+          other.size == this.size &&
+          other.createdAt == this.createdAt &&
+          other.batchId == this.batchId);
+}
+
+class DeletedRecordRowsCompanion extends UpdateCompanion<DeletedRecordRow> {
+  final Value<String> id;
+  final Value<String> type;
+  final Value<String> recoveryJson;
+  final Value<int> size;
+  final Value<DateTime> createdAt;
+  final Value<String> batchId;
+  final Value<int> rowid;
+  const DeletedRecordRowsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.recoveryJson = const Value.absent(),
+    this.size = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.batchId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeletedRecordRowsCompanion.insert({
+    required String id,
+    required String type,
+    required String recoveryJson,
+    required int size,
+    required DateTime createdAt,
+    required String batchId,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       recoveryJson = Value(recoveryJson),
+       size = Value(size),
+       createdAt = Value(createdAt),
+       batchId = Value(batchId);
+  static Insertable<DeletedRecordRow> custom({
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<String>? recoveryJson,
+    Expression<int>? size,
+    Expression<DateTime>? createdAt,
+    Expression<String>? batchId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (recoveryJson != null) 'recovery_json': recoveryJson,
+      if (size != null) 'size': size,
+      if (createdAt != null) 'created_at': createdAt,
+      if (batchId != null) 'batch_id': batchId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeletedRecordRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? type,
+    Value<String>? recoveryJson,
+    Value<int>? size,
+    Value<DateTime>? createdAt,
+    Value<String>? batchId,
+    Value<int>? rowid,
+  }) {
+    return DeletedRecordRowsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      recoveryJson: recoveryJson ?? this.recoveryJson,
+      size: size ?? this.size,
+      createdAt: createdAt ?? this.createdAt,
+      batchId: batchId ?? this.batchId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (recoveryJson.present) {
+      map['recovery_json'] = Variable<String>(recoveryJson.value);
+    }
+    if (size.present) {
+      map['size'] = Variable<int>(size.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (batchId.present) {
+      map['batch_id'] = Variable<String>(batchId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedRecordRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('recoveryJson: $recoveryJson, ')
+          ..write('size: $size, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('batchId: $batchId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DeletionMarkerRowsTable extends DeletionMarkerRows
+    with TableInfo<$DeletionMarkerRowsTable, DeletionMarkerRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeletionMarkerRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, type, origin, deletedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deletion_marker_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeletionMarkerRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_originMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deletedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id, type, origin};
+  @override
+  DeletionMarkerRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeletionMarkerRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      )!,
+    );
+  }
+
+  @override
+  $DeletionMarkerRowsTable createAlias(String alias) {
+    return $DeletionMarkerRowsTable(attachedDatabase, alias);
+  }
+}
+
+class DeletionMarkerRow extends DataClass
+    implements Insertable<DeletionMarkerRow> {
+  final String id;
+  final String type;
+  final String origin;
+  final DateTime deletedAt;
+  const DeletionMarkerRow({
+    required this.id,
+    required this.type,
+    required this.origin,
+    required this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['origin'] = Variable<String>(origin);
+    map['deleted_at'] = Variable<DateTime>(deletedAt);
+    return map;
+  }
+
+  DeletionMarkerRowsCompanion toCompanion(bool nullToAbsent) {
+    return DeletionMarkerRowsCompanion(
+      id: Value(id),
+      type: Value(type),
+      origin: Value(origin),
+      deletedAt: Value(deletedAt),
+    );
+  }
+
+  factory DeletionMarkerRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeletionMarkerRow(
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      origin: serializer.fromJson<String>(json['origin']),
+      deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'origin': serializer.toJson<String>(origin),
+      'deletedAt': serializer.toJson<DateTime>(deletedAt),
+    };
+  }
+
+  DeletionMarkerRow copyWith({
+    String? id,
+    String? type,
+    String? origin,
+    DateTime? deletedAt,
+  }) => DeletionMarkerRow(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    origin: origin ?? this.origin,
+    deletedAt: deletedAt ?? this.deletedAt,
+  );
+  DeletionMarkerRow copyWithCompanion(DeletionMarkerRowsCompanion data) {
+    return DeletionMarkerRow(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      origin: data.origin.present ? data.origin.value : this.origin,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletionMarkerRow(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('origin: $origin, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, type, origin, deletedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeletionMarkerRow &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.origin == this.origin &&
+          other.deletedAt == this.deletedAt);
+}
+
+class DeletionMarkerRowsCompanion extends UpdateCompanion<DeletionMarkerRow> {
+  final Value<String> id;
+  final Value<String> type;
+  final Value<String> origin;
+  final Value<DateTime> deletedAt;
+  final Value<int> rowid;
+  const DeletionMarkerRowsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeletionMarkerRowsCompanion.insert({
+    required String id,
+    required String type,
+    required String origin,
+    required DateTime deletedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       origin = Value(origin),
+       deletedAt = Value(deletedAt);
+  static Insertable<DeletionMarkerRow> custom({
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<String>? origin,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (origin != null) 'origin': origin,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeletionMarkerRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? type,
+    Value<String>? origin,
+    Value<DateTime>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return DeletionMarkerRowsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      origin: origin ?? this.origin,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletionMarkerRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('origin: $origin, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5610,6 +6329,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CacheRowsTable cacheRows = $CacheRowsTable(this);
   late final $ChatStorageMetaRowsTable chatStorageMetaRows =
       $ChatStorageMetaRowsTable(this);
+  late final $DeletedRecordRowsTable deletedRecordRows =
+      $DeletedRecordRowsTable(this);
+  late final $DeletionMarkerRowsTable deletionMarkerRows =
+      $DeletionMarkerRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at)',
@@ -5647,6 +6370,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     geminiThoughtSignatureRows,
     cacheRows,
     chatStorageMetaRows,
+    deletedRecordRows,
+    deletionMarkerRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -9288,6 +10013,434 @@ typedef $$ChatStorageMetaRowsTableProcessedTableManager =
       ChatStorageMetaRow,
       PrefetchHooks Function()
     >;
+typedef $$DeletedRecordRowsTableCreateCompanionBuilder =
+    DeletedRecordRowsCompanion Function({
+      required String id,
+      required String type,
+      required String recoveryJson,
+      required int size,
+      required DateTime createdAt,
+      required String batchId,
+      Value<int> rowid,
+    });
+typedef $$DeletedRecordRowsTableUpdateCompanionBuilder =
+    DeletedRecordRowsCompanion Function({
+      Value<String> id,
+      Value<String> type,
+      Value<String> recoveryJson,
+      Value<int> size,
+      Value<DateTime> createdAt,
+      Value<String> batchId,
+      Value<int> rowid,
+    });
+
+class $$DeletedRecordRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $DeletedRecordRowsTable> {
+  $$DeletedRecordRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recoveryJson => $composableBuilder(
+    column: $table.recoveryJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get size => $composableBuilder(
+    column: $table.size,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get batchId => $composableBuilder(
+    column: $table.batchId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DeletedRecordRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeletedRecordRowsTable> {
+  $$DeletedRecordRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recoveryJson => $composableBuilder(
+    column: $table.recoveryJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get size => $composableBuilder(
+    column: $table.size,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get batchId => $composableBuilder(
+    column: $table.batchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeletedRecordRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeletedRecordRowsTable> {
+  $$DeletedRecordRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get recoveryJson => $composableBuilder(
+    column: $table.recoveryJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get size =>
+      $composableBuilder(column: $table.size, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get batchId =>
+      $composableBuilder(column: $table.batchId, builder: (column) => column);
+}
+
+class $$DeletedRecordRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeletedRecordRowsTable,
+          DeletedRecordRow,
+          $$DeletedRecordRowsTableFilterComposer,
+          $$DeletedRecordRowsTableOrderingComposer,
+          $$DeletedRecordRowsTableAnnotationComposer,
+          $$DeletedRecordRowsTableCreateCompanionBuilder,
+          $$DeletedRecordRowsTableUpdateCompanionBuilder,
+          (
+            DeletedRecordRow,
+            BaseReferences<
+              _$AppDatabase,
+              $DeletedRecordRowsTable,
+              DeletedRecordRow
+            >,
+          ),
+          DeletedRecordRow,
+          PrefetchHooks Function()
+        > {
+  $$DeletedRecordRowsTableTableManager(
+    _$AppDatabase db,
+    $DeletedRecordRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeletedRecordRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeletedRecordRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeletedRecordRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> recoveryJson = const Value.absent(),
+                Value<int> size = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<String> batchId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedRecordRowsCompanion(
+                id: id,
+                type: type,
+                recoveryJson: recoveryJson,
+                size: size,
+                createdAt: createdAt,
+                batchId: batchId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String type,
+                required String recoveryJson,
+                required int size,
+                required DateTime createdAt,
+                required String batchId,
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedRecordRowsCompanion.insert(
+                id: id,
+                type: type,
+                recoveryJson: recoveryJson,
+                size: size,
+                createdAt: createdAt,
+                batchId: batchId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeletedRecordRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeletedRecordRowsTable,
+      DeletedRecordRow,
+      $$DeletedRecordRowsTableFilterComposer,
+      $$DeletedRecordRowsTableOrderingComposer,
+      $$DeletedRecordRowsTableAnnotationComposer,
+      $$DeletedRecordRowsTableCreateCompanionBuilder,
+      $$DeletedRecordRowsTableUpdateCompanionBuilder,
+      (
+        DeletedRecordRow,
+        BaseReferences<
+          _$AppDatabase,
+          $DeletedRecordRowsTable,
+          DeletedRecordRow
+        >,
+      ),
+      DeletedRecordRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DeletionMarkerRowsTableCreateCompanionBuilder =
+    DeletionMarkerRowsCompanion Function({
+      required String id,
+      required String type,
+      required String origin,
+      required DateTime deletedAt,
+      Value<int> rowid,
+    });
+typedef $$DeletionMarkerRowsTableUpdateCompanionBuilder =
+    DeletionMarkerRowsCompanion Function({
+      Value<String> id,
+      Value<String> type,
+      Value<String> origin,
+      Value<DateTime> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$DeletionMarkerRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $DeletionMarkerRowsTable> {
+  $$DeletionMarkerRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DeletionMarkerRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeletionMarkerRowsTable> {
+  $$DeletionMarkerRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeletionMarkerRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeletionMarkerRowsTable> {
+  $$DeletionMarkerRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$DeletionMarkerRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeletionMarkerRowsTable,
+          DeletionMarkerRow,
+          $$DeletionMarkerRowsTableFilterComposer,
+          $$DeletionMarkerRowsTableOrderingComposer,
+          $$DeletionMarkerRowsTableAnnotationComposer,
+          $$DeletionMarkerRowsTableCreateCompanionBuilder,
+          $$DeletionMarkerRowsTableUpdateCompanionBuilder,
+          (
+            DeletionMarkerRow,
+            BaseReferences<
+              _$AppDatabase,
+              $DeletionMarkerRowsTable,
+              DeletionMarkerRow
+            >,
+          ),
+          DeletionMarkerRow,
+          PrefetchHooks Function()
+        > {
+  $$DeletionMarkerRowsTableTableManager(
+    _$AppDatabase db,
+    $DeletionMarkerRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeletionMarkerRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeletionMarkerRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeletionMarkerRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeletionMarkerRowsCompanion(
+                id: id,
+                type: type,
+                origin: origin,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String type,
+                required String origin,
+                required DateTime deletedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DeletionMarkerRowsCompanion.insert(
+                id: id,
+                type: type,
+                origin: origin,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeletionMarkerRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeletionMarkerRowsTable,
+      DeletionMarkerRow,
+      $$DeletionMarkerRowsTableFilterComposer,
+      $$DeletionMarkerRowsTableOrderingComposer,
+      $$DeletionMarkerRowsTableAnnotationComposer,
+      $$DeletionMarkerRowsTableCreateCompanionBuilder,
+      $$DeletionMarkerRowsTableUpdateCompanionBuilder,
+      (
+        DeletionMarkerRow,
+        BaseReferences<
+          _$AppDatabase,
+          $DeletionMarkerRowsTable,
+          DeletionMarkerRow
+        >,
+      ),
+      DeletionMarkerRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9315,4 +10468,8 @@ class $AppDatabaseManager {
       $$CacheRowsTableTableManager(_db, _db.cacheRows);
   $$ChatStorageMetaRowsTableTableManager get chatStorageMetaRows =>
       $$ChatStorageMetaRowsTableTableManager(_db, _db.chatStorageMetaRows);
+  $$DeletedRecordRowsTableTableManager get deletedRecordRows =>
+      $$DeletedRecordRowsTableTableManager(_db, _db.deletedRecordRows);
+  $$DeletionMarkerRowsTableTableManager get deletionMarkerRows =>
+      $$DeletionMarkerRowsTableTableManager(_db, _db.deletionMarkerRows);
 }

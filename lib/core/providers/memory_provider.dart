@@ -1,8 +1,16 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../models/assistant_memory.dart';
 import '../services/memory_store.dart';
+import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
 
 class MemoryProvider extends ChangeNotifier {
+  MemoryProvider({this.chatService});
+
+  final ChatService? chatService;
+
   List<AssistantMemory> _memories = <AssistantMemory>[];
   bool _initialized = false;
 
@@ -50,6 +58,24 @@ class MemoryProvider extends ChangeNotifier {
   }
 
   Future<bool> delete({required int id}) async {
+    // Write trash bundle before deleting. Memory id is int, use string form.
+    final store = chatService?.deletedRecordsStore;
+    if (store != null) {
+      final mem = _memories.where((m) => m.id == id).firstOrNull;
+      if (mem != null) {
+        try {
+          await store.recordDeletion(
+            id: id.toString(),
+            type: DeletionEntityType.memory,
+            recoveryJson: jsonEncode(mem.toJson()),
+            batchId: const Uuid().v4(),
+            deletedAt: DateTime.now(),
+          );
+        } catch (e) {
+          debugPrint('MemoryProvider.delete: failed to write trash: $e');
+        }
+      }
+    }
     final ok = await MemoryStore.delete(id: id);
     await loadAll();
     return ok;

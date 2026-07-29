@@ -258,3 +258,42 @@
 ### Flagged Ambiguities
 
 - "skill" was used interchangeably to mean both "a set of instructions loaded from disk" and "an individual step in a model's reasoning process" — resolved: the former is **Skill** (capitalized, bounded in the codebase), the latter falls under general LLM domain language and is not part of Cuplivo's domain model.
+
+## Deletion Recovery & Remote-Deletion Markers
+
+### Core Concepts
+
+- **deleted_records**: A Drift table (`DeletedRecordRows`) holding recoverable payloads for locally-deleted entities. Each row = one top-level entity bundle (conversation bundle includes its messages + toolEvents + geminiSigs + MCP server links; message bundle includes its toolEvents/sigs). `size` column = `bytes(utf8(recoveryJson)) + 256` (covers DB row overhead). NOT backed up — excluded structurally (backup export never queries this table). 10 MB default cap, user-configurable. See `docs/adr/0011-deletion-recovery-two-table-split.md`.
+
+- **deletion_markers**: A Drift table (`DeletionMarkerRows`) holding id-only tombstones for sync/backup, with no payload. Two origins share one table:
+  - `origin='local'`: written on every local delete (dual-write with `deleted_records`). Source of `deleted.json`.
+  - `origin='remote'`: written when a sync peer or backup's `deleted.json` declares an id that still exists locally. UI marks these as "远端已删除" and offers one-click local deletion.
+  - Unified 5000-row FIFO by `deletedAt`, regardless of origin.
+
+- **Echo avoidance**: `deleted.json` is generated from `origin='local'` rows only. A remote marker is never echoed back — A deletes X → syncs to B → B stores `origin='remote'` row → B's `deleted.json` excludes it → A never receives its own deletion as a foreign declaration.
+
+- **deleted.json**: Optional payload in LAN sync round-2 zip AND backup zip. Contains `{type: [{id, deletedAt}, ...]}` grouped by entity type, capped at 5000 entries/type. Sourced only from `origin='local'` rows. Absent in old-format payloads → receiver treats as "no deletions declared" (backward compatible, no protocol bump).
+
+### Recovery Granularity
+
+- **Bundled per top-level entity**: 1 `deleted_records` row = 1 top-level entity. Conversation bundle nests all messages + toolEvents + geminiSigs + MCP server links. No 二级展开 in UI.
+- **7 recoverable types**: conversation, message, assistant, worldBook, quickPhrase, mcpServer, memory. Skill is NOT recoverable (filesystem entity, physical delete).
+
+### Deletion Path Policies
+
+- **clearAllData**: writes NEITHER `deleted_records` NOR `deletion_markers`. Fully destructive, no local recovery, peer-blind. See `docs/adr/0012-clearalldata-no-tombstone-blind-peer.md`.
+- **deleteAssistant cascade**: full cascade trash — 1 assistant-trash row + N conversation-trash rows. UI groups the N+1 rows by original assistantId.
+- **Orphan message restore**: refused if parent conversation no longer exists live.
+- **Orphan conversation restore**: refused if `assistantId` points to a deleted (and not simultaneously restored) assistant.
+
+### Restore Position Semantics
+
+- **messageOrder is a snapshot, not a restore target**: `message_rows.messageOrder` is compacted (`_compactMessageOrder`) on every delete. A deleted message's original `messageOrder` is stale by restore time. The bundle stores `messageId` + `groupId`/`subgroupId`/`version` for identity, NOT `messageOrder` for position.
+- **message restore = append**: restored messages are appended to the parent conversation's end (`messageOrder = max + 1`). Trash restores content, not exact timeline position.
+- **Best-effort file restore**: `_cleanupOrphanUploads` keeps its current behavior (deletes files no longer referenced by live conversations). A restored conversation's JSON may reference already-deleted upload/avatar files. UI warns at restore time.
+
+### Quota & Eviction
+
+- **deleted_records cap**: default 10 MB, user-configurable via discrete dropdown (mirrors log-max-size pattern), SharedPreferences key `trash_cap_mb_v1`. Options `[1, 5, 10, 25, 50, 100, 200, 500, 0]` MB (0 = unlimited).
+- **Eviction rule**: evict oldest by `createdAt`, NEVER self-evict the current write batch (identified by `batchId` column).
+- **deletion_markers cap**: unified 5000-row FIFO by `deletedAt`, not user-configurable.

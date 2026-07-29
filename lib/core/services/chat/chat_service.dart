@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/assistant.dart';
@@ -11,6 +13,7 @@ import '../../models/file_reference.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
+import '../deleted_records_store.dart';
 
 class ChatService extends ChangeNotifier {
   static const int defaultInitialMessageMin = 2;
@@ -21,6 +24,11 @@ class ChatService extends ChangeNotifier {
 
   late ChatDatabaseRepository _repo;
   ChatDatabaseRepository get repo => _repo;
+
+  /// Lazily created [DeletedRecordsStore] sharing the same [AppDatabase].
+  /// Null until [init] completes.
+  DeletedRecordsStore? _deletedRecordsStore;
+  DeletedRecordsStore? get deletedRecordsStore => _deletedRecordsStore;
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -58,6 +66,7 @@ class ChatService extends ChangeNotifier {
       file: File(p.join(appDataDir.path, AppDatabase.databaseFileName)),
     );
     await _repo.ensureReady();
+    _deletedRecordsStore = DeletedRecordsStore(_repo.db);
     await _loadConversationsCache();
 
     // Migrate any persisted message content that references old iOS sandbox paths
@@ -442,6 +451,9 @@ class ChatService extends ChangeNotifier {
     final conversation = _conversationsCache[id];
     if (conversation == null) return false;
 
+    // Build trash bundle BEFORE physical delete (messages won't exist after).
+    await _recordConversationDeletion(conversation);
+
     await _repo.deleteConversation(id);
     _conversationsCache.remove(id);
     _messagesCache.remove(id);
@@ -450,6 +462,88 @@ class ChatService extends ChangeNotifier {
       _currentConversationId = null;
     }
     return true;
+  }
+
+  /// Builds the recovery bundle for a conversation (conversation + messages +
+  /// toolEvents + geminiSigs + mcpServerIds) and writes it to the trash store.
+  Future<void> _recordConversationDeletion(Conversation conversation) async {
+    final store = _deletedRecordsStore;
+    if (store == null) {
+      debugPrint(
+        '_recordConversationDeletion: deletedRecordsStore is null, skipping trash',
+      );
+      return;
+    }
+    try {
+      final convId = conversation.id;
+      final total = getMessageCount(convId);
+      final messages = <ChatMessage>[];
+      for (var start = 0; start < total; start += defaultLoadedWindowMax) {
+        messages.addAll(
+          getMessagesRange(convId, start: start, limit: defaultLoadedWindowMax),
+        );
+      }
+      final toolEvents = <String, List<Map<String, dynamic>>>{};
+      final geminiSigs = <String, String?>{};
+      for (final m in messages) {
+        if (m.role == 'assistant') {
+          toolEvents[m.id] = getToolEvents(m.id);
+          geminiSigs[m.id] = getGeminiThoughtSignature(m.id);
+        }
+      }
+      final mcpServerIds = getConversationMcpServers(convId);
+      final recoveryJson = jsonEncode({
+        'conversation': conversation.toJson(),
+        'messages': messages.map((m) => m.toJson()).toList(),
+        'toolEvents': toolEvents,
+        'geminiSigs': geminiSigs,
+        'mcpServerIds': mcpServerIds,
+      });
+      await store.recordDeletion(
+        id: convId,
+        type: DeletionEntityType.conversation,
+        recoveryJson: recoveryJson,
+        batchId: const Uuid().v4(),
+        deletedAt: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('_recordConversationDeletion: failed to write trash: $e');
+    }
+  }
+
+  /// Builds the recovery bundle for a single message (message + its toolEvents
+  /// + geminiSigs if assistant) and writes it to the trash store.
+  Future<void> _recordMessageDeletion(ChatMessage message) async {
+    final store = _deletedRecordsStore;
+    if (store == null) {
+      debugPrint(
+        '_recordMessageDeletion: deletedRecordsStore is null, skipping trash',
+      );
+      return;
+    }
+    try {
+      final toolEvents = <String, List<Map<String, dynamic>>>{};
+      final geminiSigs = <String, String?>{};
+      if (message.role == 'assistant') {
+        toolEvents[message.id] = getToolEvents(message.id);
+        geminiSigs[message.id] = getGeminiThoughtSignature(message.id);
+      }
+      final recoveryJson = jsonEncode({
+        'message': message.toJson(),
+        'toolEvents': toolEvents,
+        'geminiSigs': geminiSigs,
+        'conversationId': message.conversationId,
+      });
+      await store.recordDeletion(
+        id: message.id,
+        type: DeletionEntityType.message,
+        recoveryJson: recoveryJson,
+        batchId: const Uuid().v4(),
+        deletedAt: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('_recordMessageDeletion: failed to write trash: $e');
+    }
   }
 
   Future<void> deleteConversationsForAssistant(String assistantId) async {
@@ -1588,6 +1682,9 @@ class ChatService extends ChangeNotifier {
       await _repo.updateMessageOrder(conversation.id, ids);
     }
 
+    // Build trash bundle BEFORE physical delete.
+    await _recordMessageDeletion(message);
+
     await _repo.deleteMessage(messageId);
     await _refreshConversation(message.conversationId);
     // Remove any tool events linked to this assistant message
@@ -1685,6 +1782,193 @@ class ChatService extends ChangeNotifier {
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
     notifyListeners();
+  }
+
+  // ===== Restore from trash =====
+
+  /// Restores a conversation from trash.
+  ///
+  /// The bundle contains conversation + messages + toolEvents + geminiSigs +
+  /// mcpServerIds. Re-inserts them into the live DB.
+  ///
+  /// Refused if the conversation's `assistantId` points to a deleted (and not
+  /// simultaneously restored) assistant — the caller must restore the
+  /// assistant first or in the same batch.
+  ///
+  /// Returns `null` on success, or an error message string describing why
+  /// restoration was refused.
+  Future<String?> restoreConversationFromTrash(String conversationId) async {
+    final store = _deletedRecordsStore;
+    if (store == null) return 'deletedRecordsStore not initialized';
+
+    final record = await store.getDeletedRecord(
+      conversationId,
+      DeletionEntityType.conversation,
+    );
+    if (record == null) return 'Record not found in trash';
+
+    try {
+      final bundle = jsonDecode(record.recoveryJson) as Map<String, dynamic>;
+      final convJson = bundle['conversation'] as Map<String, dynamic>;
+      final conversation = Conversation.fromJson(convJson);
+
+      // Orphan conversation check: refuse if assistantId is dead.
+      final assistantId = conversation.assistantId;
+      if (assistantId != null && assistantId.isNotEmpty) {
+        final assistant = await _repo.getAssistant(assistantId);
+        if (assistant == null) {
+          return 'This conversation belongs to a deleted assistant. Restore the assistant first.';
+        }
+      }
+
+      // Check if conversation id already exists (shouldn't happen, defensive).
+      if (_conversationsCache.containsKey(conversationId)) {
+        return 'A conversation with this id already exists';
+      }
+
+      final messagesJson = bundle['messages'] as List<dynamic>? ?? [];
+      final messages = <ChatMessage>[];
+      for (final m in messagesJson) {
+        if (m is Map<String, dynamic>) {
+          messages.add(ChatMessage.fromJson(m));
+        }
+      }
+
+      final toolEvents = <String, List<Map<String, dynamic>>>{};
+      final te = bundle['toolEvents'] as Map<String, dynamic>? ?? {};
+      for (final entry in te.entries) {
+        if (entry.value is List) {
+          toolEvents[entry.key] = (entry.value as List)
+              .whereType<Map>()
+              .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
+              .toList();
+        }
+      }
+
+      final geminiSigs = <String, String>{};
+      final gs = bundle['geminiSigs'] as Map<String, dynamic>? ?? {};
+      for (final entry in gs.entries) {
+        if (entry.value != null) {
+          geminiSigs[entry.key] = entry.value.toString();
+        }
+      }
+
+      final mcpServerIds = (bundle['mcpServerIds'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList();
+      // Attach mcpServerIds to conversation so putMigrationBatch persists them.
+      conversation.mcpServerIds = mcpServerIds;
+
+      // Re-insert via batch restore. putMigrationBatch handles conversation
+      // MCP server links internally, so no separate setConversationMcpServers
+      // call needed.
+      final messagesList = <({ChatMessage message, int messageOrder})>[];
+      for (var i = 0; i < messages.length; i++) {
+        messagesList.add((message: messages[i], messageOrder: i));
+      }
+      await _repo.putMigrationBatch(
+        conversations: [conversation],
+        messages: messagesList,
+        toolEventsByMessageId: toolEvents,
+        geminiSignaturesByMessageId: geminiSigs,
+      );
+
+      // Reload cache.
+      await _loadConversationsCache();
+
+      // Purge the trash row.
+      await store.purgeDeletedRecord(
+        conversationId,
+        DeletionEntityType.conversation,
+      );
+
+      notifyListeners();
+      return null; // success
+    } catch (e) {
+      debugPrint('restoreConversation: failed: $e');
+      return 'Restore failed: $e';
+    }
+  }
+
+  /// Restores a single message from trash by appending it to the end of its
+  /// parent conversation.
+  ///
+  /// Refused if the parent conversation no longer exists live. The user is
+  /// expected to restore the conversation first.
+  ///
+  /// Returns `null` on success, or an error message string.
+  Future<String?> restoreMessage(String messageId) async {
+    final store = _deletedRecordsStore;
+    if (store == null) return 'deletedRecordsStore not initialized';
+
+    final record = await store.getDeletedRecord(
+      messageId,
+      DeletionEntityType.message,
+    );
+    if (record == null) return 'Record not found in trash';
+
+    try {
+      final bundle = jsonDecode(record.recoveryJson) as Map<String, dynamic>;
+      final msgJson = bundle['message'] as Map<String, dynamic>;
+      final message = ChatMessage.fromJson(msgJson);
+      final conversationId = message.conversationId;
+
+      // Orphan message check: refuse if parent conversation doesn't exist.
+      if (!_conversationsCache.containsKey(conversationId)) {
+        return 'This message belongs to a deleted conversation. Restore the conversation first.';
+      }
+
+      // Check if message id already exists (defensive).
+      final existing = _repo.getMessageSync(messageId);
+      if (existing != null) {
+        return 'A message with this id already exists';
+      }
+
+      // Append to end of conversation.
+      final conversation = getCompleteConversation(conversationId);
+      if (conversation == null) {
+        return 'Parent conversation not found in cache';
+      }
+
+      final nextOrder = await _repo.nextMessageOrder(conversationId);
+      conversation.messageIds.add(messageId);
+      await _saveConversation(conversation);
+      await _repo.putMessage(message, messageOrder: nextOrder);
+
+      // Restore tool events and gemini sigs.
+      final toolEvents = bundle['toolEvents'] as Map<String, dynamic>? ?? {};
+      final teList = toolEvents[messageId];
+      if (teList is List) {
+        final events = teList
+            .whereType<Map>()
+            .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
+            .toList();
+        if (events.isNotEmpty) {
+          await setToolEvents(messageId, events);
+        }
+      }
+
+      final geminiSigs = bundle['geminiSigs'] as Map<String, dynamic>? ?? {};
+      final sig = geminiSigs[messageId];
+      if (sig != null && sig.toString().isNotEmpty) {
+        await setGeminiThoughtSignature(messageId, sig.toString());
+      }
+
+      // Update message order.
+      await _repo.updateMessageOrder(conversationId, conversation.messageIds);
+
+      // Clear cache so messages reload.
+      _messagesCache.remove(conversationId);
+
+      // Purge trash row.
+      await store.purgeDeletedRecord(messageId, DeletionEntityType.message);
+
+      notifyListeners();
+      return null; // success
+    } catch (e) {
+      debugPrint('restoreMessage: failed: $e');
+      return 'Restore failed: $e';
+    }
   }
 }
 

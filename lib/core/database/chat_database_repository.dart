@@ -16,6 +16,10 @@ class ChatDatabaseRepository {
   final AppDatabase _db;
   final sqlite.Database? _syncDb;
 
+  /// Read-only access to the underlying [AppDatabase] for stores that need
+  /// to share the same DB connection (e.g. [DeletedRecordsStore]).
+  AppDatabase get db => _db;
+
   static ChatDatabaseRepository open({File? file}) {
     final db = AppDatabase.open(file: file);
     return ChatDatabaseRepository(db, file == null ? null : _openSync(file));
@@ -737,6 +741,8 @@ class ChatDatabaseRepository {
       await _db.delete(_db.conversationRows).go();
       await _db.delete(_db.cacheRows).go();
       await _db.delete(_db.chatStorageMetaRows).go();
+      await _db.delete(_db.deletedRecordRows).go();
+      await _db.delete(_db.deletionMarkerRows).go();
     });
   }
 
@@ -899,6 +905,10 @@ class ChatDatabaseRepository {
             .getSingle();
     return (row.read(maxOrder) ?? -1) + 1;
   }
+
+  /// Public accessor for [DeletedRecordsStore] restore logic.
+  Future<int> nextMessageOrder(String conversationId) =>
+      _nextMessageOrder(conversationId);
 
   Future<void> _replaceMcpServers(
     String conversationId,

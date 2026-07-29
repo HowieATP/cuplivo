@@ -135,6 +135,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryOther => '应用';
 
   @override
+  String get storageSpaceCategoryDeletedRecords => '回收站';
+
+  @override
   String storageSpaceFilesCount(int count) {
     return '$count 个文件';
   }
@@ -5383,6 +5386,89 @@ class AppLocalizationsZh extends AppLocalizations {
   String get logSettingsMaxSizeUnlimited => '不限制';
 
   @override
+  String get trashCapLabel => '垃圾站大小上限';
+
+  @override
+  String get trashCapSubtitle => '超出时移除最旧的删除记录';
+
+  @override
+  String get trashCapUnlimited => '无上限';
+
+  @override
+  String get trashSectionLocalTab => '本地回收站';
+
+  @override
+  String get trashSectionRemoteTab => '远端已删除';
+
+  @override
+  String get trashRestoreButton => '恢复';
+
+  @override
+  String get trashPurgeButton => '彻底删除';
+
+  @override
+  String get trashClearAllButton => '清空回收站';
+
+  @override
+  String get trashRestoreWarningFiles => '附件已被清理，无法恢复';
+
+  @override
+  String get trashRestoreOrphanMessage => '此消息属于已删除的对话，请先恢复对话。';
+
+  @override
+  String get trashRestoreOrphanConversation => '此对话属于已删除的助手，请先恢复助手。';
+
+  @override
+  String get trashRemoteDeleteLocally => '在本机也删除';
+
+  @override
+  String get trashRemoteClearAllButton => '一键清除远端已删除';
+
+  @override
+  String get trashEmptyState => '回收站为空';
+
+  @override
+  String get trashRemoteEmptyState => '无远端已删除标记';
+
+  @override
+  String get trashTypeWorldBook => 'World Book';
+
+  @override
+  String get trashTypeQuickPhrase => '快捷短语';
+
+  @override
+  String get trashTypeMcpServer => 'MCP 服务器';
+
+  @override
+  String get trashTypeMemory => '记忆';
+
+  @override
+  String get trashSectionPendingTab => '待确认';
+
+  @override
+  String trashConflictSnackBar(Object count) {
+    return '$count 个删除冲突待确认';
+  }
+
+  @override
+  String get trashConflictSnackBarAction => '查看';
+
+  @override
+  String get trashConflictOriginLocal => '你曾删除（已被合并恢复）';
+
+  @override
+  String get trashConflictOriginRemote => '对端已删除';
+
+  @override
+  String get trashConflictKeepButton => '保留';
+
+  @override
+  String get trashConflictKeepAllButton => '全部保留';
+
+  @override
+  String get trashConflictEmptyState => '无待确认的删除冲突';
+
+  @override
   String get assistantEditManageSummariesTitle => '管理摘要';
 
   @override
@@ -6230,6 +6316,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '应用';
+
+  @override
+  String get storageSpaceCategoryDeletedRecords => '回收站';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -11480,6 +11569,89 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get logSettingsMaxSizeUnlimited => '不限制';
 
   @override
+  String get trashCapLabel => '垃圾站大小上限';
+
+  @override
+  String get trashCapSubtitle => '超出时移除最旧的删除记录';
+
+  @override
+  String get trashCapUnlimited => '无上限';
+
+  @override
+  String get trashSectionLocalTab => '本地回收站';
+
+  @override
+  String get trashSectionRemoteTab => '远端已删除';
+
+  @override
+  String get trashRestoreButton => '恢复';
+
+  @override
+  String get trashPurgeButton => '彻底删除';
+
+  @override
+  String get trashClearAllButton => '清空回收站';
+
+  @override
+  String get trashRestoreWarningFiles => '附件已被清理，无法恢复';
+
+  @override
+  String get trashRestoreOrphanMessage => '此消息属于已删除的对话，请先恢复对话。';
+
+  @override
+  String get trashRestoreOrphanConversation => '此对话属于已删除的助手，请先恢复助手。';
+
+  @override
+  String get trashRemoteDeleteLocally => '在本机也删除';
+
+  @override
+  String get trashRemoteClearAllButton => '一键清除远端已删除';
+
+  @override
+  String get trashEmptyState => '回收站为空';
+
+  @override
+  String get trashRemoteEmptyState => '无远端已删除标记';
+
+  @override
+  String get trashTypeWorldBook => 'World Book';
+
+  @override
+  String get trashTypeQuickPhrase => '快捷短语';
+
+  @override
+  String get trashTypeMcpServer => 'MCP 服务器';
+
+  @override
+  String get trashTypeMemory => '记忆';
+
+  @override
+  String get trashSectionPendingTab => '待确认';
+
+  @override
+  String trashConflictSnackBar(Object count) {
+    return '$count 个删除冲突待确认';
+  }
+
+  @override
+  String get trashConflictSnackBarAction => '查看';
+
+  @override
+  String get trashConflictOriginLocal => '你曾删除（已被合并恢复）';
+
+  @override
+  String get trashConflictOriginRemote => '对端已删除';
+
+  @override
+  String get trashConflictKeepButton => '保留';
+
+  @override
+  String get trashConflictKeepAllButton => '全部保留';
+
+  @override
+  String get trashConflictEmptyState => '无待确认的删除冲突';
+
+  @override
   String get assistantEditManageSummariesTitle => '管理摘要';
 
   @override
@@ -12327,6 +12499,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '應用';
+
+  @override
+  String get storageSpaceCategoryDeletedRecords => '資源回收筒';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -17575,6 +17750,89 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logSettingsMaxSizeUnlimited => '不限制';
+
+  @override
+  String get trashCapLabel => '垃圾桶大小上限';
+
+  @override
+  String get trashCapSubtitle => '超出時移除最舊的刪除記錄';
+
+  @override
+  String get trashCapUnlimited => '無上限';
+
+  @override
+  String get trashSectionLocalTab => '本機回收筒';
+
+  @override
+  String get trashSectionRemoteTab => '遠端已刪除';
+
+  @override
+  String get trashRestoreButton => '復原';
+
+  @override
+  String get trashPurgeButton => '徹底刪除';
+
+  @override
+  String get trashClearAllButton => '清空回收筒';
+
+  @override
+  String get trashRestoreWarningFiles => '附件已被清理，無法復原';
+
+  @override
+  String get trashRestoreOrphanMessage => '此訊息屬於已刪除的對話，請先復原對話。';
+
+  @override
+  String get trashRestoreOrphanConversation => '此對話屬於已刪除的助手，請先復原助手。';
+
+  @override
+  String get trashRemoteDeleteLocally => '在本機也刪除';
+
+  @override
+  String get trashRemoteClearAllButton => '一鍵清除遠端已刪除';
+
+  @override
+  String get trashEmptyState => '回收筒為空';
+
+  @override
+  String get trashRemoteEmptyState => '無遠端已刪除標記';
+
+  @override
+  String get trashTypeWorldBook => 'World Book';
+
+  @override
+  String get trashTypeQuickPhrase => '快捷短語';
+
+  @override
+  String get trashTypeMcpServer => 'MCP 伺服器';
+
+  @override
+  String get trashTypeMemory => '記憶';
+
+  @override
+  String get trashSectionPendingTab => '待確認';
+
+  @override
+  String trashConflictSnackBar(Object count) {
+    return '$count 個刪除衝突待確認';
+  }
+
+  @override
+  String get trashConflictSnackBarAction => '檢視';
+
+  @override
+  String get trashConflictOriginLocal => '你曾刪除（已被合併恢復）';
+
+  @override
+  String get trashConflictOriginRemote => '對端已刪除';
+
+  @override
+  String get trashConflictKeepButton => '保留';
+
+  @override
+  String get trashConflictKeepAllButton => '全部保留';
+
+  @override
+  String get trashConflictEmptyState => '無待確認的刪除衝突';
 
   @override
   String get assistantEditManageSummariesTitle => '管理摘要';

@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../database/chat_database_repository.dart';
 import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
@@ -80,6 +81,13 @@ class AssistantProvider extends ChangeNotifier {
       _currentAssistantId = savedId;
     }
     notifyListeners();
+  }
+
+  /// Reloads assistants from the repo and notifies listeners.
+  /// Used by [TrashRestoreCoordinator] after restoring an assistant.
+  Future<void> reloadFromRepo() async {
+    if (chatService == null) return;
+    await _doLoad(chatService!.repo);
   }
 
   Future<void> _doLoad(ChatDatabaseRepository repo) async {
@@ -635,6 +643,25 @@ class AssistantProvider extends ChangeNotifier {
     if (idx == -1) return false;
     // Do not allow deleting the last remaining assistant
     if (_assistants.length <= 1) return false;
+
+    final assistant = _assistants[idx];
+    final batchId = const Uuid().v4();
+
+    // Write assistant-trash BEFORE deleting conversations and the assistant row.
+    final store = chatService?.deletedRecordsStore;
+    if (store != null) {
+      try {
+        await store.recordDeletion(
+          id: id,
+          type: DeletionEntityType.assistant,
+          recoveryJson: jsonEncode(assistant.toJson()),
+          batchId: batchId,
+          deletedAt: DateTime.now(),
+        );
+      } catch (e) {
+        debugPrint('deleteAssistant: failed to write assistant trash: $e');
+      }
+    }
 
     await chatService?.deleteConversationsForAssistant(id);
     // Cancel any pending proactive care alarm for this assistant.

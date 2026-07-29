@@ -30,12 +30,15 @@ class MemoryStore {
     return List<AssistantMemory>.of(_cache!);
   }
 
-  static Future<void> _saveAll(List<AssistantMemory> list) async {
+  static Future<void> saveAll(List<AssistantMemory> list) async {
     _cache = List<AssistantMemory>.of(list);
     final prefs = await SharedPreferences.getInstance();
     final json = jsonEncode(list.map((e) => e.toJson()).toList());
     await prefs.setString(_memoriesKey, json);
   }
+
+  static Future<void> _saveAll(List<AssistantMemory> list) async =>
+      saveAll(list);
 
   static Future<List<AssistantMemory>> getForAssistant(
     String assistantId,

@@ -22,6 +22,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
+import 'trash_detail_page.dart';
 import '../../../theme/app_font_weights.dart';
 
 class StorageSpacePage extends StatefulWidget {
@@ -83,6 +84,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return const Color(0xFFEAB308); // yellow
       case StorageUsageCategoryKey.other:
         return cs.onSurface.withValues(alpha: 0.22);
+      case StorageUsageCategoryKey.deletedRecords:
+        return const Color(0xFF64748B); // slate
     }
   }
 
@@ -102,6 +105,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.FileText;
       case StorageUsageCategoryKey.other:
         return Lucide.Box;
+      case StorageUsageCategoryKey.deletedRecords:
+        return Lucide.Trash2;
     }
   }
 
@@ -121,6 +126,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLogs;
       case StorageUsageCategoryKey.other:
         return l10n.storageSpaceCategoryOther;
+      case StorageUsageCategoryKey.deletedRecords:
+        return l10n.storageSpaceCategoryDeletedRecords;
     }
   }
 
@@ -331,6 +338,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     if (report == null) return;
     final l10n = AppLocalizations.of(context)!;
     final title = _titleFor(key, l10n);
+    if (key == StorageUsageCategoryKey.deletedRecords) {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const TrashDetailPage()));
+      // Refresh report after potential trash changes.
+      await _refreshReport();
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _StorageCategoryPage(
@@ -499,22 +514,26 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                       color: cs.onSurface.withValues(alpha: 0.08),
                     ),
                     Expanded(
-                      child: _CategoryDetail(
-                        category: selectedCat,
-                        title: _titleFor(selectedCat.key, l10n),
-                        fmtBytes: formatBytes,
-                        subTitleFor: (id) => _subTitleFor(id, l10n),
-                        clearing: _clearing,
-                        onClearCache: _clearing ? null : _doClearCache,
-                        onClearOtherCache: _clearing
-                            ? null
-                            : _doClearOtherCache,
-                        onClearSystemCache: _clearing
-                            ? null
-                            : _doClearSystemCache,
-                        onClearLogs: _clearing ? null : _doClearLogs,
-                        refreshReport: _refreshReport,
-                      ),
+                      child:
+                          selectedCat.key ==
+                              StorageUsageCategoryKey.deletedRecords
+                          ? const TrashDetailPage(embedded: true)
+                          : _CategoryDetail(
+                              category: selectedCat,
+                              title: _titleFor(selectedCat.key, l10n),
+                              fmtBytes: formatBytes,
+                              subTitleFor: (id) => _subTitleFor(id, l10n),
+                              clearing: _clearing,
+                              onClearCache: _clearing ? null : _doClearCache,
+                              onClearOtherCache: _clearing
+                                  ? null
+                                  : _doClearOtherCache,
+                              onClearSystemCache: _clearing
+                                  ? null
+                                  : _doClearSystemCache,
+                              onClearLogs: _clearing ? null : _doClearLogs,
+                              refreshReport: _refreshReport,
+                            ),
                     ),
                   ],
                 ),
@@ -607,7 +626,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   icon: _iconFor(report.categories[i].key),
                   label: _titleFor(report.categories[i].key, l10n),
                   detailText:
-                      '${formatBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
+                      report.categories[i].key ==
+                          StorageUsageCategoryKey.deletedRecords
+                      ? null
+                      : '${formatBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
                   onTap: () => _openCategoryDetail(report.categories[i].key),
                 ),
                 if (i != report.categories.length - 1) _iosDivider(context),
@@ -1040,14 +1062,16 @@ class _CategoryMenu extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      fmtBytes(c.stats.bytes),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.65),
+                    if (c.key != StorageUsageCategoryKey.deletedRecords) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        fmtBytes(c.stats.bytes),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.65),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -2358,7 +2382,7 @@ Widget _iosNavRow(
   BuildContext context, {
   required IconData icon,
   required String label,
-  required String detailText,
+  String? detailText,
   Widget? trailing,
   required VoidCallback onTap,
 }) {
@@ -2392,16 +2416,17 @@ Widget _iosNavRow(
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: Text(
-            detailText,
-            style: TextStyle(
-              fontSize: 13,
-              color: cs.onSurface.withValues(alpha: 0.6),
+        if (detailText != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              detailText,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
-        ),
         if (trailing != null) ...[
           const SizedBox(width: 6),
           trailing,

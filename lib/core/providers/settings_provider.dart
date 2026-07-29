@@ -244,6 +244,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _logSaveOutputKey = 'log_save_output_v1';
   static const String _logAutoDeleteDaysKey = 'log_auto_delete_days_v1';
   static const String _logMaxSizeMBKey = 'log_max_size_mb_v1';
+  static const String _trashCapMbKey = 'trash_cap_mb_v1';
   static const String _appLaunchCountKey = 'app_launch_count_v1';
   // Desktop topic panel placement + right sidebar open state
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
@@ -1044,6 +1045,7 @@ class SettingsProvider extends ChangeNotifier {
     RequestLogger.saveOutput = _logSaveOutput;
     _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
     _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 0;
+    _trashCapMb = prefs.getInt(_trashCapMbKey) ?? 10;
     _appLaunchCount = prefs.getInt(_appLaunchCountKey) ?? 0;
     // Run log cleanup based on current settings
     RequestLogger.cleanupLogs(
@@ -4379,6 +4381,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     RequestLogger.cleanupLogs(autoDeleteDays: _logAutoDeleteDays, maxSizeMB: v);
   }
 
+  // Trash (deleted records) cap in MB. 0 = unlimited.
+  int _trashCapMb = 10;
+  int get trashCapMb => _trashCapMb;
+  Future<void> setTrashCapMb(int v) async {
+    if (_trashCapMb == v) return;
+    _trashCapMb = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_trashCapMbKey, v);
+  }
+
   // Search service settings
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
@@ -4539,6 +4552,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._logSaveOutput = _logSaveOutput;
     copy._logAutoDeleteDays = _logAutoDeleteDays;
     copy._logMaxSizeMB = _logMaxSizeMB;
+    copy._trashCapMb = _trashCapMb;
     copy._appLaunchCount = _appLaunchCount;
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;

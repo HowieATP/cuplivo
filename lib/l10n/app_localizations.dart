@@ -3665,6 +3665,192 @@ abstract class AppLocalizations {
   /// **'Remind me later'**
   String get backupReminderSnoozeTooltip;
 
+  /// No description provided for @lanSyncSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN Sync'**
+  String get lanSyncSectionTitle;
+
+  /// No description provided for @lanSyncServerMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Server'**
+  String get lanSyncServerMode;
+
+  /// No description provided for @lanSyncClientMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to Server'**
+  String get lanSyncClientMode;
+
+  /// No description provided for @lanSyncServerRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Server running'**
+  String get lanSyncServerRunning;
+
+  /// No description provided for @lanSyncServerAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get lanSyncServerAddress;
+
+  /// No description provided for @lanSyncServerPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get lanSyncServerPort;
+
+  /// No description provided for @lanSyncServerPin.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get lanSyncServerPin;
+
+  /// No description provided for @lanSyncServerStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Server'**
+  String get lanSyncServerStop;
+
+  /// No description provided for @lanSyncServerWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for connection...'**
+  String get lanSyncServerWaiting;
+
+  /// No description provided for @lanSyncServerPlanSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync plan sent. Waiting for zip...'**
+  String get lanSyncServerPlanSent;
+
+  /// No description provided for @lanSyncServerReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received zip. Preparing response...'**
+  String get lanSyncServerReceived;
+
+  /// No description provided for @lanSyncServerDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchange complete. Apply and restart.'**
+  String get lanSyncServerDone;
+
+  /// No description provided for @lanSyncClientHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get lanSyncClientHost;
+
+  /// No description provided for @lanSyncClientPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get lanSyncClientPort;
+
+  /// No description provided for @lanSyncClientPin.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get lanSyncClientPin;
+
+  /// No description provided for @lanSyncClientConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get lanSyncClientConnect;
+
+  /// No description provided for @lanSyncClientConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get lanSyncClientConnecting;
+
+  /// No description provided for @lanSyncClientPlanReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync plan received'**
+  String get lanSyncClientPlanReceived;
+
+  /// No description provided for @lanSyncClientConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Sync'**
+  String get lanSyncClientConfirm;
+
+  /// No description provided for @lanSyncClientExchanging.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchanging data...'**
+  String get lanSyncClientExchanging;
+
+  /// No description provided for @lanSyncClientDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync complete. Apply and restart.'**
+  String get lanSyncClientDone;
+
+  /// No description provided for @lanSyncServerDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server Mode'**
+  String get lanSyncServerDialogTitle;
+
+  /// No description provided for @lanSyncClientDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Client Mode'**
+  String get lanSyncClientDialogTitle;
+
+  /// No description provided for @lanSyncSecurityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
+  String get lanSyncSecurityNote;
+
+  /// No description provided for @lanSyncPlanToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} conversations to send'**
+  String lanSyncPlanToSend(Object count);
+
+  /// No description provided for @lanSyncPlanToReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} conversations to receive'**
+  String lanSyncPlanToReceive(Object count);
+
+  /// No description provided for @lanSyncPlanForks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} forks detected (skipped in v1)'**
+  String lanSyncPlanForks(Object count);
+
+  /// No description provided for @lanSyncPlanNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes to sync.'**
+  String get lanSyncPlanNoChanges;
+
+  /// No description provided for @lanSyncErrorInvalidPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid PIN'**
+  String get lanSyncErrorInvalidPin;
+
+  /// No description provided for @lanSyncErrorConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed: {error}'**
+  String lanSyncErrorConnection(Object error);
+
+  /// No description provided for @lanSyncApplyAndRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply and restart'**
+  String get lanSyncApplyAndRestart;
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:

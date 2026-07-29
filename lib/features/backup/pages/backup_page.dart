@@ -24,6 +24,7 @@ import '../../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../../shared/dialogs/restart_required_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../shared/widgets/lan_sync_section.dart';
 import '../../../utils/format.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/backup_reminder_helpers.dart';
@@ -329,6 +330,10 @@ class _BackupPageState extends State<BackupPage> {
 
                 // Section 2: 本地备份
                 ..._buildMobileLocalBackupSection(context, l10n, vm, header),
+
+                // Section: 局域网同步
+                header(l10n.lanSyncSectionTitle),
+                const LanSyncSection(),
 
                 // Section 3: WebDAV备份
                 header(l10n.backupPageWebDavBackup),

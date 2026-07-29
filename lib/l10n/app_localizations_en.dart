@@ -1921,6 +1921,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupReminderSnoozeTooltip => 'Remind me later';
 
   @override
+  String get lanSyncSectionTitle => 'LAN Sync';
+
+  @override
+  String get lanSyncServerMode => 'Start Server';
+
+  @override
+  String get lanSyncClientMode => 'Connect to Server';
+
+  @override
+  String get lanSyncServerRunning => 'Server running';
+
+  @override
+  String get lanSyncServerAddress => 'Address';
+
+  @override
+  String get lanSyncServerPort => 'Port';
+
+  @override
+  String get lanSyncServerPin => 'PIN';
+
+  @override
+  String get lanSyncServerStop => 'Stop Server';
+
+  @override
+  String get lanSyncServerWaiting => 'Waiting for connection...';
+
+  @override
+  String get lanSyncServerPlanSent => 'Sync plan sent. Waiting for zip...';
+
+  @override
+  String get lanSyncServerReceived => 'Received zip. Preparing response...';
+
+  @override
+  String get lanSyncServerDone => 'Exchange complete. Apply and restart.';
+
+  @override
+  String get lanSyncClientHost => 'Host';
+
+  @override
+  String get lanSyncClientPort => 'Port';
+
+  @override
+  String get lanSyncClientPin => 'PIN';
+
+  @override
+  String get lanSyncClientConnect => 'Connect';
+
+  @override
+  String get lanSyncClientConnecting => 'Connecting...';
+
+  @override
+  String get lanSyncClientPlanReceived => 'Sync plan received';
+
+  @override
+  String get lanSyncClientConfirm => 'Start Sync';
+
+  @override
+  String get lanSyncClientExchanging => 'Exchanging data...';
+
+  @override
+  String get lanSyncClientDone => 'Sync complete. Apply and restart.';
+
+  @override
+  String get lanSyncServerDialogTitle => 'Server Mode';
+
+  @override
+  String get lanSyncClientDialogTitle => 'Client Mode';
+
+  @override
+  String get lanSyncSecurityNote =>
+      'Devices on the same network can connect (minimum version: v2.2.2).';
+
+  @override
+  String lanSyncPlanToSend(Object count) {
+    return '$count conversations to send';
+  }
+
+  @override
+  String lanSyncPlanToReceive(Object count) {
+    return '$count conversations to receive';
+  }
+
+  @override
+  String lanSyncPlanForks(Object count) {
+    return '$count forks detected (skipped in v1)';
+  }
+
+  @override
+  String get lanSyncPlanNoChanges => 'No changes to sync.';
+
+  @override
+  String get lanSyncErrorInvalidPin => 'Invalid PIN';
+
+  @override
+  String lanSyncErrorConnection(Object error) {
+    return 'Connection failed: $error';
+  }
+
+  @override
+  String get lanSyncApplyAndRestart => 'Apply and restart';
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override

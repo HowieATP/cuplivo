@@ -44,25 +44,34 @@ class TrashRestoreCoordinator {
   // ===== Restore =====
 
   /// Returns `null` on success, or an error message string.
+  /// Also removes the matching deletion marker so it won't appear as a false
+  /// "conflict" (you-deleted marker) in the Pending tab after restore.
   Future<String?> restoreEntity(String id, String type) async {
+    final store = _store;
+    String? error;
     switch (type) {
       case DeletionEntityType.conversation:
-        return chatService.restoreConversationFromTrash(id);
+        error = await chatService.restoreConversationFromTrash(id);
       case DeletionEntityType.message:
-        return chatService.restoreMessage(id);
+        error = await chatService.restoreMessage(id);
       case DeletionEntityType.assistant:
-        return _restoreAssistant(id);
+        error = await _restoreAssistant(id);
       case DeletionEntityType.worldBook:
-        return _restoreWorldBook(id);
+        error = await _restoreWorldBook(id);
       case DeletionEntityType.quickPhrase:
-        return _restoreQuickPhrase(id);
+        error = await _restoreQuickPhrase(id);
       case DeletionEntityType.mcpServer:
-        return _restoreMcpServer(id);
+        error = await _restoreMcpServer(id);
       case DeletionEntityType.memory:
-        return _restoreMemory(id);
+        error = await _restoreMemory(id);
       default:
         return 'Unknown type: $type';
     }
+    if (error == null && store != null) {
+      // Clear marker to prevent false conflict detection after restore.
+      await store.purgeLocalMarker(id, type);
+    }
+    return error;
   }
 
   Future<String?> _restoreAssistant(String id) async {

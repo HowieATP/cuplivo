@@ -226,7 +226,6 @@ class _LanSyncSectionState extends State<LanSyncSection> {
       isDark,
       cs,
       children: [
-        _mobileHeader(context, l10n.lanSyncSectionTitle, cs),
         _mobileNavRow(
           context,
           icon: Icons.wifi_tethering,
@@ -243,20 +242,6 @@ class _LanSyncSectionState extends State<LanSyncSection> {
               : () => _showMobileClientSheet(context, l10n, cs),
         ),
       ],
-    );
-  }
-
-  Widget _mobileHeader(BuildContext context, String title, ColorScheme cs) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: AppFontWeights.semibold,
-          color: cs.onSurface.withValues(alpha: 0.8),
-        ),
-      ),
     );
   }
 

@@ -17,6 +17,7 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/trash_restore_coordinator.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -30,7 +31,9 @@ import '../../../utils/platform_utils.dart';
 import '../widgets/backup_reminder_helpers.dart';
 
 class BackupPage extends StatefulWidget {
-  const BackupPage({super.key});
+  const BackupPage({super.key, this.trashRestoreCoordinator});
+
+  final TrashRestoreCoordinator? trashRestoreCoordinator;
 
   @override
   State<BackupPage> createState() => _BackupPageState();
@@ -234,18 +237,23 @@ class _BackupPageState extends State<BackupPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
+    final coordinator =
+        widget.trashRestoreCoordinator ??
+        context.read<TrashRestoreCoordinator>();
 
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => BackupProvider(
             chatService: context.read<ChatService>(),
+            trashRestoreCoordinator: coordinator,
             initialConfig: settings.webDavConfig,
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => S3BackupProvider(
             chatService: context.read<ChatService>(),
+            trashRestoreCoordinator: coordinator,
             initialConfig: settings.s3Config,
           ),
         ),

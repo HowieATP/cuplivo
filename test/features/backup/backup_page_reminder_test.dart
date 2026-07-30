@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/trash_restore_coordinator.dart';
 import 'package:Cuplivo/features/backup/pages/backup_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
@@ -29,16 +30,18 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required BackupReminderProvider reminder,
 }) {
+  final chatService = ChatService();
+  final coordinator = TrashRestoreCoordinator(chatService: chatService);
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
+      ChangeNotifierProvider<ChatService>.value(value: chatService),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const BackupPage(),
+      home: BackupPage(trashRestoreCoordinator: coordinator),
     ),
   );
 }

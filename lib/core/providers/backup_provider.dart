@@ -7,6 +7,7 @@ import '../models/backup.dart';
 import '../models/incremental_backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
+import '../services/trash_restore_coordinator.dart';
 
 class BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
@@ -16,8 +17,12 @@ class BackupProvider extends ChangeNotifier {
 
   BackupProvider({
     required ChatService chatService,
+    required TrashRestoreCoordinator trashRestoreCoordinator,
     WebDavConfig? initialConfig,
-  }) : _dataSync = DataSync(chatService: chatService),
+  }) : _dataSync = DataSync(
+         chatService: chatService,
+         localIdResolver: trashRestoreCoordinator.getLocalIds,
+       ),
        _cfg = initialConfig ?? const WebDavConfig();
 
   WebDavConfig get config => _cfg;

@@ -13,6 +13,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/expansion_setting_tile.dart';
 import '../../../utils/app_directories.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../logs/request_body_beautifier.dart';
@@ -1858,7 +1859,7 @@ class _LogSettingsSheet extends StatelessWidget {
             const SizedBox(height: 12),
 
             // Auto-delete
-            _SettingTile(
+            ExpansionSettingTile(
               tileBg: tileBg,
               border: border,
               title: l10n.logSettingsAutoDelete,
@@ -1884,7 +1885,7 @@ class _LogSettingsSheet extends StatelessWidget {
             const SizedBox(height: 12),
 
             // Max size
-            _SettingTile(
+            ExpansionSettingTile(
               tileBg: tileBg,
               border: border,
               title: l10n.logSettingsMaxSize,
@@ -1904,120 +1905,6 @@ class _LogSettingsSheet extends StatelessWidget {
                 settings.setLogMaxSizeMB(_maxSizeOptions[i]);
                 onChanged();
               },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingTile extends StatelessWidget {
-  const _SettingTile({
-    required this.tileBg,
-    required this.border,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.options,
-    required this.selectedIndex,
-    required this.onSelected,
-  });
-
-  final Color tileBg;
-  final Color border;
-  final String title;
-  final String subtitle;
-  final String value;
-  final List<String> options;
-  final int selectedIndex;
-  final void Function(int index) onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: tileBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-          title: Text(
-            title,
-            style: TextStyle(
-              fontWeight: AppFontWeights.semibold,
-              color: cs.onSurface.withValues(alpha: 0.92),
-              fontSize: 14,
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: AppFontWeights.emphasis,
-                color: cs.primary,
-              ),
-            ),
-          ),
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: List.generate(options.length, (i) {
-                final bool selected = i == selectedIndex;
-                return GestureDetector(
-                  onTap: () => onSelected(i),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.14)
-                          : cs.onSurface.withValues(
-                              alpha: isDark ? 0.08 : 0.05,
-                            ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: selected
-                          ? Border.all(color: cs.primary.withValues(alpha: 0.5))
-                          : null,
-                    ),
-                    child: Text(
-                      options[i],
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: selected
-                            ? AppFontWeights.emphasis
-                            : AppFontWeights.medium,
-                        color: selected
-                            ? cs.primary
-                            : cs.onSurface.withValues(alpha: 0.72),
-                      ),
-                    ),
-                  ),
-                );
-              }),
             ),
           ],
         ),

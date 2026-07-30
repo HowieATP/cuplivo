@@ -19,6 +19,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/services/trash_restore_coordinator.dart';
+import '../../settings/pages/trash_detail_page.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -479,7 +481,33 @@ class _HomePageState extends State<HomePage>
       _controller.measureInputBar();
       if (!mounted) return;
       context.read<WorldBookProvider>().initialize();
+      _checkConflicts();
     });
+  }
+
+  Future<void> _checkConflicts() async {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return;
+    final coordinator = context.read<TrashRestoreCoordinator>();
+    final count = await coordinator.countConflicts();
+    if (!mounted || count == 0) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.trashConflictSnackBar(count)),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: l10n.trashConflictSnackBarAction,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const TrashDetailPage(initialTab: 1),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override

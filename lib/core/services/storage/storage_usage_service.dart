@@ -16,6 +16,7 @@ enum StorageUsageCategoryKey {
   cache,
   logs,
   other,
+  deletedRecords,
 }
 
 class StorageUsageStats {
@@ -362,6 +363,12 @@ abstract final class StorageUsageService {
             ),
         ],
       ),
+      // Deleted records — informational entry (actual bytes loaded by the
+      // trash detail page via DeletedRecordsStore, not via filesystem scan).
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.deletedRecords,
+        stats: const StorageUsageStats(fileCount: 0, bytes: 0),
+      ),
     ];
 
     // Ensure consistent ordering.
@@ -590,4 +597,6 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
+  StorageUsageCategoryKey.deletedRecords,
+  StorageUsageCategoryKey.other,
 ];

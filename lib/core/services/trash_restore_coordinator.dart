@@ -1,0 +1,306 @@
+import 'dart:convert';
+
+import '../database/chat_database_repository.dart';
+import '../providers/assistant_provider.dart';
+import '../providers/mcp_provider.dart';
+import '../providers/memory_provider.dart';
+import '../providers/quick_phrase_provider.dart';
+import '../providers/world_book_provider.dart';
+import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
+import '../services/memory_store.dart';
+import '../services/quick_phrase_store.dart';
+import '../services/world_book_store.dart';
+import '../models/assistant.dart';
+import '../models/assistant_memory.dart';
+import '../models/quick_phrase.dart';
+import '../models/world_book.dart';
+
+/// Central coordinator for restore / local-delete / local-id-resolution
+/// across all 7 recoverable entity types.
+///
+/// Injected into the Provider tree AFTER all concrete providers so it can
+/// depend on them. Used by [TrashDetailPage] and [DataSync].
+class TrashRestoreCoordinator {
+  TrashRestoreCoordinator({
+    required this.chatService,
+    this.assistantProvider,
+    this.worldBookProvider,
+    this.quickPhraseProvider,
+    this.mcpProvider,
+    this.memoryProvider,
+  });
+
+  final ChatService chatService;
+  final AssistantProvider? assistantProvider;
+  final WorldBookProvider? worldBookProvider;
+  final QuickPhraseProvider? quickPhraseProvider;
+  final McpProvider? mcpProvider;
+  final MemoryProvider? memoryProvider;
+
+  DeletedRecordsStore? get _store => chatService.deletedRecordsStore;
+  ChatDatabaseRepository get _repo => chatService.repo;
+
+  // ===== Restore =====
+
+  /// Returns `null` on success, or an error message string.
+  Future<String?> restoreEntity(String id, String type) async {
+    switch (type) {
+      case DeletionEntityType.conversation:
+        return chatService.restoreConversationFromTrash(id);
+      case DeletionEntityType.message:
+        return chatService.restoreMessage(id);
+      case DeletionEntityType.assistant:
+        return _restoreAssistant(id);
+      case DeletionEntityType.worldBook:
+        return _restoreWorldBook(id);
+      case DeletionEntityType.quickPhrase:
+        return _restoreQuickPhrase(id);
+      case DeletionEntityType.mcpServer:
+        return _restoreMcpServer(id);
+      case DeletionEntityType.memory:
+        return _restoreMemory(id);
+      default:
+        return 'Unknown type: $type';
+    }
+  }
+
+  Future<String?> _restoreAssistant(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(
+      id,
+      DeletionEntityType.assistant,
+    );
+    if (record == null) return 'Record not found in trash';
+    try {
+      final assistant = Assistant.fromJson(
+        (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
+      );
+      await _repo.putAssistant(assistant);
+      await assistantProvider?.reloadFromRepo();
+      await store.purgeDeletedRecord(id, DeletionEntityType.assistant);
+      return null;
+    } catch (e) {
+      return 'Restore assistant failed: $e';
+    }
+  }
+
+  Future<String?> _restoreWorldBook(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(
+      id,
+      DeletionEntityType.worldBook,
+    );
+    if (record == null) return 'Record not found in trash';
+    try {
+      final book = WorldBook.fromJson(
+        (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
+      );
+      await WorldBookStore.add(book);
+      await worldBookProvider?.loadAll();
+      await store.purgeDeletedRecord(id, DeletionEntityType.worldBook);
+      return null;
+    } catch (e) {
+      return 'Restore worldBook failed: $e';
+    }
+  }
+
+  Future<String?> _restoreQuickPhrase(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(
+      id,
+      DeletionEntityType.quickPhrase,
+    );
+    if (record == null) return 'Record not found in trash';
+    try {
+      final phrase = QuickPhrase.fromJson(
+        (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
+      );
+      await QuickPhraseStore.add(phrase);
+      await quickPhraseProvider?.loadAll();
+      await store.purgeDeletedRecord(id, DeletionEntityType.quickPhrase);
+      return null;
+    } catch (e) {
+      return 'Restore quickPhrase failed: $e';
+    }
+  }
+
+  Future<String?> _restoreMcpServer(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(
+      id,
+      DeletionEntityType.mcpServer,
+    );
+    if (record == null) return 'Record not found in trash';
+    try {
+      final config = McpServerConfig.fromJson(
+        (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
+      );
+      mcpProvider?.restoreServer(config);
+      await store.purgeDeletedRecord(id, DeletionEntityType.mcpServer);
+      return null;
+    } catch (e) {
+      return 'Restore mcpServer failed: $e';
+    }
+  }
+
+  Future<String?> _restoreMemory(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(id, DeletionEntityType.memory);
+    if (record == null) return 'Record not found in trash';
+    try {
+      final mem = AssistantMemory.fromJson(
+        (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
+      );
+      // Re-insert with original id by writing all memories + this one.
+      final all = await MemoryStore.getAll();
+      all.add(mem);
+      await MemoryStore.saveAll(all);
+      await memoryProvider?.loadAll();
+      await store.purgeDeletedRecord(id, DeletionEntityType.memory);
+      return null;
+    } catch (e) {
+      return 'Restore memory failed: $e';
+    }
+  }
+
+  // ===== Delete locally (for remote markers) =====
+
+  /// Deletes an entity locally that was marked as "remote-deleted".
+  /// Only covers types that can be deleted through available providers.
+  /// Returns true on success.
+  Future<bool> deleteLocally(String id, String type) async {
+    switch (type) {
+      case DeletionEntityType.conversation:
+        await chatService.deleteConversation(id);
+        return true;
+      case DeletionEntityType.message:
+        await chatService.deleteMessage(id);
+        return true;
+      case DeletionEntityType.assistant:
+        final ok = await assistantProvider?.deleteAssistant(id);
+        return ok ?? false;
+      case DeletionEntityType.worldBook:
+        await worldBookProvider?.deleteBook(id);
+        return true;
+      case DeletionEntityType.quickPhrase:
+        await quickPhraseProvider?.delete(id);
+        return true;
+      case DeletionEntityType.mcpServer:
+        await mcpProvider?.removeServer(id);
+        return true;
+      case DeletionEntityType.memory:
+        final idInt = int.tryParse(id);
+        if (idInt != null) {
+          await memoryProvider?.delete(id: idInt);
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  // ===== Local ID resolution (for deleted.json import) =====
+
+  /// Returns the set of locally-existing ids for a given entity type.
+  /// Used by [DataSync] to filter remote markers.
+  Future<Set<String>> getLocalIds(String type) async {
+    switch (type) {
+      case DeletionEntityType.conversation:
+        return chatService
+            .getAllCompleteConversations()
+            .map((c) => c.id)
+            .toSet();
+      case DeletionEntityType.message:
+        final ids = <String>{};
+        for (final conv in chatService.getAllCompleteConversations()) {
+          for (final m in chatService.getMessages(conv.id)) {
+            ids.add(m.id);
+          }
+        }
+        return ids;
+      case DeletionEntityType.assistant:
+        return (await chatService.getAllAssistants()).map((a) => a.id).toSet();
+      case DeletionEntityType.worldBook:
+        return worldBookProvider?.books.map((b) => b.id).toSet() ?? {};
+      case DeletionEntityType.quickPhrase:
+        return quickPhraseProvider?.phrases.map((p) => p.id).toSet() ?? {};
+      case DeletionEntityType.mcpServer:
+        return mcpProvider?.servers.map((s) => s.id).toSet() ?? {};
+      case DeletionEntityType.memory:
+        return (memoryProvider?.memories ?? [])
+            .map((m) => m.id.toString())
+            .toSet();
+      default:
+        return {};
+    }
+  }
+
+  // ===== Conflict detection (entities alive + deletion marker exists) =====
+
+  /// Returns the count of markers whose entity still exists locally.
+  /// Designed for the lightweight startup check.
+  Future<int> countConflicts() async {
+    final store = _store;
+    if (store == null) return 0;
+    final conflicts = await store.listConflicts(getLocalIds);
+    return conflicts.length;
+  }
+
+  /// Returns a human-readable display name for a live entity (not from trash).
+  /// Used by the pending-conflicts tab.
+  Future<String?> getLiveDisplayName(String id, String type) async {
+    switch (type) {
+      case DeletionEntityType.conversation:
+        final conv = chatService.getConversation(id);
+        return conv?.title;
+      case DeletionEntityType.message:
+        for (final conv in chatService.getAllCompleteConversations()) {
+          for (final m in chatService.getMessages(conv.id)) {
+            if (m.id == id) {
+              return _contentPreview(m.content);
+            }
+          }
+        }
+        return null;
+      case DeletionEntityType.assistant:
+        final assistants = await chatService.getAllAssistants();
+        return assistants.where((a) => a.id == id).firstOrNull?.name;
+      case DeletionEntityType.worldBook:
+        return worldBookProvider?.books
+            .where((b) => b.id == id)
+            .firstOrNull
+            ?.name;
+      case DeletionEntityType.quickPhrase:
+        return quickPhraseProvider?.phrases
+            .where((p) => p.id == id)
+            .firstOrNull
+            ?.title;
+      case DeletionEntityType.mcpServer:
+        return mcpProvider?.servers.where((s) => s.id == id).firstOrNull?.name;
+      case DeletionEntityType.memory:
+        final idInt = int.tryParse(id);
+        if (idInt == null) return null;
+        final mem = memoryProvider?.memories
+            .where((m) => m.id == idInt)
+            .firstOrNull;
+        return mem != null ? _contentPreview(mem.content) : null;
+      default:
+        return null;
+    }
+  }
+
+  static String? _contentPreview(String? content) {
+    if (content == null || content.isEmpty) return null;
+    final clean = content
+        .replaceAll(RegExp(r'^[#*>\-\d\.]+\s*'), '')
+        .replaceAll(RegExp(r'\*\*|__|~~'), '')
+        .trim();
+    return clean.length > 50 ? '${clean.substring(0, 50)}\u2026' : clean;
+  }
+}

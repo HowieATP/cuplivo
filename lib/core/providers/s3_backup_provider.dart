@@ -8,6 +8,7 @@ import '../models/backup.dart';
 import '../models/incremental_backup.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
+import '../services/trash_restore_coordinator.dart';
 import '../services/chat/chat_service.dart';
 
 class S3BackupProvider extends ChangeNotifier {
@@ -18,10 +19,16 @@ class S3BackupProvider extends ChangeNotifier {
   bool _busy = false;
   String? _message;
 
-  S3BackupProvider({required ChatService chatService, S3Config? initialConfig})
-    : _dataSync = DataSync(chatService: chatService),
-      _client = const S3BackupClient(),
-      _cfg = initialConfig ?? const S3Config();
+  S3BackupProvider({
+    required ChatService chatService,
+    required TrashRestoreCoordinator trashRestoreCoordinator,
+    S3Config? initialConfig,
+  }) : _dataSync = DataSync(
+         chatService: chatService,
+         localIdResolver: trashRestoreCoordinator.getLocalIds,
+       ),
+       _client = const S3BackupClient(),
+       _cfg = initialConfig ?? const S3Config();
 
   S3Config get config => _cfg;
   bool get busy => _busy;

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -17,11 +17,13 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
+import '../deleted_records_store.dart';
 import '../../../utils/app_directories.dart';
 
 class DataSync {
   final ChatService chatService;
-  DataSync({required this.chatService});
+  final Future<Set<String>> Function(String type)? _localIdResolver;
+  DataSync({required this.chatService, this._localIdResolver});
 
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
@@ -153,6 +155,7 @@ class DataSync {
 
     File? settingsTmp;
     File? chatsTmp;
+    File? deletedJsonTmp;
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json — full backup always includes settings
@@ -170,6 +173,21 @@ class DataSync {
         chatsTmp = await _exportChatsToFile(workDir, incremental: incremental);
       }
 
+      // deleted.json — id-only tombstones for sync/backup (origin='local' only)
+      if (cfg.includeChats) {
+        try {
+          final deletedJson = await buildDeletedJson(chatService.repo.db);
+          deletedJsonTmp = await _writeTempText(
+            workDir,
+            '_bk_deleted.json',
+            deletedJson,
+          );
+        } catch (e) {
+          // Non-fatal: backup proceeds without deleted.json.
+          debugPrint('prepareBackupFile: failed to write deleted.json: $e');
+        }
+      }
+
       // Resolve directory paths (need AppDirectories on main isolate)
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
@@ -178,6 +196,7 @@ class DataSync {
       final skillsDirPath = (await _getSkillsDir()).path;
       final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
+      final deletedJsonPath = deletedJsonTmp?.path;
       final effectiveIncludeFiles = isIncremental
           ? incremental.includeFiles
           : cfg.includeFiles;
@@ -189,6 +208,7 @@ class DataSync {
           outPath: outPath,
           settingsPath: settingsPath,
           chatsPath: chatsPath,
+          deletedJsonPath: deletedJsonPath,
           includeFiles: effectiveIncludeFiles,
           since: packSince,
           uploadDirPath: uploadDirPath,
@@ -208,6 +228,7 @@ class DataSync {
       // and must be deleted by the upload/export caller after it is consumed.
       await _deleteFileQuietly(settingsTmp);
       await _deleteFileQuietly(chatsTmp);
+      await _deleteFileQuietly(deletedJsonTmp);
     }
   }
 
@@ -308,6 +329,7 @@ class DataSync {
     required String outPath,
     String? settingsPath,
     String? chatsPath,
+    String? deletedJsonPath,
     required bool includeFiles,
     required String uploadDirPath,
     required String avatarsDirPath,
@@ -326,6 +348,11 @@ class DataSync {
       // chats.json
       if (chatsPath != null) {
         _addFileToZip(writer, chatsPath, 'chats.json');
+      }
+
+      // deleted.json — id-only tombstones (optional, backward compatible)
+      if (deletedJsonPath != null) {
+        _addFileToZip(writer, deletedJsonPath, 'deleted.json');
       }
 
       // skills/ — always included, independent of includeFiles
@@ -703,6 +730,38 @@ class DataSync {
 
   Future<Directory> _getSkillsDir() async {
     return await AppDirectories.getSkillsDirectory();
+  }
+
+  /// Returns the set of locally-existing ids for a given entity type.
+  /// Used by deleted.json import to filter markers to only those that
+  /// still exist locally (no point marking something that's already gone).
+  Future<Set<String>> _getLocalIdsForType(String type) async {
+    // Use the coordinator resolver if available (covers all 7 types).
+    final resolver = _localIdResolver;
+    if (resolver != null) {
+      return resolver(type);
+    }
+    // Fallback: Drift-only types (used when coordinator is not available,
+    // e.g. in tests or old code paths that construct DataSync directly).
+    switch (type) {
+      case DeletionEntityType.conversation:
+        return chatService
+            .getAllCompleteConversations()
+            .map((c) => c.id)
+            .toSet();
+      case DeletionEntityType.message:
+        final ids = <String>{};
+        for (final conv in chatService.getAllCompleteConversations()) {
+          for (final m in chatService.getMessages(conv.id)) {
+            ids.add(m.id);
+          }
+        }
+        return ids;
+      case DeletionEntityType.assistant:
+        return (await chatService.getAllAssistants()).map((a) => a.id).toSet();
+      default:
+        return <String>{};
+    }
   }
 
   /// Analyze incremental scope for preview purposes — scans conversations and
@@ -1306,6 +1365,39 @@ class DataSync {
             }
           }
         } catch (_) {}
+      }
+
+      // Restore deleted.json markers (merge mode only — overwrite wipes local)
+      if (cfg.includeChats && mode == RestoreMode.merge) {
+        final deletedFile = File(p.join(extractDir.path, 'deleted.json'));
+        if (await deletedFile.exists()) {
+          try {
+            final deletedJson = await deletedFile.readAsString();
+            final parsed = parseDeletedJson(deletedJson);
+            final store = chatService.deletedRecordsStore;
+            if (store != null) {
+              for (final entry in parsed.entries) {
+                final type = entry.key;
+                final entries = entry.value;
+                // Only write markers for ids that still exist locally.
+                // The caller (UI) will show them as "远端已删除" and offer
+                // one-click local deletion.
+                final localIds = await _getLocalIdsForType(type);
+                final toWrite = entries
+                    .where((e) => localIds.contains(e.id))
+                    .toList();
+                if (toWrite.isNotEmpty) {
+                  await store.recordRemoteDeletions(
+                    type: type,
+                    entries: toWrite,
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('restoreData: failed to import deleted.json: $e');
+          }
+        }
       }
 
       // Restore files

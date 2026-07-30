@@ -197,6 +197,49 @@ class ChatStorageMetaRows extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+/// Recoverable payloads for locally-deleted entities.
+///
+/// Each row = one top-level entity bundle. For a conversation, the bundle
+/// nests its messages + toolEvents + geminiSigs + MCP server links. For a
+/// message, the bundle nests its toolEvents/sigs.
+///
+/// NOT backed up — excluded structurally (backup export never queries this
+/// table). Subject to a user-configurable byte cap (default 10 MB); oldest
+/// rows are evicted when over cap, never the current write batch.
+class DeletedRecordRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get type =>
+      text()(); // conversation|message|assistant|worldBook|quickPhrase|mcpServer|memory
+  TextColumn get recoveryJson => text()();
+  IntColumn get size => integer()(); // bytes(utf8(recoveryJson)) + 256
+  DateTimeColumn get createdAt => dateTime()(); // deletion time
+  TextColumn get batchId =>
+      text()(); // shared by rows from the same delete operation
+
+  @override
+  Set<Column<Object>> get primaryKey => {id, type};
+}
+
+/// Id-only tombstones for sync/backup, with no payload.
+///
+/// `origin='local'` rows are written on every local delete (dual-write with
+/// [DeletedRecordRows]) and are the source of `deleted.json`. `origin='remote'`
+/// rows are written when a sync peer or backup's `deleted.json` declares an id
+/// that still exists locally; the UI marks these as "远端已删除".
+///
+/// Unified 5000-row FIFO by [deletedAt], regardless of origin. The `origin`
+/// column prevents sync echo: `deleted.json` is generated from
+/// `origin='local'` rows only.
+class DeletionMarkerRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get type => text()();
+  TextColumn get origin => text()(); // 'local' | 'remote'
+  DateTimeColumn get deletedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id, type, origin};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -207,6 +250,8 @@ class ChatStorageMetaRows extends Table {
     GeminiThoughtSignatureRows,
     CacheRows,
     ChatStorageMetaRows,
+    DeletedRecordRows,
+    DeletionMarkerRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -243,7 +288,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -330,6 +375,14 @@ class AppDatabase extends _$AppDatabase {
             assistantRows.enableTimeInjection,
           );
         } catch (_) {}
+      }
+      if (from < 11) {
+        try {
+          await migrator.createTable(deletedRecordRows);
+          await migrator.createTable(deletionMarkerRows);
+        } catch (_) {
+          // Tables may already exist (migration replay / partial retry).
+        }
       }
     },
   );

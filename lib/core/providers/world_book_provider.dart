@@ -1,9 +1,17 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 import '../models/world_book.dart';
 import '../services/world_book_store.dart';
+import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
 
 class WorldBookProvider with ChangeNotifier {
+  WorldBookProvider({this.chatService});
+
+  final ChatService? chatService;
+
   List<WorldBook> _books = const <WorldBook>[];
   bool _initialized = false;
   Map<String, List<String>> _activeIdsByAssistant =
@@ -96,6 +104,24 @@ class WorldBookProvider with ChangeNotifier {
   }
 
   Future<void> deleteBook(String id) async {
+    // Write trash bundle before deleting.
+    final store = chatService?.deletedRecordsStore;
+    if (store != null) {
+      final book = _books.where((b) => b.id == id).firstOrNull;
+      if (book != null) {
+        try {
+          await store.recordDeletion(
+            id: id,
+            type: DeletionEntityType.worldBook,
+            recoveryJson: jsonEncode(book.toJson()),
+            batchId: const Uuid().v4(),
+            deletedAt: DateTime.now(),
+          );
+        } catch (e) {
+          debugPrint('WorldBookProvider.deleteBook: failed to write trash: $e');
+        }
+      }
+    }
     await WorldBookStore.delete(id);
     await loadAll();
   }

@@ -7,6 +7,9 @@ import '../services/mcp/stdio_command_resolver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
+
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
 enum McpTransportType { sse, http, stdio, inmemory }
 
@@ -268,6 +271,12 @@ class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
 
+  McpProvider({this.chatService}) {
+    _load();
+  }
+
+  final ChatService? chatService;
+
   final Map<String, mcp.Client> _clients = {};
   final Map<String, McpStatus> _status = {}; // id -> status
   final Map<String, String> _errors = {}; // id -> last error
@@ -279,10 +288,6 @@ class McpProvider extends ChangeNotifier {
   Duration _requestTimeout = const Duration(seconds: 30);
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
-
-  McpProvider() {
-    _load();
-  }
 
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
   McpStatus statusFor(String id) => _status[id] ?? McpStatus.idle;
@@ -681,6 +686,15 @@ class McpProvider extends ChangeNotifier {
     return id;
   }
 
+  /// Restores a previously-deleted server from trash. Adds it back to the
+  /// list and persists. Used by [TrashRestoreCoordinator].
+  void restoreServer(McpServerConfig config) {
+    _servers = [..._servers, config];
+    _status[config.id] = McpStatus.idle;
+    _persist();
+    notifyListeners();
+  }
+
   Future<void> updateServer(McpServerConfig updated) async {
     final idx = _servers.indexWhere((e) => e.id == updated.id);
     if (idx < 0) return;
@@ -697,6 +711,24 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> removeServer(String id) async {
+    // Write trash bundle before deleting.
+    final store = chatService?.deletedRecordsStore;
+    if (store != null) {
+      final server = _servers.where((e) => e.id == id).firstOrNull;
+      if (server != null) {
+        try {
+          await store.recordDeletion(
+            id: id,
+            type: DeletionEntityType.mcpServer,
+            recoveryJson: jsonEncode(server.toJson()),
+            batchId: const Uuid().v4(),
+            deletedAt: DateTime.now(),
+          );
+        } catch (e) {
+          debugPrint('McpProvider.removeServer: failed to write trash: $e');
+        }
+      }
+    }
     await disconnect(id);
     _servers = _servers.where((e) => e.id != id).toList(growable: false);
     _status.remove(id);

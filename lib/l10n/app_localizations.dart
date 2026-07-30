@@ -340,6 +340,12 @@ abstract class AppLocalizations {
   /// **'App'**
   String get storageSpaceCategoryOther;
 
+  /// No description provided for @storageSpaceCategoryDeletedRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash'**
+  String get storageSpaceCategoryDeletedRecords;
+
   /// No description provided for @storageSpaceFilesCount.
   ///
   /// In en, this message translates to:
@@ -10321,6 +10327,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlimited'**
   String get logSettingsMaxSizeUnlimited;
+
+  /// No description provided for @trashCapLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash Size Limit'**
+  String get trashCapLabel;
+
+  /// No description provided for @trashCapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest deleted records removed when exceeded'**
+  String get trashCapSubtitle;
+
+  /// No description provided for @trashCapUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get trashCapUnlimited;
+
+  /// No description provided for @trashSectionLocalTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Trash'**
+  String get trashSectionLocalTab;
+
+  /// No description provided for @trashSectionRemoteTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote Deleted'**
+  String get trashSectionRemoteTab;
+
+  /// No description provided for @trashRestoreButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get trashRestoreButton;
+
+  /// No description provided for @trashPurgeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Permanently'**
+  String get trashPurgeButton;
+
+  /// No description provided for @trashClearAllButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty Trash'**
+  String get trashClearAllButton;
+
+  /// No description provided for @trashRestoreWarningFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments were already cleaned up and cannot be restored'**
+  String get trashRestoreWarningFiles;
+
+  /// No description provided for @trashRestoreOrphanMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This message belongs to a deleted conversation. Restore the conversation first.'**
+  String get trashRestoreOrphanMessage;
+
+  /// No description provided for @trashRestoreOrphanConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation belongs to a deleted assistant. Restore the assistant first.'**
+  String get trashRestoreOrphanConversation;
+
+  /// No description provided for @trashRemoteDeleteLocally.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Locally'**
+  String get trashRemoteDeleteLocally;
+
+  /// No description provided for @trashRemoteClearAllButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All Remote-Deleted'**
+  String get trashRemoteClearAllButton;
+
+  /// No description provided for @trashEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash is empty'**
+  String get trashEmptyState;
+
+  /// No description provided for @trashRemoteEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No remote deletion markers'**
+  String get trashRemoteEmptyState;
+
+  /// No description provided for @trashTypeWorldBook.
+  ///
+  /// In en, this message translates to:
+  /// **'World Book'**
+  String get trashTypeWorldBook;
+
+  /// No description provided for @trashTypeQuickPhrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Phrase'**
+  String get trashTypeQuickPhrase;
+
+  /// No description provided for @trashTypeMcpServer.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP Server'**
+  String get trashTypeMcpServer;
+
+  /// No description provided for @trashTypeMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get trashTypeMemory;
+
+  /// No description provided for @trashSectionPendingTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get trashSectionPendingTab;
+
+  /// No description provided for @trashConflictSnackBar.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deletion conflicts need review'**
+  String trashConflictSnackBar(Object count);
+
+  /// No description provided for @trashConflictSnackBarAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get trashConflictSnackBarAction;
+
+  /// No description provided for @trashConflictOriginLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'You deleted (restored by merge)'**
+  String get trashConflictOriginLocal;
+
+  /// No description provided for @trashConflictOriginRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted by peer'**
+  String get trashConflictOriginRemote;
+
+  /// No description provided for @trashConflictKeepButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get trashConflictKeepButton;
+
+  /// No description provided for @trashConflictKeepAllButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep All'**
+  String get trashConflictKeepAllButton;
+
+  /// No description provided for @trashConflictEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No pending conflicts'**
+  String get trashConflictEmptyState;
 
   /// No description provided for @assistantEditManageSummariesTitle.
   ///

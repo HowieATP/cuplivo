@@ -1,8 +1,16 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../models/quick_phrase.dart';
 import '../services/quick_phrase_store.dart';
+import '../services/chat/chat_service.dart';
+import '../services/deleted_records_store.dart';
 
 class QuickPhraseProvider with ChangeNotifier {
+  QuickPhraseProvider({this.chatService});
+
+  final ChatService? chatService;
+
   List<QuickPhrase> _phrases = [];
   bool _initialized = false;
 
@@ -43,6 +51,24 @@ class QuickPhraseProvider with ChangeNotifier {
   }
 
   Future<void> delete(String id) async {
+    // Write trash bundle before deleting.
+    final store = chatService?.deletedRecordsStore;
+    if (store != null) {
+      final phrase = _phrases.where((p) => p.id == id).firstOrNull;
+      if (phrase != null) {
+        try {
+          await store.recordDeletion(
+            id: id,
+            type: DeletionEntityType.quickPhrase,
+            recoveryJson: jsonEncode(phrase.toJson()),
+            batchId: const Uuid().v4(),
+            deletedAt: DateTime.now(),
+          );
+        } catch (e) {
+          debugPrint('QuickPhraseProvider.delete: failed to write trash: $e');
+        }
+      }
+    }
     await QuickPhraseStore.delete(id);
     await loadAll();
   }

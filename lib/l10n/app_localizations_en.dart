@@ -137,6 +137,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryOther => 'App';
 
   @override
+  String get storageSpaceCategoryDeletedRecords => 'Trash';
+
+  @override
   String storageSpaceFilesCount(int count) {
     return '$count files';
   }
@@ -5597,6 +5600,92 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logSettingsMaxSizeUnlimited => 'Unlimited';
+
+  @override
+  String get trashCapLabel => 'Trash Size Limit';
+
+  @override
+  String get trashCapSubtitle => 'Oldest deleted records removed when exceeded';
+
+  @override
+  String get trashCapUnlimited => 'Unlimited';
+
+  @override
+  String get trashSectionLocalTab => 'Local Trash';
+
+  @override
+  String get trashSectionRemoteTab => 'Remote Deleted';
+
+  @override
+  String get trashRestoreButton => 'Restore';
+
+  @override
+  String get trashPurgeButton => 'Delete Permanently';
+
+  @override
+  String get trashClearAllButton => 'Empty Trash';
+
+  @override
+  String get trashRestoreWarningFiles =>
+      'Attachments were already cleaned up and cannot be restored';
+
+  @override
+  String get trashRestoreOrphanMessage =>
+      'This message belongs to a deleted conversation. Restore the conversation first.';
+
+  @override
+  String get trashRestoreOrphanConversation =>
+      'This conversation belongs to a deleted assistant. Restore the assistant first.';
+
+  @override
+  String get trashRemoteDeleteLocally => 'Delete Locally';
+
+  @override
+  String get trashRemoteClearAllButton => 'Delete All Remote-Deleted';
+
+  @override
+  String get trashEmptyState => 'Trash is empty';
+
+  @override
+  String get trashRemoteEmptyState => 'No remote deletion markers';
+
+  @override
+  String get trashTypeWorldBook => 'World Book';
+
+  @override
+  String get trashTypeQuickPhrase => 'Quick Phrase';
+
+  @override
+  String get trashTypeMcpServer => 'MCP Server';
+
+  @override
+  String get trashTypeMemory => 'Memory';
+
+  @override
+  String get trashSectionPendingTab => 'Pending';
+
+  @override
+  String trashConflictSnackBar(Object count) {
+    return '$count deletion conflicts need review';
+  }
+
+  @override
+  String get trashConflictSnackBarAction => 'Review';
+
+  @override
+  String get trashConflictOriginLocal => 'You deleted (restored by merge)';
+
+  @override
+  String get trashConflictOriginRemote => 'Deleted by peer';
+
+  @override
+  String get trashConflictKeepButton => 'Keep';
+
+  @override
+  String get trashConflictKeepAllButton => 'Keep All';
+
+  @override
+  String get trashConflictEmptyState => 'No pending conflicts';
 
   @override
   String get assistantEditManageSummariesTitle => 'Manage Summaries';

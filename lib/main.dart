@@ -34,6 +34,7 @@ import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
@@ -139,7 +140,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => McpToolService()),
-        ChangeNotifierProvider(create: (_) => McpProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) => McpProvider(chatService: ctx.read<ChatService>()),
+        ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
@@ -149,25 +152,45 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
-        ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              QuickPhraseProvider(chatService: ctx.read<ChatService>()),
+        ),
         ChangeNotifierProvider(create: (_) => InstructionInjectionProvider()),
         ChangeNotifierProvider(
           create: (_) => InstructionInjectionGroupProvider(),
         ),
-        ChangeNotifierProvider(create: (_) => WorldBookProvider()),
-        ChangeNotifierProvider(create: (_) => MemoryProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              WorldBookProvider(chatService: ctx.read<ChatService>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => MemoryProvider(chatService: ctx.read<ChatService>()),
+        ),
+        Provider(
+          create: (ctx) => TrashRestoreCoordinator(
+            chatService: ctx.read<ChatService>(),
+            assistantProvider: ctx.read<AssistantProvider>(),
+            worldBookProvider: ctx.read<WorldBookProvider>(),
+            quickPhraseProvider: ctx.read<QuickPhraseProvider>(),
+            mcpProvider: ctx.read<McpProvider>(),
+            memoryProvider: ctx.read<MemoryProvider>(),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => BackupReminderProvider()),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BackupProvider(
             chatService: ctx.read<ChatService>(),
+            trashRestoreCoordinator: ctx.read<TrashRestoreCoordinator>(),
             initialConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
         ChangeNotifierProvider(
           create: (ctx) => S3BackupProvider(
             chatService: ctx.read<ChatService>(),
+            trashRestoreCoordinator: ctx.read<TrashRestoreCoordinator>(),
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),

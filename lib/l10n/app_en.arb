@@ -1745,6 +1745,7 @@
   "searchServicesEditDialogApiKeyRequired": "API Key is required",
   "searchServicesEditDialogInstanceUrl": "Instance URL",
   "searchServicesEditDialogUrlRequired": "URL is required",
+  "searchServicesDialogAddKey": "Add Key",
   "searchServicesEditDialogEnginesOptional": "Engines (optional)",
   "searchServicesEditDialogLanguageOptional": "Language (optional)",
   "searchServicesEditDialogUsernameOptional": "Username (optional)",

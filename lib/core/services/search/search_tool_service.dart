@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import '../../models/api_keys.dart';
+import '../api_key_manager.dart';
 import 'search_service.dart';
 import '../../providers/settings_provider.dart';
 
@@ -61,27 +63,164 @@ Best Practice: (1) Use keywords rather than a complete sentence for `query`; (2)
     String query,
     SettingsProvider settings,
   ) async {
-    try {
-      // Get selected search service
-      final services = settings.searchServices;
-      if (services.isEmpty) {
-        return jsonEncode({'error': 'No search services configured'});
+    final services = settings.searchServices;
+    if (services.isEmpty) {
+      return jsonEncode({'error': 'No search services configured'});
+    }
+
+    final selectedIndex = settings.searchServiceSelected.clamp(
+      0,
+      services.length - 1,
+    );
+    final serviceOptions = services[selectedIndex];
+    final service = SearchService.getService(serviceOptions);
+    final manager = ApiKeyManager();
+
+    // Keyless services (BingLocal, DuckDuckGo, SearXNG) — call directly.
+    if (serviceOptions.apiKeys.isEmpty) {
+      return _searchDirect(query, settings, service, serviceOptions);
+    }
+
+    // Keyed services: rotate keys on failure, retry transparently.
+    final config = serviceOptions.keyManagement ?? const KeyManagementConfig();
+    final result = await _searchWithRotation(
+      query,
+      settings,
+      service,
+      serviceOptions,
+      manager,
+      config,
+    );
+
+    // Persist updated key status/usage and roundRobinIndex back to settings.
+    await _persistKeyUpdates(
+      settings,
+      selectedIndex,
+      serviceOptions,
+      manager,
+      config,
+    );
+
+    return result;
+  }
+
+  /// Direct search for keyless services.
+  static Future<String> _searchDirect(
+    String query,
+    SettingsProvider settings,
+    SearchService service,
+    SearchServiceOptions serviceOptions,
+  ) async {
+    final result = await _trySearch(query, settings, service, serviceOptions);
+    if (result != null) return result;
+    return jsonEncode({'error': 'Search failed'});
+  }
+
+  /// Rotates keys on failure, retries transparently, and writes updated key
+  /// status/usage back to [serviceOptions.apiKeys] in-place.
+  ///
+  /// Note: there is currently no UI for strategy / auto-disable / cooldown
+  /// settings, so [keys] is captured once and is stale across retries. This is
+  /// acceptable because roundRobin (the implicit default) tolerates stale keys
+  /// thanks to the in-memory index map. If strategy/cooldown UI is added later,
+  /// the stale‑keys problem must be fixed (write updated configs back into the
+  /// list before calling selectFromKeys on subsequent attempts).
+  static Future<String> _searchWithRotation(
+    String query,
+    SettingsProvider settings,
+    SearchService service,
+    SearchServiceOptions serviceOptions,
+    ApiKeyManager manager,
+    KeyManagementConfig config,
+  ) async {
+    final keys = serviceOptions.apiKeys.where((k) => k.isEnabled).toList();
+    if (keys.isEmpty) {
+      return _searchDirect(query, settings, service, serviceOptions);
+    }
+
+    for (var attempt = 0; attempt < keys.length; attempt++) {
+      final selection = manager.selectFromKeys(keys, config, serviceOptions.id);
+      if (selection.key == null) break;
+
+      final result = await _trySearch(
+        query,
+        settings,
+        service,
+        serviceOptions,
+        apiKeyOverride: selection.key!.key,
+      );
+      if (result != null) {
+        final updated = manager.updateKeyStatusFromConfig(
+          config,
+          selection.key!,
+          true,
+        );
+        _replaceApiKey(serviceOptions.apiKeys, updated);
+        return result;
       }
 
-      final selectedIndex = settings.searchServiceSelected.clamp(
-        0,
-        services.length - 1,
+      final updated = manager.updateKeyStatusFromConfig(
+        config,
+        selection.key!,
+        false,
+        error: 'search_failed',
       );
-      final service = SearchService.getService(services[selectedIndex]);
+      _replaceApiKey(serviceOptions.apiKeys, updated);
+    }
+    return jsonEncode({'error': 'All search keys failed'});
+  }
 
-      // Execute search
+  /// Replaces an [ApiKeyConfig] in [list] by matching [id].
+  static void _replaceApiKey(List<ApiKeyConfig> list, ApiKeyConfig updated) {
+    final idx = list.indexWhere((k) => k.id == updated.id);
+    if (idx >= 0) list[idx] = updated;
+  }
+
+  /// Persists updated key status/usage and roundRobinIndex back to settings.
+  ///
+  /// Currently only roundRobinIndex is persisted because strategy/cooldown/
+  /// auto‑disable are not exposed via UI — roundRobin is the de‑facto default,
+  /// so writing back the index is sufficient. If strategy/cooldown UI is added
+  /// later, also write back disabled/error key statuses so they survive restart.
+  static Future<void> _persistKeyUpdates(
+    SettingsProvider settings,
+    int selectedIndex,
+    SearchServiceOptions serviceOptions,
+    ApiKeyManager manager,
+    KeyManagementConfig config,
+  ) async {
+    // Single-key configs: rotation has no effect on future selection, skip write.
+    if (serviceOptions.apiKeys.length <= 1) return;
+    final roundRobinIndex = manager.getRoundRobinIndex(serviceOptions.id);
+    final services = List<SearchServiceOptions>.from(settings.searchServices);
+
+    if (roundRobinIndex != null &&
+        config.strategy == LoadBalanceStrategy.roundRobin) {
+      final updatedConfig = config.copyWith(roundRobinIndex: roundRobinIndex);
+      final json = serviceOptions.toJson();
+      json['keyManagement'] = updatedConfig.toJson();
+      services[selectedIndex] = SearchServiceOptions.fromJson(json);
+    }
+
+    await settings.setSearchServices(services);
+  }
+
+  /// Returns the encoded result on success, or null on failure.
+  static Future<String?> _trySearch(
+    String query,
+    SettingsProvider settings,
+    SearchService service,
+    SearchServiceOptions serviceOptions, {
+    String? apiKeyOverride,
+  }) async {
+    try {
       final result = await service.search(
         query: query,
         commonOptions: settings.searchCommonOptions,
-        serviceOptions: services[selectedIndex],
+        serviceOptions: serviceOptions,
+        apiKeyOverride: apiKeyOverride,
       );
 
-      // Add unique IDs to each result item
       final itemsWithIds = result.items.asMap().entries.map((entry) {
         final item = entry.value;
         return SearchResultItem(
@@ -93,13 +232,12 @@ Best Practice: (1) Use keywords rather than a complete sentence for `query`; (2)
         );
       }).toList();
 
-      // Return formatted result
       return jsonEncode({
         if (result.answer != null) 'answer': result.answer,
         'items': itemsWithIds.map((item) => item.toJson()).toList(),
       });
     } catch (e) {
-      return jsonEncode({'error': 'Search failed: $e'});
+      return null;
     }
   }
 }

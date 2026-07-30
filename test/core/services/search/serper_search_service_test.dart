@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:Cuplivo/core/models/api_keys.dart';
 import 'package:Cuplivo/core/services/search/providers/serper_search_service.dart';
 import 'package:Cuplivo/core/services/search/search_service.dart';
 import 'package:Cuplivo/utils/brand_assets.dart';
@@ -12,7 +13,7 @@ void main() {
     test('serializes options and resolves factory/icon mapping', () {
       final options = SerperOptions(
         id: 'serper-1',
-        apiKey: 'sk-test',
+        apiKeys: [ApiKeyConfig.create('sk-test')],
         gl: 'cn',
         hl: 'zh-cn',
         tbs: 'qdr:d',
@@ -63,7 +64,7 @@ void main() {
         commonOptions: const SearchCommonOptions(resultSize: 1, timeout: 1000),
         serviceOptions: SerperOptions(
           id: 'serper-1',
-          apiKey: 'sk-test',
+          apiKeys: [ApiKeyConfig.create('sk-test')],
           gl: 'cn',
           hl: 'zh-cn',
           tbs: 'qdr:d',
@@ -99,7 +100,10 @@ void main() {
       final result = await service.search(
         query: 'kelivo',
         commonOptions: const SearchCommonOptions(timeout: 1000),
-        serviceOptions: SerperOptions(id: 'serper-1', apiKey: 'sk-test'),
+        serviceOptions: SerperOptions(
+          id: 'serper-1',
+          apiKeys: [ApiKeyConfig.create('sk-test')],
+        ),
       );
 
       expect(jsonDecode(captured!.body), {'q': 'kelivo'});
@@ -115,7 +119,10 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: SerperOptions(id: 'serper-1', apiKey: 'sk-test'),
+          serviceOptions: SerperOptions(
+            id: 'serper-1',
+            apiKeys: [ApiKeyConfig.create('sk-test')],
+          ),
         ),
         throwsA(
           isA<Exception>().having(

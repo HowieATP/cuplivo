@@ -28,9 +28,10 @@ class GrokSearchService extends SearchService<GrokOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required GrokOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
-      if (serviceOptions.apiKey.trim().isEmpty) {
+      if ((apiKeyOverride ?? serviceOptions.apiKey).trim().isEmpty) {
         throw Exception('Grok API key is required');
       }
 
@@ -56,7 +57,8 @@ class GrokSearchService extends SearchService<GrokOptions> {
           .post(
             Uri.parse(serviceOptions.resolvedUrl),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey.trim()}',
+              'Authorization':
+                  'Bearer ${(apiKeyOverride ?? serviceOptions.apiKey).trim()}',
               'Content-Type': 'application/json',
             },
             body: jsonEncode(body),

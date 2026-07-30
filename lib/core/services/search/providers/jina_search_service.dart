@@ -22,6 +22,7 @@ class JinaSearchService extends SearchService<JinaOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required JinaOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({'q': query});
@@ -30,7 +31,8 @@ class JinaSearchService extends SearchService<JinaOptions> {
           .post(
             Uri.parse('https://s.jina.ai/'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Accept': 'application/json',
               'Content-Type': 'application/json',
               // Speed up and reduce payload: omit page content in response

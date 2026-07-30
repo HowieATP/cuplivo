@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/api_keys.dart';
 // Import statements for service implementations
 import 'providers/bing_search_service.dart';
 import 'providers/tavily_search_service.dart';
@@ -27,6 +28,7 @@ abstract class SearchService<T extends SearchServiceOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required T serviceOptions,
+    String? apiKeyOverride,
   });
 
   // Factory method to get service instance based on options type
@@ -67,6 +69,13 @@ abstract class SearchService<T extends SearchServiceOptions> {
       default:
         return BingSearchService() as SearchService;
     }
+  }
+
+  /// Whether this service type uses API keys (keyless services don't show key UI).
+  static bool serviceUsesKeys(SearchServiceOptions options) {
+    return options is! BingLocalOptions &&
+        options is! DuckDuckGoOptions &&
+        options is! SearXNGOptions;
   }
 }
 
@@ -145,10 +154,66 @@ class SearchCommonOptions {
 // Base class for service-specific options
 abstract class SearchServiceOptions {
   final String id;
+  final List<ApiKeyConfig> apiKeys;
+  final KeyManagementConfig? keyManagement;
 
-  const SearchServiceOptions({required this.id});
+  const SearchServiceOptions({
+    required this.id,
+    this.apiKeys = const [],
+    this.keyManagement,
+  });
+
+  /// Resolves the first active key for backward-compatible single-key access.
+  /// Provider implementations (TavilySearchService, etc.) call this getter
+  /// and never see the list. Rotation happens in SearchToolService.
+  String get apiKey {
+    if (apiKeys.isEmpty) return '';
+    final enabled = apiKeys.where((k) => k.isEnabled).toList();
+    if (enabled.isEmpty) return apiKeys.first.key;
+    return enabled.first.key;
+  }
 
   Map<String, dynamic> toJson();
+
+  /// Dual-read: prefers new `apiKeys` list, falls back to legacy `apiKey` string.
+  static List<ApiKeyConfig> readKeys(Map<String, dynamic> json) {
+    if (json['apiKeys'] != null) {
+      return (json['apiKeys'] as List)
+          .map((e) => ApiKeyConfig.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    final legacy = json['apiKey'] as String?;
+    if (legacy != null && legacy.isNotEmpty) {
+      return [ApiKeyConfig.create(legacy)];
+    }
+    return [];
+  }
+
+  /// Dual-write: writes the full `apiKeys` list AND the first active key as
+  /// legacy `apiKey` string for backward compat with older versions.
+  static void writeKeys(
+    Map<String, dynamic> json,
+    List<ApiKeyConfig> keys, {
+    KeyManagementConfig? keyManagement,
+  }) {
+    json['apiKeys'] = keys.map((k) => k.toJson()).toList();
+    final active = keys.where((k) => k.isEnabled);
+    json['apiKey'] = active.isNotEmpty
+        ? active.first.key
+        : (keys.isNotEmpty ? keys.first.key : '');
+    if (keyManagement != null) {
+      json['keyManagement'] = keyManagement.toJson();
+    }
+  }
+
+  static KeyManagementConfig? readKeyManagement(Map<String, dynamic> json) {
+    if (json['keyManagement'] != null) {
+      return KeyManagementConfig.fromJson(
+        json['keyManagement'] as Map<String, dynamic>,
+      );
+    }
+    return null;
+  }
 
   static SearchServiceOptions fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String;
@@ -199,7 +264,12 @@ abstract class SearchServiceOptions {
 class BingLocalOptions extends SearchServiceOptions {
   final String acceptLanguage;
 
-  BingLocalOptions({required super.id, this.acceptLanguage = 'en-US,en;q=0.9'});
+  BingLocalOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.acceptLanguage = 'en-US,en;q=0.9',
+  });
 
   @override
   Map<String, dynamic> toJson() => {
@@ -211,6 +281,8 @@ class BingLocalOptions extends SearchServiceOptions {
   factory BingLocalOptions.fromJson(Map<String, dynamic> json) =>
       BingLocalOptions(
         id: json['id'],
+        apiKeys: SearchServiceOptions.readKeys(json),
+        keyManagement: SearchServiceOptions.readKeyManagement(json),
         acceptLanguage: json['acceptLanguage'] ?? 'en-US,en;q=0.9',
       );
 }
@@ -218,10 +290,14 @@ class BingLocalOptions extends SearchServiceOptions {
 class TavilyOptions extends SearchServiceOptions {
   static const String defaultUrl = 'https://api.tavily.com/search';
 
-  final String apiKey;
   final String url;
 
-  TavilyOptions({required super.id, required this.apiKey, this.url = ''});
+  TavilyOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.url = '',
+  });
 
   String get resolvedUrl {
     final trimmed = url.trim();
@@ -229,16 +305,20 @@ class TavilyOptions extends SearchServiceOptions {
   }
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'tavily',
-    'id': id,
-    'apiKey': apiKey,
-    'url': url.trim(),
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'tavily',
+      'id': id,
+      'url': url.trim(),
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory TavilyOptions.fromJson(Map<String, dynamic> json) => TavilyOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     url: json['url'] ?? '',
   );
 }
@@ -246,10 +326,14 @@ class TavilyOptions extends SearchServiceOptions {
 class ExaOptions extends SearchServiceOptions {
   static const String defaultUrl = 'https://api.exa.ai/search';
 
-  final String apiKey;
   final String url;
 
-  ExaOptions({required super.id, required this.apiKey, this.url = ''});
+  ExaOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.url = '',
+  });
 
   String get resolvedUrl {
     final trimmed = url.trim();
@@ -257,34 +341,35 @@ class ExaOptions extends SearchServiceOptions {
   }
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'exa',
-    'id': id,
-    'apiKey': apiKey,
-    'url': url.trim(),
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'exa', 'id': id, 'url': url.trim()};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory ExaOptions.fromJson(Map<String, dynamic> json) => ExaOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     url: json['url'] ?? '',
   );
 }
 
 class ZhipuOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  ZhipuOptions({required super.id, required this.apiKey});
+  ZhipuOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'zhipu',
-    'id': id,
-    'apiKey': apiKey,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'zhipu', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory ZhipuOptions.fromJson(Map<String, dynamic> json) =>
-      ZhipuOptions(id: json['id'], apiKey: json['apiKey']);
+  factory ZhipuOptions.fromJson(Map<String, dynamic> json) => ZhipuOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class SearXNGOptions extends SearchServiceOptions {
@@ -296,6 +381,8 @@ class SearXNGOptions extends SearchServiceOptions {
 
   SearXNGOptions({
     required super.id,
+    super.apiKeys,
+    super.keyManagement,
     required this.url,
     this.engines = '',
     this.language = '',
@@ -316,6 +403,8 @@ class SearXNGOptions extends SearchServiceOptions {
 
   factory SearXNGOptions.fromJson(Map<String, dynamic> json) => SearXNGOptions(
     id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     url: json['url'],
     engines: json['engines'] ?? '',
     language: json['language'] ?? '',
@@ -325,85 +414,99 @@ class SearXNGOptions extends SearchServiceOptions {
 }
 
 class LinkUpOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  LinkUpOptions({required super.id, required this.apiKey});
+  LinkUpOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'linkup',
-    'id': id,
-    'apiKey': apiKey,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'linkup', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory LinkUpOptions.fromJson(Map<String, dynamic> json) =>
-      LinkUpOptions(id: json['id'], apiKey: json['apiKey']);
+  factory LinkUpOptions.fromJson(Map<String, dynamic> json) => LinkUpOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class BraveOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  BraveOptions({required super.id, required this.apiKey});
+  BraveOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'brave',
-    'id': id,
-    'apiKey': apiKey,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'brave', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory BraveOptions.fromJson(Map<String, dynamic> json) =>
-      BraveOptions(id: json['id'], apiKey: json['apiKey']);
+  factory BraveOptions.fromJson(Map<String, dynamic> json) => BraveOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class MetasoOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  MetasoOptions({required super.id, required this.apiKey});
+  MetasoOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'metaso',
-    'id': id,
-    'apiKey': apiKey,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'metaso', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory MetasoOptions.fromJson(Map<String, dynamic> json) =>
-      MetasoOptions(id: json['id'], apiKey: json['apiKey']);
+  factory MetasoOptions.fromJson(Map<String, dynamic> json) => MetasoOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class OllamaOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  OllamaOptions({required super.id, required this.apiKey});
+  OllamaOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'ollama',
-    'id': id,
-    'apiKey': apiKey,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'ollama', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory OllamaOptions.fromJson(Map<String, dynamic> json) =>
-      OllamaOptions(id: json['id'], apiKey: json['apiKey']);
+  factory OllamaOptions.fromJson(Map<String, dynamic> json) => OllamaOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class JinaOptions extends SearchServiceOptions {
-  final String apiKey;
-
-  JinaOptions({required super.id, required this.apiKey});
+  JinaOptions({required super.id, super.apiKeys, super.keyManagement});
 
   @override
-  Map<String, dynamic> toJson() => {'type': 'jina', 'id': id, 'apiKey': apiKey};
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'jina', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
-  factory JinaOptions.fromJson(Map<String, dynamic> json) =>
-      JinaOptions(id: json['id'], apiKey: json['apiKey']);
+  factory JinaOptions.fromJson(Map<String, dynamic> json) => JinaOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+  );
 }
 
 class DuckDuckGoOptions extends SearchServiceOptions {
   final String region;
 
-  DuckDuckGoOptions({required super.id, this.region = 'us-en'});
+  DuckDuckGoOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.region = 'us-en',
+  });
 
   @override
   Map<String, dynamic> toJson() => {
@@ -413,37 +516,46 @@ class DuckDuckGoOptions extends SearchServiceOptions {
   };
 
   factory DuckDuckGoOptions.fromJson(Map<String, dynamic> json) =>
-      DuckDuckGoOptions(id: json['id'], region: json['region'] ?? 'us-en');
+      DuckDuckGoOptions(
+        id: json['id'],
+        apiKeys: SearchServiceOptions.readKeys(json),
+        keyManagement: SearchServiceOptions.readKeyManagement(json),
+        region: json['region'] ?? 'us-en',
+      );
 }
 
 class PerplexityOptions extends SearchServiceOptions {
-  final String apiKey;
   final String? country; // ISO 3166-1 alpha-2
   final List<String>? searchDomainFilter; // domains/URLs
   final int? maxTokensPerPage; // default 1024
 
   PerplexityOptions({
     required super.id,
-    required this.apiKey,
+    super.apiKeys,
+    super.keyManagement,
     this.country,
     this.searchDomainFilter,
     this.maxTokensPerPage,
   });
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'perplexity',
-    'id': id,
-    'apiKey': apiKey,
-    if (country != null) 'country': country,
-    if (searchDomainFilter != null) 'searchDomainFilter': searchDomainFilter,
-    if (maxTokensPerPage != null) 'maxTokensPerPage': maxTokensPerPage,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'perplexity',
+      'id': id,
+      if (country != null) 'country': country,
+      if (searchDomainFilter != null) 'searchDomainFilter': searchDomainFilter,
+      if (maxTokensPerPage != null) 'maxTokensPerPage': maxTokensPerPage,
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory PerplexityOptions.fromJson(Map<String, dynamic> json) =>
       PerplexityOptions(
         id: json['id'],
-        apiKey: json['apiKey'],
+        apiKeys: SearchServiceOptions.readKeys(json),
+        keyManagement: SearchServiceOptions.readKeyManagement(json),
         country: json['country'],
         searchDomainFilter: (json['searchDomainFilter'] as List?)
             ?.map((e) => e.toString())
@@ -453,8 +565,6 @@ class PerplexityOptions extends SearchServiceOptions {
 }
 
 class BochaOptions extends SearchServiceOptions {
-  final String apiKey;
-  // Optional parameters supported by Bocha API
   final String? freshness; // e.g., 'noLimit', 'week', 'month', etc.
   final bool summary; // whether to include textual summary
   final String? include; // e.g., 'qq.com|m.163.com'
@@ -462,7 +572,8 @@ class BochaOptions extends SearchServiceOptions {
 
   BochaOptions({
     required super.id,
-    required this.apiKey,
+    super.apiKeys,
+    super.keyManagement,
     this.freshness,
     this.summary = true,
     this.include,
@@ -470,19 +581,23 @@ class BochaOptions extends SearchServiceOptions {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'bocha',
-    'id': id,
-    'apiKey': apiKey,
-    if (freshness != null) 'freshness': freshness,
-    'summary': summary,
-    if (include != null) 'include': include,
-    if (exclude != null) 'exclude': exclude,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'bocha',
+      'id': id,
+      if (freshness != null) 'freshness': freshness,
+      'summary': summary,
+      if (include != null) 'include': include,
+      if (exclude != null) 'exclude': exclude,
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory BochaOptions.fromJson(Map<String, dynamic> json) => BochaOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     freshness: json['freshness'],
     summary: (json['summary'] ?? true) as bool,
     include: json['include'],
@@ -491,7 +606,6 @@ class BochaOptions extends SearchServiceOptions {
 }
 
 class SerperOptions extends SearchServiceOptions {
-  final String apiKey;
   final String gl;
   final String hl;
   final String tbs;
@@ -499,7 +613,8 @@ class SerperOptions extends SearchServiceOptions {
 
   SerperOptions({
     required super.id,
-    required this.apiKey,
+    super.apiKeys,
+    super.keyManagement,
     this.gl = '',
     this.hl = '',
     this.tbs = '',
@@ -507,19 +622,23 @@ class SerperOptions extends SearchServiceOptions {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'serper',
-    'id': id,
-    'apiKey': apiKey,
-    'gl': gl.trim(),
-    'hl': hl.trim(),
-    'tbs': tbs.trim(),
-    'page': page,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'serper',
+      'id': id,
+      'gl': gl.trim(),
+      'hl': hl.trim(),
+      'tbs': tbs.trim(),
+      'page': page,
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory SerperOptions.fromJson(Map<String, dynamic> json) => SerperOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     gl: json['gl'] ?? '',
     hl: json['hl'] ?? '',
     tbs: json['tbs'] ?? '',
@@ -534,7 +653,6 @@ class GrokOptions extends SearchServiceOptions {
   static const String defaultSystemPrompt =
       "You are a helpful search assistant. Search the web to find accurate and up-to-date information for the user's query. Provide a comprehensive answer with citations.";
 
-  final String apiKey;
   final String model;
   final String reasoningEffort;
   final String customUrl;
@@ -542,7 +660,8 @@ class GrokOptions extends SearchServiceOptions {
 
   GrokOptions({
     required super.id,
-    required this.apiKey,
+    super.apiKeys,
+    super.keyManagement,
     this.model = defaultModel,
     String? reasoningEffort,
     this.customUrl = defaultUrl,
@@ -571,19 +690,23 @@ class GrokOptions extends SearchServiceOptions {
   }
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'grok',
-    'id': id,
-    'apiKey': apiKey,
-    'model': model.trim(),
-    'reasoningEffort': reasoningEffort.trim(),
-    'customUrl': customUrl.trim(),
-    'systemPrompt': systemPrompt,
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'grok',
+      'id': id,
+      'model': model.trim(),
+      'reasoningEffort': reasoningEffort.trim(),
+      'customUrl': customUrl.trim(),
+      'systemPrompt': systemPrompt,
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory GrokOptions.fromJson(Map<String, dynamic> json) => GrokOptions(
     id: json['id'],
-    apiKey: json['apiKey'] ?? '',
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     model: json['model'] ?? defaultModel,
     reasoningEffort: json['reasoningEffort'],
     customUrl: json['customUrl'] ?? defaultUrl,
@@ -592,7 +715,6 @@ class GrokOptions extends SearchServiceOptions {
 }
 
 class QueritOptions extends SearchServiceOptions {
-  final String apiKey;
   final String sitesInclude;
   final String sitesExclude;
   final String timeRange;
@@ -601,7 +723,8 @@ class QueritOptions extends SearchServiceOptions {
 
   QueritOptions({
     required super.id,
-    required this.apiKey,
+    super.apiKeys,
+    super.keyManagement,
     this.sitesInclude = '',
     this.sitesExclude = '',
     this.timeRange = '',
@@ -610,20 +733,24 @@ class QueritOptions extends SearchServiceOptions {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'querit',
-    'id': id,
-    'apiKey': apiKey,
-    'sitesInclude': sitesInclude.trim(),
-    'sitesExclude': sitesExclude.trim(),
-    'timeRange': timeRange.trim(),
-    'countries': countries.trim(),
-    'languages': languages.trim(),
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'querit',
+      'id': id,
+      'sitesInclude': sitesInclude.trim(),
+      'sitesExclude': sitesExclude.trim(),
+      'timeRange': timeRange.trim(),
+      'countries': countries.trim(),
+      'languages': languages.trim(),
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
 
   factory QueritOptions.fromJson(Map<String, dynamic> json) => QueritOptions(
     id: json['id'],
-    apiKey: json['apiKey'] ?? '',
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
     sitesInclude: json['sitesInclude'] ?? '',
     sitesExclude: json['sitesExclude'] ?? '',
     timeRange: json['timeRange'] ?? '',

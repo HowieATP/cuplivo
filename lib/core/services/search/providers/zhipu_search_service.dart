@@ -22,6 +22,7 @@ class ZhipuSearchService extends SearchService<ZhipuOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required ZhipuOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -34,7 +35,8 @@ class ZhipuSearchService extends SearchService<ZhipuOptions> {
           .post(
             Uri.parse('https://open.bigmodel.cn/api/paas/v4/web_search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: body,

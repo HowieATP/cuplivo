@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/models/api_keys.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
@@ -1060,11 +1061,18 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 
   SearchServiceOptions _createService() {
     final id = const Uuid().v4().substring(0, 8);
+
+    List<ApiKeyConfig> makeKeys() {
+      final key = _controllers['apiKey']?.text;
+      if (key == null || key.isEmpty) return [];
+      return [ApiKeyConfig.create(key)];
+    }
+
     switch (_selectedType) {
       case 'tavily':
         return TavilyOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           url: _controllers['tavilyUrl']!.text.trim(),
         );
       case 'duckduckgo':
@@ -1076,11 +1084,11 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'exa':
         return ExaOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           url: _controllers['exaUrl']!.text.trim(),
         );
       case 'zhipu':
-        return ZhipuOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return ZhipuOptions(id: id, apiKeys: makeKeys());
       case 'searxng':
         return SearXNGOptions(
           id: id,
@@ -1091,24 +1099,24 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           password: _controllers['password']!.text,
         );
       case 'linkup':
-        return LinkUpOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return LinkUpOptions(id: id, apiKeys: makeKeys());
       case 'brave':
-        return BraveOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BraveOptions(id: id, apiKeys: makeKeys());
       case 'metaso':
-        return MetasoOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return MetasoOptions(id: id, apiKeys: makeKeys());
       case 'jina':
-        return JinaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return JinaOptions(id: id, apiKeys: makeKeys());
       case 'ollama':
-        return OllamaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return OllamaOptions(id: id, apiKeys: makeKeys());
       case 'perplexity':
-        return PerplexityOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return PerplexityOptions(id: id, apiKeys: makeKeys());
       case 'bocha':
-        return BochaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BochaOptions(id: id, apiKeys: makeKeys());
       case 'serper':
         final page = int.tryParse(_controllers['page']!.text.trim());
         return SerperOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           gl: _controllers['gl']!.text.trim(),
           hl: _controllers['hl']!.text.trim(),
           tbs: _controllers['tbs']!.text.trim(),
@@ -1117,7 +1125,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'querit':
         return QueritOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           sitesInclude: _controllers['sitesInclude']!.text.trim(),
           sitesExclude: _controllers['sitesExclude']!.text.trim(),
           timeRange: _controllers['timeRange']!.text.trim(),
@@ -1127,7 +1135,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'grok':
         return GrokOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           model: _controllers['model']!.text.trim(),
           reasoningEffort: _controllers['reasoningEffort']!.text,
           customUrl: _controllers['customUrl']!.text.trim(),
@@ -1149,46 +1157,30 @@ class _EditServiceDialog extends StatefulWidget {
 
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
+  late List<ApiKeyConfig> _editKeys;
+
   @override
   void initState() {
     super.initState();
+    _editKeys = List.from(widget.service.apiKeys);
     _initControllers();
   }
 
   void _initControllers() {
     final s = widget.service;
     if (s is TavilyOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
     } else if (s is DuckDuckGoOptions) {
       _controllers['region'] = TextEditingController(text: s.region);
     } else if (s is ExaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
-    } else if (s is ZhipuOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is SearXNGOptions) {
       _controllers['url'] = TextEditingController(text: s.url);
       _controllers['engines'] = TextEditingController(text: s.engines);
       _controllers['language'] = TextEditingController(text: s.language);
       _controllers['username'] = TextEditingController(text: s.username);
       _controllers['password'] = TextEditingController(text: s.password);
-    } else if (s is LinkUpOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is BraveOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is MetasoOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is OllamaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is JinaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is PerplexityOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
-    } else if (s is BochaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is SerperOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['gl'] = TextEditingController(text: s.gl);
       _controllers['hl'] = TextEditingController(text: s.hl);
       _controllers['tbs'] = TextEditingController(text: s.tbs);
@@ -1196,7 +1188,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         text: s.page == 1 ? '' : s.page.toString(),
       );
     } else if (s is QueritOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['sitesInclude'] = TextEditingController(
         text: s.sitesInclude,
       );
@@ -1207,7 +1198,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['countries'] = TextEditingController(text: s.countries);
       _controllers['languages'] = TextEditingController(text: s.languages);
     } else if (s is GrokOptions) {
-      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['model'] = TextEditingController(text: s.model);
       _controllers['reasoningEffort'] = TextEditingController(
         text: s.reasoningEffort,
@@ -1276,6 +1266,19 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  if (_editKeys.isEmpty &&
+                      widget.service is! BingLocalOptions &&
+                      widget.service is! DuckDuckGoOptions &&
+                      widget.service is! SearXNGOptions) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          l10n.searchServicesEditDialogApiKeyRequired,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   final updated = _updateService();
                   Navigator.of(context).pop(updated);
                 },
@@ -1292,13 +1295,11 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     final s = widget.service;
     InputDecoration deco(String hint) =>
         _deskInputDecoration(context).copyWith(hintText: hint);
+
+    final fields = <Widget>[];
+
     if (s is TavilyOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco(l10n.searchServicesDialogApiKey),
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         TextField(
           controller: _controllers['url'],
           decoration: _deskInputDecoration(context).copyWith(
@@ -1306,14 +1307,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
             hintText: TavilyOptions.defaultUrl,
           ),
         ),
-      ];
+      ]);
     } else if (s is ExaOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco('API Key'),
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         TextField(
           controller: _controllers['url'],
           decoration: _deskInputDecoration(context).copyWith(
@@ -1321,28 +1317,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
             hintText: ExaOptions.defaultUrl,
           ),
         ),
-      ];
-    } else if (s is ZhipuOptions ||
-        s is LinkUpOptions ||
-        s is BraveOptions ||
-        s is MetasoOptions ||
-        s is JinaOptions ||
-        s is OllamaOptions ||
-        s is PerplexityOptions ||
-        s is BochaOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco('API Key'),
-        ),
-      ];
+      ]);
     } else if (s is GrokOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco('API Key'),
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         TextField(
           controller: _controllers['model'],
           decoration: _deskInputDecoration(context).copyWith(
@@ -1373,14 +1350,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           minLines: 3,
           maxLines: 5,
         ),
-      ];
+      ]);
     } else if (s is SerperOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco('API Key'),
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         TextField(
           controller: _controllers['gl'],
           decoration: deco(l10n.searchServicesDialogCountryOptional),
@@ -1401,14 +1373,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           decoration: deco(l10n.searchServicesDialogPageOptional),
           keyboardType: TextInputType.number,
         ),
-      ];
+      ]);
     } else if (s is QueritOptions) {
-      return [
-        TextField(
-          controller: _controllers['apiKey'],
-          decoration: deco(l10n.searchServicesDialogApiKey),
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         TextField(
           controller: _controllers['sitesInclude'],
           decoration: deco(l10n.searchServicesDialogSitesIncludeOptional),
@@ -1433,16 +1400,16 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           controller: _controllers['languages'],
           decoration: deco(l10n.searchServicesDialogLanguagesOptional),
         ),
-      ];
+      ]);
     } else if (s is DuckDuckGoOptions) {
-      return [
+      fields.addAll([
         TextField(
           controller: _controllers['region'],
           decoration: deco(l10n.searchServicesEditDialogRegionOptional),
         ),
-      ];
+      ]);
     } else if (s is SearXNGOptions) {
-      return [
+      fields.addAll([
         TextField(
           controller: _controllers['url'],
           decoration: deco(l10n.searchServicesEditDialogInstanceUrl),
@@ -1468,9 +1435,109 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           decoration: deco(l10n.searchServicesAddDialogPasswordOptional),
           obscureText: true,
         ),
-      ];
+      ]);
     }
-    return [];
+
+    if (SearchService.serviceUsesKeys(s)) {
+      if (fields.isNotEmpty) fields.add(const SizedBox(height: 12));
+      fields.addAll(_buildKeyManagement());
+    }
+    return fields;
+  }
+
+  List<Widget> _buildKeyManagement() {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    final rows = <Widget>[];
+    for (int i = 0; i < _editKeys.length; i++) {
+      final k = _editKeys[i];
+      final idx = i;
+      rows.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      k.name ?? '${l10n.searchServicesDialogApiKey} ${idx + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      k.key.length > 24
+                          ? '${k.key.substring(0, 24)}...'
+                          : k.key,
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                    ),
+                  ],
+                ),
+              ),
+              IosSwitch(
+                value: k.isEnabled,
+                onChanged: (v) {
+                  setState(() => _editKeys[idx] = k.copyWith(isEnabled: v));
+                },
+              ),
+              const SizedBox(width: 6),
+              _SmallIconBtn(
+                icon: lucide.Lucide.Trash2,
+                onTap: () => setState(() => _editKeys.removeAt(idx)),
+              ),
+            ],
+          ),
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+    }
+
+    rows.add(_SmallIconBtn(icon: lucide.Lucide.Plus, onTap: () => _addKey()));
+
+    return [const SizedBox(height: 4), ...rows];
+  }
+
+  Future<void> _addKey() async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(l10n.searchServicesDialogAddKey),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: l10n.searchServicesDialogApiKey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.searchServicesEditDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.searchServicesEditDialogSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() => _editKeys.add(ApiKeyConfig.create(result)));
+    }
   }
 
   SearchServiceOptions _updateService() {
@@ -1478,7 +1545,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     if (s is TavilyOptions) {
       return TavilyOptions(
         id: s.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         url: _controllers['url']!.text.trim(),
       );
     }
@@ -1492,12 +1559,12 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     if (s is ExaOptions) {
       return ExaOptions(
         id: s.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         url: _controllers['url']!.text.trim(),
       );
     }
     if (s is ZhipuOptions) {
-      return ZhipuOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return ZhipuOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is SearXNGOptions) {
       return SearXNGOptions(
@@ -1510,31 +1577,31 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       );
     }
     if (s is LinkUpOptions) {
-      return LinkUpOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return LinkUpOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is BraveOptions) {
-      return BraveOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return BraveOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is MetasoOptions) {
-      return MetasoOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return MetasoOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is JinaOptions) {
-      return JinaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return JinaOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is OllamaOptions) {
-      return OllamaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return OllamaOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is PerplexityOptions) {
-      return PerplexityOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return PerplexityOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is BochaOptions) {
-      return BochaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+      return BochaOptions(id: s.id, apiKeys: _editKeys);
     }
     if (s is SerperOptions) {
       final page = int.tryParse(_controllers['page']!.text.trim());
       return SerperOptions(
         id: s.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         gl: _controllers['gl']!.text.trim(),
         hl: _controllers['hl']!.text.trim(),
         tbs: _controllers['tbs']!.text.trim(),
@@ -1544,7 +1611,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     if (s is QueritOptions) {
       return QueritOptions(
         id: s.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
         sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
         timeRange: (_controllers['timeRange']?.text ?? '').trim(),
@@ -1555,7 +1622,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     if (s is GrokOptions) {
       return GrokOptions(
         id: s.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         model: _controllers['model']!.text.trim(),
         reasoningEffort: _controllers['reasoningEffort']!.text,
         customUrl: _controllers['customUrl']!.text.trim(),

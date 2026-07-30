@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:Cuplivo/core/models/api_keys.dart';
 import 'package:Cuplivo/core/services/search/providers/querit_search_service.dart';
 import 'package:Cuplivo/core/services/search/search_service.dart';
 import 'package:Cuplivo/utils/brand_assets.dart';
@@ -12,7 +13,7 @@ void main() {
     test('serializes options and resolves factory/icon mapping', () {
       final options = QueritOptions(
         id: 'querit-1',
-        apiKey: 'querit-test',
+        apiKeys: [ApiKeyConfig.create('querit-test')],
         sitesInclude: 'example.com',
         sitesExclude: 'excluded.example',
         timeRange: 'd7',
@@ -78,7 +79,7 @@ void main() {
         commonOptions: const SearchCommonOptions(resultSize: 1, timeout: 1000),
         serviceOptions: QueritOptions(
           id: 'querit-1',
-          apiKey: 'querit-test',
+          apiKeys: [ApiKeyConfig.create('querit-test')],
           sitesInclude: 'example.com, docs.example.com',
           sitesExclude: 'excluded.example',
           timeRange: 'd7',
@@ -136,7 +137,10 @@ void main() {
       final result = await service.search(
         query: 'kelivo',
         commonOptions: const SearchCommonOptions(resultSize: 5, timeout: 1000),
-        serviceOptions: QueritOptions(id: 'querit-1', apiKey: 'querit-test'),
+        serviceOptions: QueritOptions(
+          id: 'querit-1',
+          apiKeys: [ApiKeyConfig.create('querit-test')],
+        ),
       );
 
       expect(jsonDecode(captured!.body), {'query': 'kelivo', 'count': 5});
@@ -168,7 +172,10 @@ void main() {
       final result = await service.search(
         query: 'kelivo',
         commonOptions: const SearchCommonOptions(timeout: 1000),
-        serviceOptions: QueritOptions(id: 'querit-1', apiKey: 'querit-test'),
+        serviceOptions: QueritOptions(
+          id: 'querit-1',
+          apiKeys: [ApiKeyConfig.create('querit-test')],
+        ),
       );
 
       expect(result.items.single.title, 'https://example.com/kelivo');
@@ -188,7 +195,7 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: QueritOptions(id: 'querit-1', apiKey: ''),
+          serviceOptions: QueritOptions(id: 'querit-1', apiKeys: []),
         ),
         throwsA(
           isA<Exception>().having(
@@ -210,7 +217,10 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: QueritOptions(id: 'querit-1', apiKey: 'querit-test'),
+          serviceOptions: QueritOptions(
+            id: 'querit-1',
+            apiKeys: [ApiKeyConfig.create('querit-test')],
+          ),
         ),
         throwsA(
           isA<Exception>().having(
@@ -236,7 +246,10 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: QueritOptions(id: 'querit-1', apiKey: 'querit-test'),
+          serviceOptions: QueritOptions(
+            id: 'querit-1',
+            apiKeys: [ApiKeyConfig.create('querit-test')],
+          ),
         ),
         throwsA(
           isA<Exception>().having(

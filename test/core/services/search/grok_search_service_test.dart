@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:Cuplivo/core/models/api_keys.dart';
 import 'package:Cuplivo/core/services/search/providers/grok_search_service.dart';
 import 'package:Cuplivo/core/services/search/search_service.dart';
 import 'package:Cuplivo/utils/brand_assets.dart';
@@ -12,7 +13,7 @@ void main() {
     test('serializes options and resolves factory/icon mapping', () {
       final options = GrokOptions(
         id: 'grok-1',
-        apiKey: 'xai-test',
+        apiKeys: [ApiKeyConfig.create('xai-test')],
         model: 'grok-test',
         reasoningEffort: 'medium',
         customUrl: 'https://example.com/responses',
@@ -81,7 +82,7 @@ void main() {
         commonOptions: const SearchCommonOptions(resultSize: 1, timeout: 1000),
         serviceOptions: GrokOptions(
           id: 'grok-1',
-          apiKey: 'xai-test',
+          apiKeys: [ApiKeyConfig.create('xai-test')],
           model: 'grok-test',
           customUrl: 'https://example.com/responses',
           systemPrompt: 'Search carefully.',
@@ -138,7 +139,7 @@ void main() {
         commonOptions: const SearchCommonOptions(timeout: 1000),
         serviceOptions: GrokOptions(
           id: 'grok-1',
-          apiKey: 'xai-test',
+          apiKeys: [ApiKeyConfig.create('xai-test')],
           model: 'grok-4-1-fast-non-reasoning',
           reasoningEffort: 'none',
         ),
@@ -174,7 +175,10 @@ void main() {
       await service.search(
         query: 'kelivo',
         commonOptions: const SearchCommonOptions(timeout: 1000),
-        serviceOptions: GrokOptions(id: 'grok-1', apiKey: 'xai-test'),
+        serviceOptions: GrokOptions(
+          id: 'grok-1',
+          apiKeys: [ApiKeyConfig.create('xai-test')],
+        ),
       );
 
       final body = jsonDecode(captured!.body) as Map<String, dynamic>;
@@ -219,7 +223,10 @@ void main() {
             resultSize: 1,
             timeout: 1000,
           ),
-          serviceOptions: GrokOptions(id: 'grok-1', apiKey: 'xai-test'),
+          serviceOptions: GrokOptions(
+            id: 'grok-1',
+            apiKeys: [ApiKeyConfig.create('xai-test')],
+          ),
         );
 
         expect(result.answer, 'Kelivo is a Flutter chat client.');
@@ -243,7 +250,7 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: GrokOptions(id: 'grok-1', apiKey: ''),
+          serviceOptions: GrokOptions(id: 'grok-1', apiKeys: []),
         ),
         throwsA(
           isA<Exception>().having(
@@ -265,7 +272,10 @@ void main() {
         () => service.search(
           query: 'kelivo',
           commonOptions: const SearchCommonOptions(timeout: 1000),
-          serviceOptions: GrokOptions(id: 'grok-1', apiKey: 'xai-test'),
+          serviceOptions: GrokOptions(
+            id: 'grok-1',
+            apiKeys: [ApiKeyConfig.create('xai-test')],
+          ),
         ),
         throwsA(
           isA<Exception>().having(

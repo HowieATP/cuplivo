@@ -31,6 +31,7 @@ class SerperSearchService extends SearchService<SerperOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required SerperOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -46,7 +47,7 @@ class SerperSearchService extends SearchService<SerperOptions> {
           .post(
             Uri.parse(endpoint),
             headers: {
-              'X-API-KEY': serviceOptions.apiKey,
+              'X-API-KEY': apiKeyOverride ?? serviceOptions.apiKey,
               'Content-Type': 'application/json',
             },
             body: jsonEncode(body),

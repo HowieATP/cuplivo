@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/models/api_keys.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1197,6 +1198,12 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
     final uuid = const Uuid();
     final id = uuid.v4().substring(0, 8);
 
+    List<ApiKeyConfig> makeKeys() {
+      final key = _controllers['apiKey']?.text;
+      if (key == null || key.isEmpty) return [];
+      return [ApiKeyConfig.create(key)];
+    }
+
     switch (_selectedType) {
       case 'bing_local':
         return BingLocalOptions(id: id);
@@ -1209,17 +1216,17 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'tavily':
         return TavilyOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           url: _controllers['tavilyUrl']!.text.trim(),
         );
       case 'exa':
         return ExaOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           url: _controllers['exaUrl']!.text.trim(),
         );
       case 'zhipu':
-        return ZhipuOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return ZhipuOptions(id: id, apiKeys: makeKeys());
       case 'searxng':
         return SearXNGOptions(
           id: id,
@@ -1230,24 +1237,24 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           password: _controllers['password']!.text,
         );
       case 'linkup':
-        return LinkUpOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return LinkUpOptions(id: id, apiKeys: makeKeys());
       case 'brave':
-        return BraveOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BraveOptions(id: id, apiKeys: makeKeys());
       case 'metaso':
-        return MetasoOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return MetasoOptions(id: id, apiKeys: makeKeys());
       case 'jina':
-        return JinaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return JinaOptions(id: id, apiKeys: makeKeys());
       case 'ollama':
-        return OllamaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return OllamaOptions(id: id, apiKeys: makeKeys());
       case 'perplexity':
-        return PerplexityOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return PerplexityOptions(id: id, apiKeys: makeKeys());
       case 'bocha':
-        return BochaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BochaOptions(id: id, apiKeys: makeKeys());
       case 'serper':
         final pageText = (_controllers['page']?.text ?? '').trim();
         return SerperOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           gl: (_controllers['gl']?.text ?? '').trim(),
           hl: (_controllers['hl']?.text ?? '').trim(),
           tbs: (_controllers['tbs']?.text ?? '').trim(),
@@ -1256,7 +1263,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'querit':
         return QueritOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
           sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
           timeRange: (_controllers['timeRange']?.text ?? '').trim(),
@@ -1266,7 +1273,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'grok':
         return GrokOptions(
           id: id,
-          apiKey: _controllers['apiKey']!.text,
+          apiKeys: makeKeys(),
           model: _controllers['model']!.text.trim(),
           reasoningEffort: _controllers['reasoningEffort']!.text,
           customUrl: _controllers['customUrl']!.text.trim(),
@@ -1292,45 +1299,30 @@ class _EditServiceSheet extends StatefulWidget {
 class _EditServiceSheetState extends State<_EditServiceSheet> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  late List<ApiKeyConfig> _editKeys;
 
   @override
   void initState() {
     super.initState();
+    _editKeys = List.from(widget.service.apiKeys);
     _initControllers();
   }
 
   void _initControllers() {
     final service = widget.service;
     if (service is TavilyOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
       _controllers['url'] = TextEditingController(text: service.url);
     } else if (service is DuckDuckGoOptions) {
       _controllers['region'] = TextEditingController(text: service.region);
     } else if (service is ExaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
       _controllers['url'] = TextEditingController(text: service.url);
-    } else if (service is ZhipuOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
     } else if (service is SearXNGOptions) {
       _controllers['url'] = TextEditingController(text: service.url);
       _controllers['engines'] = TextEditingController(text: service.engines);
       _controllers['language'] = TextEditingController(text: service.language);
       _controllers['username'] = TextEditingController(text: service.username);
       _controllers['password'] = TextEditingController(text: service.password);
-    } else if (service is LinkUpOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
-    } else if (service is BraveOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
-    } else if (service is MetasoOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
-    } else if (service is OllamaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
-    } else if (service is JinaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
-    } else if (service is BochaOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
     } else if (service is SerperOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
       _controllers['gl'] = TextEditingController(text: service.gl);
       _controllers['hl'] = TextEditingController(text: service.hl);
       _controllers['tbs'] = TextEditingController(text: service.tbs);
@@ -1338,7 +1330,6 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         text: service.page == 1 ? '' : service.page.toString(),
       );
     } else if (service is QueritOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
       _controllers['sitesInclude'] = TextEditingController(
         text: service.sitesInclude,
       );
@@ -1355,7 +1346,6 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         text: service.languages,
       );
     } else if (service is GrokOptions) {
-      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
       _controllers['model'] = TextEditingController(text: service.model);
       _controllers['reasoningEffort'] = TextEditingController(
         text: service.reasoningEffort,
@@ -1433,6 +1423,19 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
               child: FilledButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
+                    if (_editKeys.isEmpty &&
+                        widget.service is! BingLocalOptions &&
+                        widget.service is! DuckDuckGoOptions &&
+                        widget.service is! SearXNGOptions) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            l10n.searchServicesEditDialogApiKeyRequired,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
                     final updated = _updateService();
                     widget.onSave(updated);
                     Navigator.of(context).pop();
@@ -1507,86 +1510,36 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       );
     }
 
+    final fields = <Widget>[];
+
     if (service is BingLocalOptions) {
-      return [Text(l10n.searchServicesEditDialogBingLocalNoConfig)];
+      fields.add(Text(l10n.searchServicesEditDialogBingLocalNoConfig));
     } else if (service is DuckDuckGoOptions) {
-      return [
+      fields.addAll([
         buildTextField(
           key: 'region',
           label: l10n.searchServicesEditDialogRegionOptional,
           hint: 'us-en',
         ),
-      ];
+      ]);
     } else if (service is TavilyOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: l10n.searchServicesDialogApiKey,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         buildTextField(
           key: 'url',
           label: l10n.searchServicesFieldCustomUrlOptional,
           hint: TavilyOptions.defaultUrl,
         ),
-      ];
+      ]);
     } else if (service is ExaOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: 'API Key',
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         buildTextField(
           key: 'url',
           label: l10n.searchServicesFieldCustomUrlOptional,
           hint: ExaOptions.defaultUrl,
         ),
-      ];
-    } else if (service is ZhipuOptions ||
-        service is LinkUpOptions ||
-        service is BraveOptions ||
-        service is MetasoOptions ||
-        service is OllamaOptions ||
-        service is JinaOptions ||
-        service is BochaOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: 'API Key',
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-      ];
+      ]);
     } else if (service is SerperOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: 'API Key',
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         buildTextField(
           key: 'gl',
           label: l10n.searchServicesDialogCountryOptional,
@@ -1620,20 +1573,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
             return null;
           },
         ),
-      ];
+      ]);
     } else if (service is QueritOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: l10n.searchServicesDialogApiKey,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         buildTextField(
           key: 'sitesInclude',
           label: l10n.searchServicesDialogSitesIncludeOptional,
@@ -1663,20 +1605,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           label: l10n.searchServicesDialogLanguagesOptional,
           hint: l10n.searchServicesDialogLanguagesHint,
         ),
-      ];
+      ]);
     } else if (service is GrokOptions) {
-      return [
-        buildTextField(
-          key: 'apiKey',
-          label: 'API Key',
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return l10n.searchServicesEditDialogApiKeyRequired;
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
+      fields.addAll([
         buildTextField(
           key: 'model',
           label: l10n.searchServicesDialogModel,
@@ -1701,9 +1632,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           minLines: 3,
           maxLines: 5,
         ),
-      ];
+      ]);
     } else if (service is SearXNGOptions) {
-      return [
+      fields.addAll([
         buildTextField(
           key: 'url',
           label: l10n.searchServicesEditDialogInstanceUrl,
@@ -1737,10 +1668,158 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           label: l10n.searchServicesEditDialogPasswordOptional,
           obscureText: true,
         ),
-      ];
+      ]);
     }
 
-    return [];
+    if (SearchService.serviceUsesKeys(service)) {
+      if (fields.isNotEmpty) fields.add(const SizedBox(height: 12));
+      fields.addAll(_buildKeyManagement());
+    }
+    return fields;
+  }
+
+  List<Widget> _buildKeyManagement() {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final rows = <Widget>[];
+    for (int i = 0; i < _editKeys.length; i++) {
+      final k = _editKeys[i];
+      final idx = i;
+      rows.add(
+        Container(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest.withValues(
+              alpha: isDark ? 0.18 : 0.5,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        k.name ??
+                            '${l10n.searchServicesDialogApiKey} ${idx + 1}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        k.key.length > 20
+                            ? '${k.key.substring(0, 20)}...'
+                            : k.key,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: cs.onSurface,
+                          fontWeight: AppFontWeights.medium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IosSwitch(
+                  value: k.isEnabled,
+                  onChanged: (v) {
+                    setState(() {
+                      _editKeys[idx] = k.copyWith(isEnabled: v);
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _editKeys.removeAt(idx));
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Lucide.X, size: 16, color: cs.error),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      rows.add(const SizedBox(height: 8));
+    }
+
+    rows.add(
+      Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(
+            alpha: isDark ? 0.18 : 0.5,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _addKey(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Icon(Lucide.Plus, size: 16, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.searchServicesDialogAddKey,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.primary,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return [const SizedBox(height: 12), ...rows];
+  }
+
+  Future<void> _addKey() async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(l10n.searchServicesDialogAddKey),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: l10n.searchServicesDialogApiKey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.searchServicesEditDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.searchServicesEditDialogSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && result.isNotEmpty && mounted) {
+      setState(() {
+        _editKeys.add(ApiKeyConfig.create(result));
+      });
+    }
   }
 
   SearchServiceOptions _updateService() {
@@ -1749,7 +1828,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     if (service is TavilyOptions) {
       return TavilyOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         url: _controllers['url']!.text.trim(),
       );
     } else if (service is DuckDuckGoOptions) {
@@ -1761,11 +1840,11 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     } else if (service is ExaOptions) {
       return ExaOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         url: _controllers['url']!.text.trim(),
       );
     } else if (service is ZhipuOptions) {
-      return ZhipuOptions(id: service.id, apiKey: _controllers['apiKey']!.text);
+      return ZhipuOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is SearXNGOptions) {
       return SearXNGOptions(
         id: service.id,
@@ -1776,28 +1855,19 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         password: _controllers['password']!.text,
       );
     } else if (service is LinkUpOptions) {
-      return LinkUpOptions(
-        id: service.id,
-        apiKey: _controllers['apiKey']!.text,
-      );
+      return LinkUpOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is BraveOptions) {
-      return BraveOptions(id: service.id, apiKey: _controllers['apiKey']!.text);
+      return BraveOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is MetasoOptions) {
-      return MetasoOptions(
-        id: service.id,
-        apiKey: _controllers['apiKey']!.text,
-      );
+      return MetasoOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is OllamaOptions) {
-      return OllamaOptions(
-        id: service.id,
-        apiKey: _controllers['apiKey']!.text,
-      );
+      return OllamaOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is JinaOptions) {
-      return JinaOptions(id: service.id, apiKey: _controllers['apiKey']!.text);
+      return JinaOptions(id: service.id, apiKeys: _editKeys);
     } else if (service is PerplexityOptions) {
       return PerplexityOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         country: service.country,
         searchDomainFilter: service.searchDomainFilter,
         maxTokensPerPage: service.maxTokensPerPage,
@@ -1805,7 +1875,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     } else if (service is BochaOptions) {
       return BochaOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         freshness: service.freshness,
         summary: service.summary,
         include: service.include,
@@ -1815,7 +1885,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       final pageText = (_controllers['page']?.text ?? '').trim();
       return SerperOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         gl: (_controllers['gl']?.text ?? '').trim(),
         hl: (_controllers['hl']?.text ?? '').trim(),
         tbs: (_controllers['tbs']?.text ?? '').trim(),
@@ -1824,7 +1894,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     } else if (service is QueritOptions) {
       return QueritOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
         sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
         timeRange: (_controllers['timeRange']?.text ?? '').trim(),
@@ -1834,7 +1904,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     } else if (service is GrokOptions) {
       return GrokOptions(
         id: service.id,
-        apiKey: _controllers['apiKey']!.text,
+        apiKeys: _editKeys,
         model: _controllers['model']!.text.trim(),
         reasoningEffort: _controllers['reasoningEffort']!.text,
         customUrl: _controllers['customUrl']!.text.trim(),

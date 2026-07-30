@@ -13,26 +13,33 @@ class ApiKeyManager {
   factory ApiKeyManager() => _instance;
   ApiKeyManager._internal();
 
-  final Map<String, int> _roundRobinIndexMap = {}; // providerId -> index
+  final Map<String, int> _roundRobinIndexMap = {}; // scopeId -> index
   final Map<String, int> _keyUsageMap = {}; // keyId -> total uses (ephemeral)
 
   KeySelectionResult selectForProvider(ProviderConfig provider) {
-    final keys = List<ApiKeyConfig>.from(
-      (provider.apiKeys ?? const <ApiKeyConfig>[]).where((k) => k.isEnabled),
+    return selectFromKeys(
+      provider.apiKeys ?? const [],
+      provider.keyManagement ?? const KeyManagementConfig(),
+      provider.id,
     );
-    if (keys.isEmpty) return const KeySelectionResult(null, 'no_keys');
+  }
 
-    // Filter by status and cooldown
+  KeySelectionResult selectFromKeys(
+    List<ApiKeyConfig> keys,
+    KeyManagementConfig config,
+    String scopeId,
+  ) {
+    final enabled = List<ApiKeyConfig>.from(keys.where((k) => k.isEnabled));
+    if (enabled.isEmpty) return const KeySelectionResult(null, 'no_keys');
+
     final now = DateTime.now().millisecondsSinceEpoch;
-    final cooldownMs =
-        (provider.keyManagement?.failureRecoveryTimeMinutes ?? 5) * 60 * 1000;
-    final available = keys.where((k) {
+    final cooldownMs = config.failureRecoveryTimeMinutes * 60 * 1000;
+    final available = enabled.where((k) {
       if (k.status == ApiKeyStatus.disabled) return false;
       if (k.status == ApiKeyStatus.error) {
         final since = now - (k.updatedAt);
         if (since < cooldownMs) return false;
       }
-      // Only select keys marked active; error keys are filtered by cooldown above and disabled are skipped.
       return k.status == ApiKeyStatus.active;
     }).toList();
 
@@ -40,8 +47,7 @@ class ApiKeyManager {
       return const KeySelectionResult(null, 'no_available_keys');
     }
 
-    final strategy =
-        provider.keyManagement?.strategy ?? LoadBalanceStrategy.roundRobin;
+    final strategy = config.strategy;
     ApiKeyConfig chosen;
     switch (strategy) {
       case LoadBalanceStrategy.priority:
@@ -59,12 +65,10 @@ class ApiKeyManager {
         break;
       case LoadBalanceStrategy.roundRobin:
         final cur =
-            _roundRobinIndexMap[provider.id] ??
-            (provider.keyManagement?.roundRobinIndex ?? 0);
+            _roundRobinIndexMap[scopeId] ?? (config.roundRobinIndex ?? 0);
         final idx = cur % available.length;
         chosen = available[idx];
-        final next = (idx + 1) % available.length;
-        _roundRobinIndexMap[provider.id] = next;
+        _roundRobinIndexMap[scopeId] = (idx + 1) % available.length;
         break;
     }
 
@@ -73,6 +77,20 @@ class ApiKeyManager {
 
   ApiKeyConfig updateKeyStatus(
     ProviderConfig provider,
+    ApiKeyConfig key,
+    bool success, {
+    String? error,
+  }) {
+    return updateKeyStatusFromConfig(
+      provider.keyManagement ?? const KeyManagementConfig(),
+      key,
+      success,
+      error: error,
+    );
+  }
+
+  ApiKeyConfig updateKeyStatusFromConfig(
+    KeyManagementConfig config,
     ApiKeyConfig key,
     bool success, {
     String? error,
@@ -89,7 +107,7 @@ class ApiKeyManager {
       status: success
           ? ApiKeyStatus.active
           : (key.usage.consecutiveFailures + 1) >=
-                (provider.keyManagement?.maxFailuresBeforeDisable ?? 3)
+                (config.maxFailuresBeforeDisable)
           ? ApiKeyStatus.error
           : key.status,
       lastError: success ? null : (error ?? key.lastError),
@@ -102,4 +120,6 @@ class ApiKeyManager {
   void recordKeyUsage(String keyId, bool success) {
     _keyUsageMap[keyId] = (_keyUsageMap[keyId] ?? 0) + 1;
   }
+
+  int? getRoundRobinIndex(String scopeId) => _roundRobinIndexMap[scopeId];
 }

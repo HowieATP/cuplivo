@@ -22,6 +22,7 @@ class TavilySearchService extends SearchService<TavilyOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required TavilyOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -33,7 +34,8 @@ class TavilySearchService extends SearchService<TavilyOptions> {
           .post(
             Uri.parse(serviceOptions.resolvedUrl),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: body,

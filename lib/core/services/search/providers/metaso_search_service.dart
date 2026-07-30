@@ -22,6 +22,7 @@ class MetasoSearchService extends SearchService<MetasoOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required MetasoOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -35,7 +36,8 @@ class MetasoSearchService extends SearchService<MetasoOptions> {
           .post(
             Uri.parse('https://metaso.cn/api/v1/search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Accept': 'application/json',
               'Content-Type': 'application/json',
             },

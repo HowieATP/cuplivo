@@ -22,6 +22,7 @@ class SearXNGSearchService extends SearchService<SearXNGOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required SearXNGOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       if (serviceOptions.url.isEmpty) {

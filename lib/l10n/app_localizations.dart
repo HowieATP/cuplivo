@@ -7454,6 +7454,12 @@ abstract class AppLocalizations {
   /// **'URL is required'**
   String get searchServicesEditDialogUrlRequired;
 
+  /// No description provided for @searchServicesDialogAddKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Key'**
+  String get searchServicesDialogAddKey;
+
   /// No description provided for @searchServicesEditDialogEnginesOptional.
   ///
   /// In en, this message translates to:

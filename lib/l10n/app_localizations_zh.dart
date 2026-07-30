@@ -3869,6 +3869,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesEditDialogUrlRequired => 'URL 必填';
 
   @override
+  String get searchServicesDialogAddKey => '添加密钥';
+
+  @override
   String get searchServicesEditDialogEnginesOptional => '搜索引擎（可选）';
 
   @override
@@ -10052,6 +10055,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesEditDialogUrlRequired => 'URL 必填';
 
   @override
+  String get searchServicesDialogAddKey => '添加密钥';
+
+  @override
   String get searchServicesEditDialogEnginesOptional => '搜索引擎（可选）';
 
   @override
@@ -16231,6 +16237,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesEditDialogUrlRequired => 'URL 必填';
+
+  @override
+  String get searchServicesDialogAddKey => '新增金鑰';
 
   @override
   String get searchServicesEditDialogEnginesOptional => '搜尋引擎（可選）';

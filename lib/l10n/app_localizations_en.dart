@@ -4003,6 +4003,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesEditDialogUrlRequired => 'URL is required';
 
   @override
+  String get searchServicesDialogAddKey => 'Add Key';
+
+  @override
   String get searchServicesEditDialogEnginesOptional => 'Engines (optional)';
 
   @override

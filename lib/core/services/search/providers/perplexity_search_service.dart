@@ -22,6 +22,7 @@ class PerplexitySearchService extends SearchService<PerplexityOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required PerplexityOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -45,7 +46,8 @@ class PerplexitySearchService extends SearchService<PerplexityOptions> {
           .post(
             Uri.parse('https://api.perplexity.ai/search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: jsonEncode(body),

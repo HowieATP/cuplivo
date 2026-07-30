@@ -22,6 +22,7 @@ class OllamaSearchService extends SearchService<OllamaOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required OllamaOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -33,7 +34,8 @@ class OllamaSearchService extends SearchService<OllamaOptions> {
           .post(
             Uri.parse('https://ollama.com/api/web_search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: body,

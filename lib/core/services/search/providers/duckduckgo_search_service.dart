@@ -21,6 +21,7 @@ class DuckDuckGoSearchService extends SearchService<DuckDuckGoOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required DuckDuckGoOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     final ddgs = DDGS(timeout: Duration(milliseconds: commonOptions.timeout));
     final region = serviceOptions.region.trim().isNotEmpty

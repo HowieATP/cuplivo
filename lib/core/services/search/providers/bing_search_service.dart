@@ -22,6 +22,7 @@ class BingSearchService extends SearchService<BingLocalOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required BingLocalOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final encodedQuery = Uri.encodeComponent(query);

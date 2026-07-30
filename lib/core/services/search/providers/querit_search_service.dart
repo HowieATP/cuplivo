@@ -31,9 +31,10 @@ class QueritSearchService extends SearchService<QueritOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required QueritOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
-      final apiKey = serviceOptions.apiKey.trim();
+      final apiKey = (apiKeyOverride ?? serviceOptions.apiKey).trim();
       if (apiKey.isEmpty) {
         throw Exception('Querit API key is required');
       }

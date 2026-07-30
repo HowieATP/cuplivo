@@ -22,6 +22,7 @@ class ExaSearchService extends SearchService<ExaOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required ExaOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -34,7 +35,8 @@ class ExaSearchService extends SearchService<ExaOptions> {
           .post(
             Uri.parse(serviceOptions.resolvedUrl),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: body,

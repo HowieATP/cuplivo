@@ -22,6 +22,7 @@ class BraveSearchService extends SearchService<BraveOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required BraveOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final encodedQuery = Uri.encodeComponent(query);
@@ -33,7 +34,7 @@ class BraveSearchService extends SearchService<BraveOptions> {
             Uri.parse(url),
             headers: {
               'Accept': 'application/json',
-              'X-Subscription-Token': serviceOptions.apiKey,
+              'X-Subscription-Token': apiKeyOverride ?? serviceOptions.apiKey,
             },
           )
           .timeout(Duration(milliseconds: commonOptions.timeout));

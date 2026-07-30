@@ -22,6 +22,7 @@ class LinkUpSearchService extends SearchService<LinkUpOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required LinkUpOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = jsonEncode({
@@ -35,7 +36,8 @@ class LinkUpSearchService extends SearchService<LinkUpOptions> {
           .post(
             Uri.parse('https://api.linkup.so/v1/search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: body,

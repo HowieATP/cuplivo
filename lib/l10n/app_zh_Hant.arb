@@ -1322,6 +1322,7 @@
   "searchServicesEditDialogApiKeyRequired": "API Key 必填",
   "searchServicesEditDialogInstanceUrl": "實例 URL",
   "searchServicesEditDialogUrlRequired": "URL 必填",
+  "searchServicesDialogAddKey": "新增金鑰",
   "searchServicesEditDialogEnginesOptional": "搜尋引擎（可選）",
   "searchServicesEditDialogLanguageOptional": "語言（可選）",
   "searchServicesEditDialogUsernameOptional": "使用者名稱（可選）",

@@ -22,6 +22,7 @@ class BochaSearchService extends SearchService<BochaOptions> {
     required String query,
     required SearchCommonOptions commonOptions,
     required BochaOptions serviceOptions,
+    String? apiKeyOverride,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -43,7 +44,8 @@ class BochaSearchService extends SearchService<BochaOptions> {
           .post(
             Uri.parse('https://api.bochaai.com/v1/web-search'),
             headers: {
-              'Authorization': 'Bearer ${serviceOptions.apiKey}',
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
               'Content-Type': 'application/json',
             },
             body: jsonEncode(body),

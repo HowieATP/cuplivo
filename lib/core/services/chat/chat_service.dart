@@ -342,6 +342,8 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> createConversation({
     String? title,
     String? assistantId,
+    List<String>? mcpServerIds,
+    String? parentConversationId,
   }) async {
     if (!_initialized) await init();
     _discardTemporaryConversation(_currentConversationId);
@@ -349,6 +351,8 @@ class ChatService extends ChangeNotifier {
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
+      mcpServerIds: mcpServerIds,
+      parentConversationId: parentConversationId,
     );
 
     await _saveConversation(conversation);

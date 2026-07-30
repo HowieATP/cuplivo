@@ -20,6 +20,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/headless_generation_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
@@ -150,6 +151,8 @@ class HomePageController extends ChangeNotifier {
   late scroll_ctrl.ChatScrollController _scrollCtrl;
 
   McpProvider? _mcpProvider;
+  HeadlessGenerationService? _headlessGen;
+  bool _wasCurrentHeadlessActive = false;
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<MessageLocateTarget>? _locateSub;
   ReceivePort? _proactiveCarePort;
@@ -290,7 +293,8 @@ class HomePageController extends ChangeNotifier {
   bool get isCurrentConversationLoading {
     final cid = currentConversation?.id;
     if (cid == null) return false;
-    return loadingConversationIds.contains(cid);
+    return loadingConversationIds.contains(cid) ||
+        (_headlessGen?.isActive(cid) ?? false);
   }
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
@@ -563,6 +567,13 @@ class HomePageController extends ChangeNotifier {
       _mcpProvider = _context.read<McpProvider>();
       _mcpProvider!.addListener(_onMcpChanged);
     } catch (_) {}
+    try {
+      _headlessGen = _context.read<HeadlessGenerationService>();
+      _headlessGen!.addListener(_onHeadlessGenChanged);
+      debugPrint('[HeadlessGen] listener attached');
+    } catch (e) {
+      debugPrint('[HeadlessGen] listener FAILED: $e');
+    }
   }
 
   void _setupKeyboardListeners() {}
@@ -1086,6 +1097,10 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> cancelStreaming() async {
     debugPrint('[CancelTrace] HomePageController.cancelStreaming ENTER');
+    final cid = currentConversation?.id;
+    if (cid != null && (_headlessGen?.isActive(cid) ?? false)) {
+      _headlessGen!.cancel(cid);
+    }
     await _viewModel.cancelStreaming();
     notifyListeners();
     debugPrint('[CancelTrace] HomePageController.cancelStreaming EXIT');
@@ -2627,6 +2642,17 @@ class HomePageController extends ChangeNotifier {
     // Kept for potential future use
   }
 
+  void _onHeadlessGenChanged() {
+    final cid = currentConversation?.id;
+    if (cid == null) return;
+    final isNowActive = _headlessGen?.isActive(cid) ?? false;
+    if (_wasCurrentHeadlessActive && !isNowActive) {
+      _chatController.setCurrentConversation(currentConversation);
+    }
+    _wasCurrentHeadlessActive = isNowActive;
+    notifyListeners();
+  }
+
   // ============================================================================
   // Disposal
   // ============================================================================
@@ -2637,6 +2663,7 @@ class HomePageController extends ChangeNotifier {
     IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
+    _headlessGen?.removeListener(_onHeadlessGenChanged);
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

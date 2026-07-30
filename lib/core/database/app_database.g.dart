@@ -134,6 +134,17 @@ class $ConversationRowsTable extends ConversationRows
         requiredDuringInsert: false,
         defaultValue: const Constant('[]'),
       );
+  static const VerificationMeta _parentConversationIdMeta =
+      const VerificationMeta('parentConversationId');
+  @override
+  late final GeneratedColumn<String> parentConversationId =
+      GeneratedColumn<String>(
+        'parent_conversation_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -147,6 +158,7 @@ class $ConversationRowsTable extends ConversationRows
     summary,
     lastSummarizedMessageCount,
     chatSuggestionsJson,
+    parentConversationId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -246,6 +258,15 @@ class $ConversationRowsTable extends ConversationRows
         ),
       );
     }
+    if (data.containsKey('parent_conversation_id')) {
+      context.handle(
+        _parentConversationIdMeta,
+        parentConversationId.isAcceptableOrUnknown(
+          data['parent_conversation_id']!,
+          _parentConversationIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -299,6 +320,10 @@ class $ConversationRowsTable extends ConversationRows
         DriftSqlType.string,
         data['${effectivePrefix}chat_suggestions_json'],
       )!,
+      parentConversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_conversation_id'],
+      ),
     );
   }
 
@@ -320,6 +345,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
   final String? summary;
   final int lastSummarizedMessageCount;
   final String chatSuggestionsJson;
+  final String? parentConversationId;
   const ConversationRow({
     required this.id,
     required this.title,
@@ -332,6 +358,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     this.summary,
     required this.lastSummarizedMessageCount,
     required this.chatSuggestionsJson,
+    this.parentConversationId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -353,6 +380,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       lastSummarizedMessageCount,
     );
     map['chat_suggestions_json'] = Variable<String>(chatSuggestionsJson);
+    if (!nullToAbsent || parentConversationId != null) {
+      map['parent_conversation_id'] = Variable<String>(parentConversationId);
+    }
     return map;
   }
 
@@ -373,6 +403,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           : Value(summary),
       lastSummarizedMessageCount: Value(lastSummarizedMessageCount),
       chatSuggestionsJson: Value(chatSuggestionsJson),
+      parentConversationId: parentConversationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentConversationId),
     );
   }
 
@@ -399,6 +432,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatSuggestionsJson: serializer.fromJson<String>(
         json['chatSuggestionsJson'],
       ),
+      parentConversationId: serializer.fromJson<String?>(
+        json['parentConversationId'],
+      ),
     );
   }
   @override
@@ -418,6 +454,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         lastSummarizedMessageCount,
       ),
       'chatSuggestionsJson': serializer.toJson<String>(chatSuggestionsJson),
+      'parentConversationId': serializer.toJson<String?>(parentConversationId),
     };
   }
 
@@ -433,6 +470,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     Value<String?> summary = const Value.absent(),
     int? lastSummarizedMessageCount,
     String? chatSuggestionsJson,
+    Value<String?> parentConversationId = const Value.absent(),
   }) => ConversationRow(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -446,6 +484,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     lastSummarizedMessageCount:
         lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
     chatSuggestionsJson: chatSuggestionsJson ?? this.chatSuggestionsJson,
+    parentConversationId: parentConversationId.present
+        ? parentConversationId.value
+        : this.parentConversationId,
   );
   ConversationRow copyWithCompanion(ConversationRowsCompanion data) {
     return ConversationRow(
@@ -470,6 +511,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatSuggestionsJson: data.chatSuggestionsJson.present
           ? data.chatSuggestionsJson.value
           : this.chatSuggestionsJson,
+      parentConversationId: data.parentConversationId.present
+          ? data.parentConversationId.value
+          : this.parentConversationId,
     );
   }
 
@@ -486,7 +530,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ..write('versionSelectionsJson: $versionSelectionsJson, ')
           ..write('summary: $summary, ')
           ..write('lastSummarizedMessageCount: $lastSummarizedMessageCount, ')
-          ..write('chatSuggestionsJson: $chatSuggestionsJson')
+          ..write('chatSuggestionsJson: $chatSuggestionsJson, ')
+          ..write('parentConversationId: $parentConversationId')
           ..write(')'))
         .toString();
   }
@@ -504,6 +549,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     summary,
     lastSummarizedMessageCount,
     chatSuggestionsJson,
+    parentConversationId,
   );
   @override
   bool operator ==(Object other) =>
@@ -519,7 +565,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           other.versionSelectionsJson == this.versionSelectionsJson &&
           other.summary == this.summary &&
           other.lastSummarizedMessageCount == this.lastSummarizedMessageCount &&
-          other.chatSuggestionsJson == this.chatSuggestionsJson);
+          other.chatSuggestionsJson == this.chatSuggestionsJson &&
+          other.parentConversationId == this.parentConversationId);
 }
 
 class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
@@ -534,6 +581,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
   final Value<String?> summary;
   final Value<int> lastSummarizedMessageCount;
   final Value<String> chatSuggestionsJson;
+  final Value<String?> parentConversationId;
   final Value<int> rowid;
   const ConversationRowsCompanion({
     this.id = const Value.absent(),
@@ -547,6 +595,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.summary = const Value.absent(),
     this.lastSummarizedMessageCount = const Value.absent(),
     this.chatSuggestionsJson = const Value.absent(),
+    this.parentConversationId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationRowsCompanion.insert({
@@ -561,6 +610,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.summary = const Value.absent(),
     this.lastSummarizedMessageCount = const Value.absent(),
     this.chatSuggestionsJson = const Value.absent(),
+    this.parentConversationId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -578,6 +628,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Expression<String>? summary,
     Expression<int>? lastSummarizedMessageCount,
     Expression<String>? chatSuggestionsJson,
+    Expression<String>? parentConversationId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -595,6 +646,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         'last_summarized_message_count': lastSummarizedMessageCount,
       if (chatSuggestionsJson != null)
         'chat_suggestions_json': chatSuggestionsJson,
+      if (parentConversationId != null)
+        'parent_conversation_id': parentConversationId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -611,6 +664,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Value<String?>? summary,
     Value<int>? lastSummarizedMessageCount,
     Value<String>? chatSuggestionsJson,
+    Value<String?>? parentConversationId,
     Value<int>? rowid,
   }) {
     return ConversationRowsCompanion(
@@ -627,6 +681,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
       chatSuggestionsJson: chatSuggestionsJson ?? this.chatSuggestionsJson,
+      parentConversationId: parentConversationId ?? this.parentConversationId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -673,6 +728,11 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         chatSuggestionsJson.value,
       );
     }
+    if (parentConversationId.present) {
+      map['parent_conversation_id'] = Variable<String>(
+        parentConversationId.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -693,6 +753,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           ..write('summary: $summary, ')
           ..write('lastSummarizedMessageCount: $lastSummarizedMessageCount, ')
           ..write('chatSuggestionsJson: $chatSuggestionsJson, ')
+          ..write('parentConversationId: $parentConversationId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2505,6 +2566,43 @@ class $AssistantRowsTable extends AssistantRows
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _discoverableMeta = const VerificationMeta(
+    'discoverable',
+  );
+  @override
+  late final GeneratedColumn<bool> discoverable = GeneratedColumn<bool>(
+    'discoverable',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("discoverable" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _handoffIdMeta = const VerificationMeta(
+    'handoffId',
+  );
+  @override
+  late final GeneratedColumn<String> handoffId = GeneratedColumn<String>(
+    'handoff_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _handoffDescriptionMeta =
+      const VerificationMeta('handoffDescription');
+  @override
+  late final GeneratedColumn<String> handoffDescription =
+      GeneratedColumn<String>(
+        'handoff_description',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -2578,6 +2676,9 @@ class $AssistantRowsTable extends AssistantRows
     pdfMode,
     otherOfficeMode,
     enableTimeInjection,
+    discoverable,
+    handoffId,
+    handoffDescription,
     sortOrder,
     createdAt,
     updatedAt,
@@ -2910,6 +3011,30 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('discoverable')) {
+      context.handle(
+        _discoverableMeta,
+        discoverable.isAcceptableOrUnknown(
+          data['discoverable']!,
+          _discoverableMeta,
+        ),
+      );
+    }
+    if (data.containsKey('handoff_id')) {
+      context.handle(
+        _handoffIdMeta,
+        handoffId.isAcceptableOrUnknown(data['handoff_id']!, _handoffIdMeta),
+      );
+    }
+    if (data.containsKey('handoff_description')) {
+      context.handle(
+        _handoffDescriptionMeta,
+        handoffDescription.isAcceptableOrUnknown(
+          data['handoff_description']!,
+          _handoffDescriptionMeta,
+        ),
+      );
+    }
     if (data.containsKey('sort_order')) {
       context.handle(
         _sortOrderMeta,
@@ -3095,6 +3220,18 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.bool,
         data['${effectivePrefix}enable_time_injection'],
       )!,
+      discoverable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}discoverable'],
+      )!,
+      handoffId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}handoff_id'],
+      ),
+      handoffDescription: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}handoff_description'],
+      ),
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -3155,6 +3292,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String pdfMode;
   final String otherOfficeMode;
   final bool enableTimeInjection;
+  final bool discoverable;
+  final String? handoffId;
+  final String? handoffDescription;
   final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -3197,6 +3337,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.pdfMode,
     required this.otherOfficeMode,
     required this.enableTimeInjection,
+    required this.discoverable,
+    this.handoffId,
+    this.handoffDescription,
     required this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
@@ -3268,6 +3411,13 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['pdf_mode'] = Variable<String>(pdfMode);
     map['other_office_mode'] = Variable<String>(otherOfficeMode);
     map['enable_time_injection'] = Variable<bool>(enableTimeInjection);
+    map['discoverable'] = Variable<bool>(discoverable);
+    if (!nullToAbsent || handoffId != null) {
+      map['handoff_id'] = Variable<String>(handoffId);
+    }
+    if (!nullToAbsent || handoffDescription != null) {
+      map['handoff_description'] = Variable<String>(handoffDescription);
+    }
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -3331,6 +3481,13 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       pdfMode: Value(pdfMode),
       otherOfficeMode: Value(otherOfficeMode),
       enableTimeInjection: Value(enableTimeInjection),
+      discoverable: Value(discoverable),
+      handoffId: handoffId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handoffId),
+      handoffDescription: handoffDescription == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handoffDescription),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -3403,6 +3560,11 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       enableTimeInjection: serializer.fromJson<bool>(
         json['enableTimeInjection'],
       ),
+      discoverable: serializer.fromJson<bool>(json['discoverable']),
+      handoffId: serializer.fromJson<String?>(json['handoffId']),
+      handoffDescription: serializer.fromJson<String?>(
+        json['handoffDescription'],
+      ),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -3458,6 +3620,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'pdfMode': serializer.toJson<String>(pdfMode),
       'otherOfficeMode': serializer.toJson<String>(otherOfficeMode),
       'enableTimeInjection': serializer.toJson<bool>(enableTimeInjection),
+      'discoverable': serializer.toJson<bool>(discoverable),
+      'handoffId': serializer.toJson<String?>(handoffId),
+      'handoffDescription': serializer.toJson<String?>(handoffDescription),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -3503,6 +3668,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? pdfMode,
     String? otherOfficeMode,
     bool? enableTimeInjection,
+    bool? discoverable,
+    Value<String?> handoffId = const Value.absent(),
+    Value<String?> handoffDescription = const Value.absent(),
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -3554,6 +3722,11 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     pdfMode: pdfMode ?? this.pdfMode,
     otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
     enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
+    discoverable: discoverable ?? this.discoverable,
+    handoffId: handoffId.present ? handoffId.value : this.handoffId,
+    handoffDescription: handoffDescription.present
+        ? handoffDescription.value
+        : this.handoffDescription,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -3661,6 +3834,13 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       enableTimeInjection: data.enableTimeInjection.present
           ? data.enableTimeInjection.value
           : this.enableTimeInjection,
+      discoverable: data.discoverable.present
+          ? data.discoverable.value
+          : this.discoverable,
+      handoffId: data.handoffId.present ? data.handoffId.value : this.handoffId,
+      handoffDescription: data.handoffDescription.present
+          ? data.handoffDescription.value
+          : this.handoffDescription,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -3710,6 +3890,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
+          ..write('discoverable: $discoverable, ')
+          ..write('handoffId: $handoffId, ')
+          ..write('handoffDescription: $handoffDescription, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -3757,6 +3940,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     pdfMode,
     otherOfficeMode,
     enableTimeInjection,
+    discoverable,
+    handoffId,
+    handoffDescription,
     sortOrder,
     createdAt,
     updatedAt,
@@ -3805,6 +3991,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.pdfMode == this.pdfMode &&
           other.otherOfficeMode == this.otherOfficeMode &&
           other.enableTimeInjection == this.enableTimeInjection &&
+          other.discoverable == this.discoverable &&
+          other.handoffId == this.handoffId &&
+          other.handoffDescription == this.handoffDescription &&
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -3849,6 +4038,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> pdfMode;
   final Value<String> otherOfficeMode;
   final Value<bool> enableTimeInjection;
+  final Value<bool> discoverable;
+  final Value<String?> handoffId;
+  final Value<String?> handoffDescription;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -3892,6 +4084,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
+    this.discoverable = const Value.absent(),
+    this.handoffId = const Value.absent(),
+    this.handoffDescription = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3936,6 +4131,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
+    this.discoverable = const Value.absent(),
+    this.handoffId = const Value.absent(),
+    this.handoffDescription = const Value.absent(),
     required int sortOrder,
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -3984,6 +4182,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? pdfMode,
     Expression<String>? otherOfficeMode,
     Expression<bool>? enableTimeInjection,
+    Expression<bool>? discoverable,
+    Expression<String>? handoffId,
+    Expression<String>? handoffDescription,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -4040,6 +4241,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (otherOfficeMode != null) 'other_office_mode': otherOfficeMode,
       if (enableTimeInjection != null)
         'enable_time_injection': enableTimeInjection,
+      if (discoverable != null) 'discoverable': discoverable,
+      if (handoffId != null) 'handoff_id': handoffId,
+      if (handoffDescription != null) 'handoff_description': handoffDescription,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -4086,6 +4290,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? pdfMode,
     Value<String>? otherOfficeMode,
     Value<bool>? enableTimeInjection,
+    Value<bool>? discoverable,
+    Value<String?>? handoffId,
+    Value<String?>? handoffDescription,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -4134,6 +4341,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
       enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
+      discoverable: discoverable ?? this.discoverable,
+      handoffId: handoffId ?? this.handoffId,
+      handoffDescription: handoffDescription ?? this.handoffDescription,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -4270,6 +4480,15 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (enableTimeInjection.present) {
       map['enable_time_injection'] = Variable<bool>(enableTimeInjection.value);
     }
+    if (discoverable.present) {
+      map['discoverable'] = Variable<bool>(discoverable.value);
+    }
+    if (handoffId.present) {
+      map['handoff_id'] = Variable<String>(handoffId.value);
+    }
+    if (handoffDescription.present) {
+      map['handoff_description'] = Variable<String>(handoffDescription.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -4328,6 +4547,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
+          ..write('discoverable: $discoverable, ')
+          ..write('handoffId: $handoffId, ')
+          ..write('handoffDescription: $handoffDescription, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -6429,6 +6651,7 @@ typedef $$ConversationRowsTableCreateCompanionBuilder =
       Value<String?> summary,
       Value<int> lastSummarizedMessageCount,
       Value<String> chatSuggestionsJson,
+      Value<String?> parentConversationId,
       Value<int> rowid,
     });
 typedef $$ConversationRowsTableUpdateCompanionBuilder =
@@ -6444,6 +6667,7 @@ typedef $$ConversationRowsTableUpdateCompanionBuilder =
       Value<String?> summary,
       Value<int> lastSummarizedMessageCount,
       Value<String> chatSuggestionsJson,
+      Value<String?> parentConversationId,
       Value<int> rowid,
     });
 
@@ -6566,6 +6790,11 @@ class $$ConversationRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> messageRowsRefs(
     Expression<bool> Function($$MessageRowsTableFilterComposer f) f,
   ) {
@@ -6682,6 +6911,11 @@ class $$ConversationRowsTableOrderingComposer
     column: $table.chatSuggestionsJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ConversationRowsTableAnnotationComposer
@@ -6733,6 +6967,11 @@ class $$ConversationRowsTableAnnotationComposer
 
   GeneratedColumn<String> get chatSuggestionsJson => $composableBuilder(
     column: $table.chatSuggestionsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get parentConversationId => $composableBuilder(
+    column: $table.parentConversationId,
     builder: (column) => column,
   );
 
@@ -6833,6 +7072,7 @@ class $$ConversationRowsTableTableManager
                 Value<String?> summary = const Value.absent(),
                 Value<int> lastSummarizedMessageCount = const Value.absent(),
                 Value<String> chatSuggestionsJson = const Value.absent(),
+                Value<String?> parentConversationId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion(
                 id: id,
@@ -6846,6 +7086,7 @@ class $$ConversationRowsTableTableManager
                 summary: summary,
                 lastSummarizedMessageCount: lastSummarizedMessageCount,
                 chatSuggestionsJson: chatSuggestionsJson,
+                parentConversationId: parentConversationId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6861,6 +7102,7 @@ class $$ConversationRowsTableTableManager
                 Value<String?> summary = const Value.absent(),
                 Value<int> lastSummarizedMessageCount = const Value.absent(),
                 Value<String> chatSuggestionsJson = const Value.absent(),
+                Value<String?> parentConversationId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion.insert(
                 id: id,
@@ -6874,6 +7116,7 @@ class $$ConversationRowsTableTableManager
                 summary: summary,
                 lastSummarizedMessageCount: lastSummarizedMessageCount,
                 chatSuggestionsJson: chatSuggestionsJson,
+                parentConversationId: parentConversationId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7906,6 +8149,9 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
       Value<bool> enableTimeInjection,
+      Value<bool> discoverable,
+      Value<String?> handoffId,
+      Value<String?> handoffDescription,
       required int sortOrder,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -7951,6 +8197,9 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
       Value<bool> enableTimeInjection,
+      Value<bool> discoverable,
+      Value<String?> handoffId,
+      Value<String?> handoffDescription,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -8153,6 +8402,21 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<bool> get enableTimeInjection => $composableBuilder(
     column: $table.enableTimeInjection,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get discoverable => $composableBuilder(
+    column: $table.discoverable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get handoffId => $composableBuilder(
+    column: $table.handoffId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get handoffDescription => $composableBuilder(
+    column: $table.handoffDescription,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8372,6 +8636,21 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get discoverable => $composableBuilder(
+    column: $table.discoverable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get handoffId => $composableBuilder(
+    column: $table.handoffId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get handoffDescription => $composableBuilder(
+    column: $table.handoffDescription,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -8574,6 +8853,19 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get discoverable => $composableBuilder(
+    column: $table.discoverable,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get handoffId =>
+      $composableBuilder(column: $table.handoffId, builder: (column) => column);
+
+  GeneratedColumn<String> get handoffDescription => $composableBuilder(
+    column: $table.handoffDescription,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
@@ -8656,6 +8948,9 @@ class $$AssistantRowsTableTableManager
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
+                Value<bool> discoverable = const Value.absent(),
+                Value<String?> handoffId = const Value.absent(),
+                Value<String?> handoffDescription = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -8699,6 +8994,9 @@ class $$AssistantRowsTableTableManager
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
                 enableTimeInjection: enableTimeInjection,
+                discoverable: discoverable,
+                handoffId: handoffId,
+                handoffDescription: handoffDescription,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -8747,6 +9045,9 @@ class $$AssistantRowsTableTableManager
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
+                Value<bool> discoverable = const Value.absent(),
+                Value<String?> handoffId = const Value.absent(),
+                Value<String?> handoffDescription = const Value.absent(),
                 required int sortOrder,
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -8790,6 +9091,9 @@ class $$AssistantRowsTableTableManager
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
                 enableTimeInjection: enableTimeInjection,
+                discoverable: discoverable,
+                handoffId: handoffId,
+                handoffDescription: handoffDescription,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

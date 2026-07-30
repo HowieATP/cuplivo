@@ -3913,12 +3913,34 @@ class _ChatTileState extends State<_ChatTile> {
                   const SizedBox(width: 8),
                   _LoadingDot(),
                 ],
+                ..._buildHandoffBadgeWidget(context),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildHandoffBadgeWidget(BuildContext context) {
+    try {
+      final chatService = context.read<ChatService>();
+      final conv = chatService.getConversation(widget.chat.id);
+      if (conv?.parentConversationId == null) return const [];
+      final cs = Theme.of(context).colorScheme;
+      return [
+        Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: Icon(
+            Lucide.ArrowRight,
+            size: 12,
+            color: cs.primary.withValues(alpha: 0.6),
+          ),
+        ),
+      ];
+    } catch (_) {
+      return const [];
+    }
   }
 }
 

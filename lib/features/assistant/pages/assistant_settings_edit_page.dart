@@ -1741,6 +1741,9 @@ class _DesktopAssistantBasicPaneState
     extends State<_DesktopAssistantBasicPane> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _maxTokensCtrl;
+  late final TextEditingController _handoffIdCtrl;
+  late final TextEditingController _handoffDescCtrl;
+  String? _handoffIdError;
   bool _hoverChatModel = false;
   bool _hoverBgChooser = false;
   final GlobalKey _avatarKey = GlobalKey();
@@ -1751,6 +1754,8 @@ class _DesktopAssistantBasicPaneState
     final a = context.read<AssistantProvider>().getById(widget.assistantId)!;
     _nameCtrl = TextEditingController(text: a.name);
     _maxTokensCtrl = TextEditingController(text: a.maxTokens?.toString() ?? '');
+    _handoffIdCtrl = TextEditingController(text: a.handoffId ?? '');
+    _handoffDescCtrl = TextEditingController(text: a.handoffDescription ?? '');
   }
 
   @override
@@ -1760,6 +1765,8 @@ class _DesktopAssistantBasicPaneState
       final a = context.read<AssistantProvider>().getById(widget.assistantId)!;
       _nameCtrl.text = a.name;
       _maxTokensCtrl.text = a.maxTokens?.toString() ?? '';
+      _handoffIdCtrl.text = a.handoffId ?? '';
+      _handoffDescCtrl.text = a.handoffDescription ?? '';
     }
   }
 
@@ -1767,6 +1774,8 @@ class _DesktopAssistantBasicPaneState
   void dispose() {
     _nameCtrl.dispose();
     _maxTokensCtrl.dispose();
+    _handoffIdCtrl.dispose();
+    _handoffDescCtrl.dispose();
     super.dispose();
   }
 
@@ -2529,6 +2538,129 @@ class _DesktopAssistantBasicPaneState
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: _BackgroundPreview(path: a.background!),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            sectionDivider(),
+            // Handoff / Delegation
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.assistantEditHandoffSectionTitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  simpleSwitchRow(
+                    label: l10n.assistantEditHandoffDiscoverable,
+                    value: a.discoverable,
+                    onChanged: (v) => context
+                        .read<AssistantProvider>()
+                        .updateAssistant(a.copyWith(discoverable: v)),
+                  ),
+                  if (a.discoverable) ...[
+                    sectionDivider(),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.assistantEditHandoffId,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _handoffIdCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'research-bot',
+                              errorText: _handoffIdError,
+                              filled: true,
+                              fillColor: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFF2F3F5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            onChanged: (v) {
+                              final sanitized = v.toLowerCase().replaceAll(
+                                RegExp(r'[^a-z0-9-]'),
+                                '',
+                              );
+                              if (sanitized != v.toLowerCase()) {
+                                setState(
+                                  () => _handoffIdError =
+                                      l10n.assistantEditHandoffIdInvalid,
+                                );
+                              } else {
+                                final dup = ap.assistants.any(
+                                  (o) =>
+                                      o.id != a.id &&
+                                      o.handoffId == sanitized &&
+                                      sanitized.isNotEmpty,
+                                );
+                                setState(
+                                  () => _handoffIdError = dup
+                                      ? l10n.assistantEditHandoffIdUnique
+                                      : null,
+                                );
+                              }
+                              context.read<AssistantProvider>().updateAssistant(
+                                a.copyWith(handoffId: sanitized),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            l10n.assistantEditHandoffDescription,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _handoffDescCtrl,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: l10n.assistantEditHandoffDescription,
+                              filled: true,
+                              fillColor: isDark
+                                  ? Colors.white10
+                                  : const Color(0xFFF2F3F5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            onChanged: (v) => context
+                                .read<AssistantProvider>()
+                                .updateAssistant(
+                                  a.copyWith(handoffDescription: v),
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],

@@ -6448,4 +6448,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetSpeak => 'Speak';
+
+  @override
+  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
+    return '→ $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
+    return '← $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String get handoffBadgeTooltip => 'Spawned from handoff';
+
+  @override
+  String get assistantEditHandoffSectionTitle => 'Handoff / Delegation';
+
+  @override
+  String get assistantEditHandoffDiscoverable =>
+      'Discoverable by other assistants';
+
+  @override
+  String get assistantEditHandoffId => 'Handoff ID';
+
+  @override
+  String get assistantEditHandoffDescription =>
+      'Description for other assistants';
+
+  @override
+  String get assistantEditHandoffIdInvalid =>
+      'Only lowercase letters, digits, and hyphens are allowed';
+
+  @override
+  String get assistantEditHandoffIdUnique =>
+      'This Handoff ID is already in use';
+
+  @override
+  String get handoffForwardChipTooltip => 'Open the spawned conversation';
+
+  @override
+  String get handoffBackwardChipTooltip => 'Back to the parent conversation';
 }

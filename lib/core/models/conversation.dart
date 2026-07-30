@@ -19,6 +19,9 @@ class Conversation {
   // Owner assistant id; null for global/default
   String? assistantId;
 
+  // Parent conversation that spawned this one via handoff; null for normal
+  String? parentConversationId;
+
   // Truncate context starting at this index (-1 means no truncation)
   int truncateIndex;
 
@@ -43,6 +46,7 @@ class Conversation {
     this.isPinned = false,
     List<String>? mcpServerIds,
     this.assistantId,
+    this.parentConversationId,
     int? truncateIndex,
     Map<String, int>? versionSelections,
     this.summary,
@@ -67,6 +71,7 @@ class Conversation {
     bool? isPinned,
     List<String>? mcpServerIds,
     String? assistantId,
+    String? parentConversationId,
     int? truncateIndex,
     Map<String, int>? versionSelections,
     String? summary,
@@ -83,6 +88,7 @@ class Conversation {
       isPinned: isPinned ?? this.isPinned,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       assistantId: assistantId ?? this.assistantId,
+      parentConversationId: parentConversationId ?? this.parentConversationId,
       truncateIndex: truncateIndex ?? this.truncateIndex,
       versionSelections: versionSelections ?? this.versionSelections,
       summary: clearSummary ? null : (summary ?? this.summary),
@@ -102,6 +108,7 @@ class Conversation {
       'isPinned': isPinned,
       'mcpServerIds': mcpServerIds,
       'assistantId': assistantId,
+      'parentConversationId': parentConversationId,
       'truncateIndex': truncateIndex,
       'versionSelections': versionSelections,
       'summary': summary,
@@ -121,6 +128,7 @@ class Conversation {
       mcpServerIds:
           (json['mcpServerIds'] as List?)?.cast<String>() ?? <String>[],
       assistantId: json['assistantId'] as String?,
+      parentConversationId: json['parentConversationId'] as String?,
       truncateIndex: json['truncateIndex'] as int? ?? -1,
       versionSelections:
           (json['versionSelections'] as Map?)?.map(

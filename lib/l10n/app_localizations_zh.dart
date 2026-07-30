@@ -6188,6 +6188,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetSpeak => '朗读';
+
+  @override
+  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
+    return '→ $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
+    return '← $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String get handoffBadgeTooltip => '从交接创建';
+
+  @override
+  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+
+  @override
+  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+
+  @override
+  String get assistantEditHandoffId => '交接标识';
+
+  @override
+  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+
+  @override
+  String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
+
+  @override
+  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
+
+  @override
+  String get handoffForwardChipTooltip => '打开创建的新对话';
+
+  @override
+  String get handoffBackwardChipTooltip => '返回上一级对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -12374,6 +12411,43 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetSpeak => '朗读';
+
+  @override
+  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
+    return '→ $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
+    return '← $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String get handoffBadgeTooltip => '从交接创建';
+
+  @override
+  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+
+  @override
+  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+
+  @override
+  String get assistantEditHandoffId => '交接标识';
+
+  @override
+  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+
+  @override
+  String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
+
+  @override
+  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
+
+  @override
+  String get handoffForwardChipTooltip => '打开创建的新对话';
+
+  @override
+  String get handoffBackwardChipTooltip => '返回上一级对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -18560,4 +18634,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetSpeak => '朗讀';
+
+  @override
+  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
+    return '→ $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
+    return '← $assistantName · $convIdPrefix';
+  }
+
+  @override
+  String get handoffBadgeTooltip => '從交接創建';
+
+  @override
+  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+
+  @override
+  String get assistantEditHandoffDiscoverable => '可被其他助手發現';
+
+  @override
+  String get assistantEditHandoffId => '交接標識';
+
+  @override
+  String get assistantEditHandoffDescription => '對其他助手描述此助手的用途';
+
+  @override
+  String get assistantEditHandoffIdInvalid => '只允許小寫字母、數字和連字符';
+
+  @override
+  String get assistantEditHandoffIdUnique => '此交接標識已被使用';
+
+  @override
+  String get handoffForwardChipTooltip => '打開創建的新對話';
+
+  @override
+  String get handoffBackwardChipTooltip => '返回上一級對話';
 }

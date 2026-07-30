@@ -10,8 +10,12 @@ import 'package:scrollview_observer/scrollview_observer.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/storage/message_locate_bus.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -783,7 +787,7 @@ class _MessageListViewState extends State<MessageListView> {
     required List<String> suggestions,
     bool enableStreamingTextMotion = true,
   }) {
-    return ChatMessageWidget(
+    final chatWidget = ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: selectedIdx,
@@ -930,6 +934,76 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+    );
+
+    // Backward bar for handoff-spawned conversations
+    if (message.role == 'user' && index == 0) {
+      final backwardChip = _buildHandoffBackwardChip(context, message);
+      if (backwardChip != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [backwardChip, const SizedBox(height: 8), chatWidget],
+        );
+      }
+    }
+    return chatWidget;
+  }
+
+  Widget? _buildHandoffBackwardChip(BuildContext context, ChatMessage message) {
+    final ChatService chatService;
+    final AssistantProvider assistants;
+    try {
+      chatService = context.read<ChatService>();
+      assistants = context.read<AssistantProvider>();
+    } catch (_) {
+      return null;
+    }
+    final conv = chatService.getConversation(message.conversationId);
+    final parentConvId = conv?.parentConversationId;
+    if (parentConvId == null || parentConvId.isEmpty) return null;
+
+    final parentConv = chatService.getConversation(parentConvId);
+    if (parentConv == null) return null;
+
+    final parentAssistant = parentConv.assistantId != null
+        ? assistants.getById(parentConv.assistantId!)
+        : null;
+    final parentName = parentAssistant?.name ?? 'Assistant';
+    final parentPrefix = parentConvId.length >= 4
+        ? parentConvId.substring(0, 4)
+        : parentConvId;
+
+    final cs = Theme.of(context).colorScheme;
+
+    return IosCardPress(
+      onTap: () => MessageLocateBus.instance.fire(
+        conversationId: parentConvId,
+        messageId: '',
+      ),
+      borderRadius: BorderRadius.circular(999),
+      baseColor: Colors.transparent,
+      pressedScale: 0.97,
+      padding: EdgeInsets.zero,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Lucide.ArrowLeft, size: 14, color: cs.primary),
+            const SizedBox(width: 6),
+            Text(
+              '$parentName · $parentPrefix',
+              style: TextStyle(fontSize: 12, color: cs.primary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

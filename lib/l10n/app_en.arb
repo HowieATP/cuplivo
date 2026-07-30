@@ -3077,5 +3077,16 @@
   "chatMessageWidgetCopyAsMarkdown": "Copy as Markdown",
   "chatMessageWidgetCopyAsPlainText": "Copy as Plain Text",
   "chatMessageWidgetQuote": "Quote",
-  "chatMessageWidgetSpeak": "Speak"
+  "chatMessageWidgetSpeak": "Speak",
+  "handoffForwardChip": "→ {assistantName} · {convIdPrefix}",
+  "handoffBackwardChip": "← {assistantName} · {convIdPrefix}",
+  "handoffBadgeTooltip": "Spawned from handoff",
+  "assistantEditHandoffSectionTitle": "Handoff / Delegation",
+  "assistantEditHandoffDiscoverable": "Discoverable by other assistants",
+  "assistantEditHandoffId": "Handoff ID",
+  "assistantEditHandoffDescription": "Description for other assistants",
+  "assistantEditHandoffIdInvalid": "Only lowercase letters, digits, and hyphens are allowed",
+  "assistantEditHandoffIdUnique": "This Handoff ID is already in use",
+  "handoffForwardChipTooltip": "Open the spawned conversation",
+  "handoffBackwardChipTooltip": "Back to the parent conversation"
 }

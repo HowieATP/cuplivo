@@ -36,6 +36,7 @@ import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
+import 'core/services/headless_generation_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
@@ -141,13 +142,22 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(
-          create: (ctx) => McpProvider(chatService: ctx.read<ChatService>()),
+          create: (ctx) =>
+              AssistantProvider(chatService: ctx.read<ChatService>()),
         ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
           create: (ctx) =>
-              AssistantProvider(chatService: ctx.read<ChatService>()),
+              HeadlessGenerationService(chatService: ctx.read<ChatService>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => McpProvider(
+            chatService: ctx.read<ChatService>(),
+            assistantProvider: ctx.read<AssistantProvider>(),
+            headlessGen: ctx.read<HeadlessGenerationService>(),
+            contextProvider: () => navigatorKey.currentContext!,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),

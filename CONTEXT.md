@@ -297,3 +297,44 @@
 - **deleted_records cap**: default 10 MB, user-configurable via discrete dropdown (mirrors log-max-size pattern), SharedPreferences key `trash_cap_mb_v1`. Options `[1, 5, 10, 25, 50, 100, 200, 500, 0]` MB (0 = unlimited).
 - **Eviction rule**: evict oldest by `createdAt`, NEVER self-evict the current write batch (identified by `batchId` column).
 - **deletion_markers cap**: unified 5000-row FIFO by `deletedAt`, not user-configurable.
+
+## Handoff (Sub-Agent Delegation)
+
+### Core Concepts
+
+- **Handoff**: A fire-and-forget delegation where one assistant (the source) launches another assistant (the target) in a new conversation with a task prompt. The source model receives only the new conversation's UUID as the tool result — no sub-agent output is collected. The sub-agent runs with full tool access (MCP, local, memory, search). The user navigates to the sub-conversation manually.
+- **`@kelivo/subagent`**: An in-memory MCP server (same pattern as `@kelivo/fetch`) that exposes one tool: `handoff(assistant, task)`. Auto-created at startup, non-deletable, toggleable via `isActive`. Per-assistant binding via `mcpServerIds` controls which assistants can delegate — don't bind the server, can't hand off. There is no dedicated `handoffDisabled` field.
+- **`HeadlessGenerationService`**: A root-level provider that owns sub-generations. Runs the full generation pipeline (system prompt, tools, streaming, persistence) detached from any page controller. Exposes `start()`, `isActive()`, `chunkStream()`, `cancel()`. Uses the `contextProvider` pattern to reuse `ToolHandlerService`. Cancellation goes through the existing `ChatApiService` token registry — no new cancel path.
+- **Discoverable**: A per-assistant boolean (`Assistant.discoverable`, default false). When true, the assistant appears as a valid handoff target in the `@kelivo/subagent` tool description. The target declares itself; the source does not maintain a target list.
+- **`handoffId`**: A per-assistant readable handle (`[a-z0-9-]`, max 32 chars, unique across all assistants). Used as the `assistant` parameter value in the handoff tool call. Required when `discoverable == true`. Validated at save time (same pattern as skill name validation).
+- **`handoffDescription`**: A per-assistant free-form string injected into the handoff tool's description at connection time. Tells the calling model when to delegate and what prompt format to use.
+- **`parentConversationId`**: A nullable column on `conversations`. Set when a conversation is created by a handoff. Enables bidirectional navigation bars. Orphan reference (parent deleted) → backward bar simply doesn't render.
+
+### Tool Semantics
+
+- **No enum, call-time validation**: The `assistant` parameter is a free-form string. The tool description lists available targets (built at connection time, may go stale). The handler validates at call time: no match or not discoverable → error string with available targets listed. Zero discoverable assistants → error string explaining the situation. The model self-corrects from the error (same pattern as MCP tool errors via `_renderToolErrorForModel`).
+- **Task-only context**: The sub-conversation receives exactly one user message: the `task` string. No history from the parent conversation is injected. The calling model is responsible for including all necessary context in the task.
+- **Recursion**: Allowed with no depth limit. A sub-agent that has `@kelivo/subagent` bound and can see discoverable assistants may hand off again. The user is watching (they navigated to the sub-conversation) and can cancel.
+- **Outer stream lifecycle**: After the handoff tool returns the UUID, the outer model generates a farewell message naturally. The outer stream is not cancelled. The farewell persists in the parent conversation.
+
+### UI
+
+- **Forward bar**: On the assistant message containing the handoff tool-call card, a tappable chip showing "{target assistant name} · {first 4 chars of child conversation ID}". Tap navigates to the child conversation.
+- **Backward bar**: On the first user message of a handoff-spawned conversation, a tappable chip showing "← {parent assistant name} · {first 4 chars of parent conversation ID}". Tap navigates to the parent. Edge case: if the first user message is deleted, the backward bar is not shown.
+- **Conversation list badge**: A small icon (e.g. `Lucide.CornerDownRight`) on conversation list tiles where `parentConversationId != null`.
+- **Page subscription**: On `switchConversationAnimated(convId)`, the page checks `HeadlessGenerationService.isActive(convId)`. If active, subscribes to `chunkStream(convId)` and drives the existing `StreamController` from those chunks. On navigate-away, unsubscribes (generation continues, persists to DB). On return, re-attaches or loads the finalized message.
+
+### Relationship to Existing Concepts
+
+- **Handoff vs Multi-AI Comparison**: Multi-AI sends the same prompt to N models in parallel within one conversation (subgroupId cards). Handoff creates a separate conversation with a different assistant and a model-formulated task. Multi-AI is comparison; Handoff is delegation.
+- **Handoff vs ProactiveCare**: ProactiveCare is scheduled autonomous generation by a single assistant (no tools, no user interaction during generation). Handoff is model-initiated delegation with full tools and user interaction (approval, ask_user) available in the sub-conversation.
+- **Handoff vs MCP tools**: Handoff IS an MCP tool (`@kelivo/subagent`), but its effect is to launch a full agent (another assistant with its own tools), not to perform a single atomic action. The MCP protocol is the delivery mechanism; the semantic is agent delegation.
+
+### Example Dialogue
+
+> **Dev:** "The user asked the orchestrator to research a topic AND write code. The orchestrator called `handoff` twice — once to `research-bot` and once to `code-helper`. Where do the results go?"
+> **Domain expert:** "Each handoff creates a separate conversation. The orchestrator's conversation gets two tool-call cards, each with a forward bar chip. The user navigates to each sub-conversation independently. The orchestrator never sees the sub-agents' output — it only got the UUIDs back. If you need the orchestrator to synthesize results, that's a future `startAndWait()` mode, not v1."
+
+### Flagged Ambiguities
+
+- "subagent" was used interchangeably with "handoff target" and "child assistant" — resolved: the feature is called **Handoff** (the act of delegation). The target is simply "the target assistant." There is no persistent "subagent" entity — the sub-conversation is a normal conversation with a `parentConversationId`.

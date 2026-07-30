@@ -987,6 +987,9 @@ class ChatDatabaseRepository {
           ?.toIso8601String(),
       'proactiveCarePrompt': row.proactiveCarePrompt,
       'proactiveCareDecisionPrompt': row.proactiveCareDecisionPrompt,
+      'discoverable': row.discoverable,
+      'handoffId': row.handoffId,
+      'handoffDescription': row.handoffDescription,
       'createdAt': row.createdAt.toIso8601String(),
       'updatedAt': row.updatedAt.toIso8601String(),
     });
@@ -1036,6 +1039,9 @@ class ChatDatabaseRepository {
       proactiveCarePrompt: Value(a.proactiveCarePrompt),
       proactiveCareDecisionPrompt: Value(a.proactiveCareDecisionPrompt),
       enableTimeInjection: Value(a.enableTimeInjection),
+      discoverable: Value(a.discoverable),
+      handoffId: Value(a.handoffId),
+      handoffDescription: Value(a.handoffDescription),
       sortOrder: sortOrder,
       createdAt: a.createdAt,
       updatedAt: a.updatedAt,
@@ -1071,6 +1077,7 @@ class ChatDatabaseRepository {
       summary: row.summary,
       lastSummarizedMessageCount: row.lastSummarizedMessageCount,
       chatSuggestions: _decodeStringList(row.chatSuggestionsJson),
+      parentConversationId: row.parentConversationId,
     );
   }
 
@@ -1113,6 +1120,7 @@ class ChatDatabaseRepository {
       chatSuggestions: _decodeStringList(
         row['chat_suggestions_json'] as String? ?? '[]',
       ),
+      parentConversationId: row['parent_conversation_id'] as String?,
     );
   }
 
@@ -1131,6 +1139,7 @@ class ChatDatabaseRepository {
         conversation.lastSummarizedMessageCount,
       ),
       chatSuggestionsJson: Value(jsonEncode(conversation.chatSuggestions)),
+      parentConversationId: Value(conversation.parentConversationId),
     );
   }
 

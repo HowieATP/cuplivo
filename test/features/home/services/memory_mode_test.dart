@@ -368,7 +368,10 @@ class _ToolHandlerTestScope extends StatelessWidget {
         ChangeNotifierProvider<AssistantProvider>(
           create: (_) => AssistantProvider(),
         ),
-        ChangeNotifierProvider<McpProvider>(create: (_) => McpProvider()),
+        ChangeNotifierProvider<McpProvider>(
+          create: (_) =>
+              McpProvider(contextProvider: () => throw UnimplementedError()),
+        ),
         ChangeNotifierProvider<McpToolService>(create: (_) => McpToolService()),
         ChangeNotifierProvider<MemoryProvider>(create: (_) => MemoryProvider()),
       ],

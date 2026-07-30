@@ -13,6 +13,9 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   late final TextEditingController _thinkingCtrl;
   late final TextEditingController _maxTokensCtrl;
   late final TextEditingController _backgroundCtrl;
+  late final TextEditingController _handoffIdCtrl;
+  late final TextEditingController _handoffDescCtrl;
+  String? _handoffIdError;
 
   @override
   void initState() {
@@ -25,6 +28,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     );
     _maxTokensCtrl = TextEditingController(text: a.maxTokens?.toString() ?? '');
     _backgroundCtrl = TextEditingController(text: a.background ?? '');
+    _handoffIdCtrl = TextEditingController(text: a.handoffId ?? '');
+    _handoffDescCtrl = TextEditingController(text: a.handoffDescription ?? '');
   }
 
   @override
@@ -37,6 +42,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
       _thinkingCtrl.text = a.thinkingBudget?.toString() ?? '';
       _maxTokensCtrl.text = a.maxTokens?.toString() ?? '';
       _backgroundCtrl.text = a.background ?? '';
+      _handoffIdCtrl.text = a.handoffId ?? '';
+      _handoffDescCtrl.text = a.handoffDescription ?? '';
     }
   }
 
@@ -46,6 +53,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     _thinkingCtrl.dispose();
     _maxTokensCtrl.dispose();
     _backgroundCtrl.dispose();
+    _handoffIdCtrl.dispose();
+    _handoffDescCtrl.dispose();
     super.dispose();
   }
 
@@ -548,6 +557,133 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               ],
             ),
           ),
+        ),
+        // Handoff / Delegation section
+        const SizedBox(height: 16),
+        _iosSectionCard(
+          children: [
+            _iosSwitchRow(
+              context,
+              icon: Lucide.ArrowRight,
+              label: l10n.assistantEditHandoffDiscoverable,
+              value: a.discoverable,
+              onChanged: (v) => context
+                  .read<AssistantProvider>()
+                  .updateAssistant(a.copyWith(discoverable: v)),
+            ),
+            if (a.discoverable) ...[
+              _iosDivider(context),
+              // Handoff ID
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.assistantEditHandoffId,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _handoffIdCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'research-bot',
+                        errorText: _handoffIdError,
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white10
+                            : const Color(0xFFF2F3F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ),
+                      onChanged: (v) {
+                        final sanitized = v.toLowerCase().replaceAll(
+                          RegExp(r'[^a-z0-9-]'),
+                          '',
+                        );
+                        final l10n = AppLocalizations.of(context)!;
+                        if (sanitized != v.toLowerCase()) {
+                          setState(
+                            () => _handoffIdError =
+                                l10n.assistantEditHandoffIdInvalid,
+                          );
+                        } else {
+                          final dup = context
+                              .read<AssistantProvider>()
+                              .assistants
+                              .any(
+                                (o) =>
+                                    o.id != a.id &&
+                                    o.handoffId == sanitized &&
+                                    sanitized.isNotEmpty,
+                              );
+                          setState(
+                            () => _handoffIdError = dup
+                                ? l10n.assistantEditHandoffIdUnique
+                                : null,
+                          );
+                        }
+                        context.read<AssistantProvider>().updateAssistant(
+                          a.copyWith(handoffId: sanitized),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              _iosDivider(context),
+              // Handoff Description
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.assistantEditHandoffDescription,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _handoffDescCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: l10n.assistantEditHandoffDescription,
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white10
+                            : const Color(0xFFF2F3F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ),
+                      onChanged: (v) => context
+                          .read<AssistantProvider>()
+                          .updateAssistant(a.copyWith(handoffDescription: v)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ],
     );

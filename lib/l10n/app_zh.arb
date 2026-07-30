@@ -2527,5 +2527,16 @@
   "chatMessageWidgetCopyAsMarkdown": "复制为 Markdown",
   "chatMessageWidgetCopyAsPlainText": "复制为纯文本",
   "chatMessageWidgetQuote": "引用",
-  "chatMessageWidgetSpeak": "朗读"
+  "chatMessageWidgetSpeak": "朗读",
+  "handoffForwardChip": "→ {assistantName} · {convIdPrefix}",
+  "handoffBackwardChip": "← {assistantName} · {convIdPrefix}",
+  "handoffBadgeTooltip": "从交接创建",
+  "assistantEditHandoffSectionTitle": "交接 / 委派",
+  "assistantEditHandoffDiscoverable": "可被其他助手发现",
+  "assistantEditHandoffId": "交接标识",
+  "assistantEditHandoffDescription": "对其他助手描述此助手的用途",
+  "assistantEditHandoffIdInvalid": "只允许小写字母、数字和连字符",
+  "assistantEditHandoffIdUnique": "此交接标识已被使用",
+  "handoffForwardChipTooltip": "打开创建的新对话",
+  "handoffBackwardChipTooltip": "返回上一级对话"
 }

@@ -24,6 +24,7 @@ class ConversationRows extends Table {
       integer().withDefault(const Constant(0))();
   TextColumn get chatSuggestionsJson =>
       text().withDefault(const Constant('[]'))();
+  TextColumn get parentConversationId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -141,6 +142,11 @@ class AssistantRows extends Table {
   // --- Time Injection ---
   BoolColumn get enableTimeInjection =>
       boolean().withDefault(const Constant(false))();
+
+  // --- Handoff / Delegation ---
+  BoolColumn get discoverable => boolean().withDefault(const Constant(false))();
+  TextColumn get handoffId => text().nullable()();
+  TextColumn get handoffDescription => text().nullable()();
 
   // --- Sort & Timestamp ---
   IntColumn get sortOrder => integer()();
@@ -288,7 +294,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -383,6 +389,26 @@ class AppDatabase extends _$AppDatabase {
         } catch (_) {
           // Tables may already exist (migration replay / partial retry).
         }
+      }
+      if (from < 12) {
+        try {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.parentConversationId,
+          );
+        } catch (_) {}
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.discoverable);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.handoffId);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.handoffDescription,
+          );
+        } catch (_) {}
       }
     },
   );

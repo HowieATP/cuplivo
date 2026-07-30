@@ -11773,6 +11773,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Speak'**
   String get chatMessageWidgetSpeak;
+
+  /// No description provided for @handoffForwardChip.
+  ///
+  /// In en, this message translates to:
+  /// **'→ {assistantName} · {convIdPrefix}'**
+  String handoffForwardChip(Object assistantName, Object convIdPrefix);
+
+  /// No description provided for @handoffBackwardChip.
+  ///
+  /// In en, this message translates to:
+  /// **'← {assistantName} · {convIdPrefix}'**
+  String handoffBackwardChip(Object assistantName, Object convIdPrefix);
+
+  /// No description provided for @handoffBadgeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Spawned from handoff'**
+  String get handoffBadgeTooltip;
+
+  /// No description provided for @assistantEditHandoffSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Handoff / Delegation'**
+  String get assistantEditHandoffSectionTitle;
+
+  /// No description provided for @assistantEditHandoffDiscoverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Discoverable by other assistants'**
+  String get assistantEditHandoffDiscoverable;
+
+  /// No description provided for @assistantEditHandoffId.
+  ///
+  /// In en, this message translates to:
+  /// **'Handoff ID'**
+  String get assistantEditHandoffId;
+
+  /// No description provided for @assistantEditHandoffDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description for other assistants'**
+  String get assistantEditHandoffDescription;
+
+  /// No description provided for @assistantEditHandoffIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Only lowercase letters, digits, and hyphens are allowed'**
+  String get assistantEditHandoffIdInvalid;
+
+  /// No description provided for @assistantEditHandoffIdUnique.
+  ///
+  /// In en, this message translates to:
+  /// **'This Handoff ID is already in use'**
+  String get assistantEditHandoffIdUnique;
+
+  /// No description provided for @handoffForwardChipTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the spawned conversation'**
+  String get handoffForwardChipTooltip;
+
+  /// No description provided for @handoffBackwardChipTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the parent conversation'**
+  String get handoffBackwardChipTooltip;
 }
 
 class _AppLocalizationsDelegate

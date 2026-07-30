@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
@@ -9,6 +10,9 @@ import 'package:uuid/uuid.dart';
 
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
+import '../services/headless_generation_service.dart';
+import 'assistant_provider.dart';
+import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
 enum McpTransportType { sse, http, stdio, inmemory }
@@ -271,11 +275,19 @@ class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
 
-  McpProvider({this.chatService}) {
+  McpProvider({
+    this.chatService,
+    this.assistantProvider,
+    this.headlessGen,
+    required this.contextProvider,
+  }) {
     _load();
   }
 
   final ChatService? chatService;
+  final AssistantProvider? assistantProvider;
+  final HeadlessGenerationService? headlessGen;
+  final BuildContext Function() contextProvider;
 
   final Map<String, mcp.Client> _clients = {};
   final Map<String, McpStatus> _status = {}; // id -> status
@@ -319,8 +331,9 @@ class McpProvider extends ChangeNotifier {
         _servers = list;
       } catch (_) {}
     }
-    // Ensure built-in @kelivo/fetch is present by default
+    // Ensure built-in MCP servers are present by default
     _ensureBuiltinFetchServerPresent();
+    _ensureBuiltinSubagentServerPresent();
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -333,14 +346,40 @@ class McpProvider extends ChangeNotifier {
       // fire and forget
       unawaited(connect(s.id));
     }
+
+    // Refresh @kelivo/subagent tool definitions when assistants change
+    assistantProvider?.addListener(_onAssistantsChanged);
+  }
+
+  void _onAssistantsChanged() {
+    unawaited(refreshTools('kelivo_subagent'));
+  }
+
+  void _ensureBuiltinSubagentServerPresent() {
+    if (assistantProvider == null ||
+        chatService == null ||
+        headlessGen == null) {
+      return;
+    }
+    final exists = _servers.any(
+      (s) => s.id == 'kelivo_subagent' || s.name == '@kelivo/subagent',
+    );
+    if (exists) return;
+    _servers = [
+      ..._servers,
+      McpServerConfig(
+        id: 'kelivo_subagent',
+        enabled: true,
+        name: '@kelivo/subagent',
+        transport: McpTransportType.inmemory,
+        tools: const <McpToolConfig>[],
+      ),
+    ];
   }
 
   void _ensureBuiltinFetchServerPresent() {
     final exists = _servers.any(
-      (s) =>
-          s.transport == McpTransportType.inmemory ||
-          s.name == '@kelivo/fetch' ||
-          s.id == 'kelivo_fetch',
+      (s) => s.name == '@kelivo/fetch' || s.id == 'kelivo_fetch',
     );
     if (exists) return;
     final cfg = McpServerConfig(
@@ -836,8 +875,22 @@ class McpProvider extends ChangeNotifier {
 
       // In-memory builtin server path
       if (server.transport == McpTransportType.inmemory) {
-        final engine = KelivoFetchMcpServerEngine();
-        final transport = KelivoInMemoryClientTransport(engine);
+        final engine = switch (server.id) {
+          'kelivo_subagent' => KelivoSubagentMcpServerEngine(
+            assistants: assistantProvider!,
+            chatService: chatService!,
+            headlessGen: headlessGen!,
+            contextProvider: contextProvider,
+          ),
+          _ => KelivoFetchMcpServerEngine(),
+        };
+        final transport = switch (engine) {
+          KelivoSubagentMcpServerEngine e =>
+            KelivoSubagentInMemoryClientTransport(e),
+          _ => KelivoInMemoryClientTransport(
+            engine as KelivoFetchMcpServerEngine,
+          ),
+        };
         final client = mcp.McpClient.createClient(clientConfig);
         await client.connect(transport);
         _clients[id] = client;
@@ -1466,6 +1519,7 @@ class McpProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    assistantProvider?.removeListener(_onAssistantsChanged);
     // Clean up timers
     for (final t in _heartbeats.values) {
       t.cancel();

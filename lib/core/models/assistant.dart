@@ -88,6 +88,10 @@ Do **not** store sensitive information, including:
   final String otherOfficeMode;
   // Time injection
   final bool enableTimeInjection;
+  // Handoff / delegation
+  final bool discoverable;
+  final String? handoffId;
+  final String? handoffDescription;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -130,6 +134,9 @@ Do **not** store sensitive information, including:
     this.pdfMode = 'extract',
     this.otherOfficeMode = 'direct',
     this.enableTimeInjection = false,
+    this.discoverable = false,
+    this.handoffId,
+    this.handoffDescription,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? DateTime.now(),
@@ -175,6 +182,11 @@ Do **not** store sensitive information, including:
     String? pdfMode,
     String? otherOfficeMode,
     bool? enableTimeInjection,
+    bool? discoverable,
+    String? handoffId,
+    String? handoffDescription,
+    bool clearHandoffId = false,
+    bool clearHandoffDescription = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearChatModel = false,
@@ -233,6 +245,11 @@ Do **not** store sensitive information, including:
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
       enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
+      discoverable: discoverable ?? this.discoverable,
+      handoffId: clearHandoffId ? null : (handoffId ?? this.handoffId),
+      handoffDescription: clearHandoffDescription
+          ? null
+          : (handoffDescription ?? this.handoffDescription),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -277,6 +294,9 @@ Do **not** store sensitive information, including:
     'pdfMode': pdfMode,
     'otherOfficeMode': otherOfficeMode,
     'enableTimeInjection': enableTimeInjection,
+    'discoverable': discoverable,
+    'handoffId': handoffId,
+    'handoffDescription': handoffDescription,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -378,6 +398,9 @@ Do **not** store sensitive information, including:
     pdfMode: (json['pdfMode'] as String?) ?? 'extract',
     otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',
     enableTimeInjection: json['enableTimeInjection'] as bool? ?? false,
+    discoverable: json['discoverable'] as bool? ?? false,
+    handoffId: json['handoffId'] as String?,
+    handoffDescription: json['handoffDescription'] as String?,
     createdAt: json['createdAt'] != null
         ? DateTime.parse(json['createdAt'] as String)
         : DateTime.now(),

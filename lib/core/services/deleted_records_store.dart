@@ -174,10 +174,9 @@ class DeletedRecordsStore {
     )..where((t) => t.id.equals(id) & t.type.equals(type))).getSingleOrNull();
   }
 
-  /// Removes a [DeletedRecordRow] after successful restore. Does NOT touch
-  /// [DeletionMarkerRows] — the tombstone stays so peers still know it was
-  /// deleted (the entity is now alive locally, but peers that haven't synced
-  /// yet still need the tombstone).
+  /// Removes a [DeletedRecordRow] after successful restore. Also removes the
+  /// matching deletion marker (via [TrashRestoreCoordinator]) so the entity
+  /// won't appear as a false conflict in the Pending tab after restore.
   Future<void> purgeDeletedRecord(String id, String type) async {
     await (_db.delete(
       _db.deletedRecordRows,

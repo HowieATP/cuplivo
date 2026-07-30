@@ -1,10 +1,13 @@
 # Changelog
 
-## [2.2.2] - 2026-07-29
+## [2.3.0] - 2026-07-31
 
 ### Added
 
+- Multi-key rotation for web search: configure multiple API keys to raise effective rate limits (#139)
+- Handoff (subagent MCP): delegate subtasks to other assistants via an MCP tool; results are not returned yet (#140)
 - LAN sync: device-to-device chat sync over local network with a two-round-trip protocol; 4-digit PIN authentication, reuses the incremental backup zip + merge restore infrastructure, syncs chats + referenced files + missing assistants (#136)
+- Enhanced deletion: trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries local deletion markers so content deleted on one side is promptly removed on the other (#137)
 
 ## [2.2.1] - 2026-07-29
 

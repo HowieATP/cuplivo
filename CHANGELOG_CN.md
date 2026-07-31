@@ -5,6 +5,7 @@
 ### 修复
 
 - 修复升级到 schema v13 或备份完全覆盖后聊天/助手为空：同步 SQLite 连接改为在 Drift 迁移完成后再打开，恢复后强制刷新 Provider 缓存
+- 修复部分迁移后 `assistant_rows has no column named discoverable`：每次打开数据库时自愈缺失列/表
 
 ### 新增
 

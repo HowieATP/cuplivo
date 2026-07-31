@@ -6,21 +6,47 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/token_usage.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../home/controllers/stream_controller.dart' as stream_ctrl;
+
+/// Stream source signature used by [GroupChatStreamExecutor].
+typedef ChatStreamSender =
+    Stream<ChatStreamChunk> Function({
+      required ProviderConfig config,
+      required String modelId,
+      required List<Map<String, dynamic>> messages,
+      List<String>? userMediaPaths,
+      int? thinkingBudget,
+      double? temperature,
+      double? topP,
+      int? maxTokens,
+      List<Map<String, dynamic>>? tools,
+      ToolCallHandler? onToolCall,
+      Map<String, String>? extraHeaders,
+      Map<String, dynamic>? extraBody,
+      bool stream,
+      String? requestId,
+      bool allowImagesApiRouting,
+      bool ocrActive,
+    });
 
 /// Stream executor for group chat member assistants.
 class GroupChatStreamExecutor {
   GroupChatStreamExecutor({
     required this.chatService,
     required this.streamController,
-  });
+    ChatStreamSender? sendMessageStream,
+  }) : _sendMessageStream =
+           sendMessageStream ?? ChatApiService.sendMessageStream;
 
   final ChatService chatService;
   final stream_ctrl.StreamController streamController;
+  final ChatStreamSender _sendMessageStream;
 
   final Map<String, StreamSubscription<ChatStreamChunk>> _streams = {};
+  final Map<String, _ActiveStream> _activeStreams = {};
 
   Future<void> executeStream(
     stream_ctrl.GenerationContext ctx, {
@@ -34,8 +60,12 @@ class GroupChatStreamExecutor {
 
     streamController.markStreamingStarted(state.messageId);
 
+    final done = _activeStreams[streamKey] ??= _ActiveStream(
+      messageId: state.messageId,
+    );
+
     try {
-      final stream = ChatApiService.sendMessageStream(
+      final stream = _sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
@@ -61,29 +91,70 @@ class GroupChatStreamExecutor {
       final sub = stream.listen(
         (chunk) {
           final prev = pending.isEmpty ? Future<void>.value() : pending.last;
-          final next = prev.then((_) => _handleChunk(chunk, state));
-          pending.add(next);
+          pending.add(prev.then((_) => _handleChunk(chunk, state)));
         },
         onError: (Object e, StackTrace st) {
           final prev = pending.isEmpty ? Future<void>.value() : pending.last;
-          pending.add(prev.then((_) => _handleError(e, state)));
+          pending.add(
+            prev
+                .then((_) async {
+                  await _handleError(e, state);
+                  _complete(done);
+                })
+                .catchError((Object chainError, StackTrace chainStack) {
+                  debugPrint(
+                    '[GroupChatStreamExecutor] stream error chain: $chainError\n$chainStack',
+                  );
+                  _complete(done);
+                }),
+          );
         },
         onDone: () {
           final prev = pending.isEmpty ? Future<void>.value() : pending.last;
-          pending.add(prev.then((_) => _handleDone(state)));
+          pending.add(
+            prev
+                .then((_) async {
+                  await _handleDone(state);
+                  _complete(done);
+                })
+                .catchError((Object chainError, StackTrace chainStack) {
+                  debugPrint(
+                    '[GroupChatStreamExecutor] stream done chain: $chainError\n$chainStack',
+                  );
+                  _complete(done);
+                }),
+          );
         },
         cancelOnError: false,
       );
       _streams[streamKey] = sub;
+
+      // Returned future must complete only when the stream really ended
+      // (final content already persisted), so callers reading the message
+      // right after this future see the finished row, not the placeholder.
+      await done.completer.future;
     } catch (e, st) {
       debugPrint('[GroupChatStreamExecutor] start error: $e\n$st');
       await _handleError(e, state);
+    } finally {
+      _activeStreams.remove(streamKey);
+      _complete(done);
     }
+  }
+
+  static void _complete(_ActiveStream active) {
+    if (!active.completer.isCompleted) active.completer.complete();
   }
 
   Future<void> cancel(String streamKey) async {
     await _streams[streamKey]?.cancel();
     _streams.remove(streamKey);
+    final active = _activeStreams.remove(streamKey);
+    if (active != null) {
+      // Mirror normal chat cancelStreaming: keep partial content, mark done.
+      await chatService.updateMessage(active.messageId, isStreaming: false);
+      _complete(active);
+    }
     ChatApiService.cancelRequest(streamKey);
   }
 
@@ -254,5 +325,18 @@ class GroupChatStreamExecutor {
       unawaited(s.cancel());
     }
     _streams.clear();
+    for (final active in _activeStreams.values) {
+      _complete(active);
+    }
+    _activeStreams.clear();
   }
+}
+
+/// Tracks one in-flight stream: the message row it writes to plus the
+/// completion signal that fires only after the stream has fully ended
+/// (or was cancelled).
+class _ActiveStream {
+  _ActiveStream({required this.messageId});
+  final String messageId;
+  final Completer<void> completer = Completer<void>();
 }

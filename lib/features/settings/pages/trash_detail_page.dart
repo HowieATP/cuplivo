@@ -90,6 +90,8 @@ class _TrashDetailPageState extends State<TrashDetailPage>
         return l10n.trashTypeMcpServer;
       case DeletionEntityType.memory:
         return l10n.trashTypeMemory;
+      case DeletionEntityType.groupChat:
+        return l10n.groupChatMyGroupChats;
       default:
         return type;
     }

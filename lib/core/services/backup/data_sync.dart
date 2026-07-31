@@ -15,6 +15,9 @@ import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/director_message.dart';
+import '../../models/group_chat.dart';
+import '../../models/group_chat_member.dart';
 import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
 import '../deleted_records_store.dart';
@@ -892,7 +895,7 @@ class DataSync {
     final sink = file.openWrite();
 
     try {
-      sink.write('{"version":1,');
+      sink.write('{"version":2,');
 
       // --- conversations ---
       sink.write('"conversations":[');
@@ -940,6 +943,28 @@ class DataSync {
       // --- geminiThoughtSigs ---
       sink.write('"geminiThoughtSigs":');
       sink.write(jsonEncode(geminiThoughtSigs));
+      sink.write(',');
+
+      // --- group chats (v2) ---
+      final groups = await chatService.repo.getAllGroupChats();
+      final groupPayload = <Map<String, dynamic>>[];
+      final memberPayload = <Map<String, dynamic>>[];
+      final directorPayload = <Map<String, dynamic>>[];
+      for (final g in groups) {
+        groupPayload.add(g.toJson());
+        final members = await chatService.repo.getGroupMembers(g.id);
+        memberPayload.addAll(members.map((m) => m.toJson()));
+        final dmsgs = await chatService.repo.getDirectorMessages(g.id);
+        directorPayload.addAll(dmsgs.map((m) => m.toJson()));
+      }
+      sink.write('"groupChats":');
+      sink.write(jsonEncode(groupPayload));
+      sink.write(',');
+      sink.write('"groupMembers":');
+      sink.write(jsonEncode(memberPayload));
+      sink.write(',');
+      sink.write('"directorMessages":');
+      sink.write(jsonEncode(directorPayload));
 
       sink.write('}');
     } finally {
@@ -1362,6 +1387,67 @@ class DataSync {
                   );
                 } catch (_) {}
               }
+            }
+          }
+
+          // Restore group chat metadata (v2 keys; ignored on v1 backups).
+          final groupChatsRaw = obj['groupChats'] as List? ?? const [];
+          final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
+          final directorMsgsRaw = obj['directorMessages'] as List? ?? const [];
+          if (groupChatsRaw.isNotEmpty) {
+            final existingGroupIds = mode == RestoreMode.merge
+                ? (await chatService.repo.getAllGroupChats())
+                      .map((g) => g.id)
+                      .toSet()
+                : <String>{};
+            for (final raw in groupChatsRaw) {
+              try {
+                final g = GroupChat.fromJson(
+                  (raw as Map).cast<String, dynamic>(),
+                );
+                if (mode == RestoreMode.merge &&
+                    existingGroupIds.contains(g.id)) {
+                  continue;
+                }
+                await chatService.repo.putGroupChat(g);
+              } catch (e) {
+                debugPrint('restoreData: groupChat row: $e');
+              }
+            }
+            final membersByGroup = <String, List<GroupChatMember>>{};
+            for (final raw in groupMembersRaw) {
+              try {
+                final m = GroupChatMember.fromJson(
+                  (raw as Map).cast<String, dynamic>(),
+                );
+                (membersByGroup[m.groupChatId] ??= []).add(m);
+              } catch (_) {}
+            }
+            for (final entry in membersByGroup.entries) {
+              if (mode == RestoreMode.merge &&
+                  existingGroupIds.contains(entry.key)) {
+                continue;
+              }
+              try {
+                await chatService.repo.putGroupMembers(
+                  entry.key,
+                  entry.value,
+                );
+              } catch (e) {
+                debugPrint('restoreData: groupMembers: $e');
+              }
+            }
+            for (final raw in directorMsgsRaw) {
+              try {
+                final m = DirectorMessage.fromJson(
+                  (raw as Map).cast<String, dynamic>(),
+                );
+                if (mode == RestoreMode.merge &&
+                    existingGroupIds.contains(m.groupChatId)) {
+                  continue;
+                }
+                await chatService.repo.appendDirectorMessage(m);
+              } catch (_) {}
             }
           }
         } catch (_) {}

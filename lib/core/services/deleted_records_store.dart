@@ -15,6 +15,7 @@ class DeletionEntityType {
   static const quickPhrase = 'quickPhrase';
   static const mcpServer = 'mcpServer';
   static const memory = 'memory';
+  static const groupChat = 'groupChat';
 
   static const all = [
     conversation,
@@ -24,6 +25,7 @@ class DeletionEntityType {
     quickPhrase,
     mcpServer,
     memory,
+    groupChat,
   ];
 }
 

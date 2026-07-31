@@ -664,6 +664,12 @@ class AssistantProvider extends ChangeNotifier {
     }
 
     await chatService?.deleteConversationsForAssistant(id);
+    // Drop membership from all multi-assistant group chats.
+    try {
+      await chatService?.repo.removeAssistantFromAllGroups(id);
+    } catch (e) {
+      debugPrint('deleteAssistant: remove from groups failed: $e');
+    }
     // Cancel any pending proactive care alarm for this assistant.
     if (Platform.isAndroid && ProactiveCareAlarmService.isSupported) {
       ProactiveCareAlarmService.cancelFor(id);

@@ -15,18 +15,25 @@ import '../models/preset_message.dart';
 import 'app_database.dart';
 
 class ChatDatabaseRepository {
-  ChatDatabaseRepository(this._db, [this._syncDb]);
+  ChatDatabaseRepository(this._db, {this._databaseFile, this._syncDb});
 
   final AppDatabase _db;
-  final sqlite.Database? _syncDb;
+  final File? _databaseFile;
+  sqlite.Database? _syncDb;
 
   /// Read-only access to the underlying [AppDatabase] for stores that need
   /// to share the same DB connection (e.g. [DeletedRecordsStore]).
   AppDatabase get db => _db;
 
+  /// Open Drift immediately, but **do not** open the sync sqlite3 connection
+  /// until [ensureReady] has finished Drift migrations.
+  ///
+  /// Opening the sync connection before v12→v13 migration can leave it on the
+  /// old schema; subsequent `SELECT *` + column reads for
+  /// `conversation_kind` / `speaker_assistant_id` then throw and empty caches.
   static ChatDatabaseRepository open({File? file}) {
     final db = AppDatabase.open(file: file);
-    return ChatDatabaseRepository(db, file == null ? null : _openSync(file));
+    return ChatDatabaseRepository(db, databaseFile: file);
   }
 
   static sqlite.Database _openSync(File file) {
@@ -38,12 +45,36 @@ class ChatDatabaseRepository {
   }
 
   Future<void> close() async {
-    _syncDb?.close();
+    _closeSync();
     await _db.close();
   }
 
+  void _closeSync() {
+    try {
+      _syncDb?.close();
+    } catch (_) {}
+    _syncDb = null;
+  }
+
+  /// Open or re-open the main-isolate sync connection after schema is current.
+  void reopenSyncConnection() {
+    final file = _databaseFile;
+    if (file == null) return;
+    _closeSync();
+    _syncDb = _openSync(file);
+  }
+
+  /// Runs Drift open/migration, then opens a fresh sync connection that sees
+  /// the post-migration schema (new columns/tables).
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+    // Checkpoint so a main-isolate sqlite3 connection sees migrated pages.
+    try {
+      await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {
+      // Non-fatal: reopen still picks up committed schema changes.
+    }
+    reopenSyncConnection();
   }
 
   Future<void> checkpoint() async {
@@ -1138,8 +1169,21 @@ class ChatDatabaseRepository {
       ),
       parentConversationId: row['parent_conversation_id'] as String?,
       conversationKind:
-          row['conversation_kind'] as String? ?? Conversation.kindNormal,
+          _readOptionalString(row, 'conversation_kind') ??
+          Conversation.kindNormal,
     );
+  }
+
+  /// Safe column read: missing columns (pre-migration sync connection) return
+  /// null instead of throwing and wiping the whole conversation cache.
+  static String? _readOptionalString(sqlite.Row row, String column) {
+    try {
+      final value = row[column];
+      if (value == null) return null;
+      return value.toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   ConversationRowsCompanion _conversationCompanion(Conversation conversation) {
@@ -1219,7 +1263,7 @@ class ChatDatabaseRepository {
       cachedTokens: row['cached_tokens'] as int?,
       durationMs: row['duration_ms'] as int?,
       isPreset: row['is_preset'] == 1,
-      speakerAssistantId: row['speaker_assistant_id'] as String?,
+      speakerAssistantId: _readOptionalString(row, 'speaker_assistant_id'),
     );
   }
 

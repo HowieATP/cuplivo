@@ -2,6 +2,10 @@
 
 ## [2.3.0] - 2026-07-31
 
+### Fixed
+
+- Fix empty chats/assistants after upgrading to schema v13 or backup overwrite: open the sync SQLite connection only after Drift migration, and refresh provider caches after restore
+
 ### Added
 
 - Multi-assistant group chat: director-orchestrated multi-assistant conversations with private per-assistant context, group settings, and director logs

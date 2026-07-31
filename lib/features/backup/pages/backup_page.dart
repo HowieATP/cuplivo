@@ -12,8 +12,10 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/models/backup.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
+import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -213,6 +215,13 @@ class _BackupPageState extends State<BackupPage> {
     Future<T> Function() task,
   ) => _runWithLoadingOverlay(context, task);
 
+  Future<void> _afterSuccessfulRestore(BuildContext context) async {
+    if (!context.mounted) return;
+    await _refreshProvidersAfterRestore(context);
+    if (!context.mounted) return;
+    await showRestartRequiredDialog(context);
+  }
+
   Future<void> _restoreIncrementalItem({
     required BuildContext context,
     required Future<void> Function() performRestore,
@@ -229,7 +238,7 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    await showRestartRequiredDialog(context);
+    await _afterSuccessfulRestore(context);
   }
 
   @override
@@ -603,7 +612,7 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            await showRestartRequiredDialog(
+                                            await _afterSuccessfulRestore(
                                               context,
                                             );
                                           },
@@ -667,7 +676,7 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    await showRestartRequiredDialog(context);
+                                    await _afterSuccessfulRestore(context);
                                   },
                                 ),
                               );
@@ -993,7 +1002,7 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            await showRestartRequiredDialog(
+                                            await _afterSuccessfulRestore(
                                               context,
                                             );
                                           },
@@ -1058,7 +1067,7 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    await showRestartRequiredDialog(context);
+                                    await _afterSuccessfulRestore(context);
                                   },
                                 ),
                               );
@@ -1360,6 +1369,29 @@ class _BackupPageState extends State<BackupPage> {
     }
   }
 
+  /// After wipe/restore, providers must re-read SQLite; otherwise UI keeps a
+  /// cleared or pre-restore in-memory snapshot (P0 empty chats/assistants).
+  Future<void> _refreshProvidersAfterRestore(BuildContext context) async {
+    final chatService = context.read<ChatService>();
+    final assistantProvider = context.read<AssistantProvider>();
+    final groupChatProvider = context.read<GroupChatProvider>();
+    try {
+      await chatService.reloadCachesFromDb();
+    } catch (e) {
+      debugPrint('backup refresh ChatService: $e');
+    }
+    try {
+      await assistantProvider.reloadFromRepo();
+    } catch (e) {
+      debugPrint('backup refresh AssistantProvider: $e');
+    }
+    try {
+      await groupChatProvider.load();
+    } catch (e) {
+      debugPrint('backup refresh GroupChatProvider: $e');
+    }
+  }
+
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -1388,7 +1420,7 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    await showRestartRequiredDialog(context);
+    await _afterSuccessfulRestore(context);
   }
 
   Future<void> _showWebDavSettingsPage(

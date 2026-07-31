@@ -1429,10 +1429,7 @@ class DataSync {
                 continue;
               }
               try {
-                await chatService.repo.putGroupMembers(
-                  entry.key,
-                  entry.value,
-                );
+                await chatService.repo.putGroupMembers(entry.key, entry.value);
               } catch (e) {
                 debugPrint('restoreData: groupMembers: $e');
               }
@@ -1694,7 +1691,20 @@ class DataSync {
             final assistants = merged.map(Assistant.fromJson).toList();
             await chatService.putAssistants(assistants);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('restoreData: assistants restore failed: $e\n$st');
+          rethrow;
+        }
+      }
+
+      // Always re-sync conversation cache from disk after restore so UI/providers
+      // do not keep a wiped in-memory view while SQLite already has rows.
+      if (chatService.initialized) {
+        try {
+          await chatService.reloadCachesFromDb();
+        } catch (e, st) {
+          debugPrint('restoreData: reloadCachesFromDb failed: $e\n$st');
+        }
       }
     } finally {
       await _deleteDirectoryQuietly(extractDir);

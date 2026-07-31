@@ -65,9 +65,19 @@ class ChatService extends ChangeNotifier {
     _repo = ChatDatabaseRepository.open(
       file: File(p.join(appDataDir.path, AppDatabase.databaseFileName)),
     );
+    // ensureReady runs Drift migrations then opens a post-migration sync DB.
     await _repo.ensureReady();
     _deletedRecordsStore = DeletedRecordsStore(_repo.db);
-    await _loadConversationsCache();
+    try {
+      await _loadConversationsCache();
+    } catch (e, st) {
+      // Recover once: reopen sync after migration and retry cache load.
+      debugPrint(
+        '[ChatService.init] conversation cache load failed, reopening sync: $e\n$st',
+      );
+      _repo.reopenSyncConnection();
+      await _loadConversationsCache();
+    }
 
     // Migrate any persisted message content that references old iOS sandbox paths
     await _migrateSandboxPaths();
@@ -77,6 +87,19 @@ class ChatService extends ChangeNotifier {
     await _resetStaleStreamingFlags();
 
     _initialized = true;
+    notifyListeners();
+  }
+
+  /// Re-read conversations from SQLite into the in-memory cache.
+  /// Call after bulk restore / wipe so UI matches disk.
+  Future<void> reloadCachesFromDb() async {
+    if (!_initialized) {
+      await init();
+      return;
+    }
+    _repo.reopenSyncConnection();
+    await _loadConversationsCache();
+    _messagesCache.clear();
     notifyListeners();
   }
 
@@ -832,6 +855,15 @@ class ChatService extends ChangeNotifier {
       final ids = messages.map((m) => m.id).toList();
       _conversationsCache[c.id] = c.copyWith(messageIds: ids);
       _messagesCache[c.id] = List<ChatMessage>.of(messages);
+    }
+
+    // Also re-sync from disk so includeGroup / conversationKind match SQLite.
+    try {
+      await _loadConversationsCache();
+    } catch (e) {
+      debugPrint('[ChatService.restoreConversationsBatch] cache reload: $e');
+      _repo.reopenSyncConnection();
+      await _loadConversationsCache();
     }
 
     notifyListeners();
@@ -1752,6 +1784,8 @@ class ChatService extends ChangeNotifier {
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
     _currentConversationId = null;
+    // Sync connection may still hold pre-wipe page cache; reopen cleanly.
+    _repo.reopenSyncConnection();
     // Remove uploads directory completely
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();

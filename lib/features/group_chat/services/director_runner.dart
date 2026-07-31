@@ -13,6 +13,10 @@ import 'director_context_builder.dart';
 import 'director_tool_protocol.dart';
 
 /// Runs one director decision via tool-calling.
+///
+/// Uses the same transport as normal chat ([ChatApiService.sendMessageStream])
+/// with provider-default `tool_choice: auto` (not `required`), so DeepSeek and
+/// other OpenAI-compatible hosts that reject forced tools still work.
 class DirectorRunner {
   DirectorRunner({required this.chatService, required this.contextBuilder});
 
@@ -20,7 +24,7 @@ class DirectorRunner {
   final DirectorContextBuilder contextBuilder;
 
   static const temperature = 0.2;
-  static const maxTokens = 256;
+  static const maxTokens = 512;
   static const timeout = Duration(seconds: 45);
 
   Future<DirectorDecision> run({
@@ -78,9 +82,12 @@ class DirectorRunner {
       ),
     );
 
+    String? lastError;
+    String? lastFreeText;
     DirectorDecision? decision;
+
     try {
-      decision = await _callOnce(
+      final result = await _callOnce(
         config: config,
         modelId: modelId,
         messages: apiMessages,
@@ -88,20 +95,25 @@ class DirectorRunner {
         assistantIds: assistantIds,
         requestId: 'director-${group.id}-$nextOrder',
       );
+      decision = result.decision;
+      lastFreeText = result.freeText;
     } catch (e) {
+      lastError = e.toString();
       debugPrint('[Director] first call failed: $e');
     }
 
     if (decision == null) {
-      // One retry with stronger instruction.
+      // Retry with stronger instruction (same as daily chat: tool_choice auto).
       final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
         ..add({
           'role': 'user',
           'content':
-              'You must call select_speaker or end_turn now. No free-text.',
+              'You must respond ONLY by calling the tools select_speaker or '
+              'end_turn. Do not write free-text answers. '
+              'Valid assistant_id values: ${assistantIds.join(', ')}',
         });
       try {
-        decision = await _callOnce(
+        final result = await _callOnce(
           config: config,
           modelId: modelId,
           messages: retryMessages,
@@ -109,13 +121,31 @@ class DirectorRunner {
           assistantIds: assistantIds,
           requestId: 'director-${group.id}-$nextOrder-retry',
         );
+        decision = result.decision;
+        lastFreeText = result.freeText ?? lastFreeText;
       } catch (e) {
+        lastError = e.toString();
         debugPrint('[Director] retry failed: $e');
       }
     }
 
+    // Weak free-text fallback: if model printed an assistant id, use it.
+    if (decision == null && lastFreeText != null && lastFreeText.isNotEmpty) {
+      decision = _tryParseFreeTextDecision(lastFreeText, assistantIds);
+      if (decision != null) {
+        debugPrint(
+          '[Director] free-text fallback decision=${decision.kind} '
+          'assistant=${decision.assistantId}',
+        );
+      }
+    }
+
     decision ??= DirectorDecision.end(
-      reason: 'fallback_no_tool',
+      reason: lastError != null
+          ? 'fallback_no_tool: $lastError'
+          : (lastFreeText != null && lastFreeText.isNotEmpty
+                ? 'fallback_no_tool: free_text=${_clip(lastFreeText, 200)}'
+                : 'fallback_no_tool'),
       fallback: true,
     );
     debugPrint(
@@ -133,6 +163,9 @@ class DirectorRunner {
           'assistant_id': decision.assistantId,
           'reason': decision.reason,
           'fallback': decision.fallback,
+          if (lastFreeText != null && lastFreeText.isNotEmpty)
+            'model_text': _clip(lastFreeText, 500),
+          if (lastError != null) 'error': _clip(lastError, 300),
         }),
         messageOrder: nextOrder + 1,
         metaJson: jsonEncode({'type': 'decision'}),
@@ -142,7 +175,7 @@ class DirectorRunner {
     return decision;
   }
 
-  Future<DirectorDecision?> _callOnce({
+  Future<({DirectorDecision? decision, String? freeText})> _callOnce({
     required dynamic config,
     required String modelId,
     required List<Map<String, dynamic>> messages,
@@ -151,6 +184,7 @@ class DirectorRunner {
     required String requestId,
   }) async {
     DirectorDecision? decided;
+    final freeTextBuf = StringBuffer();
     final completer = Completer<DirectorDecision?>();
 
     Future<String> onToolCall(
@@ -163,12 +197,14 @@ class DirectorRunner {
       if (decided != null && !completer.isCompleted) {
         completer.complete(decided);
       }
-      // Cancel further tool rounds.
+      // Stop provider tool follow-up rounds; decision is enough.
       unawaited(Future(() => ChatApiService.cancelRequest(requestId)));
       return jsonEncode({'ok': true});
     }
 
     try {
+      // Match normal Cuplivo chat tool path: do NOT force tool_choice=required.
+      // Providers default to tool_choice: auto (DeepSeek-compatible).
       final stream = ChatApiService.sendMessageStream(
         config: config,
         modelId: modelId,
@@ -179,12 +215,13 @@ class DirectorRunner {
         maxTokens: maxTokens,
         stream: false,
         requestId: requestId,
-        // Merged after provider defaults so this wins for OpenAI-compatible hosts.
-        extraBody: const {'tool_choice': 'required'},
       );
 
       final sub = stream.listen(
         (chunk) {
+          if (chunk.content.isNotEmpty) {
+            freeTextBuf.write(chunk.content);
+          }
           if (decided != null) return;
           final calls = chunk.toolCalls;
           if (calls == null || calls.isEmpty) return;
@@ -206,7 +243,7 @@ class DirectorRunner {
         cancelOnError: true,
       );
 
-      return await completer.future.timeout(
+      final decision = await completer.future.timeout(
         timeout,
         onTimeout: () {
           unawaited(sub.cancel());
@@ -215,6 +252,8 @@ class DirectorRunner {
           throw TimeoutException('director timeout');
         },
       );
+      final freeText = freeTextBuf.toString().trim();
+      return (decision: decision, freeText: freeText.isEmpty ? null : freeText);
     } catch (e) {
       debugPrint('[Director] _callOnce error: $e');
       rethrow;
@@ -226,18 +265,51 @@ class DirectorRunner {
     Map<String, dynamic> args,
     List<String> assistantIds,
   ) {
-    if (name == DirectorTools.endTurn) {
+    // Normalize names some gateways mangle (prefix/suffix).
+    final normalized = name.trim().toLowerCase().replaceAll('-', '_');
+    if (normalized == DirectorTools.endTurn ||
+        normalized.endsWith(DirectorTools.endTurn)) {
       return DirectorDecision.end(reason: args['reason']?.toString());
     }
-    if (name == DirectorTools.selectSpeaker) {
-      final id = args['assistant_id']?.toString();
+    if (normalized == DirectorTools.selectSpeaker ||
+        normalized.endsWith(DirectorTools.selectSpeaker)) {
+      final id =
+          args['assistant_id']?.toString() ??
+          args['assistantId']?.toString() ??
+          args['id']?.toString();
       if (id == null || !assistantIds.contains(id)) {
-        debugPrint('[Director] invalid assistant_id=$id');
+        debugPrint('[Director] invalid assistant_id=$id args=$args');
         return null;
       }
       return DirectorDecision.speak(id, reason: args['reason']?.toString());
     }
     return null;
+  }
+
+  /// Best-effort parse when model ignored tools and wrote text.
+  DirectorDecision? _tryParseFreeTextDecision(
+    String text,
+    List<String> assistantIds,
+  ) {
+    final lower = text.toLowerCase();
+    if (lower.contains('end_turn') ||
+        lower.contains('no assistant') ||
+        lower.contains('nobody') ||
+        lower.contains('silence')) {
+      return DirectorDecision.end(reason: 'free_text_end_turn', fallback: true);
+    }
+    for (final id in assistantIds) {
+      if (text.contains(id)) {
+        return DirectorDecision.speak(id, reason: 'free_text_id_match');
+      }
+    }
+    return null;
+  }
+
+  static String _clip(String s, int max) {
+    final t = s.trim();
+    if (t.length <= max) return t;
+    return '${t.substring(0, max)}…';
   }
 }
 

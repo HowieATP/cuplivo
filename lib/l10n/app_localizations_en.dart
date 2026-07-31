@@ -6489,4 +6489,145 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get handoffBackwardChipTooltip => 'Back to the parent conversation';
+
+  @override
+  String get groupChatMyGroupChats => 'My group chats';
+
+  @override
+  String get groupChatCreate => 'New group chat';
+
+  @override
+  String get groupChatDefaultName => 'Group chat';
+
+  @override
+  String get groupChatNameHint => 'Group name';
+
+  @override
+  String get groupChatCancel => 'Cancel';
+
+  @override
+  String get groupChatConfirm => 'OK';
+
+  @override
+  String get groupChatEmptyList => 'No group chats yet. Tap + to create one.';
+
+  @override
+  String get groupChatSettingsTitle => 'Group settings';
+
+  @override
+  String get groupChatNotFound => 'Group chat not found';
+
+  @override
+  String get groupChatBasicInfo => 'Basic info';
+
+  @override
+  String get groupChatMembers => 'Members';
+
+  @override
+  String get groupChatAdvancedSettings => 'Advanced settings';
+
+  @override
+  String get groupChatDirectorLogs => 'Director logs';
+
+  @override
+  String get groupChatDelete => 'Delete group chat';
+
+  @override
+  String get groupChatDeleteConfirm =>
+      'Delete this group chat? It will move to Trash.';
+
+  @override
+  String get groupChatUserLabel => 'Me';
+
+  @override
+  String get groupChatInvite => 'Invite';
+
+  @override
+  String get groupChatMemberSoftCapWarning =>
+      'You have many members; performance may degrade.';
+
+  @override
+  String get groupChatMemberHardCapReached =>
+      'Maximum of 20 assistants per group.';
+
+  @override
+  String get groupChatDirectorModel => 'Director model';
+
+  @override
+  String get groupChatDirectorModelFollowGlobal => 'Follow global default';
+
+  @override
+  String get groupChatDirectorModelClear => 'Use global default';
+
+  @override
+  String get groupChatDirectorSystemPrompt => 'Director system prompt';
+
+  @override
+  String get groupChatAvailableVariables => 'Available variables';
+
+  @override
+  String get groupChatMaxAssistantMessages =>
+      'Max assistant messages per round';
+
+  @override
+  String get groupChatInjectionMode => 'Assistant detail injection position';
+
+  @override
+  String get groupChatInjectionN => 'N (every N messages)';
+
+  @override
+  String get groupChatInjectionBeforeSystem => 'Before system prompt';
+
+  @override
+  String get groupChatInjectionAppendSystem => 'Append into system prompt';
+
+  @override
+  String get groupChatInjectionEndFirstUser => 'End of first user message';
+
+  @override
+  String get groupChatInjectionEndEveryUser => 'End of every user message';
+
+  @override
+  String get groupChatInjectionEndEveryUserAndAssistant =>
+      'End of every user and assistant message';
+
+  @override
+  String get groupChatInjectionEveryNUser => 'Every N user messages';
+
+  @override
+  String get groupChatInjectionEveryNUserAndAssistant =>
+      'Every N user and assistant messages';
+
+  @override
+  String get groupChatDirectorLogsEmpty => 'No director logs yet.';
+
+  @override
+  String get groupChatNoAssistantsToInvite => 'No more assistants to invite.';
+
+  @override
+  String get groupChatEmptyConversation =>
+      'Send a message to start the group chat.';
+
+  @override
+  String get groupChatNoAssistants =>
+      'Add assistants in group settings before chatting.';
+
+  @override
+  String get groupChatNoDirectorModel =>
+      'No director model configured. Set a director model or a global default model.';
+
+  @override
+  String get groupChatDirectorModelNoTools =>
+      'Director model does not support tools. Pick a tool-capable model.';
+
+  @override
+  String get groupChatDirectorTimeout => 'Director timed out. Try again.';
+
+  @override
+  String get groupChatDirectorError =>
+      'Director failed. Check logs and model settings.';
+
+  @override
+  String get groupChatAssistantNoModel =>
+      'Selected assistant has no model configured.';
 }

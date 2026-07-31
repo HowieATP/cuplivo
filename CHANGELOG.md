@@ -4,6 +4,7 @@
 
 ### Added
 
+- Multi-assistant group chat: director-orchestrated multi-assistant conversations with private per-assistant context, group settings, and director logs
 - Multi-key rotation for web search: configure multiple API keys to raise effective rate limits (#139)
 - Handoff (subagent MCP): delegate subtasks to other assistants via an MCP tool; results are not returned yet (#140)
 - LAN sync: device-to-device chat sync over local network with a two-round-trip protocol; 4-digit PIN authentication, reuses the incremental backup zip + merge restore infrastructure, syncs chats + referenced files + missing assistants (#136)

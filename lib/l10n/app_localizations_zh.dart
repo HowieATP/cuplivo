@@ -6225,6 +6225,135 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
+
+  @override
+  String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String get groupChatCreate => '新建群聊';
+
+  @override
+  String get groupChatDefaultName => '群聊';
+
+  @override
+  String get groupChatNameHint => '群名称';
+
+  @override
+  String get groupChatCancel => '取消';
+
+  @override
+  String get groupChatConfirm => '确定';
+
+  @override
+  String get groupChatEmptyList => '暂无群聊，点击 + 创建';
+
+  @override
+  String get groupChatSettingsTitle => '群聊设置';
+
+  @override
+  String get groupChatNotFound => '找不到该群聊';
+
+  @override
+  String get groupChatBasicInfo => '基本信息';
+
+  @override
+  String get groupChatMembers => '群成员';
+
+  @override
+  String get groupChatAdvancedSettings => '高级设置';
+
+  @override
+  String get groupChatDirectorLogs => '导演日志';
+
+  @override
+  String get groupChatDelete => '删除群聊';
+
+  @override
+  String get groupChatDeleteConfirm => '确定删除该群聊？将移入回收站。';
+
+  @override
+  String get groupChatUserLabel => '我';
+
+  @override
+  String get groupChatInvite => '邀请';
+
+  @override
+  String get groupChatMemberSoftCapWarning => '成员较多，可能影响性能。';
+
+  @override
+  String get groupChatMemberHardCapReached => '每个群最多 20 个助手。';
+
+  @override
+  String get groupChatDirectorModel => '导演模型';
+
+  @override
+  String get groupChatDirectorModelFollowGlobal => '跟随全局默认';
+
+  @override
+  String get groupChatDirectorModelClear => '使用全局默认';
+
+  @override
+  String get groupChatDirectorSystemPrompt => '导演系统提示词';
+
+  @override
+  String get groupChatAvailableVariables => '可用变量';
+
+  @override
+  String get groupChatMaxAssistantMessages => '每轮对话助手消息上限';
+
+  @override
+  String get groupChatInjectionMode => '助手详细信息注入位置';
+
+  @override
+  String get groupChatInjectionN => 'N（每 N 条）';
+
+  @override
+  String get groupChatInjectionBeforeSystem => '系统提示词之前';
+
+  @override
+  String get groupChatInjectionAppendSystem => '追加进入系统提示词';
+
+  @override
+  String get groupChatInjectionEndFirstUser => '首轮用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEndEveryUser => '每轮用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEndEveryUserAndAssistant => '每轮用户与助手消息的结尾';
+
+  @override
+  String get groupChatInjectionEveryNUser => '每 N 轮用户消息注入用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEveryNUserAndAssistant => '每 N 条用户与助手消息，注入消息的结尾';
+
+  @override
+  String get groupChatDirectorLogsEmpty => '暂无导演日志。';
+
+  @override
+  String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
+
+  @override
+  String get groupChatEmptyConversation => '发送消息开始群聊。';
+
+  @override
+  String get groupChatNoAssistants => '请先在群设置中添加助手。';
+
+  @override
+  String get groupChatNoDirectorModel => '未配置导演模型。请设置导演模型或全局默认模型。';
+
+  @override
+  String get groupChatDirectorModelNoTools => '导演模型不支持工具调用。请选择支持工具的模型。';
+
+  @override
+  String get groupChatDirectorTimeout => '导演响应超时，请重试。';
+
+  @override
+  String get groupChatDirectorError => '导演调用失败，请检查日志与模型设置。';
+
+  @override
+  String get groupChatAssistantNoModel => '该助手未配置模型。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -12448,6 +12577,135 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
+
+  @override
+  String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String get groupChatCreate => '新建群聊';
+
+  @override
+  String get groupChatDefaultName => '群聊';
+
+  @override
+  String get groupChatNameHint => '群名称';
+
+  @override
+  String get groupChatCancel => '取消';
+
+  @override
+  String get groupChatConfirm => '确定';
+
+  @override
+  String get groupChatEmptyList => '暂无群聊，点击 + 创建';
+
+  @override
+  String get groupChatSettingsTitle => '群聊设置';
+
+  @override
+  String get groupChatNotFound => '找不到该群聊';
+
+  @override
+  String get groupChatBasicInfo => '基本信息';
+
+  @override
+  String get groupChatMembers => '群成员';
+
+  @override
+  String get groupChatAdvancedSettings => '高级设置';
+
+  @override
+  String get groupChatDirectorLogs => '导演日志';
+
+  @override
+  String get groupChatDelete => '删除群聊';
+
+  @override
+  String get groupChatDeleteConfirm => '确定删除该群聊？将移入回收站。';
+
+  @override
+  String get groupChatUserLabel => '我';
+
+  @override
+  String get groupChatInvite => '邀请';
+
+  @override
+  String get groupChatMemberSoftCapWarning => '成员较多，可能影响性能。';
+
+  @override
+  String get groupChatMemberHardCapReached => '每个群最多 20 个助手。';
+
+  @override
+  String get groupChatDirectorModel => '导演模型';
+
+  @override
+  String get groupChatDirectorModelFollowGlobal => '跟随全局默认';
+
+  @override
+  String get groupChatDirectorModelClear => '使用全局默认';
+
+  @override
+  String get groupChatDirectorSystemPrompt => '导演系统提示词';
+
+  @override
+  String get groupChatAvailableVariables => '可用变量';
+
+  @override
+  String get groupChatMaxAssistantMessages => '每轮对话助手消息上限';
+
+  @override
+  String get groupChatInjectionMode => '助手详细信息注入位置';
+
+  @override
+  String get groupChatInjectionN => 'N（每 N 条）';
+
+  @override
+  String get groupChatInjectionBeforeSystem => '系统提示词之前';
+
+  @override
+  String get groupChatInjectionAppendSystem => '追加进入系统提示词';
+
+  @override
+  String get groupChatInjectionEndFirstUser => '首轮用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEndEveryUser => '每轮用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEndEveryUserAndAssistant => '每轮用户与助手消息的结尾';
+
+  @override
+  String get groupChatInjectionEveryNUser => '每 N 轮用户消息注入用户消息的结尾';
+
+  @override
+  String get groupChatInjectionEveryNUserAndAssistant => '每 N 条用户与助手消息，注入消息的结尾';
+
+  @override
+  String get groupChatDirectorLogsEmpty => '暂无导演日志。';
+
+  @override
+  String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
+
+  @override
+  String get groupChatEmptyConversation => '发送消息开始群聊。';
+
+  @override
+  String get groupChatNoAssistants => '请先在群设置中添加助手。';
+
+  @override
+  String get groupChatNoDirectorModel => '未配置导演模型。请设置导演模型或全局默认模型。';
+
+  @override
+  String get groupChatDirectorModelNoTools => '导演模型不支持工具调用。请选择支持工具的模型。';
+
+  @override
+  String get groupChatDirectorTimeout => '导演响应超时，请重试。';
+
+  @override
+  String get groupChatDirectorError => '导演调用失败，请检查日志与模型设置。';
+
+  @override
+  String get groupChatAssistantNoModel => '该助手未配置模型。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -18671,4 +18929,134 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get handoffBackwardChipTooltip => '返回上一級對話';
+
+  @override
+  String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String get groupChatCreate => '新建群聊';
+
+  @override
+  String get groupChatDefaultName => '群聊';
+
+  @override
+  String get groupChatNameHint => '群名稱';
+
+  @override
+  String get groupChatCancel => '取消';
+
+  @override
+  String get groupChatConfirm => '確定';
+
+  @override
+  String get groupChatEmptyList => '暫無群聊，點擊 + 建立';
+
+  @override
+  String get groupChatSettingsTitle => '群聊設定';
+
+  @override
+  String get groupChatNotFound => '找不到該群聊';
+
+  @override
+  String get groupChatBasicInfo => '基本資訊';
+
+  @override
+  String get groupChatMembers => '群成員';
+
+  @override
+  String get groupChatAdvancedSettings => '進階設定';
+
+  @override
+  String get groupChatDirectorLogs => '導演日誌';
+
+  @override
+  String get groupChatDelete => '刪除群聊';
+
+  @override
+  String get groupChatDeleteConfirm => '確定刪除該群聊？將移入回收站。';
+
+  @override
+  String get groupChatUserLabel => '我';
+
+  @override
+  String get groupChatInvite => '邀請';
+
+  @override
+  String get groupChatMemberSoftCapWarning => '成員較多，可能影響效能。';
+
+  @override
+  String get groupChatMemberHardCapReached => '每個群最多 20 個助手。';
+
+  @override
+  String get groupChatDirectorModel => '導演模型';
+
+  @override
+  String get groupChatDirectorModelFollowGlobal => '跟隨全域預設';
+
+  @override
+  String get groupChatDirectorModelClear => '使用全域預設';
+
+  @override
+  String get groupChatDirectorSystemPrompt => '導演系統提示詞';
+
+  @override
+  String get groupChatAvailableVariables => '可用變數';
+
+  @override
+  String get groupChatMaxAssistantMessages => '每輪對話助手訊息上限';
+
+  @override
+  String get groupChatInjectionMode => '助手詳細資訊注入位置';
+
+  @override
+  String get groupChatInjectionN => 'N（每 N 條）';
+
+  @override
+  String get groupChatInjectionBeforeSystem => '系統提示詞之前';
+
+  @override
+  String get groupChatInjectionAppendSystem => '追加進入系統提示詞';
+
+  @override
+  String get groupChatInjectionEndFirstUser => '首輪使用者訊息的結尾';
+
+  @override
+  String get groupChatInjectionEndEveryUser => '每輪使用者訊息的結尾';
+
+  @override
+  String get groupChatInjectionEndEveryUserAndAssistant => '每輪使用者與助手訊息的結尾';
+
+  @override
+  String get groupChatInjectionEveryNUser => '每 N 輪使用者訊息注入使用者訊息的結尾';
+
+  @override
+  String get groupChatInjectionEveryNUserAndAssistant =>
+      '每 N 條使用者與助手訊息，注入訊息的結尾';
+
+  @override
+  String get groupChatDirectorLogsEmpty => '暫無導演日誌。';
+
+  @override
+  String get groupChatNoAssistantsToInvite => '沒有可邀請的助手。';
+
+  @override
+  String get groupChatEmptyConversation => '傳送訊息開始群聊。';
+
+  @override
+  String get groupChatNoAssistants => '請先在群設定中新增助手。';
+
+  @override
+  String get groupChatNoDirectorModel => '未設定導演模型。請設定導演模型或全域預設模型。';
+
+  @override
+  String get groupChatDirectorModelNoTools => '導演模型不支援工具呼叫。請選擇支援工具的模型。';
+
+  @override
+  String get groupChatDirectorTimeout => '導演回應逾時，請重試。';
+
+  @override
+  String get groupChatDirectorError => '導演呼叫失敗，請檢查日誌與模型設定。';
+
+  @override
+  String get groupChatAssistantNoModel => '該助手未設定模型。';
 }

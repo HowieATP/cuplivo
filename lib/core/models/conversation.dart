@@ -37,6 +37,14 @@ class Conversation {
   // LLM-generated quick follow-up suggestions for the latest assistant reply.
   List<String> chatSuggestions;
 
+  /// 'normal' | 'group'
+  String conversationKind;
+
+  static const String kindNormal = 'normal';
+  static const String kindGroup = 'group';
+
+  bool get isGroup => conversationKind == kindGroup;
+
   Conversation({
     String? id,
     required this.title,
@@ -52,6 +60,7 @@ class Conversation {
     this.summary,
     int? lastSummarizedMessageCount,
     List<String>? chatSuggestions,
+    this.conversationKind = kindNormal,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -78,6 +87,7 @@ class Conversation {
     int? lastSummarizedMessageCount,
     List<String>? chatSuggestions,
     bool clearSummary = false,
+    String? conversationKind,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -95,6 +105,7 @@ class Conversation {
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
       chatSuggestions: chatSuggestions ?? this.chatSuggestions,
+      conversationKind: conversationKind ?? this.conversationKind,
     );
   }
 
@@ -114,6 +125,7 @@ class Conversation {
       'summary': summary,
       'lastSummarizedMessageCount': lastSummarizedMessageCount,
       'chatSuggestions': chatSuggestions,
+      'conversationKind': conversationKind,
     };
   }
 
@@ -140,6 +152,7 @@ class Conversation {
           json['lastSummarizedMessageCount'] as int? ?? 0,
       chatSuggestions:
           (json['chatSuggestions'] as List?)?.cast<String>() ?? <String>[],
+      conversationKind: json['conversationKind'] as String? ?? kindNormal,
     );
   }
 }

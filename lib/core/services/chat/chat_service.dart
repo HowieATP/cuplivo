@@ -95,18 +95,22 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _loadConversationsCache() async {
+    // Cache holds all conversations including group (for getConversation by id).
     _conversationsCache
       ..clear()
       ..addEntries(
-        _repo.getAllConversationsSync().map(
-          (conversation) => MapEntry(conversation.id, conversation),
-        ),
+        _repo
+            .getAllConversationsSync(includeGroup: true)
+            .map((conversation) => MapEntry(conversation.id, conversation)),
       );
   }
 
-  List<Conversation> getAllConversations() {
+  /// UI default excludes group transcripts. Use [includeGroup] for admin/debug.
+  List<Conversation> getAllConversations({bool includeGroup = false}) {
     if (!_initialized) return [];
-    final conversations = _conversationsCache.values.toList();
+    final conversations = _conversationsCache.values
+        .where((c) => includeGroup || !c.isGroup)
+        .toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return conversations;
   }
@@ -344,19 +348,26 @@ class ChatService extends ChangeNotifier {
     String? assistantId,
     List<String>? mcpServerIds,
     String? parentConversationId,
+    String conversationKind = Conversation.kindNormal,
+    bool setAsCurrent = true,
   }) async {
     if (!_initialized) await init();
-    _discardTemporaryConversation(_currentConversationId);
+    if (setAsCurrent) {
+      _discardTemporaryConversation(_currentConversationId);
+    }
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
       mcpServerIds: mcpServerIds,
       parentConversationId: parentConversationId,
+      conversationKind: conversationKind,
     );
 
     await _saveConversation(conversation);
-    _currentConversationId = conversation.id;
+    if (setAsCurrent) {
+      _currentConversationId = conversation.id;
+    }
     notifyListeners();
     return conversation;
   }
@@ -420,8 +431,19 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteConversation(String id) async {
+  Future<void> deleteConversation(String id, {bool allowGroup = false}) async {
     if (!_initialized) return;
+
+    final existing =
+        _conversationsCache[id] ??
+        _draftConversations[id] ??
+        _repo.getConversationSync(id, includeMessageIds: false);
+    if (existing != null && existing.isGroup && !allowGroup) {
+      throw StateError(
+        'Cannot delete group conversation via deleteConversation; '
+        'use GroupChatProvider.deleteGroup instead (id=$id)',
+      );
+    }
 
     final deleted =
         await _deleteDraftConversation(id) ||
@@ -1062,6 +1084,7 @@ class ChatService extends ChangeNotifier {
     String? subgroupId,
     int? version,
     bool isPreset = false,
+    String? speakerAssistantId,
   }) async {
     if (!_initialized) await init();
 
@@ -1106,6 +1129,7 @@ class ChatService extends ChangeNotifier {
       subgroupId: subgroupId,
       version: version,
       isPreset: isPreset,
+      speakerAssistantId: speakerAssistantId,
     );
 
     if (!temporary) {

@@ -26,6 +26,10 @@ class ConversationRows extends Table {
       text().withDefault(const Constant('[]'))();
   TextColumn get parentConversationId => text().nullable()();
 
+  /// 'normal' | 'group' — group public transcripts use kind=group.
+  TextColumn get conversationKind =>
+      text().withDefault(const Constant('normal'))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -65,6 +69,9 @@ class MessageRows extends Table {
   IntColumn get durationMs => integer().nullable()();
   IntColumn get messageOrder => integer()();
   BoolColumn get isPreset => boolean().withDefault(const Constant(false))();
+
+  /// Speaker assistant id for group chats; null for user messages / 1:1.
+  TextColumn get speakerAssistantId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -246,6 +253,65 @@ class DeletionMarkerRows extends Table {
   Set<Column<Object>> get primaryKey => {id, type, origin};
 }
 
+@TableIndex(name: 'idx_group_chats_updated_at', columns: {#updatedAt})
+class GroupChatRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get avatar => text().nullable()();
+  TextColumn get conversationId => text().unique().references(
+    ConversationRows,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+  TextColumn get directorModelProvider => text().nullable()();
+  TextColumn get directorModelId => text().nullable()();
+  TextColumn get directorSystemPrompt =>
+      text().withDefault(const Constant(''))();
+  IntColumn get maxAssistantMessagesPerRound =>
+      integer().withDefault(const Constant(3))();
+  TextColumn get assistantDetailInjectionMode =>
+      text().withDefault(const Constant('endOfEveryUserMessage'))();
+  IntColumn get assistantDetailInjectionN =>
+      integer().withDefault(const Constant(5))();
+  TextColumn get pendingCapAssistantMessageId => text().nullable()();
+  IntColumn get assistantMessagesThisRound =>
+      integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class GroupChatMemberRows extends Table {
+  TextColumn get groupChatId =>
+      text().references(GroupChatRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get memberKey => text()();
+  TextColumn get assistantId => text().nullable()();
+  IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {groupChatId, memberKey};
+}
+
+@TableIndex(
+  name: 'idx_director_messages_group_order',
+  columns: {#groupChatId, #messageOrder},
+)
+class DirectorMessageRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get groupChatId =>
+      text().references(GroupChatRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get role => text()();
+  TextColumn get content => text()();
+  IntColumn get messageOrder => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  TextColumn get metaJson => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -258,6 +324,9 @@ class DeletionMarkerRows extends Table {
     ChatStorageMetaRows,
     DeletedRecordRows,
     DeletionMarkerRows,
+    GroupChatRows,
+    GroupChatMemberRows,
+    DirectorMessageRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -294,7 +363,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -409,6 +478,36 @@ class AppDatabase extends _$AppDatabase {
             assistantRows.handoffDescription,
           );
         } catch (_) {}
+      }
+      if (from < 13) {
+        try {
+          await migrator.createTable(groupChatRows);
+        } catch (_) {
+          // table may already exist on migration replay
+        }
+        try {
+          await migrator.createTable(groupChatMemberRows);
+        } catch (_) {}
+        try {
+          await migrator.createTable(directorMessageRows);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.conversationKind,
+          );
+        } catch (_) {
+          // column may already exist on migration replay
+        }
+        try {
+          await migrator.addColumn(messageRows, messageRows.speakerAssistantId);
+        } catch (_) {
+          // column may already exist on migration replay
+        }
+        await customStatement(
+          "UPDATE conversation_rows SET conversation_kind = 'normal' "
+          "WHERE conversation_kind IS NULL OR conversation_kind = ''",
+        );
       }
     },
   );

@@ -51,6 +51,9 @@ class ChatMessage {
 
   final bool isPreset;
 
+  /// Group chat speaker; null for user messages and classic 1:1 assistant.
+  final String? speakerAssistantId;
+
   factory ChatMessage({
     String? id,
     required String role,
@@ -74,6 +77,7 @@ class ChatMessage {
     int? cachedTokens,
     int? durationMs,
     bool isPreset = false,
+    String? speakerAssistantId,
   }) {
     final resolvedId = id ?? const Uuid().v4();
     return ChatMessage._(
@@ -99,6 +103,7 @@ class ChatMessage {
       cachedTokens: cachedTokens,
       durationMs: durationMs,
       isPreset: isPreset,
+      speakerAssistantId: speakerAssistantId,
     );
   }
 
@@ -125,6 +130,7 @@ class ChatMessage {
     this.cachedTokens,
     this.durationMs,
     this.isPreset = false,
+    this.speakerAssistantId,
   });
 
   // Sentinel for copyWith — not passed vs explicitly null.
@@ -153,6 +159,7 @@ class ChatMessage {
     Object? cachedTokens = sentinel,
     Object? durationMs = sentinel,
     Object? isPreset = sentinel,
+    Object? speakerAssistantId = sentinel,
   }) {
     return ChatMessage(
       id: identical(id, sentinel) ? this.id : id as String,
@@ -209,6 +216,9 @@ class ChatMessage {
       isPreset: identical(isPreset, sentinel)
           ? this.isPreset
           : isPreset as bool,
+      speakerAssistantId: identical(speakerAssistantId, sentinel)
+          ? this.speakerAssistantId
+          : speakerAssistantId as String?,
     );
   }
 
@@ -236,6 +246,7 @@ class ChatMessage {
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
       'isPreset': isPreset,
+      'speakerAssistantId': speakerAssistantId,
     };
   }
 
@@ -267,6 +278,7 @@ class ChatMessage {
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
       isPreset: json['isPreset'] as bool? ?? false,
+      speakerAssistantId: json['speakerAssistantId'] as String?,
     );
   }
 }

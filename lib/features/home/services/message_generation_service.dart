@@ -273,6 +273,7 @@ class MessageGenerationService {
     String? groupId,
     String? subgroupId,
     int version = 0,
+    String? speakerAssistantId,
   }) async {
     return chatService.addMessage(
       conversationId: conversationId,
@@ -284,6 +285,7 @@ class MessageGenerationService {
       groupId: groupId,
       subgroupId: subgroupId,
       version: version,
+      speakerAssistantId: speakerAssistantId,
     );
   }
 

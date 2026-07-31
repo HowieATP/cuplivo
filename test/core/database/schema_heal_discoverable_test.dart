@@ -116,7 +116,7 @@ CREATE TABLE message_rows (
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );
 ''');
-    raw.dispose();
+    raw.close();
 
     final repo = ChatDatabaseRepository.open(file: dbFile);
     await repo.ensureReady();

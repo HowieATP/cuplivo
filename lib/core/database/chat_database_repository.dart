@@ -7,7 +7,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../models/assistant.dart';
-import '../models/director_message.dart';
 import '../models/group_chat.dart';
 import '../models/group_chat_member.dart';
 import '../models/assistant_detail_injection.dart';
@@ -780,8 +779,7 @@ class ChatDatabaseRepository {
       await _db.delete(_db.assistantRows).go();
       await _db.delete(_db.conversationMcpServerRows).go();
       await _db.delete(_db.messageRows).go();
-      // Group tables before conversations (director/members cascade from group).
-      await _db.delete(_db.directorMessageRows).go();
+      // Group tables before conversations (members cascade from group).
       await _db.delete(_db.groupChatMemberRows).go();
       await _db.delete(_db.groupChatRows).go();
       await _db.delete(_db.conversationRows).go();
@@ -1382,37 +1380,6 @@ class ChatDatabaseRepository {
     )..where((t) => t.assistantId.equals(assistantId))).go();
   }
 
-  Future<List<DirectorMessage>> getDirectorMessages(String groupChatId) async {
-    final rows =
-        await (_db.select(_db.directorMessageRows)
-              ..where((t) => t.groupChatId.equals(groupChatId))
-              ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
-            .get();
-    return rows.map(_directorMessageFromRow).toList(growable: false);
-  }
-
-  Future<int> getDirectorMessageCount(String groupChatId) async {
-    final count = _db.directorMessageRows.id.count();
-    final row =
-        await (_db.selectOnly(_db.directorMessageRows)
-              ..addColumns([count])
-              ..where(_db.directorMessageRows.groupChatId.equals(groupChatId)))
-            .getSingle();
-    return row.read(count) ?? 0;
-  }
-
-  Future<void> appendDirectorMessage(DirectorMessage message) async {
-    await _db
-        .into(_db.directorMessageRows)
-        .insertOnConflictUpdate(_directorMessageCompanion(message));
-  }
-
-  Future<void> clearDirectorMessages(String groupChatId) async {
-    await (_db.delete(
-      _db.directorMessageRows,
-    )..where((t) => t.groupChatId.equals(groupChatId))).go();
-  }
-
   GroupChat _groupChatFromRow(GroupChatRow row) {
     return GroupChat(
       id: row.id,
@@ -1470,30 +1437,6 @@ class ChatDatabaseRepository {
       memberKey: m.memberKey,
       assistantId: Value(m.assistantId),
       sortOrder: m.sortOrder,
-    );
-  }
-
-  DirectorMessage _directorMessageFromRow(DirectorMessageRow row) {
-    return DirectorMessage(
-      id: row.id,
-      groupChatId: row.groupChatId,
-      role: row.role,
-      content: row.content,
-      messageOrder: row.messageOrder,
-      createdAt: row.createdAt,
-      metaJson: row.metaJson,
-    );
-  }
-
-  DirectorMessageRowsCompanion _directorMessageCompanion(DirectorMessage m) {
-    return DirectorMessageRowsCompanion.insert(
-      id: m.id,
-      groupChatId: m.groupChatId,
-      role: m.role,
-      content: m.content,
-      messageOrder: m.messageOrder,
-      createdAt: m.createdAt,
-      metaJson: Value(m.metaJson),
     );
   }
 

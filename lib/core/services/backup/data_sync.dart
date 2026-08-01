@@ -15,7 +15,6 @@ import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
-import '../../models/director_message.dart';
 import '../../models/group_chat.dart';
 import '../../models/group_chat_member.dart';
 import '../../models/incremental_backup.dart';
@@ -953,11 +952,10 @@ class DataSync {
       final groups = await chatService.repo.getAllGroupChats();
       final groupPayload = <Map<String, dynamic>>[];
       final memberPayload = <Map<String, dynamic>>[];
-      final directorPayload = <Map<String, dynamic>>[];
       // Incremental scope: a group qualifies when it was active since `since`,
       // or when its conversation made it into this export. A qualifying group
-      // carries its FULL director session + members — the director session is
-      // an atomic working context and must never be sliced.
+      // carries its FULL members — the director session is ephemeral (rebuilt
+      // from the public transcript) and is never stored or exported.
       final exportedConversationIds = conversations.map((c) => c.id).toSet();
       for (final g in groups) {
         if (incremental != null &&
@@ -968,17 +966,12 @@ class DataSync {
         groupPayload.add(g.toJson());
         final members = await chatService.repo.getGroupMembers(g.id);
         memberPayload.addAll(members.map((m) => m.toJson()));
-        final dmsgs = await chatService.repo.getDirectorMessages(g.id);
-        directorPayload.addAll(dmsgs.map((m) => m.toJson()));
       }
       sink.write('"groupChats":');
       sink.write(jsonEncode(groupPayload));
       sink.write(',');
       sink.write('"groupMembers":');
       sink.write(jsonEncode(memberPayload));
-      sink.write(',');
-      sink.write('"directorMessages":');
-      sink.write(jsonEncode(directorPayload));
 
       sink.write('}');
     } finally {
@@ -1407,7 +1400,6 @@ class DataSync {
           // Restore group chat metadata (v2 keys; ignored on v1 backups).
           final groupChatsRaw = obj['groupChats'] as List? ?? const [];
           final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
-          final directorMsgsRaw = obj['directorMessages'] as List? ?? const [];
           if (groupChatsRaw.isNotEmpty) {
             final existingGroupIds = mode == RestoreMode.merge
                 ? (await chatService.repo.getAllGroupChats())
@@ -1448,20 +1440,6 @@ class DataSync {
                 await chatService.repo.putGroupMembers(entry.key, entry.value);
               } catch (e) {
                 debugPrint('restoreData: groupMembers: $e');
-              }
-            }
-            for (final raw in directorMsgsRaw) {
-              try {
-                final m = DirectorMessage.fromJson(
-                  (raw as Map).cast<String, dynamic>(),
-                );
-                if (mode == RestoreMode.merge &&
-                    existingGroupIds.contains(m.groupChatId)) {
-                  continue;
-                }
-                await chatService.repo.appendDirectorMessage(m);
-              } catch (e) {
-                debugPrint('restoreData: directorMessages: $e');
               }
             }
           }

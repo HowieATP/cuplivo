@@ -13,7 +13,6 @@ import '../services/quick_phrase_store.dart';
 import '../services/world_book_store.dart';
 import '../models/assistant.dart';
 import '../models/assistant_memory.dart';
-import '../models/director_message.dart';
 import '../models/group_chat.dart';
 import '../models/group_chat_member.dart';
 import '../models/quick_phrase.dart';
@@ -338,19 +337,10 @@ class TrashRestoreCoordinator {
             (e) => GroupChatMember.fromJson((e as Map).cast<String, dynamic>()),
           )
           .toList();
-      final directorRaw = map['directorMessages'] as List? ?? const [];
-      final directorMsgs = directorRaw
-          .map(
-            (e) => DirectorMessage.fromJson((e as Map).cast<String, dynamic>()),
-          )
-          .toList();
 
       // Conversation/messages may already be restored via conversation trash.
       await chatService.repo.putGroupChat(group);
       await chatService.repo.putGroupMembers(group.id, members);
-      for (final m in directorMsgs) {
-        await chatService.repo.appendDirectorMessage(m);
-      }
       await store.purgeDeletedRecord(id, DeletionEntityType.groupChat);
       return null;
     } catch (e) {

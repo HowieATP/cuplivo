@@ -352,7 +352,7 @@ flutter analyze
   - API provider implementations in `lib/core/services/api/providers/` (`openai_common.dart`, `claude_official.dart`, `google_common.dart`, `google_vertex.dart`, `google_gemini.dart`, `openai_responses.dart`, `openai_images.dart`) -- they share bug patterns and feature gaps
   - The 4 ARB files (3.1), `CHANGELOG.md` + `CHANGELOG_CN.md` (1.4), `README.md` + `README_ZH_CN.md` features sections (3.18)
   - Similar GitHub Actions workflow files (3.7)
-  - Group chat schema surfaces: any new group-related table / column / backup section must be wired into all three of `clearAllData` (child-before-parent FK delete order), `_exportChatsToFile` (export section), and `_restoreFromBackupFile` (restore section) in the same change. Group conversations (kind=group) enter incremental exports whole -- never slice their message list or director session
+  - Group chat schema surfaces: any new group-related table / column / backup section must be wired into all three of `clearAllData` (child-before-parent FK delete order), `_exportChatsToFile` (export section), and `_restoreFromBackupFile` (restore section) in the same change. Group conversations (kind=group) enter incremental exports whole -- never slice their message list; the Director session is ephemeral (rebuilt from the public transcript), never persisted or exported.
 - When touching a path dependency under `dependencies/`, update that dependency's own source in the same change; do not patch only the root repo surface.
 - Trap: "I fixed it in one place" is not "done". Before marking a task complete, run `rg` for the changed identifier / pattern across the whole repo and confirm every parallel surface was updated or explicitly excluded. State any intentional exclusions in the delivery notes.
 

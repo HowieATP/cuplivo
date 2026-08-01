@@ -41,7 +41,7 @@ void main() {
       conversationKind: Conversation.kindGroup,
     );
     await repo.putConversation(group);
-    // Reopen sync so it sees the new row (and schema remains v13).
+    // Reopen sync so it sees the new row (and schema remains v14).
     repo.reopenSyncConnection();
     final nonGroup = repo.getAllConversationsSync(includeGroup: false);
     expect(nonGroup.any((c) => c.id == group.id), isFalse);

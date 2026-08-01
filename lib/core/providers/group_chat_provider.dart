@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/conversation.dart';
-import '../models/director_message.dart';
 import '../models/group_chat.dart';
 import '../models/group_chat_member.dart';
 import '../models/assistant_detail_injection.dart';
@@ -190,10 +189,6 @@ class GroupChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<DirectorMessage>> directorMessages(String groupChatId) {
-    return _chatService.repo.getDirectorMessages(groupChatId);
-  }
-
   Future<void> persistGroupState(GroupChat group) async {
     await _chatService.repo.putGroupChat(group);
     final idx = _groups.indexWhere((g) => g.id == group.id);
@@ -203,8 +198,8 @@ class GroupChatProvider extends ChangeNotifier {
 
   /// Full delete with trash packaging.
   ///
-  /// Trash records: the group bundle (group + members + director session) and
-  /// the conversation are TWO independent trash entries. Restore order matters
+  /// Trash records: the group bundle (group + members) and the conversation
+  /// are TWO independent trash entries. Restore order matters
   /// — the group row has a FK to the conversation, so the conversation must be
   /// restored first; restoring either side alone leaves an orphan.
   Future<void> deleteGroup(String groupChatId) async {
@@ -212,9 +207,6 @@ class GroupChatProvider extends ChangeNotifier {
     if (group == null) return;
 
     final members = membersOf(groupChatId);
-    final directorMsgs = await _chatService.repo.getDirectorMessages(
-      groupChatId,
-    );
     final store = _chatService.deletedRecordsStore;
     final batchId = const Uuid().v4();
     final deletedAt = DateTime.now();
@@ -223,7 +215,6 @@ class GroupChatProvider extends ChangeNotifier {
       final recovery = jsonEncode({
         'groupChat': group.toJson(),
         'members': members.map((m) => m.toJson()).toList(),
-        'directorMessages': directorMsgs.map((m) => m.toJson()).toList(),
         'conversationId': group.conversationId,
       });
       await store.recordDeletion(
@@ -235,7 +226,7 @@ class GroupChatProvider extends ChangeNotifier {
       );
     }
 
-    // Delete group row first (cascades members + director); then conversation
+    // Delete group row first (cascades members); then conversation
     // with allowGroup so trash for conversation may also run.
     await _chatService.repo.deleteGroupChat(groupChatId);
     try {

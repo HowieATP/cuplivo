@@ -1,7 +1,6 @@
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_detail_injection.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/models/director_message.dart';
 import '../../../core/models/group_chat.dart';
 import '../../../core/services/chat/chat_service.dart';
 
@@ -134,28 +133,62 @@ class DirectorContextBuilder {
     }
   }
 
-  /// Count human-user director turns from history (E1/E3 style markers not
-  /// required — count role=user messages that look like human turns using
-  /// existing rows where content contains the user choose prompt).
-  int countHumanUserTurns(List<DirectorMessage> history) {
-    return history
-        .where((m) => m.role == 'user' && m.content.contains('请选择是否由助手发送下条消息'))
+  int countHumanUserTurnsFromPublic(List<ChatMessage> collapsed) {
+    return collapsed.where((m) => m.role == 'user').length;
+  }
+
+  int countDirectorUserMessagesFromPublic(List<ChatMessage> collapsed) {
+    return collapsed
+        .where((m) => m.role == 'user' || m.role == 'assistant')
         .length;
   }
 
-  int countDirectorUserMessages(List<DirectorMessage> history) {
-    return history.where((m) => m.role == 'user').length;
+  /// Collapse using index-into-sorted-versions (default last).
+  List<ChatMessage> collapsePublicVersions(
+    List<ChatMessage> publicMessages,
+    Map<String, int> versionSelections,
+  ) {
+    final byGroup = <String, List<ChatMessage>>{};
+    final order = <String>[];
+    for (final m in publicMessages) {
+      final gid = m.groupId ?? m.id;
+      final list = byGroup.putIfAbsent(gid, () {
+        order.add(gid);
+        return <ChatMessage>[];
+      });
+      list.add(m);
+    }
+    for (final e in byGroup.entries) {
+      e.value.sort((a, b) => a.version.compareTo(b.version));
+    }
+    final out = <ChatMessage>[];
+    for (final gid in order) {
+      final vers = byGroup[gid]!;
+      final sel = versionSelections[gid];
+      final idx = (sel != null && sel >= 0 && sel < vers.length)
+          ? sel
+          : (vers.length - 1);
+      out.add(vers[idx]);
+    }
+    return out;
   }
 
-  /// Build API messages for one director call (system computed live + history
-  /// without old system rows + new user content).
-  List<Map<String, dynamic>> buildApiMessages({
+  /// Build API messages from the public transcript (no director DB history).
+  ///
+  /// Historical turns are reconstructed as full E1/E2 strings (with choice
+  /// prompts). [newUserContent] is the live tip (E1/E2/E3), already roster-
+  /// injected when needed.
+  List<Map<String, dynamic>> buildApiMessagesFromPublic({
     required GroupChat group,
-    required List<DirectorMessage> history,
+    required List<ChatMessage> publicMessages,
+    required Map<String, int> versionSelections,
     required String newUserContent,
     required List<Assistant> rosterAssistants,
     required String userName,
     required List<String> memberNames,
+    required Map<String, Assistant> assistantsById,
+    String? skipPendingCapMessageId,
+    String? excludeTrailingUserMessageId,
   }) {
     final roster = buildRosterBlock(rosterAssistants);
     final prompt = substituteVariables(
@@ -176,9 +209,37 @@ class DirectorContextBuilder {
       api.add({'role': 'system', 'content': prompt});
     }
 
-    for (final m in history) {
-      if (m.role == 'system') continue;
-      api.add({'role': m.role, 'content': m.content});
+    final collapsed = collapsePublicVersions(publicMessages, versionSelections);
+    for (final m in collapsed) {
+      if (skipPendingCapMessageId != null && m.id == skipPendingCapMessageId) {
+        continue;
+      }
+      if (excludeTrailingUserMessageId != null &&
+          m.id == excludeTrailingUserMessageId &&
+          m.role == 'user') {
+        continue;
+      }
+      if (m.role == 'user') {
+        api.add({
+          'role': 'user',
+          'content': buildUserTurnE1(
+            userName: userName,
+            userMessageText: contentForDirector(m),
+          ),
+        });
+      } else if (m.role == 'assistant') {
+        final name =
+            assistantsById[m.speakerAssistantId]?.name ??
+            m.speakerAssistantId ??
+            'Assistant';
+        api.add({
+          'role': 'user',
+          'content': buildAssistantTurnE2(
+            assistantName: name,
+            assistantContent: contentForDirector(m),
+          ),
+        });
+      }
     }
     api.add({'role': 'user', 'content': newUserContent});
     return api;

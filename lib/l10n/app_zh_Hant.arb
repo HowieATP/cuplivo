@@ -2574,6 +2574,7 @@
   "groupChatInjectionEveryNUser": "每 N 輪使用者訊息注入使用者訊息的結尾",
   "groupChatInjectionEveryNUserAndAssistant": "每 N 條使用者與助手訊息，注入訊息的結尾",
   "groupChatDirectorLogsEmpty": "暫無導演日誌。",
+  "groupChatDirectorLogsEphemeral": "導演上下文從公共會話現場拼裝，不再單獨落庫。",
   "groupChatNoAssistantsToInvite": "沒有可邀請的助手。",
   "groupChatEmptyConversation": "傳送訊息開始群聊。",
   "groupChatNoAssistants": "請先在群設定中新增助手。",

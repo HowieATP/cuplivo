@@ -3124,6 +3124,7 @@
   "groupChatInjectionEveryNUser": "Every N user messages",
   "groupChatInjectionEveryNUserAndAssistant": "Every N user and assistant messages",
   "groupChatDirectorLogsEmpty": "No director logs yet.",
+  "groupChatDirectorLogsEphemeral": "Director context is assembled live from the public conversation and is not stored separately.",
   "groupChatNoAssistantsToInvite": "No more assistants to invite.",
   "groupChatEmptyConversation": "Send a message to start the group chat.",
   "groupChatNoAssistants": "Add assistants in group settings before chatting.",

@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
 
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -141,10 +142,15 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreAfter,
     this.hideMoreActions,
     this.headerWidget,
+    this.resolveSpeaker,
   });
 
   final ScrollController scrollController;
   final ListObserverController observerController;
+
+  /// When set, assistant chrome (name/avatar) uses this per-message speaker
+  /// instead of [AssistantProvider.currentAssistant]. Used by group chat.
+  final Assistant? Function(ChatMessage message)? resolveSpeaker;
 
   /// Pre-collapsed messages (from ChatController.collapsedMessages).
   final List<ChatMessage> messages;
@@ -525,9 +531,17 @@ class _MessageListViewState extends State<MessageListView> {
     final r = widget.reasoning[message.id];
     final t = widget.translations[message.id];
     final chatScale = context.watch<SettingsProvider>().chatFontScale;
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final useAssistAvatar = assistant?.useAssistantAvatar == true;
-    final useAssistName = assistant?.useAssistantName == true;
+    final resolved = widget.resolveSpeaker?.call(message);
+    final assistant =
+        resolved ?? context.watch<AssistantProvider>().currentAssistant;
+    final forceSpeakerChrome =
+        widget.resolveSpeaker != null && message.role == 'assistant';
+    final useAssistAvatar = forceSpeakerChrome
+        ? true
+        : assistant?.useAssistantAvatar == true;
+    final useAssistName = forceSpeakerChrome
+        ? true
+        : assistant?.useAssistantName == true;
     final showDivider =
         widget.truncCollapsedIndex >= 0 && index == widget.truncCollapsedIndex;
     final gid = (message.groupId ?? message.id);

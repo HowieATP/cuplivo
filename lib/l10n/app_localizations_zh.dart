@@ -6332,6 +6332,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
 
   @override
+  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
+
+  @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
 
   @override
@@ -12682,6 +12685,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
+
+  @override
+  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
 
   @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
@@ -19035,6 +19041,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get groupChatDirectorLogsEmpty => '暫無導演日誌。';
+
+  @override
+  String get groupChatDirectorLogsEphemeral => '導演上下文從公共會話現場拼裝，不再單獨落庫。';
 
   @override
   String get groupChatNoAssistantsToInvite => '沒有可邀請的助手。';

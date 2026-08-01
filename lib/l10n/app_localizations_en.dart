@@ -6602,6 +6602,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupChatDirectorLogsEmpty => 'No director logs yet.';
 
   @override
+  String get groupChatDirectorLogsEphemeral =>
+      'Director context is assembled live from the public conversation and is not stored separately.';
+
+  @override
   String get groupChatNoAssistantsToInvite => 'No more assistants to invite.';
 
   @override

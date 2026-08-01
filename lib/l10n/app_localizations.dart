@@ -12050,6 +12050,12 @@ abstract class AppLocalizations {
   /// **'No director logs yet.'**
   String get groupChatDirectorLogsEmpty;
 
+  /// No description provided for @groupChatDirectorLogsEphemeral.
+  ///
+  /// In en, this message translates to:
+  /// **'Director context is assembled live from the public conversation and is not stored separately.'**
+  String get groupChatDirectorLogsEphemeral;
+
   /// No description provided for @groupChatNoAssistantsToInvite.
   ///
   /// In en, this message translates to:

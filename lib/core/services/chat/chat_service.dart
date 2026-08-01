@@ -1587,6 +1587,7 @@ class ChatService extends ChangeNotifier {
       isStreaming: false,
       groupId: gid,
       version: nextVersion,
+      speakerAssistantId: original.speakerAssistantId,
     );
     // Append to conversation order at the end (we'll group when rendering)
     if (_draftConversations.containsKey(cid)) {

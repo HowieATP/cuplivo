@@ -87,6 +87,7 @@ class AssistantPrivateContextBuilder {
     return out;
   }
 
+  /// Index into sorted versions; default last (matches ChatController).
   List<ChatMessage> _collapseVersions(
     List<ChatMessage> messages,
     Map<String, int> versionSelections,
@@ -95,25 +96,23 @@ class AssistantPrivateContextBuilder {
     final order = <String>[];
     for (final m in messages) {
       final gid = m.groupId ?? m.id;
-      if (!byGroup.containsKey(gid)) {
-        byGroup[gid] = [];
+      final list = byGroup.putIfAbsent(gid, () {
         order.add(gid);
-      }
-      byGroup[gid]!.add(m);
+        return <ChatMessage>[];
+      });
+      list.add(m);
+    }
+    for (final e in byGroup.entries) {
+      e.value.sort((a, b) => a.version.compareTo(b.version));
     }
     final out = <ChatMessage>[];
     for (final gid in order) {
-      final list = byGroup[gid]!;
-      final want = versionSelections[gid] ?? 0;
-      ChatMessage? pick;
-      for (final m in list) {
-        if (m.version == want) {
-          pick = m;
-          break;
-        }
-      }
-      pick ??= list.last;
-      out.add(pick);
+      final vers = byGroup[gid]!;
+      final sel = versionSelections[gid];
+      final idx = (sel != null && sel >= 0 && sel < vers.length)
+          ? sel
+          : (vers.length - 1);
+      out.add(vers[idx]);
     }
     return out;
   }

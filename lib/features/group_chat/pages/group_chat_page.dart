@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'dart:io' show File;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scrollview_observer/scrollview_observer.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -13,12 +14,14 @@ import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../desktop/message_edit_dialog.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
-import '../../../theme/app_font_weights.dart';
-import '../../../utils/sandbox_path_resolver.dart';
+import '../../chat/models/message_edit_result.dart';
+import '../../chat/widgets/message_edit_sheet.dart';
+import '../../chat/widgets/message_more_sheet.dart';
 import '../../home/controllers/chat_controller.dart';
 import '../../home/controllers/generation_controller.dart';
 import '../../home/controllers/stream_controller.dart' as stream_ctrl;
@@ -27,6 +30,7 @@ import '../../home/services/message_builder_service.dart';
 import '../../home/services/message_generation_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../../home/widgets/chat_input_bar.dart';
+import '../../home/widgets/message_list_view.dart';
 import '../controllers/group_chat_orchestrator.dart';
 import '../controllers/group_chat_stream_executor.dart';
 import '../models/chat_input_mode.dart';
@@ -44,7 +48,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _inputFocus = FocusNode();
+  final _isProcessingFiles = ValueNotifier<bool>(false);
+  final _translations = <String, TranslationUiState>{};
 
+  late ListObserverController _observerController;
   late ChatService _chatService;
   late stream_ctrl.StreamController _streamController;
   late ChatController _chatController;
@@ -54,20 +61,28 @@ class _GroupChatPageState extends State<GroupChatPage> {
   late GroupChatStreamExecutor _streamExecutor;
   late GroupChatOrchestrator _orchestrator;
 
-  List<ChatMessage> _messages = [];
   bool _loading = false;
   bool _initialized = false;
+
+  bool get _isDesktop =>
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
+    _observerController = ListObserverController(controller: _scrollController);
     _chatService = context.read<ChatService>();
     _streamController = stream_ctrl.StreamController(
       chatService: _chatService,
       onStateChanged: () {
-        if (mounted) setState(() => _reloadMessages());
+        if (mounted) {
+          _refreshList();
+          setState(() {});
+        }
       },
       getSettingsProvider: () => context.read<SettingsProvider>(),
       getCurrentConversationId: () {
@@ -76,6 +91,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       },
     );
     _chatController = ChatController(chatService: _chatService);
+    _chatController.addListener(_onChatControllerChanged);
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
       contextProvider: context,
@@ -117,19 +133,37 @@ class _GroupChatPageState extends State<GroupChatPage> {
       askUserService: context.read<AskUserInteractionService>(),
       onUiFeedback: _onUiFeedback,
       onMessagesChanged: () {
-        if (mounted) setState(() => _reloadMessages());
+        if (mounted) {
+          _refreshList();
+          setState(() {});
+        }
       },
     );
-    _reloadMessages();
+    _bindConversation();
   }
 
-  void _reloadMessages() {
+  void _onChatControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _bindConversation() {
     final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
-    if (g == null) {
-      _messages = [];
-      return;
+    if (g == null) return;
+    final convo = _chatService.getConversation(g.conversationId);
+    if (convo != null) {
+      _chatController.setCurrentConversation(convo);
     }
-    _messages = List.of(_chatService.getMessages(g.conversationId));
+  }
+
+  void _refreshList() {
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+    final convo = _chatService.getConversation(g.conversationId);
+    if (convo != null) {
+      _chatController.updateCurrentConversation(convo);
+    }
+    _chatController.loadVersionSelections();
+    _chatController.reloadMessages();
   }
 
   void _onUiFeedback(String key) {
@@ -150,6 +184,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
   void dispose() {
     _orchestrator.requestStop();
     _streamExecutor.dispose();
+    _streamController.dispose();
+    _chatController.removeListener(_onChatControllerChanged);
+    _chatController.dispose();
+    _isProcessingFiles.dispose();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
@@ -173,7 +211,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
         content: text,
       );
       await gp.touchUpdatedAt(group.id);
-      _reloadMessages();
+      _refreshList();
       setState(() {});
       await _orchestrator.handleUserMessage(
         group: group,
@@ -184,10 +222,117 @@ class _GroupChatPageState extends State<GroupChatPage> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _reloadMessages();
         });
+        _refreshList();
       }
     }
+  }
+
+  Assistant? _resolveSpeaker(ChatMessage m) {
+    if (m.role != 'assistant') return null;
+    final id = m.speakerAssistantId;
+    if (id == null || id.isEmpty) return null;
+    return context.read<AssistantProvider>().getById(id);
+  }
+
+  Future<void> _onVersionChange(String groupId, int version) async {
+    await _chatController.setSelectedVersion(groupId, version);
+    _refreshList();
+  }
+
+  Future<void> _onRegenerate(ChatMessage message) async {
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+    setState(() => _loading = true);
+    try {
+      await _orchestrator.regenerateAssistantMessage(
+        group: g,
+        message: message,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+        _refreshList();
+      }
+    }
+  }
+
+  Future<void> _onResend(ChatMessage message) async {
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+    setState(() => _loading = true);
+    try {
+      await _orchestrator.resendUserMessage(group: g, userMessage: message);
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+        _refreshList();
+      }
+    }
+  }
+
+  Future<void> _onEdit(ChatMessage message) async {
+    if (!mounted) return;
+    final Future<MessageEditResult?> future = _isDesktop
+        ? showMessageEditDesktopDialog(context, message: message)
+        : showMessageEditSheet(context, message: message);
+    final result = await future;
+    if (result == null || !mounted) return;
+
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+
+    final newMsg = await _chatService.appendMessageVersion(
+      messageId: message.id,
+      content: result.content,
+    );
+    if (newMsg == null) return;
+    final gid = newMsg.groupId ?? newMsg.id;
+    await _chatService.setSelectedVersion(
+      g.conversationId,
+      gid,
+      newMsg.version,
+    );
+    _refreshList();
+
+    if (!result.shouldSend) {
+      setState(() {});
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      if (newMsg.role == 'assistant') {
+        await _orchestrator.regenerateAssistantMessage(
+          group: g,
+          message: newMsg,
+        );
+      } else if (newMsg.role == 'user') {
+        await _orchestrator.resendUserMessage(group: g, userMessage: newMsg);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+        _refreshList();
+      }
+    }
+  }
+
+  Future<void> _onDelete(
+    ChatMessage message,
+    Map<String, List<ChatMessage>> byGroup, {
+    required bool allVersions,
+  }) async {
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+    await _orchestrator.deleteMessageVersions(
+      group: g,
+      message: message,
+      allVersions: allVersions,
+      byGroup: byGroup,
+    );
+    _refreshList();
+    setState(() {});
   }
 
   @override
@@ -196,8 +341,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
     final cs = Theme.of(context).colorScheme;
     final gp = context.watch<GroupChatProvider>();
     final group = gp.getById(widget.groupChatId);
-    final assistants = context.watch<AssistantProvider>().assistants;
-    final byId = {for (final a in assistants) a.id: a};
 
     if (group == null) {
       return Scaffold(
@@ -206,8 +349,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
       );
     }
 
-    // Refresh messages when provider notifies
-    _reloadMessages();
+    final messages = _chatController.collapsedMessages;
+    final byGroup = _chatController.groupedMessages;
 
     return Scaffold(
       appBar: AppBar(
@@ -238,7 +381,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       body: Column(
         children: [
           Expanded(
-            child: _messages.isEmpty
+            child: messages.isEmpty
                 ? Center(
                     child: Text(
                       l10n.groupChatEmptyConversation,
@@ -247,22 +390,56 @@ class _GroupChatPageState extends State<GroupChatPage> {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = _messages[index];
-                      final speaker = msg.role == 'assistant'
-                          ? byId[msg.speakerAssistantId]
-                          : null;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _GroupMessageBubble(
-                          message: msg,
-                          speaker: speaker,
-                        ),
-                      );
+                : MessageListView(
+                    scrollController: _scrollController,
+                    observerController: _observerController,
+                    messages: messages,
+                    byGroup: byGroup,
+                    versionSelections: _chatController.versionSelections,
+                    reasoning: _streamController.reasoning,
+                    reasoningSegments: _streamController.reasoningSegments,
+                    contentSplits: _streamController.contentSplits,
+                    toolParts: _streamController.toolParts,
+                    translations: _translations,
+                    selecting: false,
+                    selectedItems: const <String>{},
+                    dividerPadding: EdgeInsets.zero,
+                    isProcessingFiles: _isProcessingFiles,
+                    streamingContentNotifier:
+                        _streamController.streamingContentNotifier,
+                    resolveSpeaker: _resolveSpeaker,
+                    hideMoreActions: () => {
+                      MessageMoreAction.multiAI,
+                      MessageMoreAction.fork,
+                      MessageMoreAction.selectMessages,
+                    },
+                    onVersionChange: _onVersionChange,
+                    onRegenerateMessage: (m) {
+                      unawaited(_onRegenerate(m));
+                    },
+                    onResendMessage: (m) {
+                      unawaited(_onResend(m));
+                    },
+                    onEditMessage: (m) {
+                      unawaited(_onEdit(m));
+                    },
+                    onDeleteMessage: (m, bg) =>
+                        _onDelete(m, bg, allVersions: false),
+                    onDeleteAllVersions: (m, bg) =>
+                        _onDelete(m, bg, allVersions: true),
+                    onToggleReasoning: (id) {
+                      final r = _streamController.reasoning[id];
+                      if (r == null) return;
+                      r.expanded = !r.expanded;
+                      setState(() {});
+                    },
+                    onToggleReasoningSegment: (id, index) {
+                      final segs = _streamController.reasoningSegments[id];
+                      if (segs == null || index < 0 || index >= segs.length) {
+                        return;
+                      }
+                      segs[index].expanded = !segs[index].expanded;
+                      setState(() {});
                     },
                   ),
           ),
@@ -288,89 +465,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GroupMessageBubble extends StatelessWidget {
-  const _GroupMessageBubble({required this.message, this.speaker});
-  final ChatMessage message;
-  final Assistant? speaker;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isUser = message.role == 'user';
-    final name = isUser
-        ? context.watch<UserProvider>().name
-        : (speaker?.name ?? message.speakerAssistantId ?? 'Assistant');
-    final avatar = isUser ? null : speaker?.avatar;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _avatar(context, cs, name, avatar, isUser),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: AppFontWeights.emphasis,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isUser
-                      ? cs.primary.withValues(alpha: 0.10)
-                      : cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: SelectableText(
-                  message.content.isEmpty && message.isStreaming
-                      ? '…'
-                      : message.content,
-                  style: const TextStyle(fontSize: 15, height: 1.4),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _avatar(
-    BuildContext context,
-    ColorScheme cs,
-    String name,
-    String? avatar,
-    bool isUser,
-  ) {
-    final a = avatar?.trim() ?? '';
-    if (!isUser && a.isNotEmpty && !kIsWeb) {
-      final path = SandboxPathResolver.fix(a);
-      final f = File(path);
-      if (f.existsSync()) {
-        return ClipOval(
-          child: Image.file(f, width: 32, height: 32, fit: BoxFit.cover),
-        );
-      }
-    }
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: cs.primary.withValues(alpha: 0.12),
-      child: Text(
-        name.isNotEmpty ? name.characters.first : '?',
-        style: TextStyle(fontSize: 13, color: cs.primary),
       ),
     );
   }

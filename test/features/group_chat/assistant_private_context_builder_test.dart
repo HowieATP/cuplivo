@@ -23,11 +23,7 @@ void main() {
     final bob = Assistant(id: 'a2', name: 'Bob', systemPrompt: 'B');
 
     final public = [
-      ChatMessage(
-        role: 'user',
-        content: 'Hello all',
-        conversationId: 'c1',
-      ),
+      ChatMessage(role: 'user', content: 'Hello all', conversationId: 'c1'),
       ChatMessage(
         role: 'assistant',
         content: 'Hi from Alice',
@@ -40,11 +36,7 @@ void main() {
         conversationId: 'c1',
         speakerAssistantId: 'a2',
       ),
-      ChatMessage(
-        role: 'user',
-        content: 'Continue',
-        conversationId: 'c1',
-      ),
+      ChatMessage(role: 'user', content: 'Continue', conversationId: 'c1'),
     ];
 
     final private = builder.build(
@@ -64,5 +56,48 @@ void main() {
     expect(userJoined, contains('[User]: Hello all'));
     expect(userJoined, contains('[Bob]: Hi from Bob'));
     expect(userJoined, contains('[User]: Continue'));
+  });
+
+  test('private context collapse defaults to last version by index', () {
+    final service = _FakeChatService();
+    final builder = AssistantPrivateContextBuilder(chatService: service);
+    final conv = Conversation(
+      id: 'c1',
+      title: 'g',
+      conversationKind: Conversation.kindGroup,
+    );
+    final alice = Assistant(id: 'a1', name: 'Alice', systemPrompt: 'A');
+    const gid = 'ag';
+    final public = [
+      ChatMessage(role: 'user', content: 'Q', conversationId: 'c1'),
+      ChatMessage(
+        id: 'v0',
+        role: 'assistant',
+        content: 'old',
+        conversationId: 'c1',
+        speakerAssistantId: 'a1',
+        groupId: gid,
+        version: 0,
+      ),
+      ChatMessage(
+        id: 'v1',
+        role: 'assistant',
+        content: 'new',
+        conversationId: 'c1',
+        speakerAssistantId: 'a1',
+        groupId: gid,
+        version: 1,
+      ),
+    ];
+
+    final private = builder.build(
+      conversation: conv,
+      publicMessages: public,
+      speaker: alice,
+      userName: 'User',
+      assistantsById: {'a1': alice},
+    );
+    final assistant = private.where((m) => m.role == 'assistant').single;
+    expect(assistant.content, 'new');
   });
 }

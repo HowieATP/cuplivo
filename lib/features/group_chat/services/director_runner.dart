@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/assistant.dart';
-import '../../../core/models/director_message.dart';
+import '../../../core/models/chat_message.dart';
 import '../../../core/models/group_chat.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -17,6 +17,9 @@ import 'director_tool_protocol.dart';
 /// Uses the same transport as normal chat ([ChatApiService.sendMessageStream])
 /// with provider-default `tool_choice: auto` (not `required`), so DeepSeek and
 /// other OpenAI-compatible hosts that reject forced tools still work.
+///
+/// Director history is not persisted; each call is assembled from the public
+/// conversation transcript.
 class DirectorRunner {
   DirectorRunner({required this.chatService, required this.contextBuilder});
 
@@ -36,6 +39,11 @@ class DirectorRunner {
     required SettingsProvider settings,
     required bool Function(String providerKey, String modelId)
     modelSupportsTools,
+    required List<ChatMessage> publicMessages,
+    required Map<String, int> versionSelections,
+    required Map<String, Assistant> assistantsById,
+    String? skipPendingCapMessageId,
+    String? excludeTrailingUserMessageId,
   }) async {
     final providerKey =
         (group.directorModelProvider ?? settings.currentModelProvider)?.trim();
@@ -57,30 +65,21 @@ class DirectorRunner {
     final config = settings.getProviderConfig(providerKey);
     final assistantIds = rosterAssistants.map((a) => a.id).toList();
     final tools = DirectorTools.definitions(assistantIds);
-    final history = await chatService.repo.getDirectorMessages(group.id);
 
-    final apiMessages = contextBuilder.buildApiMessages(
+    final apiMessages = contextBuilder.buildApiMessagesFromPublic(
       group: group,
-      history: history,
+      publicMessages: publicMessages,
+      versionSelections: versionSelections,
       newUserContent: newUserContent,
       rosterAssistants: rosterAssistants,
       userName: userName,
       memberNames: memberNames,
+      assistantsById: assistantsById,
+      skipPendingCapMessageId: skipPendingCapMessageId,
+      excludeTrailingUserMessageId: excludeTrailingUserMessageId,
     );
 
-    // Persist the new user turn first.
-    final nextOrder = history.isEmpty
-        ? 0
-        : history.map((m) => m.messageOrder).reduce((a, b) => a > b ? a : b) +
-              1;
-    await chatService.repo.appendDirectorMessage(
-      DirectorMessage(
-        groupChatId: group.id,
-        role: 'user',
-        content: newUserContent,
-        messageOrder: nextOrder,
-      ),
-    );
+    final requestStamp = DateTime.now().microsecondsSinceEpoch;
 
     String? lastError;
     String? lastFreeText;
@@ -93,7 +92,7 @@ class DirectorRunner {
         messages: apiMessages,
         tools: tools,
         assistantIds: assistantIds,
-        requestId: 'director-${group.id}-$nextOrder',
+        requestId: 'director-${group.id}-$requestStamp',
       );
       decision = result.decision;
       lastFreeText = result.freeText;
@@ -103,7 +102,6 @@ class DirectorRunner {
     }
 
     if (decision == null) {
-      // Retry with stronger instruction (same as daily chat: tool_choice auto).
       final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
         ..add({
           'role': 'user',
@@ -119,7 +117,7 @@ class DirectorRunner {
           messages: retryMessages,
           tools: tools,
           assistantIds: assistantIds,
-          requestId: 'director-${group.id}-$nextOrder-retry',
+          requestId: 'director-${group.id}-$requestStamp-retry',
         );
         decision = result.decision;
         lastFreeText = result.freeText ?? lastFreeText;
@@ -129,7 +127,6 @@ class DirectorRunner {
       }
     }
 
-    // Weak free-text fallback: if model printed an assistant id, use it.
     if (decision == null && lastFreeText != null && lastFreeText.isNotEmpty) {
       decision = _tryParseFreeTextDecision(lastFreeText, assistantIds);
       if (decision != null) {
@@ -151,25 +148,6 @@ class DirectorRunner {
     debugPrint(
       '[Director] decision=${decision.kind} '
       'assistant=${decision.assistantId} fallback=${decision.fallback}',
-    );
-
-    // Persist assistant decision row for logs.
-    await chatService.repo.appendDirectorMessage(
-      DirectorMessage(
-        groupChatId: group.id,
-        role: 'assistant',
-        content: jsonEncode({
-          'kind': decision.kind.name,
-          'assistant_id': decision.assistantId,
-          'reason': decision.reason,
-          'fallback': decision.fallback,
-          if (lastFreeText != null && lastFreeText.isNotEmpty)
-            'model_text': _clip(lastFreeText, 500),
-          if (lastError != null) 'error': _clip(lastError, 300),
-        }),
-        messageOrder: nextOrder + 1,
-        metaJson: jsonEncode({'type': 'decision'}),
-      ),
     );
 
     return decision;
@@ -197,14 +175,11 @@ class DirectorRunner {
       if (decided != null && !completer.isCompleted) {
         completer.complete(decided);
       }
-      // Stop provider tool follow-up rounds; decision is enough.
       unawaited(Future(() => ChatApiService.cancelRequest(requestId)));
       return jsonEncode({'ok': true});
     }
 
     try {
-      // Match normal Cuplivo chat tool path: do NOT force tool_choice=required.
-      // Providers default to tool_choice: auto (DeepSeek-compatible).
       final stream = ChatApiService.sendMessageStream(
         config: config,
         modelId: modelId,
@@ -265,7 +240,6 @@ class DirectorRunner {
     Map<String, dynamic> args,
     List<String> assistantIds,
   ) {
-    // Normalize names some gateways mangle (prefix/suffix).
     final normalized = name.trim().toLowerCase().replaceAll('-', '_');
     if (normalized == DirectorTools.endTurn ||
         normalized.endsWith(DirectorTools.endTurn)) {
@@ -286,7 +260,6 @@ class DirectorRunner {
     return null;
   }
 
-  /// Best-effort parse when model ignored tools and wrote text.
   DirectorDecision? _tryParseFreeTextDecision(
     String text,
     List<String> assistantIds,

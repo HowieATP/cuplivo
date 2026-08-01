@@ -911,26 +911,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   String _assistantNameFallback() {
     try {
-      final chat = context.read<ChatService>();
-      final convo = chat.getConversation(widget.message.conversationId);
-      final aId = convo?.assistantId;
-      if (aId != null && aId.isNotEmpty) {
-        final ap = context.read<AssistantProvider>();
-        final a = ap.getById(aId);
-        final name = a?.name.trim();
-        if (name != null && name.isNotEmpty) return name;
-      }
+      final a = _assistantForMessage();
+      final name = a?.name.trim();
+      if (name != null && name.isNotEmpty) return name;
     } catch (_) {}
     return 'AI Assistant';
   }
 
   Assistant? _assistantForMessage() {
     try {
+      final ap = context.watch<AssistantProvider>();
+      final speakerId = widget.message.speakerAssistantId;
+      if (speakerId != null && speakerId.isNotEmpty) {
+        final speaker = ap.getById(speakerId);
+        if (speaker != null) return speaker;
+      }
       final chat = context.read<ChatService>();
       final convo = chat.getConversation(widget.message.conversationId);
       final aId = convo?.assistantId;
       if (aId == null || aId.isEmpty) return null;
-      final ap = context.watch<AssistantProvider>();
       return ap.getById(aId);
     } catch (_) {
       return null;

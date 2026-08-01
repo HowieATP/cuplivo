@@ -614,9 +614,16 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Reload messages from storage.
+  ///
+  /// When the loaded window sits at the conversation tail and new messages
+  /// were appended (e.g. written via ChatService by group chat), the window
+  /// re-anchors to the new tail so the appended messages are visible. Windows
+  /// in the middle of history keep their position.
   void reloadMessages() {
     if (_currentConversation == null) return;
     final conversationId = _currentConversation!.id;
+    final wasAtTail =
+        _loadedStartIndex + _messages.length >= _totalMessageCount;
     _totalMessageCount = _chatService.getMessageCount(conversationId);
     if (_totalMessageCount == 0) {
       _messages = [];
@@ -633,13 +640,16 @@ class ChatController extends ChangeNotifier {
         .clamp(0, _totalMessageCount)
         .toInt();
     final safeStart = start > maxStart ? maxStart : start;
-    _messages = List.of(
-      _chatService.getMessagesRange(
-        conversationId,
-        start: safeStart,
-        limit: visibleCount,
-      ),
+    final range = _chatService.getMessagesRange(
+      conversationId,
+      start: safeStart,
+      limit: visibleCount,
     );
+    if (wasAtTail && safeStart + range.length < _totalMessageCount) {
+      loadEndWindow();
+      return;
+    }
+    _messages = List.of(range);
     _loadedStartIndex = safeStart;
     notifyListeners();
   }

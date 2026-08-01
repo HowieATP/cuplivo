@@ -19,7 +19,7 @@ final Logger _logger = Logger('mcp_client.sse_auth_transport');
 class SseAuthClientTransport implements ClientTransport {
   final String serverUrl;
   final Map<String, String> _baseHeaders;
-  final OAuthToken? _oauthToken;
+  OAuthToken? _oauthToken;
   final OAuthClient? _oauthClient;
   final _messageController = StreamController<dynamic>.broadcast();
   final _closeCompleter = Completer<void>();
@@ -175,6 +175,11 @@ class SseAuthClientTransport implements ClientTransport {
         refreshToken: _oauthToken!.refreshToken!,
       );
 
+      // The refreshed token must become the current one — send() and
+      // future refreshes read it. Without this the 401-retry loop in
+      // send() would keep using the stale token forever.
+      _oauthToken = newToken;
+
       // Update headers with new token
       final newHeaders = Map<String, String>.from(_baseHeaders);
       newHeaders['Authorization'] = 'Bearer ${newToken.accessToken}';
@@ -328,10 +333,11 @@ class SseAuthClientTransport implements ClientTransport {
       });
 
       // Add current OAuth token if available
-      if (_oauthToken != null) {
+      final token = _oauthToken;
+      if (token != null) {
         request.headers.set(
           'Authorization',
-          'Bearer ${_oauthToken.accessToken}',
+          'Bearer ${token.accessToken}',
         );
       }
 

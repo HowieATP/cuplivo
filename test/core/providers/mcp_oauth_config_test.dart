@@ -191,6 +191,73 @@ void main() {
       );
     });
 
+    test('beginOAuthFlow with configOverride starts from the form config '
+        'and persists discovered values onto a server without OAuth', () async {
+      SharedPreferences.setMockInitialValues({});
+      final discoveryServer = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/.well-known/oauth-authorization-server') {
+          return http.Response(
+            jsonEncode({
+              'issuer': 'https://mcp.example.com/',
+              'authorization_endpoint': 'https://mcp.example.com/authorize',
+              'token_endpoint': 'https://mcp.example.com/token',
+              'registration_endpoint': 'https://mcp.example.com/register',
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (path == '/register' && request.method == 'POST') {
+          return http.Response(
+            jsonEncode({'client_id': 'dcr-client-1'}),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('not found', 404);
+      });
+      final provider = McpProvider(
+        contextProvider: () => throw UnimplementedError(),
+        oauthFlowService: OAuthFlowService(
+          clientFactory: () => discoveryServer,
+        ),
+      );
+      final id = await provider.addServer(
+        enabled: false,
+        name: 'Tavily',
+        transport: McpTransportType.http,
+        url: 'https://mcp.example.com/mcp',
+      );
+
+      // Server has no persisted OAuth config (switch just turned on);
+      // the override carries the form's empty fields.
+      final result = await provider.beginOAuthFlow(
+        id,
+        configOverride: const McpOAuthConfig(
+          authorizationEndpoint: '',
+          tokenEndpoint: '',
+          clientId: '',
+        ),
+      );
+
+      expect(result.usedDiscovery, isTrue);
+      expect(result.usedDcr, isTrue);
+      expect(
+        result.authorizationUrl.queryParameters['client_id'],
+        'dcr-client-1',
+      );
+      // Discovered values were persisted onto the server config.
+      final updated = provider.getById(id)!;
+      expect(
+        updated.oauth?.authorizationEndpoint,
+        'https://mcp.example.com/authorize',
+      );
+      expect(updated.oauth?.tokenEndpoint, 'https://mcp.example.com/token');
+      expect(updated.oauth?.clientId, 'dcr-client-1');
+      expect(updated.oauth?.clientRegistrationVersion, 2);
+    });
+
     test('beginOAuthFlow returns an authorize URL with client_id', () async {
       SharedPreferences.setMockInitialValues({});
       final provider = buildProvider();

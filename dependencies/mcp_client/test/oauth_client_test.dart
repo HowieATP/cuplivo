@@ -236,4 +236,73 @@ void main() {
       },
     );
   });
+
+  group('OAuthTokenManager refresh hooks', () {
+    test('getAccessToken fires onTokenRefresh with the new token', () async {
+      final fake = _FakeOAuthClient();
+      final manager = mcp.OAuthTokenManager(fake);
+      final refreshed = <mcp.OAuthToken>[];
+      manager.onTokenRefresh = (oldToken, newToken) {
+        refreshed.add(newToken);
+      };
+      manager.setToken(
+        mcp.OAuthToken(
+          accessToken: 'at-expired',
+          refreshToken: 'rt-1',
+          expiresIn: 1,
+          issuedAt: DateTime.now().subtract(const Duration(seconds: 5)),
+        ),
+      );
+
+      final access = await manager.getAccessToken();
+
+      expect(access, 'at-refreshed');
+      // The refreshed token replaced the expired one.
+      expect(manager.currentToken?.accessToken, 'at-refreshed');
+      expect(manager.currentToken?.refreshToken, 'rt-refreshed');
+      // The persistence hook must fire (regression: it was only reachable
+      // via OAuthTokenManager.refreshToken(), which nothing called).
+      expect(refreshed, hasLength(1));
+      expect(refreshed.single.accessToken, 'at-refreshed');
+    });
+
+    test('setToken alone does not fire onTokenRefresh', () async {
+      final fake = _FakeOAuthClient();
+      final manager = mcp.OAuthTokenManager(fake);
+      var calls = 0;
+      manager.onTokenRefresh = (oldToken, newToken) => calls++;
+
+      manager.setToken(
+        mcp.OAuthToken(
+          accessToken: 'at-1',
+          refreshToken: 'rt-1',
+          expiresIn: 3600,
+          issuedAt: DateTime.now(),
+        ),
+      );
+
+      expect(calls, 0);
+    });
+  });
+}
+
+class _FakeOAuthClient extends mcp.HttpOAuthClient {
+  _FakeOAuthClient()
+    : super(
+        config: mcp.OAuthConfig(
+          authorizationEndpoint: 'https://auth.example.com/authorize',
+          tokenEndpoint: 'https://auth.example.com/token',
+          clientId: 'c',
+        ),
+      );
+
+  @override
+  Future<mcp.OAuthToken> refreshToken({required String refreshToken}) async {
+    return mcp.OAuthToken(
+      accessToken: 'at-refreshed',
+      refreshToken: 'rt-refreshed',
+      expiresIn: 3600,
+      issuedAt: DateTime.now(),
+    );
+  }
 }

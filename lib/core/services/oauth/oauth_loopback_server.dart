@@ -17,6 +17,7 @@ class OAuthLoopbackServer {
   HttpServer? _server;
   HttpServer? _serverV6;
   Completer<Uri?>? _callback;
+  final Set<Completer<void>> _waitCancels = {};
 
   /// The loopback callback URL (e.g. `http://localhost:41234/callback`).
   Uri? get callbackUrl => _server == null
@@ -89,15 +90,31 @@ class OAuthLoopbackServer {
   ///
   /// Returns the full callback URI (with `code`/`error` query parameters),
   /// or null when [timeout] elapses without a callback (the caller then
-  /// falls back to the manual paste flow).
+  /// falls back to the manual paste flow). [cancelWait] interrupts the
+  /// wait, returning null immediately (the caller distinguishes this from
+  /// a timeout via its session's `interrupted` flag).
   Future<Uri?> waitForCallback(Duration timeout) async {
     final callback = _callback;
     if (callback == null) return null;
-    final result = await callback.future.timeout(
-      timeout,
-      onTimeout: () => null,
-    );
-    return result;
+    final cancel = Completer<void>();
+    _waitCancels.add(cancel);
+    try {
+      return await Future.any<Uri?>([
+        callback.future,
+        cancel.future.then((_) => null),
+        Future<Uri?>.delayed(timeout, () => null),
+      ]);
+    } finally {
+      _waitCancels.remove(cancel);
+    }
+  }
+
+  /// Interrupts an in-flight [waitForCallback] (returns null to the
+  /// waiter). The callback completer stays pending until [close].
+  void cancelWait() {
+    for (final c in _waitCancels.toList()) {
+      if (!c.isCompleted) c.complete();
+    }
   }
 
   /// Stops the server and releases the port.

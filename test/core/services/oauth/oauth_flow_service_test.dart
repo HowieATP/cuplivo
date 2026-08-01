@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 
 import 'package:Cuplivo/core/services/oauth/oauth_flow_service.dart';
+import 'package:Cuplivo/core/services/oauth/oauth_loopback_server.dart';
 
 const _serverUrl = 'https://mcp.example.com/mcp/';
 
@@ -311,6 +312,133 @@ void main() {
             ),
           ),
         );
+      },
+    );
+  });
+
+  group('OAuthFlowService discovery failure', () {
+    test('no discoverable metadata → noAuthEndpoint instead of a '
+        'malformed URL', () async {
+      // Everything 404s: discovery returns null, DCR is skipped.
+      final nothing = MockClient((request) async => http.Response('nope', 404));
+      final service = OAuthFlowService(clientFactory: () => nothing);
+
+      await expectLater(
+        service.beginFlow(
+          key: 'server-1',
+          config: _config(),
+          serverUrl: _serverUrl,
+        ),
+        throwsA(
+          isA<OAuthFlowException>().having(
+            (e) => e.code,
+            'code',
+            OAuthFlowErrorCode.noAuthEndpoint,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('OAuthFlowService paste override', () {
+    test('a pasted code overrides an in-flight callback wait', () async {
+      final service = _service();
+      await service.beginFlow(
+        key: 'server-1',
+        config: _config(),
+        serverUrl: _serverUrl,
+      );
+      final waiting = service.completeFlow(
+        key: 'server-1',
+        callbackTimeout: const Duration(minutes: 2),
+      );
+      // Attach the matcher BEFORE the interruption — the overridden waiter
+      // completes with an error the moment it is interrupted, and an
+      // un-listened failing future surfaces as an unhandled error.
+      final waitingExpectation = expectLater(
+        waiting,
+        throwsA(
+          isA<OAuthFlowException>().having(
+            (e) => e.code,
+            'code',
+            OAuthFlowErrorCode.interrupted,
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // The paste wins: it exchanges immediately.
+      final token = await service.completeFlow(
+        key: 'server-1',
+        pasted: 'cb-code',
+      );
+      expect(token.accessToken, 'access-123');
+
+      // The overridden waiter exits silently via the internal `interrupted`
+      // signal instead of surfacing a timeout error.
+      await waitingExpectation;
+    });
+
+    test('an empty paste does not override an in-flight wait', () async {
+      final service = _service();
+      await service.beginFlow(
+        key: 'server-1',
+        config: _config(),
+        serverUrl: _serverUrl,
+      );
+      final waiting = service.completeFlow(
+        key: 'server-1',
+        callbackTimeout: const Duration(minutes: 2),
+      );
+      final waitingExpectation = expectLater(
+        waiting,
+        throwsA(
+          isA<OAuthFlowException>().having(
+            (e) => e.code,
+            'code',
+            OAuthFlowErrorCode.callbackTimeout,
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      await expectLater(
+        service.completeFlow(key: 'server-1', pasted: ''),
+        throwsA(
+          isA<OAuthFlowException>().having(
+            (e) => e.code,
+            'code',
+            OAuthFlowErrorCode.noSession,
+          ),
+        ),
+      );
+
+      // Cancel interrupts the pending wait so the waiter does not hang
+      // until the timeout.
+      service.cancelFlow('server-1');
+      await waitingExpectation;
+    });
+  });
+
+  group('OAuthLoopbackServer cancellation', () {
+    test(
+      'cancelWait interrupts waitForCallback; close releases the port',
+      () async {
+        final server = OAuthLoopbackServer();
+        await server.start();
+        final port = server.callbackUrl!.port;
+
+        final wait = server.waitForCallback(const Duration(minutes: 2));
+        server.cancelWait();
+        expect(await wait, isNull);
+
+        await server.close();
+        // Port must be released: rebinding the same port succeeds.
+        final probe = await ServerSocket.bind(
+          InternetAddress.loopbackIPv4,
+          port,
+        );
+        await probe.close();
       },
     );
   });

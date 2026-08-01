@@ -101,13 +101,16 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     _oauthInitialized = true;
     _oauth =
         McpOAuthSectionController(
-            beginFlowOp: (serverId) =>
-                context.read<McpProvider>().beginOAuthFlow(serverId),
+            beginFlowOp: (serverId, config) => context
+                .read<McpProvider>()
+                .beginOAuthFlow(serverId, configOverride: config),
             completeFlowOp: (serverId, pasted) =>
                 context.read<McpProvider>().completeOAuthFlow(serverId, pasted),
             clearTokenOp: (serverId) =>
                 context.read<McpProvider>().clearOAuthToken(serverId),
             ensureServerIdOp: _ensureServerId,
+            removeServerOp: (serverId) =>
+                context.read<McpProvider>().removeServer(serverId),
             notify: (message, {isError = false}) {
               if (!mounted) return;
               showAppSnackBar(
@@ -137,7 +140,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     return OAuthSectionMessages(
       notConfigured: l10n.mcpOAuthConfigIncomplete,
       urlCopied: l10n.mcpOAuthUrlCopied,
-      flowStartFailed: l10n.mcpOAuthConfigIncomplete,
+      flowStartFailed: l10n.mcpOAuthFlowStartFailed,
       success: l10n.mcpOAuthSuccess,
       tokenCleared: l10n.mcpOAuthTokenCleared,
     );
@@ -155,6 +158,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       OAuthFlowErrorCode.callbackTimeout => l10n.mcpOAuthErrorCallbackTimeout,
       OAuthFlowErrorCode.authorizationDenied =>
         l10n.mcpOAuthErrorAuthorizationDenied,
+      OAuthFlowErrorCode.noAuthEndpoint => l10n.mcpOAuthErrorNoAuthEndpoint,
+      // Internal signal, filtered out by the controller before this
+      // mapper is reached — placeholder never shown.
+      OAuthFlowErrorCode.interrupted => '',
     };
     // Show the raw server detail (error_description) for exchange
     // failures — the generic message hides the root cause.
@@ -719,7 +726,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 icon: Lucide.Check,
                 label: l10n.mcpOAuthCompleteButton,
                 backgroundColor: cs.primary,
-                enabled: !_oauth.completing,
+                enabled:
+                    !_oauth.completing ||
+                    _oauth.pasteCtrl.text.trim().isNotEmpty,
                 onTap: () => _oauth.completeFlow(
                   _oauth.createdId ?? widget.serverId ?? '',
                 ),

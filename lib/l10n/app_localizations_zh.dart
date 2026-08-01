@@ -2965,6 +2965,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpOAuthConfigIncomplete => '请先填写授权端点、令牌端点和 Client ID';
 
   @override
+  String get mcpOAuthFlowStartFailed => '无法启动授权流程，请检查服务器地址和网络后重试';
+
+  @override
+  String get mcpOAuthErrorNoAuthEndpoint => '无法自动发现授权端点。请检查服务器地址，或在高级配置中手动填写端点';
+
+  @override
   String get mcpOAuthSuccess => 'OAuth 授权成功';
 
   @override
@@ -2984,9 +2990,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpOAuthErrorExchangeFailed => '令牌交换失败，请检查端点和 Client ID';
-
-  @override
-  String get mcpOAuthManualModeHint => '自动回调不可用——请打开链接完成授权，然后把 code 粘贴回来';
 
   @override
   String get mcpOAuthAutoWaitHint => '正在等待浏览器回调……若未自动跳转，请在下方粘贴 code';
@@ -9424,6 +9427,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpOAuthConfigIncomplete => '请先填写授权端点、令牌端点和 Client ID';
 
   @override
+  String get mcpOAuthFlowStartFailed => '无法启动授权流程，请检查服务器地址和网络后重试';
+
+  @override
+  String get mcpOAuthErrorNoAuthEndpoint => '无法自动发现授权端点。请检查服务器地址，或在高级配置中手动填写端点';
+
+  @override
   String get mcpOAuthSuccess => 'OAuth 授权成功';
 
   @override
@@ -9443,9 +9452,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthErrorExchangeFailed => '令牌交换失败，请检查端点和 Client ID';
-
-  @override
-  String get mcpOAuthManualModeHint => '自动回调不可用——请打开链接完成授权，然后把 code 粘贴回来';
 
   @override
   String get mcpOAuthAutoWaitHint => '正在等待浏览器回调……若未自动跳转，请在下方粘贴 code';
@@ -15882,6 +15888,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpOAuthConfigIncomplete => '請先填寫授權端點、令牌端點和 Client ID';
 
   @override
+  String get mcpOAuthFlowStartFailed => '無法啟動授權流程，請檢查伺服器位址和網路後重試';
+
+  @override
+  String get mcpOAuthErrorNoAuthEndpoint => '無法自動發現授權端點。請檢查伺服器位址，或在進階設定中手動填寫端點';
+
+  @override
   String get mcpOAuthSuccess => 'OAuth 授權成功';
 
   @override
@@ -15901,9 +15913,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthErrorExchangeFailed => '令牌交換失敗，請檢查端點和 Client ID';
-
-  @override
-  String get mcpOAuthManualModeHint => '自動回調不可用——請開啟連結完成授權，然後把 code 貼回來';
 
   @override
   String get mcpOAuthAutoWaitHint => '正在等待瀏覽器回調……若未自動跳轉，請在下方貼上 code';

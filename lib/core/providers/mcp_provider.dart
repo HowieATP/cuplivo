@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
@@ -418,8 +419,11 @@ class McpProvider extends ChangeNotifier {
     this.assistantProvider,
     this.headlessGen,
     required this.contextProvider,
+    http.Client Function()? oauthClientFactory,
     OAuthFlowService? oauthFlowService,
-  }) : oauthFlowService = oauthFlowService ?? OAuthFlowService() {
+  }) : oauthFlowService =
+           oauthFlowService ??
+           OAuthFlowService(clientFactory: oauthClientFactory) {
     _load();
   }
 
@@ -908,13 +912,22 @@ class McpProvider extends ChangeNotifier {
   /// loopback callback server. Any discovered/registered values are
   /// persisted back into the server config. Returns the flow start result.
   ///
-  /// Throws [StateError] when the server has no OAuth configuration.
-  Future<OAuthFlowStartResult> beginOAuthFlow(String serverId) async {
+  /// [configOverride] supplies the form's current OAuth configuration.
+  /// Without it (and when the server has no persisted config) the flow
+  /// fails — the edit form is the source of truth, e.g. the OAuth switch
+  /// may have just been turned on and never saved.
+  ///
+  /// Throws [StateError] when neither the override nor the server has an
+  /// OAuth configuration.
+  Future<OAuthFlowStartResult> beginOAuthFlow(
+    String serverId, {
+    McpOAuthConfig? configOverride,
+  }) async {
     final server = getById(serverId);
     if (server == null) {
       throw StateError('MCP server not found: $serverId');
     }
-    final oauth = server.oauth;
+    final oauth = configOverride ?? server.oauth;
     if (oauth == null) {
       throw StateError(
         'OAuth is not configured for server "${server.name}". '
@@ -936,30 +949,30 @@ class McpProvider extends ChangeNotifier {
     );
     // Persist discovered/registered values so the next run starts
     // fully configured. Persist only the deltas to avoid clobbering
-    // user-edited fields with identical values.
+    // user-edited fields with identical values. When the server never
+    // had an OAuth config (switch just turned on in the edit form),
+    // the override becomes the persisted base.
     if (result.usedDiscovery || result.usedDcr) {
       final idx = _servers.indexWhere((e) => e.id == serverId);
       if (idx >= 0) {
         final current = _servers[idx];
-        final existing = current.oauth;
-        if (existing != null) {
-          final updated = existing.copyWith(
-            authorizationEndpoint:
-                result.discoveredAuthorizationEndpoint ??
-                existing.authorizationEndpoint,
-            tokenEndpoint:
-                result.discoveredTokenEndpoint ?? existing.tokenEndpoint,
-            clientId: result.discoveredClientId ?? existing.clientId,
-            // A fresh DCR registration carries both loopback variants.
-            clientRegistrationVersion: result.usedDcr
-                ? 2
-                : existing.clientRegistrationVersion,
-          );
-          _servers = List<McpServerConfig>.of(_servers)
-            ..[idx] = current.copyWith(oauth: updated);
-          await _persist();
-          notifyListeners();
-        }
+        final existing = current.oauth ?? oauth;
+        final updated = existing.copyWith(
+          authorizationEndpoint:
+              result.discoveredAuthorizationEndpoint ??
+              existing.authorizationEndpoint,
+          tokenEndpoint:
+              result.discoveredTokenEndpoint ?? existing.tokenEndpoint,
+          clientId: result.discoveredClientId ?? existing.clientId,
+          // A fresh DCR registration carries both loopback variants.
+          clientRegistrationVersion: result.usedDcr
+              ? 2
+              : existing.clientRegistrationVersion,
+        );
+        _servers = List<McpServerConfig>.of(_servers)
+          ..[idx] = current.copyWith(oauth: updated);
+        await _persist();
+        notifyListeners();
       }
     }
     return result;

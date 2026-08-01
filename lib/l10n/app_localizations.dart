@@ -5723,6 +5723,18 @@ abstract class AppLocalizations {
   /// **'Fill in Authorization Endpoint, Token Endpoint and Client ID first'**
   String get mcpOAuthConfigIncomplete;
 
+  /// No description provided for @mcpOAuthFlowStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to start authorization. Check the server URL and network, then try again.'**
+  String get mcpOAuthFlowStartFailed;
+
+  /// No description provided for @mcpOAuthErrorNoAuthEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not discover the authorization endpoint. Check the server URL, or fill in the endpoints manually under Advanced Config.'**
+  String get mcpOAuthErrorNoAuthEndpoint;
+
   /// No description provided for @mcpOAuthSuccess.
   ///
   /// In en, this message translates to:
@@ -5764,12 +5776,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Token exchange failed. Check your endpoints and Client ID.'**
   String get mcpOAuthErrorExchangeFailed;
-
-  /// No description provided for @mcpOAuthManualModeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto callback unavailable — open the URL, authorize, then paste the code back'**
-  String get mcpOAuthManualModeHint;
 
   /// No description provided for @mcpOAuthAutoWaitHint.
   ///

@@ -53,6 +53,11 @@ class OAuthFlowSession {
   /// the token exchange unless it is OOB-style.
   final String? actualRedirectUri;
 
+  /// Set when an in-flight automatic callback wait is overridden by a
+  /// pasted code (see [OAuthFlowService.completeFlow]). The overridden
+  /// waiter exits silently instead of surfacing a timeout error.
+  bool interrupted = false;
+
   OAuthFlowSession({
     required this.key,
     required this.client,
@@ -122,6 +127,7 @@ class OAuthFlowService {
     String? discoveredClientId;
 
     final httpClient = _clientFactory();
+    OAuthLoopbackServer? loopbackServer;
     try {
       // 1. Discover the authorization server when endpoints are missing.
       mcp.AuthServerMetadata? metadata;
@@ -195,7 +201,6 @@ class OAuthFlowService {
       }
 
       // 3. Start the loopback server (auto-callback).
-      OAuthLoopbackServer? loopbackServer;
       if (allowLoopback) {
         final candidate = OAuthLoopbackServer();
         try {
@@ -212,6 +217,16 @@ class OAuthFlowService {
       //    browsers race ::1/127.0.0.1, and the client was registered with
       //    both loopback variants);
       //    manual → user-configured redirect URI, or none (OOB-style).
+      // Fail loudly when discovery produced no authorization endpoint —
+      // continuing would build a malformed relative URL that only fails
+      // later at launch time with a misleading error.
+      if (effectiveConfig.authorizationEndpoint.isEmpty) {
+        throw const OAuthFlowException(
+          OAuthFlowErrorCode.noAuthEndpoint,
+          'Authorization endpoint is empty and could not be discovered '
+          '(RFC 8414 discovery returned no metadata).',
+        );
+      }
       String? actualRedirectUri;
       final additionalParams = <String, String>{};
       final loopbackUrl = loopbackServer?.callbackUrl;
@@ -254,6 +269,10 @@ class OAuthFlowService {
       );
     } catch (e) {
       httpClient.close();
+      // The loopback server may already be bound (e.g. the authorize-URL
+      // step failed) but the session was never registered — release the
+      // port so failed starts do not leak listeners.
+      await loopbackServer?.close();
       rethrow;
     }
   }
@@ -280,10 +299,20 @@ class OAuthFlowService {
       );
     }
     if (!_inFlight.add(key)) {
-      throw const OAuthFlowException(
-        OAuthFlowErrorCode.noSession,
-        'The flow is already completing.',
-      );
+      // An automatic completion is already waiting on the loopback
+      // callback. A non-empty paste overrides it (the user chose the
+      // manual path); an empty paste is a duplicate call and is rejected.
+      final overrides = pasted != null && pasted.trim().isNotEmpty;
+      if (!overrides) {
+        throw const OAuthFlowException(
+          OAuthFlowErrorCode.noSession,
+          'The flow is already completing.',
+        );
+      }
+      session.interrupted = true;
+      session.loopbackServer?.cancelWait();
+      // The overridden waiter keeps its `_inFlight` slot clean-up to the
+      // overriding call, which removes the key on success/failure.
     }
 
     try {
@@ -296,6 +325,14 @@ class OAuthFlowService {
           callbackTimeout,
         );
         if (callback == null) {
+          if (session.interrupted) {
+            // Overridden by a pasted code: exit silently — the overriding
+            // call owns the flow outcome now.
+            throw const OAuthFlowException(
+              OAuthFlowErrorCode.interrupted,
+              'The automatic callback wait was overridden by a pasted code.',
+            );
+          }
           throw const OAuthFlowException(
             OAuthFlowErrorCode.callbackTimeout,
             'No authorization callback received.',
@@ -394,6 +431,12 @@ class OAuthFlowService {
     } catch (e) {
       // Validation failures (noCode, stateMismatch, callbackTimeout, ...):
       // keep the session for a retry, close the consumed/timed-out loopback.
+      if (e is OAuthFlowException && e.code == OAuthFlowErrorCode.interrupted) {
+        // Overridden by a paste — the overriding call owns the `_inFlight`
+        // slot and cleans it up on completion. Do not remove it here.
+        await session.loopbackServer?.close();
+        rethrow;
+      }
       _inFlight.remove(key);
       await session.loopbackServer?.close();
       rethrow;
@@ -408,6 +451,8 @@ class OAuthFlowService {
   void _cancel(String key) {
     final existing = _sessions.remove(key);
     existing?.client.close();
+    // Interrupt any pending callback wait so the waiter exits promptly.
+    existing?.loopbackServer?.cancelWait();
     if (existing?.loopbackServer != null) {
       unawaited(existing!.loopbackServer!.close());
     }
@@ -449,6 +494,11 @@ enum OAuthFlowErrorCode {
   exchangeFailed,
   callbackTimeout,
   authorizationDenied,
+  noAuthEndpoint,
+
+  /// Internal signal: an automatic loopback wait was overridden by a
+  /// pasted code. Not shown to the user.
+  interrupted,
 }
 
 /// A user-recoverable error in the OAuth flow (bad paste, state mismatch,

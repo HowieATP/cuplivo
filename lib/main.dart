@@ -38,6 +38,7 @@ import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/headless_generation_service.dart';
+import 'core/services/network/dio_http_client.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
@@ -53,11 +54,38 @@ import 'core/services/notification_service.dart';
 import 'core/services/proactive_care_alarm_service.dart';
 import 'core/services/proactive_care_message_flow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _didCheckUpdates = false; // one-time update check flag
+
+/// Builds an HTTP client for MCP OAuth discovery/registration/loopback
+/// traffic, honoring the app's global proxy setting. The MCP transport
+/// (SSE) is proxied elsewhere; without this the OAuth handshake would
+/// bypass the proxy and fail on networks that require it.
+http.Client _oauthHttpClient(SettingsProvider sp) {
+  final enabled = sp.globalProxyEnabled;
+  final host = sp.globalProxyHost.trim();
+  final portStr = sp.globalProxyPort.trim();
+  final user = sp.globalProxyUsername.trim();
+  final pass = sp.globalProxyPassword;
+  if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
+    final port = int.tryParse(portStr) ?? 8080;
+    return DioHttpClient(
+      proxy: NetworkProxyConfig(
+        enabled: true,
+        type: sp.globalProxyType,
+        host: host,
+        port: port,
+        username: user.isEmpty ? null : user,
+        password: pass.isEmpty ? null : pass,
+      ),
+    );
+  }
+  return DioHttpClient();
+}
 
 Future<void> main() async {
   await runZoned(
@@ -157,12 +185,16 @@ class MyApp extends StatelessWidget {
               HeadlessGenerationService(chatService: ctx.read<ChatService>()),
         ),
         ChangeNotifierProvider(
-          create: (ctx) => McpProvider(
-            chatService: ctx.read<ChatService>(),
-            assistantProvider: ctx.read<AssistantProvider>(),
-            headlessGen: ctx.read<HeadlessGenerationService>(),
-            contextProvider: () => navigatorKey.currentContext!,
-          ),
+          create: (ctx) {
+            final sp = ctx.read<SettingsProvider>();
+            return McpProvider(
+              chatService: ctx.read<ChatService>(),
+              assistantProvider: ctx.read<AssistantProvider>(),
+              headlessGen: ctx.read<HeadlessGenerationService>(),
+              contextProvider: () => navigatorKey.currentContext!,
+              oauthClientFactory: () => _oauthHttpClient(sp),
+            );
+          },
         ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),

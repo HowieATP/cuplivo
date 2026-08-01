@@ -493,16 +493,18 @@ class OAuthTokenManager {
         final newToken = await _client.refreshToken(
           refreshToken: _currentToken!.refreshToken!,
         );
-        setToken(newToken);
+        // refreshToken() stores the token and fires the persistence hook
+        // (onTokenRefresh) — refreshed tokens must reach the host.
+        await refreshToken(newToken);
         return newToken.accessToken;
       } catch (e) {
         _errorController.add(
           e is OAuthError
               ? e
               : OAuthError(
-                error: 'refresh_failed',
-                errorDescription: e.toString(),
-              ),
+                  error: 'refresh_failed',
+                  errorDescription: e.toString(),
+                ),
         );
         rethrow;
       }
@@ -532,15 +534,17 @@ class OAuthTokenManager {
         final newToken = await _client.refreshToken(
           refreshToken: _currentToken!.refreshToken!,
         );
-        setToken(newToken);
+        // refreshToken() stores the token and fires the persistence hook
+        // (onTokenRefresh) — refreshed tokens must reach the host.
+        await refreshToken(newToken);
       } catch (e) {
         _errorController.add(
           e is OAuthError
               ? e
               : OAuthError(
-                error: 'auto_refresh_failed',
-                errorDescription: e.toString(),
-              ),
+                  error: 'auto_refresh_failed',
+                  errorDescription: e.toString(),
+                ),
         );
       }
     });

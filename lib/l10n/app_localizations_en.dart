@@ -3066,6 +3066,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Fill in Authorization Endpoint, Token Endpoint and Client ID first';
 
   @override
+  String get mcpOAuthFlowStartFailed =>
+      'Failed to start authorization. Check the server URL and network, then try again.';
+
+  @override
+  String get mcpOAuthErrorNoAuthEndpoint =>
+      'Could not discover the authorization endpoint. Check the server URL, or fill in the endpoints manually under Advanced Config.';
+
+  @override
   String get mcpOAuthSuccess => 'OAuth authorization successful';
 
   @override
@@ -3090,10 +3098,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpOAuthErrorExchangeFailed =>
       'Token exchange failed. Check your endpoints and Client ID.';
-
-  @override
-  String get mcpOAuthManualModeHint =>
-      'Auto callback unavailable — open the URL, authorize, then paste the code back';
 
   @override
   String get mcpOAuthAutoWaitHint =>

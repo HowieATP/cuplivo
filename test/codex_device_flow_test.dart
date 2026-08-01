@@ -1,0 +1,825 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
+import 'package:Cuplivo/core/providers/settings_provider.dart';
+
+class _ScriptedClient extends http.BaseClient {
+  final List<FutureOr<http.Response> Function(http.Request)> handlers = [];
+  final List<http.Request> requests = [];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final req = http.Request(request.method, request.url)
+      ..headers.addAll(request.headers);
+    if (request is http.Request) {
+      req.body = request.body;
+    }
+    requests.add(req);
+    final handler = handlers.isEmpty ? null : handlers.removeAt(0);
+    final respOrFuture = handler?.call(req) ?? http.Response('{}', 500);
+    final resp = await Future.value(respOrFuture);
+    return http.StreamedResponse(
+      Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
+      resp.statusCode,
+      headers: resp.headers,
+    );
+  }
+}
+
+http.Response _json(int status, Map<String, dynamic> body) => http.Response(
+  jsonEncode(body),
+  status,
+  headers: {'content-type': 'application/json'},
+);
+
+String _jwt(String payloadJson) {
+  final enc = base64Url.encode(utf8.encode(payloadJson)).replaceAll('=', '');
+  return 'eyJhbGciOiJub25lIn0.$enc.c2ln';
+}
+
+String _jwtWithAccount(String accountId) => _jwt(
+  jsonEncode({
+    'iss': 'https://auth.openai.com',
+    'https://api.openai.com/auth': {'chatgpt_account_id': accountId},
+  }),
+);
+
+Map<String, dynamic> _tokenBody(String accountId, {int expiresIn = 3600}) => {
+  'access_token': _jwtWithAccount(accountId),
+  'refresh_token': 'rt-1',
+  'expires_in': expiresIn,
+};
+
+ProviderConfig _cfg({
+  String id = 'OpenAI',
+  String baseUrl = 'https://api.openai.com/v1',
+  ProviderKind? kind,
+  bool? multiKey,
+  bool? useResponseApi,
+}) => ProviderConfig(
+  id: id,
+  enabled: true,
+  name: id,
+  apiKey: '',
+  baseUrl: baseUrl,
+  providerType: kind,
+  multiKeyEnabled: multiKey,
+  useResponseApi: useResponseApi,
+);
+
+CodexOAuthCredential _freshCred(String accountId) => CodexOAuthCredential(
+  accessToken: _jwtWithAccount(accountId),
+  refreshToken: 'rt-old',
+  expiresAt: DateTime.now().add(const Duration(hours: 1)),
+  accountId: accountId,
+);
+
+CodexOAuthCredential _expiredCred(String accountId) => CodexOAuthCredential(
+  accessToken: _jwtWithAccount(accountId),
+  refreshToken: 'rt-old',
+  expiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
+  accountId: accountId,
+);
+
+String? _headerOf(http.Request req, String name) {
+  for (final e in req.headers.entries) {
+    if (e.key.toLowerCase() == name.toLowerCase()) return e.value;
+  }
+  return null;
+}
+
+Future<void> _waitForRequests(
+  _ScriptedClient client,
+  int count, {
+  Duration timeout = const Duration(seconds: 3),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (client.requests.length < count && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
+void main() {
+  late _ScriptedClient client;
+  late CodexDeviceCodeController controller;
+  int onAuthenticatedCalls = 0;
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    client = _ScriptedClient();
+    controller = CodexDeviceCodeController(
+      clientFactory: (proxy) => client,
+      pollDeadline: kCodexFlowDeadline,
+    );
+    CodexDeviceCodeController.debugOverrideInstance(controller);
+    onAuthenticatedCalls = 0;
+  });
+
+  group('startFlow', () {
+    test('happy path exchanges and persists credential', () async {
+      DateTime? poll1At;
+      DateTime? poll2At;
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '5',
+        }),
+      );
+      client.handlers.add((_) async {
+        poll1At = DateTime.now();
+        return http.Response('{}', 403);
+      });
+      client.handlers.add((_) async {
+        poll2At = DateTime.now();
+        return _json(200, {
+          'authorization_code': 'ac-1',
+          'code_verifier': 'cv-1',
+        });
+      });
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(controller.status, CodexAuthStatus.signedIn);
+      expect(controller.credential, isNotNull);
+      expect(controller.credential!.accountId, 'acc-1');
+      expect(onAuthenticatedCalls, 1);
+      expect(client.requests.length, 4);
+
+      final usercodeReq = client.requests[0];
+      expect(usercodeReq.url.toString(), kCodexUsercodeEndpoint);
+      expect(usercodeReq.body, jsonEncode({'client_id': kCodexClientId}));
+
+      final pollReq = client.requests[1];
+      expect(pollReq.url.toString(), kCodexPollEndpoint);
+      expect(
+        pollReq.body,
+        jsonEncode({'device_auth_id': 'da-1', 'user_code': 'ABC-DEF'}),
+      );
+
+      final exchangeReq = client.requests[3];
+      expect(exchangeReq.url.toString(), kCodexTokenEndpoint);
+      expect(
+        _headerOf(exchangeReq, 'Content-Type'),
+        'application/x-www-form-urlencoded',
+      );
+      expect(exchangeReq.body, contains('grant_type=authorization_code'));
+      expect(exchangeReq.body, contains('code=ac-1'));
+      expect(exchangeReq.body, contains('code_verifier=cv-1'));
+      expect(
+        exchangeReq.body,
+        contains('redirect_uri=https://auth.openai.com/deviceauth/callback'),
+      );
+
+      // string interval '5' honored: ~5s wait between pending polls
+      expect(
+        poll2At!.difference(poll1At!),
+        greaterThanOrEqualTo(const Duration(seconds: 4)),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNotNull);
+    });
+
+    test('usercode 404 returns notEnabled with zero polls', () async {
+      client.handlers.add((_) async => http.Response('{}', 404));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.notEnabled);
+      expect(client.requests.length, 1);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(onAuthenticatedCalls, 0);
+    });
+
+    test('missing interval falls back to 5s default', () async {
+      DateTime? poll1At;
+      DateTime? poll2At;
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'device_auth_id': 'da-1', 'user_code': 'ABC-DEF'}),
+      );
+      client.handlers.add((_) async {
+        poll1At = DateTime.now();
+        return http.Response('{}', 403);
+      });
+      client.handlers.add((_) async {
+        poll2At = DateTime.now();
+        return _json(200, {
+          'authorization_code': 'ac-1',
+          'code_verifier': 'cv-1',
+        });
+      });
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(
+        poll2At!.difference(poll1At!),
+        greaterThanOrEqualTo(const Duration(seconds: 4)),
+      );
+    });
+
+    test('invalid interval string falls back to 5s default', () async {
+      DateTime? poll1At;
+      DateTime? poll2At;
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': 'abc',
+        }),
+      );
+      client.handlers.add((_) async {
+        poll1At = DateTime.now();
+        return http.Response('{}', 403);
+      });
+      client.handlers.add((_) async {
+        poll2At = DateTime.now();
+        return _json(200, {
+          'authorization_code': 'ac-1',
+          'code_verifier': 'cv-1',
+        });
+      });
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(
+        poll2At!.difference(poll1At!),
+        greaterThanOrEqualTo(const Duration(seconds: 4)),
+      );
+    });
+
+    test(
+      'pending poll forms (403/404/string error/map error) tolerated',
+      () async {
+        client.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        client.handlers.add((_) async => http.Response('{}', 403));
+        client.handlers.add((_) async => http.Response('{}', 404));
+        client.handlers.add(
+          (_) async =>
+              _json(400, {'error': 'deviceauth_authorization_pending'}),
+        );
+        client.handlers.add(
+          (_) async => _json(400, {
+            'error': {'code': 'deviceauth_authorization_pending'},
+          }),
+        );
+        client.handlers.add(
+          (_) async => _json(200, {
+            'authorization_code': 'ac-1',
+            'code_verifier': 'cv-1',
+          }),
+        );
+        client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+        final outcome = await controller.startFlow(
+          cfg: codexProviderConfig(),
+          onAuthenticated: () async {},
+        );
+
+        expect(outcome, CodexFlowOutcome.success);
+        expect(client.requests.length, 7);
+        for (final req in client.requests.sublist(1, 5)) {
+          expect(
+            req.body,
+            jsonEncode({'device_auth_id': 'da-1', 'user_code': 'ABC-DEF'}),
+          );
+        }
+      },
+    );
+
+    test('slow_down grows the poll interval', () async {
+      DateTime? poll1At;
+      DateTime? poll2At;
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async {
+        poll1At = DateTime.now();
+        return _json(429, {'error': 'slow_down'});
+      });
+      client.handlers.add((_) async {
+        poll2At = DateTime.now();
+        return _json(200, {
+          'authorization_code': 'ac-1',
+          'code_verifier': 'cv-1',
+        });
+      });
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      // base interval 1s + 5s slow_down increment
+      expect(
+        poll2At!.difference(poll1At!),
+        greaterThanOrEqualTo(const Duration(seconds: 5)),
+      );
+    });
+
+    test('poll 200 missing code_verifier fails', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async => _json(200, {'authorization_code': 'ac-1'}),
+      );
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(onAuthenticatedCalls, 0);
+    });
+
+    test('poll deadline exceeded returns timedOut', () async {
+      final shortController = CodexDeviceCodeController(
+        clientFactory: (proxy) => client,
+        pollDeadline: const Duration(milliseconds: 300),
+      );
+      CodexDeviceCodeController.debugOverrideInstance(shortController);
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => http.Response('{}', 403));
+      client.handlers.add((_) async => http.Response('{}', 403));
+
+      final sw = Stopwatch()..start();
+      final outcome = await shortController.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+      sw.stop();
+
+      expect(outcome, CodexFlowOutcome.timedOut);
+      expect(shortController.status, CodexAuthStatus.signedOut);
+      expect(sw.elapsed, lessThan(const Duration(seconds: 2)));
+      expect(client.requests.length, greaterThanOrEqualTo(2));
+    });
+
+    test('cancel during polling aborts without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '5',
+        }),
+      );
+      client.handlers.add((_) async => http.Response('{}', 403));
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+      await _waitForRequests(client, 2);
+      controller.cancel();
+      final outcome = await flow;
+
+      expect(outcome, CodexFlowOutcome.cancelled);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('cancel during exchange discards credential', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        return _json(200, _tokenBody('acc-1'));
+      });
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+      await _waitForRequests(client, 3);
+      controller.cancel();
+      final outcome = await flow;
+
+      expect(outcome, CodexFlowOutcome.cancelled);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('startFlow is not reentrant while polling', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '5',
+        }),
+      );
+      client.handlers.add((_) async => http.Response('{}', 403));
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+      await _waitForRequests(client, 2);
+      final second = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+      expect(second, CodexFlowOutcome.failed);
+      controller.cancel();
+      await flow;
+    });
+  });
+
+  group('ensureFresh', () {
+    test('does nothing when credential is fresh', () async {
+      controller.credential = _freshCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
+
+      await controller.ensureFresh();
+
+      expect(client.requests, isEmpty);
+    });
+
+    test('refreshes expired credential without redirect_uri', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-2')));
+
+      await controller.ensureFresh();
+
+      expect(client.requests.length, 1);
+      final req = client.requests.single;
+      expect(req.url.toString(), kCodexTokenEndpoint);
+      expect(req.body, contains('grant_type=refresh_token'));
+      expect(req.body, contains('refresh_token=rt-old'));
+      expect(req.body, contains('client_id=$kCodexClientId'));
+      expect(req.body, isNot(contains('redirect_uri')));
+      expect(controller.credential!.accountId, 'acc-2');
+      expect(controller.status, CodexAuthStatus.signedIn);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNotNull);
+    });
+
+    test('clears credential on invalid_grant', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      client.handlers.add((_) async => _json(400, {'error': 'invalid_grant'}));
+
+      await controller.ensureFresh();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.expired);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('keeps credential on server error', () async {
+      controller.credential = _expiredCred('acc-1');
+      client.handlers.add((_) async => http.Response('oops', 500));
+
+      await controller.ensureFresh();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.status, CodexAuthStatus.expired);
+    });
+
+    test('keeps credential when refresh response is malformed', () async {
+      controller.credential = _expiredCred('acc-1');
+      client.handlers.add((_) async => _json(200, {'access_token': 'x'}));
+
+      await controller.ensureFresh();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.status, CodexAuthStatus.expired);
+    });
+
+    test('is single-flight under concurrency', () async {
+      controller.credential = _expiredCred('acc-1');
+      client.handlers.add((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        return _json(200, _tokenBody('acc-2'));
+      });
+
+      await Future.wait([
+        controller.ensureFresh(),
+        controller.ensureFresh(),
+        controller.ensureFresh(),
+      ]);
+
+      expect(client.requests.length, 1);
+    });
+  });
+
+  group('maybeCodexHeaders', () {
+    test('empty for non-codex hosts', () {
+      controller.credential = _freshCred('acc-1');
+
+      final h = controller.maybeCodexHeaders(
+        _cfg(id: 'OpenAI', useResponseApi: true),
+      );
+
+      expect(h, isEmpty);
+    });
+
+    test('empty without credential', () {
+      final h = controller.maybeCodexHeaders(codexProviderConfig());
+
+      expect(h, isEmpty);
+    });
+
+    test('fresh credential with responses api yields three headers', () {
+      controller.credential = _freshCred('acc-1');
+
+      final h = controller.maybeCodexHeaders(codexProviderConfig());
+
+      expect(h, {
+        'Authorization': 'Bearer ${_jwtWithAccount('acc-1')}',
+        'chatgpt-account-id': 'acc-1',
+        'OpenAI-Beta': 'responses=experimental',
+      });
+    });
+
+    test('fresh credential without responses api omits OpenAI-Beta', () {
+      controller.credential = _freshCred('acc-1');
+
+      final h = controller.maybeCodexHeaders(
+        _cfg(id: 'Codex', baseUrl: kCodexBaseUrl, useResponseApi: false),
+      );
+
+      expect(h, {
+        'Authorization': 'Bearer ${_jwtWithAccount('acc-1')}',
+        'chatgpt-account-id': 'acc-1',
+      });
+    });
+
+    test(
+      'stale credential yields empty headers and background refresh',
+      () async {
+        controller.credential = _expiredCred('acc-1');
+        client.handlers.add((_) async => _json(200, _tokenBody('acc-2')));
+
+        final h = controller.maybeCodexHeaders(codexProviderConfig());
+
+        expect(h, isEmpty);
+        await _waitForRequests(client, 1);
+        expect(client.requests.length, 1);
+      },
+    );
+  });
+
+  group('routing helpers', () {
+    test('isCodexHost branches', () {
+      expect(CodexDeviceCodeController.isCodexHost(_cfg(id: 'Codex')), isTrue);
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex'),
+        ),
+        isTrue,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/somewhere'),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'OpenAI', baseUrl: 'https://api.openai.com/v1'),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(_cfg(id: 'X', baseUrl: '')),
+        isFalse,
+      );
+    });
+
+    test('showEntryFor branches', () {
+      expect(
+        CodexDeviceCodeController.showEntryFor(_cfg(id: 'OpenAI')),
+        isTrue,
+      );
+      expect(CodexDeviceCodeController.showEntryFor(_cfg(id: 'Codex')), isTrue);
+      expect(
+        CodexDeviceCodeController.showEntryFor(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex'),
+        ),
+        isTrue,
+      );
+      expect(
+        CodexDeviceCodeController.showEntryFor(
+          _cfg(id: 'X', kind: ProviderKind.claude),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.showEntryFor(
+          _cfg(id: 'X', kind: ProviderKind.google),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.showEntryFor(
+          _cfg(id: 'OpenAI', multiKey: true),
+        ),
+        isFalse,
+      );
+      expect(CodexDeviceCodeController.showEntryFor(_cfg(id: 'X')), isFalse);
+    });
+  });
+
+  group('codexProviderConfig', () {
+    test('declares the codex provider surface', () {
+      final cfg = codexProviderConfig();
+
+      expect(cfg.id, kCodexProviderKey);
+      expect(cfg.name, kCodexProviderKey);
+      expect(cfg.enabled, isTrue);
+      expect(cfg.apiKey, isEmpty);
+      expect(cfg.baseUrl, kCodexBaseUrl);
+      expect(cfg.providerType, ProviderKind.openai);
+      expect(cfg.useResponseApi, isTrue);
+      expect(cfg.models.length, 7);
+      expect(cfg.models, contains('gpt-5.3-codex-spark'));
+      expect(cfg.models, contains('gpt-5.6-terra'));
+      expect(cfg.modelOverrides.length, 7);
+      for (final ov in cfg.modelOverrides.values) {
+        expect(ov['type'], 'chat');
+        expect(ov['input'], ['text']);
+        expect(ov['output'], ['text']);
+        expect(ov['abilities'], ['tool', 'reasoning']);
+      }
+      expect(cfg.balanceEnabled, isFalse);
+      expect(cfg.multiKeyEnabled, isFalse);
+      expect(cfg.proxyEnabled, isFalse);
+      expect(cfg.claudePromptCachingEnabled, isFalse);
+    });
+  });
+
+  group('JWT account id extraction', () {
+    test('exchange fails on 2-segment access token', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add(
+        (_) async => _json(200, {
+          'access_token': 'aaa.bbb',
+          'refresh_token': 'rt-1',
+          'expires_in': 3600,
+        }),
+      );
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+    });
+
+    test('exchange fails when jwt lacks auth claim', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add(
+        (_) async => _json(200, {
+          'access_token': _jwt(jsonEncode({'iss': 'https://auth.openai.com'})),
+          'refresh_token': 'rt-1',
+          'expires_in': 3600,
+        }),
+      );
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+    });
+
+    test('exchange fails on empty account id', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+    });
+  });
+
+  group('signOut', () {
+    test('clears credential and stored prefs', () async {
+      controller.credential = _freshCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode(controller.credential!.toJson()),
+      );
+
+      await controller.signOut();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+  });
+}

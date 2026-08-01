@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
+import '../../providers/codex_device_code_controller.dart';
 import '../../models/token_usage.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
@@ -148,8 +149,9 @@ class ChatApiService {
   /// Keep both in sync when changing header merge order.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
-    String modelId,
-  ) {
+    String modelId, {
+    bool includeCodexAuth = true,
+  }) {
     final ov = _modelOverride(cfg, modelId);
     final out = <String, String>{
       ...providerDefaultHeaders(cfg),
@@ -161,6 +163,11 @@ class ChatApiService {
     // AIhubmix promo header (opt-in per-provider)
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
       out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
+    }
+    // Codex OAuth bearer + account headers
+    if (includeCodexAuth) {
+      final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
+      if (h.isNotEmpty) out.addAll(h);
     }
     return out;
   }
@@ -778,6 +785,9 @@ class ChatApiService {
     final safePrompt = UnicodeSanitizer.sanitize(prompt);
     try {
       if (kind == ProviderKind.openai) {
+        if (CodexDeviceCodeController.isCodexHost(config)) {
+          await CodexDeviceCodeController.instance.ensureFresh();
+        }
         final url = _openAICompatibleUrl(config);
         Map<String, dynamic> body;
         final effectiveInfo = _effectiveModelInfo(config, modelId);

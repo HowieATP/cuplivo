@@ -6464,6 +6464,72 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get groupChatAssistantNoModel => '该助手未配置模型。';
+
+  @override
+  String get codexLoginTitle => 'Codex 账号登录';
+
+  @override
+  String get codexLoginSubtitle => '使用 ChatGPT 账号登录以使用 Codex 模型。';
+
+  @override
+  String get codexLoginSignInButton => '登录你的 Codex 账号';
+
+  @override
+  String get codexLoginSignOutButton => '退出登录';
+
+  @override
+  String get codexLoginStatusSignedIn => '已登录';
+
+  @override
+  String get codexLoginStatusSignedOut => '未登录';
+
+  @override
+  String get codexLoginStatusWaiting => '等待授权…';
+
+  @override
+  String get codexLoginStatusPolling => '等待登录…';
+
+  @override
+  String get codexLoginStatusExpired => '授权已过期';
+
+  @override
+  String get codexLoginStatusFailed => '登录失败';
+
+  @override
+  String get codexLoginUsercodeLabel => '你的验证码';
+
+  @override
+  String get codexLoginOpenPageButton => '打开授权页面';
+
+  @override
+  String get codexLoginCopyCodeButton => '复制验证码';
+
+  @override
+  String get codexLoginCopiedToast => '验证码已复制到剪贴板';
+
+  @override
+  String get codexLoginCancelButton => '取消';
+
+  @override
+  String get codexLoginAccountLabel => 'ChatGPT 账号';
+
+  @override
+  String get codexLoginExpiresLabel => '令牌过期时间';
+
+  @override
+  String get codexLoginRefreshFailedToast => '令牌刷新失败，请重新登录';
+
+  @override
+  String get codexLoginSignedOutToast => '已退出登录';
+
+  @override
+  String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
+
+  @override
+  String get codexLoginExpiredToast => '登录已过期，请重新开始';
+
+  @override
+  String get codexLoginNetworkError => '网络错误，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -12926,6 +12992,72 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get groupChatAssistantNoModel => '该助手未配置模型。';
+
+  @override
+  String get codexLoginTitle => 'Codex 账号登录';
+
+  @override
+  String get codexLoginSubtitle => '使用 ChatGPT 账号登录以使用 Codex 模型。';
+
+  @override
+  String get codexLoginSignInButton => '登录你的 Codex 账号';
+
+  @override
+  String get codexLoginSignOutButton => '退出登录';
+
+  @override
+  String get codexLoginStatusSignedIn => '已登录';
+
+  @override
+  String get codexLoginStatusSignedOut => '未登录';
+
+  @override
+  String get codexLoginStatusWaiting => '等待授权…';
+
+  @override
+  String get codexLoginStatusPolling => '等待登录…';
+
+  @override
+  String get codexLoginStatusExpired => '授权已过期';
+
+  @override
+  String get codexLoginStatusFailed => '登录失败';
+
+  @override
+  String get codexLoginUsercodeLabel => '你的验证码';
+
+  @override
+  String get codexLoginOpenPageButton => '打开授权页面';
+
+  @override
+  String get codexLoginCopyCodeButton => '复制验证码';
+
+  @override
+  String get codexLoginCopiedToast => '验证码已复制到剪贴板';
+
+  @override
+  String get codexLoginCancelButton => '取消';
+
+  @override
+  String get codexLoginAccountLabel => 'ChatGPT 账号';
+
+  @override
+  String get codexLoginExpiresLabel => '令牌过期时间';
+
+  @override
+  String get codexLoginRefreshFailedToast => '令牌刷新失败，请重新登录';
+
+  @override
+  String get codexLoginSignedOutToast => '已退出登录';
+
+  @override
+  String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
+
+  @override
+  String get codexLoginExpiredToast => '登录已过期，请重新开始';
+
+  @override
+  String get codexLoginNetworkError => '网络错误，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -19389,4 +19521,70 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get groupChatAssistantNoModel => '該助手未設定模型。';
+
+  @override
+  String get codexLoginTitle => 'Codex 帳號登入';
+
+  @override
+  String get codexLoginSubtitle => '使用 ChatGPT 帳號登入以使用 Codex 模型。';
+
+  @override
+  String get codexLoginSignInButton => '登入你的 Codex 帳號';
+
+  @override
+  String get codexLoginSignOutButton => '登出';
+
+  @override
+  String get codexLoginStatusSignedIn => '已登入';
+
+  @override
+  String get codexLoginStatusSignedOut => '未登入';
+
+  @override
+  String get codexLoginStatusWaiting => '等待授權…';
+
+  @override
+  String get codexLoginStatusPolling => '等待登入…';
+
+  @override
+  String get codexLoginStatusExpired => '授權已過期';
+
+  @override
+  String get codexLoginStatusFailed => '登入失敗';
+
+  @override
+  String get codexLoginUsercodeLabel => '你的驗證碼';
+
+  @override
+  String get codexLoginOpenPageButton => '開啟授權頁面';
+
+  @override
+  String get codexLoginCopyCodeButton => '複製驗證碼';
+
+  @override
+  String get codexLoginCopiedToast => '驗證碼已複製到剪貼簿';
+
+  @override
+  String get codexLoginCancelButton => '取消';
+
+  @override
+  String get codexLoginAccountLabel => 'ChatGPT 帳號';
+
+  @override
+  String get codexLoginExpiresLabel => '令牌過期時間';
+
+  @override
+  String get codexLoginRefreshFailedToast => '令牌刷新失敗，請重新登入';
+
+  @override
+  String get codexLoginSignedOutToast => '已登出';
+
+  @override
+  String get codexLoginHelpText => '你將被引導至 ChatGPT 網站授權 Codex 存取。';
+
+  @override
+  String get codexLoginExpiredToast => '登入已過期，請重新開始';
+
+  @override
+  String get codexLoginNetworkError => '網路錯誤，請重試';
 }

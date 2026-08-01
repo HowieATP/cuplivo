@@ -1487,6 +1487,11 @@ class _DesktopProviderDetailPaneState
                       ),
                     ),
                   ),
+                if (kind == ProviderKind.openai &&
+                    CodexDeviceCodeController.showEntryFor(cfg)) ...[
+                  const SizedBox(height: 14),
+                  CodexAccountEntry(cfg: cfg),
+                ],
                 const SizedBox(height: 14),
               ],
 

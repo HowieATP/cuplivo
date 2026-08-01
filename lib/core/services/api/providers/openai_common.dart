@@ -1056,6 +1056,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
+  if (CodexDeviceCodeController.isCodexHost(config)) {
+    await CodexDeviceCodeController.instance.ensureFresh();
+  }
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');

@@ -15,8 +15,15 @@ String _effectiveApiKey(ProviderConfig cfg) =>
 Set<String> _builtInTools(ProviderConfig cfg, String modelId) =>
     ChatApiService._builtInTools(cfg, modelId);
 
-Map<String, String> _customHeaders(ProviderConfig cfg, String modelId) =>
-    ChatApiService._customHeaders(cfg, modelId);
+Map<String, String> _customHeaders(
+  ProviderConfig cfg,
+  String modelId, {
+  bool includeCodexAuth = true,
+}) => ChatApiService._customHeaders(
+  cfg,
+  modelId,
+  includeCodexAuth: includeCodexAuth,
+);
 
 dynamic _parseOverrideValue(String v) => ChatApiService._parseOverrideValue(v);
 

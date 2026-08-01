@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/codex_device_code_controller.dart';
+import '../../../shared/widgets/codex_account_entry.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -1265,6 +1267,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               onChanged: (_) => _save(),
             ),
             const SizedBox(height: 12),
+          ],
+          if (_kind == ProviderKind.openai &&
+              CodexDeviceCodeController.showEntryFor(_cfg)) ...[
+            const SizedBox(height: 12),
+            CodexAccountEntry(cfg: _cfg),
           ],
           _inputRow(
             context,

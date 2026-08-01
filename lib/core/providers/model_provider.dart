@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io' show HttpException;
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
+import 'codex_device_code_controller.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
@@ -150,6 +151,9 @@ class _Http {
 class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+    if (CodexDeviceCodeController.isCodexHost(cfg)) {
+      return const <ModelInfo>[];
+    }
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
@@ -357,16 +361,23 @@ class ProviderManager {
   /// Keep both in sync when changing header merge order.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
-    String modelId,
-  ) {
+    String modelId, {
+    bool includeCodexAuth = true,
+  }) {
     final ov = _modelOverride(cfg, modelId);
-    return <String, String>{
+    final out = <String, String>{
       ...providerDefaultHeaders(cfg),
       ...ModelOverridePayloadParser.customHeaders({
         'headers': cfg.customHeaders,
       }),
       ...ModelOverridePayloadParser.customHeaders(ov),
     };
+    // Codex OAuth bearer + account headers
+    if (includeCodexAuth) {
+      final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
+      if (h.isNotEmpty) out.addAll(h);
+    }
+    return out;
   }
 
   /// Mirrors [ChatApiService._customBody] in chat_api_service.dart.
@@ -410,6 +421,9 @@ class ProviderManager {
     final client = _Http.clientFor(cfg);
     try {
       if (kind == ProviderKind.openai) {
+        if (CodexDeviceCodeController.isCodexHost(cfg)) {
+          await CodexDeviceCodeController.instance.ensureFresh();
+        }
         final base = cfg.baseUrl.endsWith('/')
             ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
             : cfg.baseUrl;

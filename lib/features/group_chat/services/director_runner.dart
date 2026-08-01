@@ -12,6 +12,27 @@ import '../../../core/services/chat/chat_service.dart';
 import 'director_context_builder.dart';
 import 'director_tool_protocol.dart';
 
+/// Stream source signature used by [DirectorRunner] (injectable for tests).
+typedef DirectorStreamSender =
+    Stream<ChatStreamChunk> Function({
+      required ProviderConfig config,
+      required String modelId,
+      required List<Map<String, dynamic>> messages,
+      List<String>? userMediaPaths,
+      int? thinkingBudget,
+      double? temperature,
+      double? topP,
+      int? maxTokens,
+      List<Map<String, dynamic>>? tools,
+      ToolCallHandler? onToolCall,
+      Map<String, String>? extraHeaders,
+      Map<String, dynamic>? extraBody,
+      bool stream,
+      String? requestId,
+      bool allowImagesApiRouting,
+      bool ocrActive,
+    });
+
 /// Runs one director decision via tool-calling.
 ///
 /// Uses the same transport as normal chat ([ChatApiService.sendMessageStream])
@@ -21,10 +42,16 @@ import 'director_tool_protocol.dart';
 /// Director history is not persisted; each call is assembled from the public
 /// conversation transcript.
 class DirectorRunner {
-  DirectorRunner({required this.chatService, required this.contextBuilder});
+  DirectorRunner({
+    required this.chatService,
+    required this.contextBuilder,
+    DirectorStreamSender? sendMessageStream,
+  }) : _sendMessageStream =
+           sendMessageStream ?? ChatApiService.sendMessageStream;
 
   final ChatService chatService;
   final DirectorContextBuilder contextBuilder;
+  final DirectorStreamSender _sendMessageStream;
 
   static const temperature = 0.2;
   static const maxTokens = 512;
@@ -164,23 +191,29 @@ class DirectorRunner {
     DirectorDecision? decided;
     final freeTextBuf = StringBuffer();
     final completer = Completer<DirectorDecision?>();
+    StreamSubscription<ChatStreamChunk>? sub;
 
     Future<String> onToolCall(
       String name,
       Map<String, dynamic> args, {
       String? toolCallId,
     }) async {
-      if (decided != null) return jsonEncode({'ok': true, 'ignored': true});
+      if (decided != null) return jsonEncode({'ok': true});
       decided = _parseTool(name, args, assistantIds);
       if (decided != null && !completer.isCompleted) {
         completer.complete(decided);
+        // The first valid tool call IS the decision. Cancel the stream right
+        // away so the provider cannot keep generating follow-up tool rounds.
+        // Keep the result neutral (never "ignored"): a model that reads
+        // "ignored" interprets it as a rejected call and retries in a loop.
+        unawaited(sub?.cancel());
+        ChatApiService.cancelRequest(requestId);
       }
-      unawaited(Future(() => ChatApiService.cancelRequest(requestId)));
       return jsonEncode({'ok': true});
     }
 
     try {
-      final stream = ChatApiService.sendMessageStream(
+      final stream = _sendMessageStream(
         config: config,
         modelId: modelId,
         messages: messages,
@@ -192,7 +225,7 @@ class DirectorRunner {
         requestId: requestId,
       );
 
-      final sub = stream.listen(
+      sub = stream.listen(
         (chunk) {
           if (chunk.content.isNotEmpty) {
             freeTextBuf.write(chunk.content);
@@ -205,6 +238,9 @@ class DirectorRunner {
             decided = _parseTool(c.name, args, assistantIds);
             if (decided != null) {
               if (!completer.isCompleted) completer.complete(decided);
+              // Same immediate stop as onToolCall: no follow-up tool rounds.
+              unawaited(sub?.cancel());
+              ChatApiService.cancelRequest(requestId);
               break;
             }
           }
@@ -221,7 +257,7 @@ class DirectorRunner {
       final decision = await completer.future.timeout(
         timeout,
         onTimeout: () {
-          unawaited(sub.cancel());
+          unawaited(sub?.cancel());
           ChatApiService.cancelRequest(requestId);
           debugPrint('[Director] timeout');
           throw TimeoutException('director timeout');

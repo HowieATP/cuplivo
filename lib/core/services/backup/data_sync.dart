@@ -914,7 +914,11 @@ class DataSync {
       bool firstMsg = true;
       for (final c in conversations) {
         var msgs = chatService.getMessages(c.id);
-        if (incremental != null && c.createdAt.isBefore(incremental.since)) {
+        // Group transcripts are all-or-nothing: a partial message list would
+        // corrupt member assistants' private context after restore.
+        if (incremental != null &&
+            !c.isGroup &&
+            c.createdAt.isBefore(incremental.since)) {
           msgs = msgs
               .where((m) => incremental.sinceCheck(m.timestamp))
               .toList();
@@ -950,7 +954,17 @@ class DataSync {
       final groupPayload = <Map<String, dynamic>>[];
       final memberPayload = <Map<String, dynamic>>[];
       final directorPayload = <Map<String, dynamic>>[];
+      // Incremental scope: a group qualifies when it was active since `since`,
+      // or when its conversation made it into this export. A qualifying group
+      // carries its FULL director session + members — the director session is
+      // an atomic working context and must never be sliced.
+      final exportedConversationIds = conversations.map((c) => c.id).toSet();
       for (final g in groups) {
+        if (incremental != null &&
+            g.updatedAt.isBefore(incremental.since) &&
+            !exportedConversationIds.contains(g.conversationId)) {
+          continue;
+        }
         groupPayload.add(g.toJson());
         final members = await chatService.repo.getGroupMembers(g.id);
         memberPayload.addAll(members.map((m) => m.toJson()));
@@ -1421,7 +1435,9 @@ class DataSync {
                   (raw as Map).cast<String, dynamic>(),
                 );
                 (membersByGroup[m.groupChatId] ??= []).add(m);
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('restoreData: groupMembers parse: $e');
+              }
             }
             for (final entry in membersByGroup.entries) {
               if (mode == RestoreMode.merge &&
@@ -1444,7 +1460,9 @@ class DataSync {
                   continue;
                 }
                 await chatService.repo.appendDirectorMessage(m);
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('restoreData: directorMessages: $e');
+              }
             }
           }
         } catch (_) {}

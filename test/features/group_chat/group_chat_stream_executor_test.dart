@@ -306,6 +306,6 @@ void main() {
     await running.timeout(const Duration(seconds: 5));
 
     final finalUpdate = fake.updates.lastWhere((u) => u.isStreaming == false);
-    expect(finalUpdate.content, contains('Error:'));
+    expect(finalUpdate.content, 'Exception: boom');
   });
 }

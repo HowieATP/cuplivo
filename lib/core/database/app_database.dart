@@ -253,6 +253,16 @@ class DeletionMarkerRows extends Table {
   Set<Column<Object>> get primaryKey => {id, type, origin};
 }
 
+// ===== Multi-assistant group chat (schema v13) =====
+// Layered model: the public transcript lives in ConversationRows
+// (conversation_kind='group') + MessageRows.speakerAssistantId; GroupChatRows
+// holds metadata + per-round runtime state; GroupChatMemberRows is the M:N
+// membership join (same shape as ConversationMcpServerRows); DirectorMessageRows
+// is the Director's private session — a second stream that must NEVER be read
+// by public-transcript consumers. See docs/adr/0015 and CONTEXT.md.
+// Sync rule: any new group-related table must be wired into clearAllData
+// (child-before-parent FK order), _exportChatsToFile and _restoreFromBackupFile
+// in the same change.
 @TableIndex(name: 'idx_group_chats_updated_at', columns: {#updatedAt})
 class GroupChatRows extends Table {
   TextColumn get id => text()();
@@ -363,6 +373,9 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
+  // Migrations follow the original per-version pattern only — no runtime
+  // self-heal. A locally corrupted dev DB is repaired by reinstalling, not
+  // by healing schema on every open.
   int get schemaVersion => 13;
 
   @override

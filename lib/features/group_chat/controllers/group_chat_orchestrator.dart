@@ -412,11 +412,3 @@ class GroupChatOrchestrator {
     return true;
   }
 }
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    if (!it.moveNext()) return null;
-    return it.current;
-  }
-}

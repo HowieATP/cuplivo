@@ -89,7 +89,8 @@ class _GroupChatPageState extends State<GroupChatPage> {
       onStateChanged: () {
         if (mounted) setState(() {});
       },
-      getTitleForLocale: (_) => 'Group',
+      getTitleForLocale: (ctx) =>
+          AppLocalizations.of(ctx)!.groupChatDefaultName,
     );
     _messageGenerationService = MessageGenerationService(
       chatService: _chatService,

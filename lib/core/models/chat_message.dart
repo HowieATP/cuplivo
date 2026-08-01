@@ -51,7 +51,12 @@ class ChatMessage {
 
   final bool isPreset;
 
-  /// Group chat speaker; null for user messages and classic 1:1 assistant.
+  /// Group chat speaker (who spoke); null for user messages and classic 1:1
+  /// assistant. Message identity has four independent dimensions: speaker
+  /// (this field), parallel thread (subgroupId, Multi-AI), retry version
+  /// (version), and anchor group (groupId). Version-collapse logic is
+  /// duplicated in multi_ai_engine.dart and
+  /// AssistantPrivateContextBuilder._collapseVersions — change both together.
   final String? speakerAssistantId;
 
   factory ChatMessage({

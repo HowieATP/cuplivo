@@ -297,10 +297,11 @@ class GroupChatStreamExecutor {
     if (!state.finishHandled) {
       state.finishHandled = true;
       final existing = state.fullContentRaw;
+      // Mirror chat_actions.dart: raw error text, no prefix.
       await chatService.updateMessage(
         state.messageId,
         isStreaming: false,
-        content: existing.isNotEmpty ? existing : 'Error: $error',
+        content: existing.isNotEmpty ? existing : error.toString(),
       );
     }
     streamController.markStreamingEnded(state.messageId);

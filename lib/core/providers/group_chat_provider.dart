@@ -74,15 +74,17 @@ class GroupChatProvider extends ChangeNotifier {
   }
 
   Future<GroupChat> createGroup({required String name}) async {
+    // Callers must pass a non-empty, localized name (see GroupChatListPage).
+    final trimmed = name.trim();
     final conversation = await _chatService.createConversation(
-      title: name.trim().isEmpty ? 'Group' : name.trim(),
+      title: trimmed,
       assistantId: null,
       conversationKind: Conversation.kindGroup,
       setAsCurrent: false,
     );
 
     final group = GroupChat(
-      name: name.trim().isEmpty ? 'Group' : name.trim(),
+      name: trimmed,
       conversationId: conversation.id,
       directorSystemPrompt: GroupChat.defaultDirectorSystemPrompt,
       maxAssistantMessagesPerRound: 3,
@@ -110,11 +112,16 @@ class GroupChatProvider extends ChangeNotifier {
     } else {
       _groups.add(updated);
     }
-    // Keep conversation title in sync with group name.
+    // Keep conversation title in sync with group name. This is the ONLY
+    // path that renames a group's conversation — always via
+    // ChatService.setConversationTitle (repo + in-memory cache + updatedAt),
+    // never a bare repo.putConversation.
     final conv = _chatService.getConversation(updated.conversationId);
     if (conv != null && conv.title != updated.name) {
-      conv.title = updated.name;
-      await _chatService.repo.putConversation(conv);
+      await _chatService.setConversationTitle(
+        updated.conversationId,
+        updated.name,
+      );
     }
     notifyListeners();
   }
@@ -123,6 +130,9 @@ class GroupChatProvider extends ChangeNotifier {
     final g = getById(groupChatId);
     if (g == null) return;
     await updateGroup(g.copyWith(updatedAt: DateTime.now()));
+    // Group activity must also move the conversation's updatedAt so backup
+    // inventory ordering reflects it.
+    await _chatService.bumpConversationUpdatedAt(g.conversationId);
   }
 
   Future<void> setMembers(String groupChatId, List<String> assistantIds) async {
@@ -192,6 +202,11 @@ class GroupChatProvider extends ChangeNotifier {
   }
 
   /// Full delete with trash packaging.
+  ///
+  /// Trash records: the group bundle (group + members + director session) and
+  /// the conversation are TWO independent trash entries. Restore order matters
+  /// — the group row has a FK to the conversation, so the conversation must be
+  /// restored first; restoring either side alone leaves an orphan.
   Future<void> deleteGroup(String groupChatId) async {
     final group = getById(groupChatId);
     if (group == null) return;

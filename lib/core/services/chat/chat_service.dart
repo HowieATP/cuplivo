@@ -129,6 +129,8 @@ class ChatService extends ChangeNotifier {
   }
 
   /// UI default excludes group transcripts. Use [includeGroup] for admin/debug.
+  /// Any new conversation enumeration must default to excluding group
+  /// conversations unless it has an explicit reason (backup inventory/admin).
   List<Conversation> getAllConversations({bool includeGroup = false}) {
     if (!_initialized) return [];
     final conversations = _conversationsCache.values
@@ -393,6 +395,46 @@ class ChatService extends ChangeNotifier {
     }
     notifyListeners();
     return conversation;
+  }
+
+  /// Single source of truth for renaming a conversation. Group chat renames
+  /// (GroupChatProvider.updateGroup) go through here so the in-memory cache
+  /// and updatedAt stay in sync with the group name.
+  Future<void> setConversationTitle(
+    String conversationId,
+    String newTitle,
+  ) async {
+    if (!_initialized) await init();
+    var conversation =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId];
+    conversation ??= _repo.getConversationSync(
+      conversationId,
+      includeMessageIds: false,
+    );
+    if (conversation == null) return;
+    conversation.title = newTitle;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+    notifyListeners();
+  }
+
+  /// Bumps a conversation's updatedAt (repo + cache) without touching its
+  /// title. Used so group chat activity reorders the conversation in backup
+  /// inventory.
+  Future<void> bumpConversationUpdatedAt(String conversationId) async {
+    if (!_initialized) return;
+    var conversation =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId];
+    conversation ??= _repo.getConversationSync(
+      conversationId,
+      includeMessageIds: false,
+    );
+    if (conversation == null) return;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+    notifyListeners();
   }
 
   Future<void> _saveConversation(Conversation conversation) async {

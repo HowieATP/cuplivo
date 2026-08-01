@@ -10,6 +10,7 @@ import 'src/transport/sse_heartbeat_transport.dart';
 import 'src/common/result.dart';
 import 'src/models/models.dart';
 import 'src/auth/oauth.dart';
+import 'src/auth/oauth_client.dart';
 
 export 'src/models/models.dart';
 export 'src/client/client.dart';
@@ -136,6 +137,7 @@ sealed class TransportConfig {
     Duration? heartbeatInterval,
     OAuthConfig? oauthConfig,
     OAuthToken? oauthToken,
+    Function(OAuthToken token)? onTokenRefreshed,
     String? bearerToken,
     bool enableCompression,
     bool enableGzip,
@@ -152,6 +154,8 @@ sealed class TransportConfig {
     int? maxConcurrentRequests,
     bool? useHttp2,
     OAuthConfig? oauthConfig,
+    OAuthToken? oauthToken,
+    Function(OAuthToken token)? onTokenRefreshed,
     bool enableCompression,
     Duration? heartbeatInterval,
     int maxMissedHeartbeats,
@@ -183,6 +187,7 @@ final class SseTransportConfig extends TransportConfig {
   final Duration? heartbeatInterval;
   final OAuthConfig? oauthConfig;
   final OAuthToken? oauthToken;
+  final Function(OAuthToken token)? onTokenRefreshed;
   final String? bearerToken;
   final bool enableCompression;
   final bool enableGzip;
@@ -197,6 +202,7 @@ final class SseTransportConfig extends TransportConfig {
     this.heartbeatInterval,
     this.oauthConfig,
     this.oauthToken,
+    this.onTokenRefreshed,
     this.bearerToken,
     this.enableCompression = false,
     this.enableGzip = true,
@@ -214,6 +220,8 @@ final class StreamableHttpTransportConfig extends TransportConfig {
   final int? maxConcurrentRequests;
   final bool? useHttp2;
   final OAuthConfig? oauthConfig;
+  final OAuthToken? oauthToken;
+  final Function(OAuthToken token)? onTokenRefreshed;
   final bool enableCompression;
   final Duration? heartbeatInterval;
   final int maxMissedHeartbeats;
@@ -226,6 +234,8 @@ final class StreamableHttpTransportConfig extends TransportConfig {
     this.maxConcurrentRequests,
     this.useHttp2,
     this.oauthConfig,
+    this.oauthToken,
+    this.onTokenRefreshed,
     this.enableCompression = false,
     this.heartbeatInterval,
     this.maxMissedHeartbeats = 3,
@@ -293,6 +303,7 @@ class McpClient {
         headers: final headers,
         oauthConfig: final oauthConfig,
         oauthToken: final oauthToken,
+        onTokenRefreshed: final onTokenRefreshed,
         bearerToken: final bearerToken,
         enableCompression: final enableCompression,
         heartbeatInterval: final heartbeatInterval,
@@ -303,6 +314,7 @@ class McpClient {
           headers: headers,
           oauthConfig: oauthConfig,
           oauthToken: oauthToken,
+          onTokenRefreshed: onTokenRefreshed,
           bearerToken: bearerToken,
           enableCompression: enableCompression,
           heartbeatInterval: heartbeatInterval,
@@ -315,6 +327,8 @@ class McpClient {
         maxConcurrentRequests: final maxConcurrentRequests,
         useHttp2: final useHttp2,
         oauthConfig: final oauthConfig,
+        oauthToken: final oauthToken,
+        onTokenRefreshed: final onTokenRefreshed,
         enableCompression: final _,
         heartbeatInterval: final _,
         maxMissedHeartbeats: final _,
@@ -327,6 +341,8 @@ class McpClient {
           maxConcurrentRequests: maxConcurrentRequests,
           useHttp2: useHttp2,
           oauthConfig: oauthConfig,
+          oauthToken: oauthToken,
+          onTokenRefreshed: onTokenRefreshed,
           terminateOnClose: terminateOnClose,
         ),
     };
@@ -338,6 +354,7 @@ class McpClient {
     Map<String, String>? headers,
     OAuthConfig? oauthConfig,
     OAuthToken? oauthToken,
+    Function(OAuthToken token)? onTokenRefreshed,
     String? bearerToken,
     bool enableCompression = false,
     Duration? heartbeatInterval,
@@ -350,7 +367,10 @@ class McpClient {
         serverUrl: serverUrl,
         headers: headers,
         oauthToken: oauthToken,
+        oauthClient:
+            oauthConfig == null ? null : HttpOAuthClient(config: oauthConfig),
         bearerToken: bearerToken,
+        onTokenRefreshed: onTokenRefreshed,
       );
     } else if (enableCompression) {
       // Use compression-enabled SSE transport

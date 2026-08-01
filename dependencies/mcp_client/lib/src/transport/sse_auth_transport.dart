@@ -8,6 +8,7 @@ import 'dart:io'
 
 import '../../logger.dart';
 import '../auth/oauth.dart';
+import '../auth/oauth_client.dart';
 import '../models/models.dart';
 import 'transport.dart';
 import 'event_source.dart';
@@ -18,7 +19,7 @@ final Logger _logger = Logger('mcp_client.sse_auth_transport');
 class SseAuthClientTransport implements ClientTransport {
   final String serverUrl;
   final Map<String, String> _baseHeaders;
-  final OAuthToken? _oauthToken;
+  OAuthToken? _oauthToken;
   final OAuthClient? _oauthClient;
   final _messageController = StreamController<dynamic>.broadcast();
   final _closeCompleter = Completer<void>();
@@ -30,15 +31,18 @@ class SseAuthClientTransport implements ClientTransport {
   // Token refresh management
   Timer? _tokenRefreshTimer;
   bool _isRefreshingToken = false;
+  final Function(OAuthToken token)? _onTokenRefreshed;
 
   SseAuthClientTransport._internal({
     required this.serverUrl,
     Map<String, String>? headers,
     OAuthToken? oauthToken,
     OAuthClient? oauthClient,
+    Function(OAuthToken token)? onTokenRefreshed,
   }) : _baseHeaders = headers ?? {},
        _oauthToken = oauthToken,
-       _oauthClient = oauthClient {
+       _oauthClient = oauthClient,
+       _onTokenRefreshed = onTokenRefreshed {
     _eventSource = AuthenticatedEventSource();
   }
 
@@ -49,12 +53,14 @@ class SseAuthClientTransport implements ClientTransport {
     OAuthToken? oauthToken,
     OAuthClient? oauthClient,
     String? bearerToken,
+    Function(OAuthToken token)? onTokenRefreshed,
   }) async {
     final transport = SseAuthClientTransport._internal(
       serverUrl: serverUrl,
       headers: headers,
       oauthToken: oauthToken,
       oauthClient: oauthClient,
+      onTokenRefreshed: onTokenRefreshed,
     );
 
     try {
@@ -169,6 +175,11 @@ class SseAuthClientTransport implements ClientTransport {
         refreshToken: _oauthToken!.refreshToken!,
       );
 
+      // The refreshed token must become the current one — send() and
+      // future refreshes read it. Without this the 401-retry loop in
+      // send() would keep using the stale token forever.
+      _oauthToken = newToken;
+
       // Update headers with new token
       final newHeaders = Map<String, String>.from(_baseHeaders);
       newHeaders['Authorization'] = 'Bearer ${newToken.accessToken}';
@@ -183,6 +194,7 @@ class SseAuthClientTransport implements ClientTransport {
       _scheduleTokenRefresh();
 
       _logger.debug('Token refreshed successfully');
+      _onTokenRefreshed?.call(newToken);
     } catch (e) {
       _logger.debug('Token refresh failed: $e');
       _handleAuthFailure(401, 'Token refresh failed');
@@ -321,10 +333,11 @@ class SseAuthClientTransport implements ClientTransport {
       });
 
       // Add current OAuth token if available
-      if (_oauthToken != null) {
+      final token = _oauthToken;
+      if (token != null) {
         request.headers.set(
           'Authorization',
-          'Bearer ${_oauthToken.accessToken}',
+          'Bearer ${token.accessToken}',
         );
       }
 
@@ -384,6 +397,11 @@ class SseAuthClientTransport implements ClientTransport {
 
     // Close event source
     _eventSource.close();
+
+    // Release the OAuth client (owns the underlying HTTP client)
+    if (_oauthClient case final HttpOAuthClient c) {
+      c.close();
+    }
 
     // Close streams
     if (!_messageController.isClosed) {

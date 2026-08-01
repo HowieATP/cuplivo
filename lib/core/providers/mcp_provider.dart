@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
@@ -11,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
 import '../services/headless_generation_service.dart';
+import '../services/oauth/oauth_flow_service.dart';
 import 'assistant_provider.dart';
 import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
@@ -111,6 +113,107 @@ class McpToolConfig {
   );
 }
 
+/// Static OAuth 2.1 configuration for a remote MCP server.
+///
+/// This is an app-level DTO; the library's `mcp.OAuthConfig` is built from
+/// it at connection time via [toLibraryConfig]. Empty endpoint fields are
+/// legal — the flow auto-discovers (RFC 8414) and auto-registers a client
+/// (RFC 7591) at authorization time.
+class McpOAuthConfig {
+  final String authorizationEndpoint;
+  final String tokenEndpoint;
+  final String clientId;
+  final String? clientSecret;
+  final String scopes; // space-separated, optional
+  final String? redirectUri;
+
+  /// Registration provenance of [clientId]:
+  /// - 0: unregistered or user-provided (never auto-replaced)
+  /// - 1: auto-registered by an older build (127.0.0.1 loopback variant
+  ///   only) — re-registered on the next flow so `localhost` redirects work
+  /// - 2: auto-registered with both loopback variants (current)
+  final int clientRegistrationVersion;
+
+  const McpOAuthConfig({
+    required this.authorizationEndpoint,
+    required this.tokenEndpoint,
+    required this.clientId,
+    this.clientSecret,
+    this.scopes = '',
+    this.redirectUri,
+    this.clientRegistrationVersion = 0,
+  });
+
+  McpOAuthConfig copyWith({
+    String? authorizationEndpoint,
+    String? tokenEndpoint,
+    String? clientId,
+    String? clientSecret,
+    bool clearClientSecret = false,
+    String? scopes,
+    String? redirectUri,
+    bool clearRedirectUri = false,
+    int? clientRegistrationVersion,
+  }) => McpOAuthConfig(
+    authorizationEndpoint: authorizationEndpoint ?? this.authorizationEndpoint,
+    tokenEndpoint: tokenEndpoint ?? this.tokenEndpoint,
+    clientId: clientId ?? this.clientId,
+    clientSecret: clearClientSecret
+        ? null
+        : (clientSecret ?? this.clientSecret),
+    scopes: scopes ?? this.scopes,
+    redirectUri: clearRedirectUri ? null : (redirectUri ?? this.redirectUri),
+    clientRegistrationVersion:
+        clientRegistrationVersion ?? this.clientRegistrationVersion,
+  );
+
+  Map<String, dynamic> toJson() {
+    final secret = clientSecret;
+    final redirect = redirectUri;
+    return {
+      'authorizationEndpoint': authorizationEndpoint,
+      'tokenEndpoint': tokenEndpoint,
+      'clientId': clientId,
+      if (secret != null && secret.isNotEmpty) 'clientSecret': secret,
+      if (scopes.trim().isNotEmpty) 'scopes': scopes,
+      if (redirect != null && redirect.isNotEmpty) 'redirectUri': redirect,
+      if (clientRegistrationVersion != 0)
+        'clientRegistrationVersion': clientRegistrationVersion,
+    };
+  }
+
+  factory McpOAuthConfig.fromJson(Map<String, dynamic> json) => McpOAuthConfig(
+    authorizationEndpoint: (json['authorizationEndpoint'] as String?) ?? '',
+    tokenEndpoint: (json['tokenEndpoint'] as String?) ?? '',
+    clientId: (json['clientId'] as String?) ?? '',
+    clientSecret: json['clientSecret'] as String?,
+    scopes: (json['scopes'] as String?) ?? '',
+    redirectUri: json['redirectUri'] as String?,
+    clientRegistrationVersion: (json['clientRegistrationVersion'] as int?) ?? 0,
+  );
+
+  /// Builds the library-level OAuth configuration for connection time.
+  mcp.OAuthConfig toLibraryConfig() {
+    final secret = clientSecret;
+    final redirect = redirectUri;
+    final scopeList = scopes
+        .split(' ')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    return mcp.OAuthConfig(
+      authorizationEndpoint: authorizationEndpoint.trim(),
+      tokenEndpoint: tokenEndpoint.trim(),
+      clientId: clientId.trim(),
+      clientSecret: (secret == null || secret.isEmpty) ? null : secret,
+      redirectUri: (redirect == null || redirect.isEmpty) ? null : redirect,
+      scopes: scopeList,
+      grantType: mcp.OAuthGrantType.authorizationCode,
+      codeChallengeMethod: 'S256',
+    );
+  }
+}
+
 class McpServerConfig {
   final String id; // stable id
   final bool enabled;
@@ -128,6 +231,10 @@ class McpServerConfig {
   final int? heartbeatIntervalSeconds; // null = use default (12s)
   final String
   toolPrefix; // optional prefix prepended to all tool names from this server
+  // OAuth (HTTP/SSE only). Null = no OAuth, static headers apply.
+  final McpOAuthConfig? oauth;
+  // Persisted OAuth token. Null = never authorized or cleared.
+  final mcp.OAuthToken? oauthToken;
 
   McpServerConfig({
     required this.id,
@@ -143,6 +250,8 @@ class McpServerConfig {
     this.workingDirectory,
     this.heartbeatIntervalSeconds,
     this.toolPrefix = '',
+    this.oauth,
+    this.oauthToken,
   });
 
   McpServerConfig copyWith({
@@ -161,6 +270,10 @@ class McpServerConfig {
     int? heartbeatIntervalSeconds,
     bool clearHeartbeatIntervalSeconds = false,
     String? toolPrefix,
+    McpOAuthConfig? oauth,
+    bool clearOauth = false,
+    mcp.OAuthToken? oauthToken,
+    bool clearOauthToken = false,
   }) => McpServerConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -179,6 +292,8 @@ class McpServerConfig {
         ? null
         : (heartbeatIntervalSeconds ?? this.heartbeatIntervalSeconds),
     toolPrefix: toolPrefix ?? this.toolPrefix,
+    oauth: clearOauth ? null : (oauth ?? this.oauth),
+    oauthToken: clearOauthToken ? null : (oauthToken ?? this.oauthToken),
   );
 
   Map<String, dynamic> toJson() => {
@@ -201,6 +316,8 @@ class McpServerConfig {
     if (heartbeatIntervalSeconds != null)
       'heartbeatIntervalSeconds': heartbeatIntervalSeconds,
     if (toolPrefix.isNotEmpty) 'toolPrefix': toolPrefix,
+    if (oauth != null) 'oauth': oauth!.toJson(),
+    if (oauthToken != null) 'oauthToken': oauthToken!.toJson(),
   };
 
   factory McpServerConfig.fromJson(Map<String, dynamic> json) {
@@ -221,6 +338,14 @@ class McpServerConfig {
         const <McpToolConfig>[];
     final heartbeatIntervalSeconds = json['heartbeatIntervalSeconds'] as int?;
     final toolPrefix = (json['toolPrefix'] as String?) ?? '';
+    final oauth = json['oauth'] is Map
+        ? McpOAuthConfig.fromJson(
+            (json['oauth'] as Map).cast<String, dynamic>(),
+          )
+        : null;
+    final oauthToken = json['oauthToken'] is Map
+        ? _oauthTokenFromJson(json['oauthToken'])
+        : null;
     if (t == McpTransportType.stdio) {
       final argsAny = json['args'];
       final envAny = json['env'];
@@ -240,6 +365,8 @@ class McpServerConfig {
         workingDirectory: (json['workingDirectory'] as String?)?.trim(),
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
+        oauth: oauth,
+        oauthToken: oauthToken,
       );
     } else if (t == McpTransportType.inmemory) {
       return McpServerConfig(
@@ -250,6 +377,8 @@ class McpServerConfig {
         tools: tools,
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
+        oauth: oauth,
+        oauthToken: oauthToken,
       );
     } else {
       return McpServerConfig(
@@ -266,7 +395,17 @@ class McpServerConfig {
             const {},
         heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
+        oauth: oauth,
+        oauthToken: oauthToken,
       );
+    }
+  }
+
+  static mcp.OAuthToken? _oauthTokenFromJson(dynamic raw) {
+    try {
+      return mcp.OAuthToken.fromJson((raw as Map).cast<String, dynamic>());
+    } catch (_) {
+      return null;
     }
   }
 }
@@ -280,7 +419,11 @@ class McpProvider extends ChangeNotifier {
     this.assistantProvider,
     this.headlessGen,
     required this.contextProvider,
-  }) {
+    http.Client Function()? oauthClientFactory,
+    OAuthFlowService? oauthFlowService,
+  }) : oauthFlowService =
+           oauthFlowService ??
+           OAuthFlowService(clientFactory: oauthClientFactory) {
     _load();
   }
 
@@ -288,6 +431,9 @@ class McpProvider extends ChangeNotifier {
   final AssistantProvider? assistantProvider;
   final HeadlessGenerationService? headlessGen;
   final BuildContext Function() contextProvider;
+
+  /// Provider-agnostic OAuth flow orchestration (see ADR-0016).
+  final OAuthFlowService oauthFlowService;
 
   final Map<String, mcp.Client> _clients = {};
   final Map<String, McpStatus> _status = {}; // id -> status
@@ -341,8 +487,12 @@ class McpProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // Auto-connect enabled servers
+    // Auto-connect enabled servers. Skip OAuth servers that have not been
+    // authorized yet — connecting them would fail with "no token yet" and
+    // leave a stale error state (the connect happens after authorization).
     for (final s in _servers.where((e) => e.enabled)) {
+      final needsOAuth = s.oauth != null && s.oauthToken == null;
+      if (needsOAuth) continue;
       // fire and forget
       unawaited(connect(s.id));
     }
@@ -697,6 +847,7 @@ class McpProvider extends ChangeNotifier {
     String? workingDirectory,
     int? heartbeatIntervalSeconds,
     String toolPrefix = '',
+    McpOAuthConfig? oauth,
   }) async {
     final id = const Uuid().v4();
     final cfg = McpServerConfig(
@@ -714,12 +865,17 @@ class McpProvider extends ChangeNotifier {
           : null,
       heartbeatIntervalSeconds: heartbeatIntervalSeconds,
       toolPrefix: toolPrefix,
+      oauth: oauth,
     );
     _servers = [..._servers, cfg];
     _status[id] = McpStatus.idle;
     await _persist();
     notifyListeners();
-    if (enabled) {
+    // Skip the automatic connect when OAuth is configured but not yet
+    // authorized — it would fail with "no token yet" and leave a stale
+    // error state. The connection happens after authorization completes.
+    final needsOAuth = cfg.oauth != null && cfg.oauthToken == null;
+    if (enabled && !needsOAuth) {
       unawaited(connect(id));
     }
     return id;
@@ -747,6 +903,136 @@ class McpProvider extends ChangeNotifier {
       await disconnect(updated.id);
       unawaited(connect(updated.id));
     }
+  }
+
+  /// Starts the OAuth authorization flow for [serverId].
+  ///
+  /// Auto-discovers missing endpoints (RFC 8414), dynamically registers a
+  /// public client when no Client ID is set (RFC 7591), and starts a
+  /// loopback callback server. Any discovered/registered values are
+  /// persisted back into the server config. Returns the flow start result.
+  ///
+  /// [configOverride] supplies the form's current OAuth configuration.
+  /// Without it (and when the server has no persisted config) the flow
+  /// fails — the edit form is the source of truth, e.g. the OAuth switch
+  /// may have just been turned on and never saved.
+  ///
+  /// Throws [StateError] when neither the override nor the server has an
+  /// OAuth configuration.
+  Future<OAuthFlowStartResult> beginOAuthFlow(
+    String serverId, {
+    McpOAuthConfig? configOverride,
+  }) async {
+    final server = getById(serverId);
+    if (server == null) {
+      throw StateError('MCP server not found: $serverId');
+    }
+    final oauth = configOverride ?? server.oauth;
+    if (oauth == null) {
+      throw StateError(
+        'OAuth is not configured for server "${server.name}". '
+        'Enable OAuth in the server edit page first.',
+      );
+    }
+    // Client IDs auto-registered by older builds only carry the
+    // `127.0.0.1` loopback variant, which breaks `localhost` redirects.
+    // The feature is unreleased, so such clients are discarded and
+    // re-registered (fresh client ID with both loopback variants).
+    var config = oauth.toLibraryConfig();
+    if (oauth.clientRegistrationVersion == 1) {
+      config = config.copyWith(clientId: '');
+    }
+    final result = await oauthFlowService.beginFlow(
+      key: serverId,
+      config: config,
+      serverUrl: server.url,
+    );
+    // Persist discovered/registered values so the next run starts
+    // fully configured. Persist only the deltas to avoid clobbering
+    // user-edited fields with identical values. When the server never
+    // had an OAuth config (switch just turned on in the edit form),
+    // the override becomes the persisted base.
+    if (result.usedDiscovery || result.usedDcr) {
+      final idx = _servers.indexWhere((e) => e.id == serverId);
+      if (idx >= 0) {
+        final current = _servers[idx];
+        final existing = current.oauth ?? oauth;
+        final updated = existing.copyWith(
+          authorizationEndpoint:
+              result.discoveredAuthorizationEndpoint ??
+              existing.authorizationEndpoint,
+          tokenEndpoint:
+              result.discoveredTokenEndpoint ?? existing.tokenEndpoint,
+          clientId: result.discoveredClientId ?? existing.clientId,
+          // A fresh DCR registration carries both loopback variants.
+          clientRegistrationVersion: result.usedDcr
+              ? 2
+              : existing.clientRegistrationVersion,
+        );
+        _servers = List<McpServerConfig>.of(_servers)
+          ..[idx] = current.copyWith(oauth: updated);
+        await _persist();
+        notifyListeners();
+      }
+    }
+    return result;
+  }
+
+  /// Completes the OAuth flow for [serverId] with the pasted content
+  /// (raw code or full redirect URL). Persists the obtained token and
+  /// reconnects the server so the pre-authorization error state clears.
+  Future<void> completeOAuthFlow(
+    String serverId,
+    String pasted, {
+    Duration callbackTimeout = const Duration(minutes: 2),
+  }) async {
+    final token = await oauthFlowService.completeFlow(
+      key: serverId,
+      pasted: pasted,
+      callbackTimeout: callbackTimeout,
+    );
+    final idx = _servers.indexWhere((e) => e.id == serverId);
+    if (idx < 0) {
+      oauthFlowService.cancelFlow(serverId);
+      return;
+    }
+    final server = _servers[idx];
+    _servers = List<McpServerConfig>.of(_servers)
+      ..[idx] = server.copyWith(oauthToken: token);
+    await _persist();
+    notifyListeners();
+    if (server.enabled) {
+      // The connection may have failed earlier with "no token yet" —
+      // reconnect now that the token is persisted.
+      await disconnect(serverId);
+      unawaited(connect(serverId));
+    }
+  }
+
+  /// Clears the persisted OAuth token for [serverId] (logout).
+  Future<void> clearOAuthToken(String serverId) async {
+    final idx = _servers.indexWhere((e) => e.id == serverId);
+    if (idx < 0) return;
+    _servers = List<McpServerConfig>.of(_servers)
+      ..[idx] = _servers[idx].copyWith(clearOauthToken: true);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Cancels an in-flight OAuth flow (PKCE verifier discarded).
+  void cancelOAuthFlow(String serverId) {
+    oauthFlowService.cancelFlow(serverId);
+  }
+
+  /// Persists a refreshed OAuth token without bouncing the connection.
+  /// Invoked from the transport's `onTokenRefreshed` hook.
+  void _persistOAuthToken(String serverId, mcp.OAuthToken token) {
+    final idx = _servers.indexWhere((e) => e.id == serverId);
+    if (idx < 0) return;
+    _servers = List<McpServerConfig>.of(_servers)
+      ..[idx] = _servers[idx].copyWith(oauthToken: token);
+    unawaited(_persist());
+    notifyListeners();
   }
 
   Future<void> removeServer(String id) async {
@@ -906,17 +1192,36 @@ class McpProvider extends ChangeNotifier {
       }
 
       final mergedHeaders = <String, String>{...server.headers};
+      final oauthConfig = server.oauth?.toLibraryConfig();
       final transportConfig = await () async {
         if (server.transport == McpTransportType.sse) {
+          if (oauthConfig != null && server.oauthToken == null) {
+            throw StateError(
+              'OAuth server "${server.name}" has no token yet. '
+              'Authorize it first (edit → OAuth section → 开始授权).',
+            );
+          }
           return mcp.TransportConfig.sse(
             serverUrl: server.url,
             headers: mergedHeaders.isEmpty ? null : mergedHeaders,
+            oauthConfig: oauthConfig,
+            oauthToken: server.oauthToken,
+            onTokenRefreshed: (token) => _persistOAuthToken(id, token),
           );
         } else if (server.transport == McpTransportType.http) {
+          if (oauthConfig != null && server.oauthToken == null) {
+            throw StateError(
+              'OAuth server "${server.name}" has no token yet. '
+              'Authorize it first (edit → OAuth section → 开始授权).',
+            );
+          }
           return mcp.TransportConfig.streamableHttp(
             baseUrl: server.url,
             headers: mergedHeaders.isEmpty ? null : mergedHeaders,
             timeout: _requestTimeout,
+            oauthConfig: oauthConfig,
+            oauthToken: server.oauthToken,
+            onTokenRefreshed: (token) => _persistOAuthToken(id, token),
           );
         } else {
           // STDIO; only supported on desktop

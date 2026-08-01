@@ -685,6 +685,7 @@ These memories are automatically included in future conversation contexts within
         final relevantChats = chats
             .where(
               (c) =>
+                  !c.isGroup &&
                   c.assistantId == assistant!.id &&
                   c.id != currentConversationId,
             )

@@ -15,6 +15,8 @@ import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/group_chat.dart';
+import '../../models/group_chat_member.dart';
 import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
 import '../deleted_records_store.dart';
@@ -892,7 +894,7 @@ class DataSync {
     final sink = file.openWrite();
 
     try {
-      sink.write('{"version":1,');
+      sink.write('{"version":2,');
 
       // --- conversations ---
       sink.write('"conversations":[');
@@ -911,7 +913,11 @@ class DataSync {
       bool firstMsg = true;
       for (final c in conversations) {
         var msgs = chatService.getMessages(c.id);
-        if (incremental != null && c.createdAt.isBefore(incremental.since)) {
+        // Group transcripts are all-or-nothing: a partial message list would
+        // corrupt member assistants' private context after restore.
+        if (incremental != null &&
+            !c.isGroup &&
+            c.createdAt.isBefore(incremental.since)) {
           msgs = msgs
               .where((m) => incremental.sinceCheck(m.timestamp))
               .toList();
@@ -940,6 +946,32 @@ class DataSync {
       // --- geminiThoughtSigs ---
       sink.write('"geminiThoughtSigs":');
       sink.write(jsonEncode(geminiThoughtSigs));
+      sink.write(',');
+
+      // --- group chats (v2) ---
+      final groups = await chatService.repo.getAllGroupChats();
+      final groupPayload = <Map<String, dynamic>>[];
+      final memberPayload = <Map<String, dynamic>>[];
+      // Incremental scope: a group qualifies when it was active since `since`,
+      // or when its conversation made it into this export. A qualifying group
+      // carries its FULL members — the director session is ephemeral (rebuilt
+      // from the public transcript) and is never stored or exported.
+      final exportedConversationIds = conversations.map((c) => c.id).toSet();
+      for (final g in groups) {
+        if (incremental != null &&
+            g.updatedAt.isBefore(incremental.since) &&
+            !exportedConversationIds.contains(g.conversationId)) {
+          continue;
+        }
+        groupPayload.add(g.toJson());
+        final members = await chatService.repo.getGroupMembers(g.id);
+        memberPayload.addAll(members.map((m) => m.toJson()));
+      }
+      sink.write('"groupChats":');
+      sink.write(jsonEncode(groupPayload));
+      sink.write(',');
+      sink.write('"groupMembers":');
+      sink.write(jsonEncode(memberPayload));
 
       sink.write('}');
     } finally {
@@ -1364,6 +1396,53 @@ class DataSync {
               }
             }
           }
+
+          // Restore group chat metadata (v2 keys; ignored on v1 backups).
+          final groupChatsRaw = obj['groupChats'] as List? ?? const [];
+          final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
+          if (groupChatsRaw.isNotEmpty) {
+            final existingGroupIds = mode == RestoreMode.merge
+                ? (await chatService.repo.getAllGroupChats())
+                      .map((g) => g.id)
+                      .toSet()
+                : <String>{};
+            for (final raw in groupChatsRaw) {
+              try {
+                final g = GroupChat.fromJson(
+                  (raw as Map).cast<String, dynamic>(),
+                );
+                if (mode == RestoreMode.merge &&
+                    existingGroupIds.contains(g.id)) {
+                  continue;
+                }
+                await chatService.repo.putGroupChat(g);
+              } catch (e) {
+                debugPrint('restoreData: groupChat row: $e');
+              }
+            }
+            final membersByGroup = <String, List<GroupChatMember>>{};
+            for (final raw in groupMembersRaw) {
+              try {
+                final m = GroupChatMember.fromJson(
+                  (raw as Map).cast<String, dynamic>(),
+                );
+                (membersByGroup[m.groupChatId] ??= []).add(m);
+              } catch (e) {
+                debugPrint('restoreData: groupMembers parse: $e');
+              }
+            }
+            for (final entry in membersByGroup.entries) {
+              if (mode == RestoreMode.merge &&
+                  existingGroupIds.contains(entry.key)) {
+                continue;
+              }
+              try {
+                await chatService.repo.putGroupMembers(entry.key, entry.value);
+              } catch (e) {
+                debugPrint('restoreData: groupMembers: $e');
+              }
+            }
+          }
         } catch (_) {}
       }
 
@@ -1608,7 +1687,20 @@ class DataSync {
             final assistants = merged.map(Assistant.fromJson).toList();
             await chatService.putAssistants(assistants);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('restoreData: assistants restore failed: $e\n$st');
+          rethrow;
+        }
+      }
+
+      // Always re-sync conversation cache from disk after restore so UI/providers
+      // do not keep a wiped in-memory view while SQLite already has rows.
+      if (chatService.initialized) {
+        try {
+          await chatService.reloadCachesFromDb();
+        } catch (e, st) {
+          debugPrint('restoreData: reloadCachesFromDb failed: $e\n$st');
+        }
       }
     } finally {
       await _deleteDirectoryQuietly(extractDir);

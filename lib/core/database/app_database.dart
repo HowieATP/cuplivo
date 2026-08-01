@@ -26,6 +26,10 @@ class ConversationRows extends Table {
       text().withDefault(const Constant('[]'))();
   TextColumn get parentConversationId => text().nullable()();
 
+  /// 'normal' | 'group' — group public transcripts use kind=group.
+  TextColumn get conversationKind =>
+      text().withDefault(const Constant('normal'))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -65,6 +69,9 @@ class MessageRows extends Table {
   IntColumn get durationMs => integer().nullable()();
   IntColumn get messageOrder => integer()();
   BoolColumn get isPreset => boolean().withDefault(const Constant(false))();
+
+  /// Speaker assistant id for group chats; null for user messages / 1:1.
+  TextColumn get speakerAssistantId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -246,6 +253,58 @@ class DeletionMarkerRows extends Table {
   Set<Column<Object>> get primaryKey => {id, type, origin};
 }
 
+// ===== Multi-assistant group chat (schema v13) =====
+// Layered model: the public transcript lives in ConversationRows
+// (conversation_kind='group') + MessageRows.speakerAssistantId; GroupChatRows
+// holds metadata + per-round runtime state; GroupChatMemberRows is the M:N
+// membership join (same shape as ConversationMcpServerRows). The Director
+// session is ephemeral — rebuilt from the public transcript on every call,
+// never persisted (the v13 `director_message_rows` table was dropped in v14).
+// See docs/adr/0015 and CONTEXT.md.
+// Sync rule: any new group-related table must be wired into clearAllData
+// (child-before-parent FK order), _exportChatsToFile and _restoreFromBackupFile
+// in the same change.
+@TableIndex(name: 'idx_group_chats_updated_at', columns: {#updatedAt})
+class GroupChatRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get avatar => text().nullable()();
+  TextColumn get conversationId => text().unique().references(
+    ConversationRows,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+  TextColumn get directorModelProvider => text().nullable()();
+  TextColumn get directorModelId => text().nullable()();
+  TextColumn get directorSystemPrompt =>
+      text().withDefault(const Constant(''))();
+  IntColumn get maxAssistantMessagesPerRound =>
+      integer().withDefault(const Constant(3))();
+  TextColumn get assistantDetailInjectionMode =>
+      text().withDefault(const Constant('endOfEveryUserMessage'))();
+  IntColumn get assistantDetailInjectionN =>
+      integer().withDefault(const Constant(5))();
+  TextColumn get pendingCapAssistantMessageId => text().nullable()();
+  IntColumn get assistantMessagesThisRound =>
+      integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class GroupChatMemberRows extends Table {
+  TextColumn get groupChatId =>
+      text().references(GroupChatRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get memberKey => text()();
+  TextColumn get assistantId => text().nullable()();
+  IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {groupChatId, memberKey};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -258,6 +317,8 @@ class DeletionMarkerRows extends Table {
     ChatStorageMetaRows,
     DeletedRecordRows,
     DeletionMarkerRows,
+    GroupChatRows,
+    GroupChatMemberRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -294,7 +355,10 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  // Migrations follow the original per-version pattern only — no runtime
+  // self-heal. A locally corrupted dev DB is repaired by reinstalling, not
+  // by healing schema on every open.
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -409,6 +473,38 @@ class AppDatabase extends _$AppDatabase {
             assistantRows.handoffDescription,
           );
         } catch (_) {}
+      }
+      if (from < 13) {
+        try {
+          await migrator.createTable(groupChatRows);
+        } catch (_) {
+          // table may already exist on migration replay
+        }
+        try {
+          await migrator.createTable(groupChatMemberRows);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.conversationKind,
+          );
+        } catch (_) {
+          // column may already exist on migration replay
+        }
+        try {
+          await migrator.addColumn(messageRows, messageRows.speakerAssistantId);
+        } catch (_) {
+          // column may already exist on migration replay
+        }
+        await customStatement(
+          "UPDATE conversation_rows SET conversation_kind = 'normal' "
+          "WHERE conversation_kind IS NULL OR conversation_kind = ''",
+        );
+      }
+      if (from < 14) {
+        // The Director session is ephemeral (rebuilt from the public
+        // transcript); the v13 table is unused by the live flow.
+        await customStatement('DROP TABLE IF EXISTS director_message_rows');
       }
     },
   );

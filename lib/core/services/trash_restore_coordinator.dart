@@ -13,6 +13,8 @@ import '../services/quick_phrase_store.dart';
 import '../services/world_book_store.dart';
 import '../models/assistant.dart';
 import '../models/assistant_memory.dart';
+import '../models/group_chat.dart';
+import '../models/group_chat_member.dart';
 import '../models/quick_phrase.dart';
 import '../models/world_book.dart';
 
@@ -64,6 +66,8 @@ class TrashRestoreCoordinator {
         error = await _restoreMcpServer(id);
       case DeletionEntityType.memory:
         error = await _restoreMemory(id);
+      case DeletionEntityType.groupChat:
+        error = await _restoreGroupChat(id);
       default:
         return 'Unknown type: $type';
     }
@@ -209,6 +213,9 @@ class TrashRestoreCoordinator {
           await memoryProvider?.delete(id: idInt);
         }
         return true;
+      case DeletionEntityType.groupChat:
+        await chatService.repo.deleteGroupChat(id);
+        return true;
       default:
         return false;
     }
@@ -245,6 +252,9 @@ class TrashRestoreCoordinator {
         return (memoryProvider?.memories ?? [])
             .map((m) => m.id.toString())
             .toSet();
+      case DeletionEntityType.groupChat:
+        final groups = await chatService.repo.getAllGroupChats();
+        return groups.map((g) => g.id).toSet();
       default:
         return {};
     }
@@ -299,8 +309,42 @@ class TrashRestoreCoordinator {
             .where((m) => m.id == idInt)
             .firstOrNull;
         return mem != null ? _contentPreview(mem.content) : null;
+      case DeletionEntityType.groupChat:
+        final g = await chatService.repo.getGroupChat(id);
+        return g?.name;
       default:
         return null;
+    }
+  }
+
+  Future<String?> _restoreGroupChat(String id) async {
+    final store = _store;
+    if (store == null) return 'DeletedRecordsStore not initialized';
+    final record = await store.getDeletedRecord(
+      id,
+      DeletionEntityType.groupChat,
+    );
+    if (record == null) return 'Record not found in trash';
+    try {
+      final map = (jsonDecode(record.recoveryJson) as Map)
+          .cast<String, dynamic>();
+      final group = GroupChat.fromJson(
+        (map['groupChat'] as Map).cast<String, dynamic>(),
+      );
+      final membersRaw = map['members'] as List? ?? const [];
+      final members = membersRaw
+          .map(
+            (e) => GroupChatMember.fromJson((e as Map).cast<String, dynamic>()),
+          )
+          .toList();
+
+      // Conversation/messages may already be restored via conversation trash.
+      await chatService.repo.putGroupChat(group);
+      await chatService.repo.putGroupMembers(group.id, members);
+      await store.purgeDeletedRecord(id, DeletionEntityType.groupChat);
+      return null;
+    } catch (e) {
+      return 'Restore groupChat failed: $e';
     }
   }
 

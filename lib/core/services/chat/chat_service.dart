@@ -65,9 +65,19 @@ class ChatService extends ChangeNotifier {
     _repo = ChatDatabaseRepository.open(
       file: File(p.join(appDataDir.path, AppDatabase.databaseFileName)),
     );
+    // ensureReady runs Drift migrations then opens a post-migration sync DB.
     await _repo.ensureReady();
     _deletedRecordsStore = DeletedRecordsStore(_repo.db);
-    await _loadConversationsCache();
+    try {
+      await _loadConversationsCache();
+    } catch (e, st) {
+      // Recover once: reopen sync after migration and retry cache load.
+      debugPrint(
+        '[ChatService.init] conversation cache load failed, reopening sync: $e\n$st',
+      );
+      _repo.reopenSyncConnection();
+      await _loadConversationsCache();
+    }
 
     // Migrate any persisted message content that references old iOS sandbox paths
     await _migrateSandboxPaths();
@@ -77,6 +87,19 @@ class ChatService extends ChangeNotifier {
     await _resetStaleStreamingFlags();
 
     _initialized = true;
+    notifyListeners();
+  }
+
+  /// Re-read conversations from SQLite into the in-memory cache.
+  /// Call after bulk restore / wipe so UI matches disk.
+  Future<void> reloadCachesFromDb() async {
+    if (!_initialized) {
+      await init();
+      return;
+    }
+    _repo.reopenSyncConnection();
+    await _loadConversationsCache();
+    _messagesCache.clear();
     notifyListeners();
   }
 
@@ -95,18 +118,24 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _loadConversationsCache() async {
+    // Cache holds all conversations including group (for getConversation by id).
     _conversationsCache
       ..clear()
       ..addEntries(
-        _repo.getAllConversationsSync().map(
-          (conversation) => MapEntry(conversation.id, conversation),
-        ),
+        _repo
+            .getAllConversationsSync(includeGroup: true)
+            .map((conversation) => MapEntry(conversation.id, conversation)),
       );
   }
 
-  List<Conversation> getAllConversations() {
+  /// UI default excludes group transcripts. Use [includeGroup] for admin/debug.
+  /// Any new conversation enumeration must default to excluding group
+  /// conversations unless it has an explicit reason (backup inventory/admin).
+  List<Conversation> getAllConversations({bool includeGroup = false}) {
     if (!_initialized) return [];
-    final conversations = _conversationsCache.values.toList();
+    final conversations = _conversationsCache.values
+        .where((c) => includeGroup || !c.isGroup)
+        .toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return conversations;
   }
@@ -344,21 +373,68 @@ class ChatService extends ChangeNotifier {
     String? assistantId,
     List<String>? mcpServerIds,
     String? parentConversationId,
+    String conversationKind = Conversation.kindNormal,
+    bool setAsCurrent = true,
   }) async {
     if (!_initialized) await init();
-    _discardTemporaryConversation(_currentConversationId);
+    if (setAsCurrent) {
+      _discardTemporaryConversation(_currentConversationId);
+    }
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
       mcpServerIds: mcpServerIds,
       parentConversationId: parentConversationId,
+      conversationKind: conversationKind,
     );
 
     await _saveConversation(conversation);
-    _currentConversationId = conversation.id;
+    if (setAsCurrent) {
+      _currentConversationId = conversation.id;
+    }
     notifyListeners();
     return conversation;
+  }
+
+  /// Single source of truth for renaming a conversation. Group chat renames
+  /// (GroupChatProvider.updateGroup) go through here so the in-memory cache
+  /// and updatedAt stay in sync with the group name.
+  Future<void> setConversationTitle(
+    String conversationId,
+    String newTitle,
+  ) async {
+    if (!_initialized) await init();
+    var conversation =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId];
+    conversation ??= _repo.getConversationSync(
+      conversationId,
+      includeMessageIds: false,
+    );
+    if (conversation == null) return;
+    conversation.title = newTitle;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+    notifyListeners();
+  }
+
+  /// Bumps a conversation's updatedAt (repo + cache) without touching its
+  /// title. Used so group chat activity reorders the conversation in backup
+  /// inventory.
+  Future<void> bumpConversationUpdatedAt(String conversationId) async {
+    if (!_initialized) return;
+    var conversation =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId];
+    conversation ??= _repo.getConversationSync(
+      conversationId,
+      includeMessageIds: false,
+    );
+    if (conversation == null) return;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+    notifyListeners();
   }
 
   Future<void> _saveConversation(Conversation conversation) async {
@@ -420,8 +496,19 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteConversation(String id) async {
+  Future<void> deleteConversation(String id, {bool allowGroup = false}) async {
     if (!_initialized) return;
+
+    final existing =
+        _conversationsCache[id] ??
+        _draftConversations[id] ??
+        _repo.getConversationSync(id, includeMessageIds: false);
+    if (existing != null && existing.isGroup && !allowGroup) {
+      throw StateError(
+        'Cannot delete group conversation via deleteConversation; '
+        'use GroupChatProvider.deleteGroup instead (id=$id)',
+      );
+    }
 
     final deleted =
         await _deleteDraftConversation(id) ||
@@ -812,6 +899,15 @@ class ChatService extends ChangeNotifier {
       _messagesCache[c.id] = List<ChatMessage>.of(messages);
     }
 
+    // Also re-sync from disk so includeGroup / conversationKind match SQLite.
+    try {
+      await _loadConversationsCache();
+    } catch (e) {
+      debugPrint('[ChatService.restoreConversationsBatch] cache reload: $e');
+      _repo.reopenSyncConnection();
+      await _loadConversationsCache();
+    }
+
     notifyListeners();
   }
 
@@ -1062,6 +1158,7 @@ class ChatService extends ChangeNotifier {
     String? subgroupId,
     int? version,
     bool isPreset = false,
+    String? speakerAssistantId,
   }) async {
     if (!_initialized) await init();
 
@@ -1106,6 +1203,7 @@ class ChatService extends ChangeNotifier {
       subgroupId: subgroupId,
       version: version,
       isPreset: isPreset,
+      speakerAssistantId: speakerAssistantId,
     );
 
     if (!temporary) {
@@ -1489,6 +1587,7 @@ class ChatService extends ChangeNotifier {
       isStreaming: false,
       groupId: gid,
       version: nextVersion,
+      speakerAssistantId: original.speakerAssistantId,
     );
     // Append to conversation order at the end (we'll group when rendering)
     if (_draftConversations.containsKey(cid)) {
@@ -1728,6 +1827,8 @@ class ChatService extends ChangeNotifier {
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
     _currentConversationId = null;
+    // Sync connection may still hold pre-wipe page cache; reopen cleanly.
+    _repo.reopenSyncConnection();
     // Remove uploads directory completely
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();

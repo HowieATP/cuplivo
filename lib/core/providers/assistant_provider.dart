@@ -84,10 +84,35 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   /// Reloads assistants from the repo and notifies listeners.
-  /// Used by [TrashRestoreCoordinator] after restoring an assistant.
+  /// Used by [TrashRestoreCoordinator] after restoring an assistant, and after
+  /// backup overwrite/merge restore.
+  ///
+  /// Always replaces the in-memory list with disk state (including empty), so
+  /// a wipe+restore cannot leave a stale pre-restore list.
   Future<void> reloadFromRepo() async {
-    if (chatService == null) return;
-    await _doLoad(chatService!.repo);
+    if (chatService == null || !chatService!.initialized) return;
+    final prefs = await SharedPreferences.getInstance();
+    final rows = await chatService!.repo.getAllAssistants();
+    _assistants
+      ..clear()
+      ..addAll(rows);
+    if (_assistants.isEmpty) {
+      await _migrateFromPrefs(prefs, chatService!.repo);
+    }
+    if (_assistants.isEmpty) {
+      _loaded = false;
+      _currentAssistantId = null;
+      notifyListeners();
+      return;
+    }
+    _loaded = true;
+    final savedId = prefs.getString(_currentAssistantKey);
+    if (savedId != null && _assistants.any((a) => a.id == savedId)) {
+      _currentAssistantId = savedId;
+    } else {
+      _currentAssistantId = _assistants.first.id;
+    }
+    notifyListeners();
   }
 
   Future<void> _doLoad(ChatDatabaseRepository repo) async {
@@ -664,6 +689,12 @@ class AssistantProvider extends ChangeNotifier {
     }
 
     await chatService?.deleteConversationsForAssistant(id);
+    // Drop membership from all multi-assistant group chats.
+    try {
+      await chatService?.repo.removeAssistantFromAllGroups(id);
+    } catch (e) {
+      debugPrint('deleteAssistant: remove from groups failed: $e');
+    }
     // Cancel any pending proactive care alarm for this assistant.
     if (Platform.isAndroid && ProactiveCareAlarmService.isSupported) {
       ProactiveCareAlarmService.cancelFor(id);

@@ -11839,6 +11839,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the parent conversation'**
   String get handoffBackwardChipTooltip;
+
+  /// No description provided for @groupChatMyGroupChats.
+  ///
+  /// In en, this message translates to:
+  /// **'My group chats'**
+  String get groupChatMyGroupChats;
+
+  /// No description provided for @groupChatCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New group chat'**
+  String get groupChatCreate;
+
+  /// No description provided for @groupChatDefaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Group chat'**
+  String get groupChatDefaultName;
+
+  /// No description provided for @groupChatNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get groupChatNameHint;
+
+  /// No description provided for @groupChatCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get groupChatCancel;
+
+  /// No description provided for @groupChatConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get groupChatConfirm;
+
+  /// No description provided for @groupChatEmptyList.
+  ///
+  /// In en, this message translates to:
+  /// **'No group chats yet. Tap + to create one.'**
+  String get groupChatEmptyList;
+
+  /// No description provided for @groupChatSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Group settings'**
+  String get groupChatSettingsTitle;
+
+  /// No description provided for @groupChatNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Group chat not found'**
+  String get groupChatNotFound;
+
+  /// No description provided for @groupChatBasicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic info'**
+  String get groupChatBasicInfo;
+
+  /// No description provided for @groupChatMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get groupChatMembers;
+
+  /// No description provided for @groupChatAdvancedSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced settings'**
+  String get groupChatAdvancedSettings;
+
+  /// No description provided for @groupChatDirectorLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Director logs'**
+  String get groupChatDirectorLogs;
+
+  /// No description provided for @groupChatDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group chat'**
+  String get groupChatDelete;
+
+  /// No description provided for @groupChatDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate group chat'**
+  String get groupChatDuplicate;
+
+  /// No description provided for @groupChatDuplicateConfigOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy config only'**
+  String get groupChatDuplicateConfigOnly;
+
+  /// No description provided for @groupChatDuplicateConfigOnlyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new empty conversation with the same members and director settings.'**
+  String get groupChatDuplicateConfigOnlyDesc;
+
+  /// No description provided for @groupChatDuplicateDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Group chat duplicated'**
+  String get groupChatDuplicateDone;
+
+  /// No description provided for @groupChatDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this group chat? It will move to Trash.'**
+  String get groupChatDeleteConfirm;
+
+  /// No description provided for @groupChatUserLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get groupChatUserLabel;
+
+  /// No description provided for @groupChatInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get groupChatInvite;
+
+  /// No description provided for @groupChatMemberSoftCapWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'You have many members; performance may degrade.'**
+  String get groupChatMemberSoftCapWarning;
+
+  /// No description provided for @groupChatMemberHardCapReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum of 20 assistants per group.'**
+  String get groupChatMemberHardCapReached;
+
+  /// No description provided for @groupChatDirectorModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Director model'**
+  String get groupChatDirectorModel;
+
+  /// No description provided for @groupChatDirectorModelFollowGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow global default'**
+  String get groupChatDirectorModelFollowGlobal;
+
+  /// No description provided for @groupChatDirectorModelClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Use global default'**
+  String get groupChatDirectorModelClear;
+
+  /// No description provided for @groupChatDirectorSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Director system prompt'**
+  String get groupChatDirectorSystemPrompt;
+
+  /// No description provided for @groupChatAvailableVariables.
+  ///
+  /// In en, this message translates to:
+  /// **'Available variables'**
+  String get groupChatAvailableVariables;
+
+  /// No description provided for @groupChatMaxAssistantMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Max assistant messages per round'**
+  String get groupChatMaxAssistantMessages;
+
+  /// No description provided for @groupChatInjectionMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant detail injection position'**
+  String get groupChatInjectionMode;
+
+  /// No description provided for @groupChatInjectionN.
+  ///
+  /// In en, this message translates to:
+  /// **'N (every N messages)'**
+  String get groupChatInjectionN;
+
+  /// No description provided for @groupChatInjectionBeforeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Before system prompt'**
+  String get groupChatInjectionBeforeSystem;
+
+  /// No description provided for @groupChatInjectionAppendSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Append into system prompt'**
+  String get groupChatInjectionAppendSystem;
+
+  /// No description provided for @groupChatInjectionEndFirstUser.
+  ///
+  /// In en, this message translates to:
+  /// **'End of first user message'**
+  String get groupChatInjectionEndFirstUser;
+
+  /// No description provided for @groupChatInjectionEndEveryUser.
+  ///
+  /// In en, this message translates to:
+  /// **'End of every user message'**
+  String get groupChatInjectionEndEveryUser;
+
+  /// No description provided for @groupChatInjectionEndEveryUserAndAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'End of every user and assistant message'**
+  String get groupChatInjectionEndEveryUserAndAssistant;
+
+  /// No description provided for @groupChatInjectionEveryNUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Every N user messages'**
+  String get groupChatInjectionEveryNUser;
+
+  /// No description provided for @groupChatInjectionEveryNUserAndAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Every N user and assistant messages'**
+  String get groupChatInjectionEveryNUserAndAssistant;
+
+  /// No description provided for @groupChatDirectorLogsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No director logs yet.'**
+  String get groupChatDirectorLogsEmpty;
+
+  /// No description provided for @groupChatDirectorLogsEphemeral.
+  ///
+  /// In en, this message translates to:
+  /// **'Director context is assembled live from the public conversation and is not stored separately.'**
+  String get groupChatDirectorLogsEphemeral;
+
+  /// No description provided for @groupChatNoAssistantsToInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'No more assistants to invite.'**
+  String get groupChatNoAssistantsToInvite;
+
+  /// No description provided for @groupChatEmptyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a message to start the group chat.'**
+  String get groupChatEmptyConversation;
+
+  /// No description provided for @groupChatNoAssistants.
+  ///
+  /// In en, this message translates to:
+  /// **'Add assistants in group settings before chatting.'**
+  String get groupChatNoAssistants;
+
+  /// No description provided for @groupChatNoDirectorModel.
+  ///
+  /// In en, this message translates to:
+  /// **'No director model configured. Set a director model or a global default model.'**
+  String get groupChatNoDirectorModel;
+
+  /// No description provided for @groupChatDirectorModelNoTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Director model does not support tools. Pick a tool-capable model.'**
+  String get groupChatDirectorModelNoTools;
+
+  /// No description provided for @groupChatDirectorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Director timed out. Try again.'**
+  String get groupChatDirectorTimeout;
+
+  /// No description provided for @groupChatDirectorError.
+  ///
+  /// In en, this message translates to:
+  /// **'Director failed. Check logs and model settings.'**
+  String get groupChatDirectorError;
+
+  /// No description provided for @groupChatAssistantNoModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected assistant has no model configured.'**
+  String get groupChatAssistantNoModel;
 }
 
 class _AppLocalizationsDelegate

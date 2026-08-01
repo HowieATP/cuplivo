@@ -22,6 +22,7 @@ import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
+import 'core/providers/group_chat_provider.dart';
 import 'core/providers/tag_provider.dart';
 import 'core/providers/update_provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
@@ -144,6 +145,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (ctx) =>
               AssistantProvider(chatService: ctx.read<ChatService>()),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              GroupChatProvider(chatService: ctx.read<ChatService>()),
         ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),

@@ -7,22 +7,32 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../models/assistant.dart';
+import '../models/group_chat.dart';
+import '../models/group_chat_member.dart';
+import '../models/assistant_detail_injection.dart';
 import '../models/preset_message.dart';
 import 'app_database.dart';
 
 class ChatDatabaseRepository {
-  ChatDatabaseRepository(this._db, [this._syncDb]);
+  ChatDatabaseRepository(this._db, {this._databaseFile, this._syncDb});
 
   final AppDatabase _db;
-  final sqlite.Database? _syncDb;
+  final File? _databaseFile;
+  sqlite.Database? _syncDb;
 
   /// Read-only access to the underlying [AppDatabase] for stores that need
   /// to share the same DB connection (e.g. [DeletedRecordsStore]).
   AppDatabase get db => _db;
 
+  /// Open Drift immediately, but **do not** open the sync sqlite3 connection
+  /// until [ensureReady] has finished Drift migrations.
+  ///
+  /// Opening the sync connection before v12→v13 migration can leave it on the
+  /// old schema; subsequent `SELECT *` + column reads for
+  /// `conversation_kind` / `speaker_assistant_id` then throw and empty caches.
   static ChatDatabaseRepository open({File? file}) {
     final db = AppDatabase.open(file: file);
-    return ChatDatabaseRepository(db, file == null ? null : _openSync(file));
+    return ChatDatabaseRepository(db, databaseFile: file);
   }
 
   static sqlite.Database _openSync(File file) {
@@ -34,19 +44,45 @@ class ChatDatabaseRepository {
   }
 
   Future<void> close() async {
-    _syncDb?.close();
+    _closeSync();
     await _db.close();
   }
 
+  void _closeSync() {
+    try {
+      _syncDb?.close();
+    } catch (_) {}
+    _syncDb = null;
+  }
+
+  /// Open or re-open the main-isolate sync connection after schema is current.
+  void reopenSyncConnection() {
+    final file = _databaseFile;
+    if (file == null) return;
+    _closeSync();
+    _syncDb = _openSync(file);
+  }
+
+  /// Runs Drift open/migration, then opens a fresh sync connection that sees
+  /// the post-migration schema (new columns/tables).
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+    // Checkpoint so a main-isolate sqlite3 connection sees migrated pages.
+    try {
+      await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {
+      // Non-fatal: reopen still picks up committed schema changes.
+    }
+    reopenSyncConnection();
   }
 
   Future<void> checkpoint() async {
     await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
   }
 
-  Future<List<Conversation>> getAllConversations() async {
+  Future<List<Conversation>> getAllConversations({
+    bool includeGroup = false,
+  }) async {
     final rows =
         await (_db.select(_db.conversationRows)..orderBy([
               (t) => OrderingTerm(
@@ -57,6 +93,9 @@ class ChatDatabaseRepository {
             .get();
     final out = <Conversation>[];
     for (final row in rows) {
+      if (!includeGroup && row.conversationKind == Conversation.kindGroup) {
+        continue;
+      }
       out.add(await _conversationFromRow(row));
     }
     return out;
@@ -159,7 +198,7 @@ class ChatDatabaseRepository {
     return out;
   }
 
-  List<Conversation> getAllConversationsSync() {
+  List<Conversation> getAllConversationsSync({bool includeGroup = false}) {
     final db = _syncDb;
     if (db == null) return const <Conversation>[];
     final rows = db.select(
@@ -167,6 +206,7 @@ class ChatDatabaseRepository {
     );
     return rows
         .map((row) => _conversationFromSqliteRow(row, includeMessageIds: false))
+        .where((c) => includeGroup || !c.isGroup)
         .toList(growable: false);
   }
 
@@ -176,6 +216,7 @@ class ChatDatabaseRepository {
     final rows = db.select(
       'SELECT * FROM conversation_rows ORDER BY updated_at DESC',
     );
+    // Always includes group transcripts (backup / complete inventory).
     return rows
         .map((row) => _conversationFromSqliteRow(row, includeMessageIds: true))
         .toList(growable: false);
@@ -738,6 +779,9 @@ class ChatDatabaseRepository {
       await _db.delete(_db.assistantRows).go();
       await _db.delete(_db.conversationMcpServerRows).go();
       await _db.delete(_db.messageRows).go();
+      // Group tables before conversations (members cascade from group).
+      await _db.delete(_db.groupChatMemberRows).go();
+      await _db.delete(_db.groupChatRows).go();
       await _db.delete(_db.conversationRows).go();
       await _db.delete(_db.cacheRows).go();
       await _db.delete(_db.chatStorageMetaRows).go();
@@ -1078,6 +1122,7 @@ class ChatDatabaseRepository {
       lastSummarizedMessageCount: row.lastSummarizedMessageCount,
       chatSuggestions: _decodeStringList(row.chatSuggestionsJson),
       parentConversationId: row.parentConversationId,
+      conversationKind: row.conversationKind,
     );
   }
 
@@ -1121,7 +1166,22 @@ class ChatDatabaseRepository {
         row['chat_suggestions_json'] as String? ?? '[]',
       ),
       parentConversationId: row['parent_conversation_id'] as String?,
+      conversationKind:
+          _readOptionalString(row, 'conversation_kind') ??
+          Conversation.kindNormal,
     );
+  }
+
+  /// Safe column read: missing columns (pre-migration sync connection) return
+  /// null instead of throwing and wiping the whole conversation cache.
+  static String? _readOptionalString(sqlite.Row row, String column) {
+    try {
+      final value = row[column];
+      if (value == null) return null;
+      return value.toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   ConversationRowsCompanion _conversationCompanion(Conversation conversation) {
@@ -1140,6 +1200,7 @@ class ChatDatabaseRepository {
       ),
       chatSuggestionsJson: Value(jsonEncode(conversation.chatSuggestions)),
       parentConversationId: Value(conversation.parentConversationId),
+      conversationKind: Value(conversation.conversationKind),
     );
   }
 
@@ -1167,6 +1228,7 @@ class ChatDatabaseRepository {
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
       isPreset: row.isPreset,
+      speakerAssistantId: row.speakerAssistantId,
     );
   }
 
@@ -1199,6 +1261,7 @@ class ChatDatabaseRepository {
       cachedTokens: row['cached_tokens'] as int?,
       durationMs: row['duration_ms'] as int?,
       isPreset: row['is_preset'] == 1,
+      speakerAssistantId: _readOptionalString(row, 'speaker_assistant_id'),
     );
   }
 
@@ -1243,7 +1306,137 @@ class ChatDatabaseRepository {
       cachedTokens: Value(message.cachedTokens),
       durationMs: Value(message.durationMs),
       isPreset: Value(message.isPreset),
+      speakerAssistantId: Value(message.speakerAssistantId),
       messageOrder: messageOrder,
+    );
+  }
+
+  // ===== Group chat CRUD =====
+
+  Future<List<GroupChat>> getAllGroupChats() async {
+    final rows =
+        await (_db.select(_db.groupChatRows)..orderBy([
+              (t) => OrderingTerm(
+                expression: t.updatedAt,
+                mode: OrderingMode.desc,
+              ),
+            ]))
+            .get();
+    return rows.map(_groupChatFromRow).toList(growable: false);
+  }
+
+  Future<GroupChat?> getGroupChat(String id) async {
+    final row = await (_db.select(
+      _db.groupChatRows,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    return row == null ? null : _groupChatFromRow(row);
+  }
+
+  Future<GroupChat?> getGroupChatByConversationId(String conversationId) async {
+    final row = await (_db.select(
+      _db.groupChatRows,
+    )..where((t) => t.conversationId.equals(conversationId))).getSingleOrNull();
+    return row == null ? null : _groupChatFromRow(row);
+  }
+
+  Future<void> putGroupChat(GroupChat group) async {
+    await _db
+        .into(_db.groupChatRows)
+        .insertOnConflictUpdate(_groupChatCompanion(group));
+  }
+
+  Future<void> deleteGroupChat(String id) async {
+    await (_db.delete(_db.groupChatRows)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<List<GroupChatMember>> getGroupMembers(String groupChatId) async {
+    final rows =
+        await (_db.select(_db.groupChatMemberRows)
+              ..where((t) => t.groupChatId.equals(groupChatId))
+              ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+            .get();
+    return rows.map(_groupMemberFromRow).toList(growable: false);
+  }
+
+  Future<void> putGroupMembers(
+    String groupChatId,
+    List<GroupChatMember> members,
+  ) async {
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.groupChatMemberRows,
+      )..where((t) => t.groupChatId.equals(groupChatId))).go();
+      for (final m in members) {
+        await _db
+            .into(_db.groupChatMemberRows)
+            .insertOnConflictUpdate(_groupMemberCompanion(m));
+      }
+    });
+  }
+
+  Future<void> removeAssistantFromAllGroups(String assistantId) async {
+    await (_db.delete(
+      _db.groupChatMemberRows,
+    )..where((t) => t.assistantId.equals(assistantId))).go();
+  }
+
+  GroupChat _groupChatFromRow(GroupChatRow row) {
+    return GroupChat(
+      id: row.id,
+      name: row.name,
+      avatar: row.avatar,
+      conversationId: row.conversationId,
+      directorModelProvider: row.directorModelProvider,
+      directorModelId: row.directorModelId,
+      directorSystemPrompt: row.directorSystemPrompt,
+      maxAssistantMessagesPerRound: row.maxAssistantMessagesPerRound,
+      assistantDetailInjectionMode: AssistantDetailInjectionModeX.fromStorage(
+        row.assistantDetailInjectionMode,
+      ),
+      assistantDetailInjectionN: row.assistantDetailInjectionN,
+      pendingCapAssistantMessageId: row.pendingCapAssistantMessageId,
+      assistantMessagesThisRound: row.assistantMessagesThisRound,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    );
+  }
+
+  GroupChatRowsCompanion _groupChatCompanion(GroupChat g) {
+    return GroupChatRowsCompanion.insert(
+      id: g.id,
+      name: g.name,
+      avatar: Value(g.avatar),
+      conversationId: g.conversationId,
+      directorModelProvider: Value(g.directorModelProvider),
+      directorModelId: Value(g.directorModelId),
+      directorSystemPrompt: Value(g.directorSystemPrompt),
+      maxAssistantMessagesPerRound: Value(g.maxAssistantMessagesPerRound),
+      assistantDetailInjectionMode: Value(
+        g.assistantDetailInjectionMode.storageValue,
+      ),
+      assistantDetailInjectionN: Value(g.assistantDetailInjectionN),
+      pendingCapAssistantMessageId: Value(g.pendingCapAssistantMessageId),
+      assistantMessagesThisRound: Value(g.assistantMessagesThisRound),
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    );
+  }
+
+  GroupChatMember _groupMemberFromRow(GroupChatMemberRow row) {
+    return GroupChatMember(
+      groupChatId: row.groupChatId,
+      memberKey: row.memberKey,
+      assistantId: row.assistantId,
+      sortOrder: row.sortOrder,
+    );
+  }
+
+  GroupChatMemberRowsCompanion _groupMemberCompanion(GroupChatMember m) {
+    return GroupChatMemberRowsCompanion.insert(
+      groupChatId: m.groupChatId,
+      memberKey: m.memberKey,
+      assistantId: Value(m.assistantId),
+      sortOrder: m.sortOrder,
     );
   }
 

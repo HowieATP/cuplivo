@@ -15,6 +15,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../settings/pages/settings_page.dart';
 import '../../translate/pages/translate_page.dart';
 import '../../backup/pages/backup_page.dart';
+import '../../group_chat/pages/group_chat_list_page.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/update_provider.dart';
 import '../../../core/models/assistant.dart';
@@ -1280,6 +1281,52 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     ).push(MaterialPageRoute(builder: (_) => const BackupPage()));
   }
 
+  void _openMyGroupChats() {
+    Haptics.light();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const GroupChatListPage()));
+  }
+
+  Widget _buildMyGroupChatsEntry(BuildContext context, Color textBase) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.92);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: IosCardPress(
+        baseColor: bg,
+        borderRadius: BorderRadius.circular(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        onTap: _openMyGroupChats,
+        child: Row(
+          children: [
+            Icon(Lucide.MessagesSquare, size: 18, color: cs.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.groupChatMyGroupChats,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: _isDesktop ? 13.5 : 14.5,
+                  fontWeight: AppFontWeights.emphasis,
+                  color: textBase.withValues(alpha: 0.92),
+                ),
+              ),
+            ),
+            Icon(
+              Lucide.ChevronRight,
+              size: 16,
+              color: textBase.withValues(alpha: 0.45),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBackupReminderBanner(
     BuildContext context,
     Color textBase, {
@@ -1544,6 +1591,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       textBase,
                       topicsOnly: topicsOnly,
                     ),
+                    if (!widget.globalSearchMode)
+                      _buildMyGroupChatsEntry(context, textBase),
                     // 1. 搜索框 + 历史按钮（固定头部）
                     if (_isDesktop)
                       // 桌面端

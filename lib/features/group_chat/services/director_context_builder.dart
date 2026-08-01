@@ -177,7 +177,9 @@ class DirectorContextBuilder {
   ///
   /// Historical turns are reconstructed as full E1/E2 strings (with choice
   /// prompts). [newUserContent] is the live tip (E1/E2/E3), already roster-
-  /// injected when needed.
+  /// injected when needed. A conversation-level context boundary
+  /// (`truncateIndex`, set by "clear context") is applied in raw-space and
+  /// mapped to collapsed skip count, mirroring normal chat.
   List<Map<String, dynamic>> buildApiMessagesFromPublic({
     required GroupChat group,
     required List<ChatMessage> publicMessages,
@@ -210,7 +212,15 @@ class DirectorContextBuilder {
     }
 
     final collapsed = collapsePublicVersions(publicMessages, versionSelections);
-    for (final m in collapsed) {
+    final truncateIndex =
+        chatService.getConversation(group.conversationId)?.truncateIndex ?? -1;
+    final skip = ChatService.rawToCollapsedSkip(
+      rawMessages: publicMessages,
+      collapsedMessages: collapsed,
+      truncateIndex: truncateIndex,
+    );
+    final history = skip > 0 ? collapsed.sublist(skip) : collapsed;
+    for (final m in history) {
       if (skipPendingCapMessageId != null && m.id == skipPendingCapMessageId) {
         continue;
       }

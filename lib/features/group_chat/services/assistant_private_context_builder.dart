@@ -28,12 +28,14 @@ class AssistantPrivateContextBuilder {
       conversation.versionSelections,
     );
 
-    // truncateIndex before rewrite
-    var slice = selected;
-    if (conversation.truncateIndex >= 0 &&
-        conversation.truncateIndex < selected.length) {
-      slice = selected.sublist(conversation.truncateIndex);
-    }
+    // truncateIndex is a raw-space boundary (normal chat semantics); map it
+    // to a collapsed skip count so versioned groups stay aligned.
+    final skip = ChatService.rawToCollapsedSkip(
+      rawMessages: publicMessages,
+      collapsedMessages: selected,
+      truncateIndex: conversation.truncateIndex,
+    );
+    var slice = skip > 0 ? selected.sublist(skip) : selected;
 
     final buffer = <String>[];
     final out = <ChatMessage>[];

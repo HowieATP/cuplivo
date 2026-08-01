@@ -100,4 +100,67 @@ void main() {
     final assistant = private.where((m) => m.role == 'assistant').single;
     expect(assistant.content, 'new');
   });
+
+  test(
+    'private context truncation follows raw-space boundary across versions',
+    () {
+      final service = _FakeChatService();
+      final builder = AssistantPrivateContextBuilder(chatService: service);
+      final alice = Assistant(id: 'a1', name: 'Alice', systemPrompt: 'A');
+      final conv = Conversation(
+        id: 'c1',
+        title: 'g',
+        conversationKind: Conversation.kindGroup,
+        truncateIndex: 2,
+      );
+      const gid = 'ag';
+      final public = [
+        ChatMessage(
+          id: 'u0',
+          role: 'user',
+          content: 'Old start',
+          conversationId: 'c1',
+        ),
+        ChatMessage(
+          id: 'v0',
+          role: 'assistant',
+          content: 'old version',
+          conversationId: 'c1',
+          speakerAssistantId: 'a1',
+          groupId: gid,
+          version: 0,
+        ),
+        ChatMessage(
+          id: 'v1',
+          role: 'assistant',
+          content: 'new version',
+          conversationId: 'c1',
+          speakerAssistantId: 'a1',
+          groupId: gid,
+          version: 1,
+        ),
+        ChatMessage(
+          id: 'u1',
+          role: 'user',
+          content: 'Continue',
+          conversationId: 'c1',
+        ),
+      ];
+
+      // Raw boundary 2: u0 (anchor 0) and the versioned group (anchor 1) are
+      // both before it; only u1 survives. Collapsed-space indexing would have
+      // kept the versioned group instead.
+      final private = builder.build(
+        conversation: conv,
+        publicMessages: public,
+        speaker: alice,
+        userName: 'User',
+        assistantsById: {'a1': alice},
+      );
+
+      expect(private, hasLength(1));
+      expect(private.single.role, 'user');
+      expect(private.single.content, contains('[User]: Continue'));
+    },
+  );
 }

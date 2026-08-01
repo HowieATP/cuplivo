@@ -335,6 +335,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
     setState(() {});
   }
 
+  Future<void> _clearContext() async {
+    final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
+    if (g == null) return;
+    final updated = await _chatService.toggleTruncateAtTail(g.conversationId);
+    if (updated != null && mounted) {
+      _refreshList();
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -457,6 +467,9 @@ class _GroupChatPageState extends State<GroupChatPage> {
               onStop: () {
                 _orchestrator.requestStop();
                 setState(() => _loading = false);
+              },
+              onClearContext: () {
+                unawaited(_clearContext());
               },
               onSend: (data) async {
                 unawaited(_send(data));

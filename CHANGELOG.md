@@ -2,15 +2,8 @@
 
 ## [2.3.0] - 2026-07-31
 
-### Fixed
-
-- Fix empty chats/assistants after upgrading to schema v13 or backup overwrite: open the sync SQLite connection only after Drift migration, and refresh provider caches after restore
-- Fix `assistant_rows has no column named discoverable` after partial handoff/group migrations: self-heal missing columns/tables on every DB open
-- Group chat director: use the same `tool_choice: auto` path as normal chat so DeepSeek and similar hosts can select a speaker (was forcing `required` → silent end_turn)
-
 ### Added
 
-- Multi-assistant group chat: director-orchestrated multi-assistant conversations with private per-assistant context, group settings, and director logs
 - Multi-key rotation for web search: configure multiple API keys to raise effective rate limits (#139)
 - Handoff (subagent MCP): delegate subtasks to other assistants via an MCP tool; results are not returned yet (#140)
 - LAN sync: device-to-device chat sync over local network with a two-round-trip protocol; 4-digit PIN authentication, reuses the incremental backup zip + merge restore infrastructure, syncs chats + referenced files + missing assistants (#136)

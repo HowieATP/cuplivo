@@ -338,3 +338,28 @@
 ### Flagged Ambiguities
 
 - "subagent" was used interchangeably with "handoff target" and "child assistant" — resolved: the feature is called **Handoff** (the act of delegation). The target is simply "the target assistant." There is no persistent "subagent" entity — the sub-conversation is a normal conversation with a `parentConversationId`.
+
+## Multi-Assistant Group Chat (多助手群聊)
+
+- **Director (导演)**: The single model that decides the speaking order in a group chat. It never speaks to the user directly — it only calls `select_speaker` / `end_turn`. Implementation lives in `lib/features/group_chat/services/director_runner.dart`; the controller class `GroupChatOrchestrator` is implementation detail, NOT a domain term.
+- **Round (轮)**: The speaking cycle that starts with a user message and ends when the Director calls `end_turn`. One round contains 1 user turn + 0..N assistant turns (N ≤ the per-round assistant message cap). Hitting the cap only *pauses* the round — `end_turn` is the round's only true endpoint.
+- **Turn (回合)**: One message in the Director session. E1 = user turn, E2 = assistant turn, E3 = cap-resume turn (pending capped assistant content merged with the next user message). E1/E2/E3 are code labels only; the domain term is "turn".
+- **Public transcript (公开记录)**: The member-visible message stream — `Conversation` (kind=group) + `MessageRows.speakerAssistantId`. It is a normal input to the regular message pipeline (context building, memory, backup conversations/messages sections, trash conversation restore).
+- **Director session (导演会话)**: The Director's private working stream — `DirectorMessageRows` (system prompt + E1/E2/E3 turn wrappers + decision rows). Invisible to member assistants. The "导演日志" page is its read-only view, not a separate entity. **The two streams never mix**: public-stream consumers must never see director rows, and the backup `directorMessages` section is fully independent.
+- **Roster (名册)**: A snapshot of the group's member assistants (id/name/persona) injected into the Director context per the injection mode. Membership caps: soft 12, hard 20 (invites beyond the hard cap are rejected).
+- **Injection mode (注入模式)**: Where/when the roster is injected into the Director context — 7 modes: before system prompt, appended into system prompt, end of first user turn, end of every user turn, end of every user+assistant turn, every N user turns, every N user+assistant turns.
+- **Speaker (发言者)**: The assistant the Director selects to speak this turn. Public transcript messages are tagged with `speakerAssistantId`; user messages carry none.
+- **Cap (轮次上限)** / **pending cap message (封顶待续消息)**: The per-round assistant message limit (`maxAssistantMessagesPerRound`, default 3). When the cap is hit, the last assistant message becomes the pending cap message and is merged into the next user message's E3; the round pauses rather than ends.
+- **conversation kind (会话类别)**: The `Conversation` discriminator — `normal` (regular conversations, including 1:1) or `group` (a group chat's public transcript). Group conversations have no single owner assistant (`assistantId = null`) and link to their `GroupChat` 1:1 via `conversationId`. Regular conversation lists exclude group by default (`getAllConversations(includeGroup: false)`); `includeGroup: true` is only for backup inventory / admin surfaces.
+
+### Relationship to Existing Concepts
+
+- **vs Multi-AI Comparison (多 AI 对比)**: Multi-AI sends the same user message to N models in parallel (subgroupId cards) — no Director, no private member context. Group chat is sequential orchestration: the Director picks one speaker per turn, and each member assistant gets a privately rewritten context. Parallel comparison vs sequential orchestration — orthogonal features; an assistant can participate in both.
+- **vs Handoff (交接)**: Handoff is model-initiated fire-and-forget delegation creating a separate child conversation (`parentConversationId`). Group chat is a user-initiated persistent session mediated by the Director, with all speech landing in one public transcript. Model-initiated vs user-initiated.
+- **vs ProactiveCare (主动关怀)**: ProactiveCare is scheduled autonomous generation by a single assistant with no tools. Group chat is on-demand, multi-assistant, Director-orchestrated.
+- **vs regular 1:1 conversation**: A group chat IS a conversation (`kind=group`) — just without an owner assistant, plus a `GroupChat` entity and a Director session alongside.
+- **Membership**: An assistant can be a member of multiple groups; deleting an assistant removes it from all groups' membership (`removeAssistantFromAllGroups`). Its historical speeches remain in public transcripts — intentional.
+
+### Flagged Ambiguities
+
+- "orchestrator" was used informally in the Handoff example dialogue (the delegating assistant) and as part of the controller class name `GroupChatOrchestrator` — neither is a domain term. The domain term for the group-chat decision-making model is **Director**.

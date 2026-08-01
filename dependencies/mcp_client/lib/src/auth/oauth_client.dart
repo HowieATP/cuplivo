@@ -49,6 +49,94 @@ class HttpOAuthClient implements OAuthClient {
     return _metadata!;
   }
 
+  /// Discovers the authorization server metadata (RFC 8414) for the
+  /// authorization server associated with [serverUrl] (an MCP resource
+  /// server URL). Probes `{origin}/.well-known/oauth-authorization-server`.
+  /// Returns null when no metadata is served (server does not use OAuth).
+  static Future<AuthServerMetadata?> discoverAuthServerMetadata(
+    String serverUrl, {
+    http.Client? client,
+  }) async {
+    final uri = Uri.parse(serverUrl);
+    if (!uri.hasScheme || uri.host.isEmpty) return null;
+    final metadataUrl = '${uri.origin}/.well-known/oauth-authorization-server';
+    final closer = client ?? http.Client();
+    try {
+      final response = await closer.get(
+        Uri.parse(metadataUrl),
+        headers: {'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) return null;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return AuthServerMetadata.fromJson(json);
+    } catch (e) {
+      return null;
+    } finally {
+      if (client == null) closer.close();
+    }
+  }
+
+  /// Registers this client with the authorization server (RFC 7591
+  /// dynamic client registration). Requires the server to expose a
+  /// `registration_endpoint` in its metadata (or pass [registrationEndpoint]
+  /// explicitly when the endpoint was discovered out-of-band).
+  ///
+  /// Registers as a PUBLIC client (`token_endpoint_auth_method: none`) by
+  /// default; pass a different value for confidential clients.
+  Future<RegisteredClient> registerClient({
+    required List<String> redirectUris,
+    String? clientName,
+    String tokenEndpointAuthMethod = 'none',
+    List<String>? grantTypes,
+    List<String>? responseTypes,
+    String? registrationEndpoint,
+  }) async {
+    final endpoint =
+        registrationEndpoint ??
+        (await _discoverMetadata()).registrationEndpoint;
+    if (endpoint == null) {
+      throw OAuthError(
+        error: 'no_registration_endpoint',
+        errorDescription:
+            'Authorization server does not expose a registration endpoint',
+      );
+    }
+
+    final payload = <String, dynamic>{
+      'client_name': clientName ?? 'Cuplivo',
+      'redirect_uris': redirectUris,
+      'grant_types': grantTypes ?? ['authorization_code', 'refresh_token'],
+      'response_types': responseTypes ?? ['code'],
+      'token_endpoint_auth_method': tokenEndpointAuthMethod,
+    };
+
+    final response = await _httpClient.post(
+      Uri.parse(endpoint),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw OAuthError(
+        error: 'client_registration_failed',
+        errorDescription:
+            'Dynamic client registration failed (HTTP ${response.statusCode}): '
+            '${_safeBody(response.body)}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return RegisteredClient.fromJson(json);
+  }
+
+  static String _safeBody(String body) {
+    if (body.length <= 300) return body;
+    return body.substring(0, 300);
+  }
+
   /// Generate PKCE code verifier and challenge
   Map<String, String> _generatePkce() {
     final random = Random.secure();
@@ -102,6 +190,7 @@ class HttpOAuthClient implements OAuthClient {
   Future<OAuthToken> exchangeCodeForToken({
     required String code,
     required String codeVerifier,
+    String? redirectUri,
   }) async {
     final metadata = await _discoverMetadata();
 
@@ -110,7 +199,9 @@ class HttpOAuthClient implements OAuthClient {
       'code': code,
       'client_id': config.clientId,
       'code_verifier': codeVerifier,
-      if (config.redirectUri != null) 'redirect_uri': config.redirectUri!,
+      if (redirectUri != null) 'redirect_uri': redirectUri,
+      if (redirectUri == null && config.redirectUri != null)
+        'redirect_uri': config.redirectUri!,
     };
 
     final headers = <String, String>{

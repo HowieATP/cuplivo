@@ -26,6 +26,14 @@ class StreamableHttpTransportConfig {
   /// OAuth configuration (optional)
   final OAuthConfig? oauthConfig;
 
+  /// Previously obtained OAuth token (optional). Injected before the first
+  /// request so persisted tokens survive app restarts.
+  final OAuthToken? oauthToken;
+
+  /// Called whenever the internal token manager refreshes the token.
+  /// The host application persists the new token here.
+  final Function(OAuthToken token)? onTokenRefreshed;
+
   /// Additional headers to send with requests
   final Map<String, String> headers;
 
@@ -47,6 +55,8 @@ class StreamableHttpTransportConfig {
   const StreamableHttpTransportConfig({
     required this.baseUrl,
     this.oauthConfig,
+    this.oauthToken,
+    this.onTokenRefreshed,
     this.headers = const {},
     this.timeout = const Duration(seconds: 30),
     this.sseReadTimeout = const Duration(minutes: 5),
@@ -99,6 +109,8 @@ class StreamableHttpClientTransport implements ClientTransport {
   static Future<StreamableHttpClientTransport> create({
     required String baseUrl,
     OAuthConfig? oauthConfig,
+    OAuthToken? oauthToken,
+    Function(OAuthToken token)? onTokenRefreshed,
     Map<String, String>? headers,
     Duration? timeout,
     int? maxConcurrentRequests,
@@ -109,6 +121,8 @@ class StreamableHttpClientTransport implements ClientTransport {
     final config = StreamableHttpTransportConfig(
       baseUrl: baseUrl,
       oauthConfig: oauthConfig,
+      oauthToken: oauthToken,
+      onTokenRefreshed: onTokenRefreshed,
       headers: headers ?? const {},
       timeout: timeout ?? const Duration(seconds: 30),
       maxConcurrentRequests: maxConcurrentRequests ?? 10,
@@ -129,6 +143,13 @@ class StreamableHttpClientTransport implements ClientTransport {
     if (oauthConfig != null) {
       oauthClient = HttpOAuthClient(config: oauthConfig, httpClient: client);
       tokenManager = OAuthTokenManager(oauthClient);
+      if (oauthToken != null) {
+        tokenManager.setToken(oauthToken);
+      }
+      if (onTokenRefreshed != null) {
+        tokenManager.onTokenRefresh =
+            (oldToken, newToken) => onTokenRefreshed(newToken);
+      }
     }
 
     return StreamableHttpClientTransport._(

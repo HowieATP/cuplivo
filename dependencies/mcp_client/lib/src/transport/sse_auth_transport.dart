@@ -8,6 +8,7 @@ import 'dart:io'
 
 import '../../logger.dart';
 import '../auth/oauth.dart';
+import '../auth/oauth_client.dart';
 import '../models/models.dart';
 import 'transport.dart';
 import 'event_source.dart';
@@ -30,15 +31,18 @@ class SseAuthClientTransport implements ClientTransport {
   // Token refresh management
   Timer? _tokenRefreshTimer;
   bool _isRefreshingToken = false;
+  final Function(OAuthToken token)? _onTokenRefreshed;
 
   SseAuthClientTransport._internal({
     required this.serverUrl,
     Map<String, String>? headers,
     OAuthToken? oauthToken,
     OAuthClient? oauthClient,
+    Function(OAuthToken token)? onTokenRefreshed,
   }) : _baseHeaders = headers ?? {},
        _oauthToken = oauthToken,
-       _oauthClient = oauthClient {
+       _oauthClient = oauthClient,
+       _onTokenRefreshed = onTokenRefreshed {
     _eventSource = AuthenticatedEventSource();
   }
 
@@ -49,12 +53,14 @@ class SseAuthClientTransport implements ClientTransport {
     OAuthToken? oauthToken,
     OAuthClient? oauthClient,
     String? bearerToken,
+    Function(OAuthToken token)? onTokenRefreshed,
   }) async {
     final transport = SseAuthClientTransport._internal(
       serverUrl: serverUrl,
       headers: headers,
       oauthToken: oauthToken,
       oauthClient: oauthClient,
+      onTokenRefreshed: onTokenRefreshed,
     );
 
     try {
@@ -183,6 +189,7 @@ class SseAuthClientTransport implements ClientTransport {
       _scheduleTokenRefresh();
 
       _logger.debug('Token refreshed successfully');
+      _onTokenRefreshed?.call(newToken);
     } catch (e) {
       _logger.debug('Token refresh failed: $e');
       _handleAuthFailure(401, 'Token refresh failed');
@@ -384,6 +391,11 @@ class SseAuthClientTransport implements ClientTransport {
 
     // Close event source
     _eventSource.close();
+
+    // Release the OAuth client (owns the underlying HTTP client)
+    if (_oauthClient case final HttpOAuthClient c) {
+      c.close();
+    }
 
     // Close streams
     if (!_messageController.isClosed) {

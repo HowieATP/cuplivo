@@ -57,6 +57,37 @@ class OAuthConfig {
     this.codeChallengeMethod = 'S256',
   });
 
+  /// Returns a copy with the given fields replaced. Nulls are no-ops;
+  /// [clearClientSecret] / [clearRedirectUri] clear those fields.
+  OAuthConfig copyWith({
+    String? authServerMetadataUrl,
+    bool clearAuthServerMetadataUrl = false,
+    String? authorizationEndpoint,
+    String? tokenEndpoint,
+    String? clientId,
+    String? clientSecret,
+    bool clearClientSecret = false,
+    String? redirectUri,
+    bool clearRedirectUri = false,
+    List<String>? scopes,
+    OAuthGrantType? grantType,
+    String? codeChallengeMethod,
+  }) => OAuthConfig(
+    authServerMetadataUrl: clearAuthServerMetadataUrl
+        ? null
+        : (authServerMetadataUrl ?? this.authServerMetadataUrl),
+    authorizationEndpoint: authorizationEndpoint ?? this.authorizationEndpoint,
+    tokenEndpoint: tokenEndpoint ?? this.tokenEndpoint,
+    clientId: clientId ?? this.clientId,
+    clientSecret: clearClientSecret
+        ? null
+        : (clientSecret ?? this.clientSecret),
+    redirectUri: clearRedirectUri ? null : (redirectUri ?? this.redirectUri),
+    scopes: scopes ?? this.scopes,
+    grantType: grantType ?? this.grantType,
+    codeChallengeMethod: codeChallengeMethod ?? this.codeChallengeMethod,
+  );
+
   Map<String, dynamic> toJson() => {
     if (authServerMetadataUrl != null)
       'authServerMetadataUrl': authServerMetadataUrl,
@@ -284,6 +315,49 @@ class OAuthError {
   @override
   String toString() =>
       'OAuthError: $error${errorDescription != null ? ' - $errorDescription' : ''}';
+}
+
+/// Result of RFC 7591 dynamic client registration.
+@immutable
+class RegisteredClient {
+  /// Client identifier assigned by the authorization server.
+  final String clientId;
+
+  /// Client secret (only for confidential clients).
+  final String? clientSecret;
+
+  /// Redirect URIs registered for this client.
+  final List<String> redirectUris;
+
+  /// Token endpoint authentication method.
+  final String? tokenEndpointAuthMethod;
+
+  /// Granted scopes.
+  final String? scope;
+
+  /// Client name echoed back by the server.
+  final String? clientName;
+
+  const RegisteredClient({
+    required this.clientId,
+    this.clientSecret,
+    this.redirectUris = const [],
+    this.tokenEndpointAuthMethod,
+    this.scope,
+    this.clientName,
+  });
+
+  factory RegisteredClient.fromJson(Map<String, dynamic> json) =>
+      RegisteredClient(
+        clientId: json['client_id'] as String,
+        clientSecret: json['client_secret'] as String?,
+        redirectUris:
+            (json['redirect_uris'] as List<dynamic>?)?.cast<String>() ??
+            const [],
+        tokenEndpointAuthMethod: json['token_endpoint_auth_method'] as String?,
+        scope: json['scope'] as String?,
+        clientName: json['client_name'] as String?,
+      );
 }
 
 /// OAuth client interface

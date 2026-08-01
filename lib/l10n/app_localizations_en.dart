@@ -6533,6 +6533,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupChatDelete => 'Delete group chat';
 
   @override
+  String get groupChatDuplicate => 'Duplicate group chat';
+
+  @override
+  String get groupChatDuplicateConfigOnly => 'Copy config only';
+
+  @override
+  String get groupChatDuplicateConfigOnlyDesc =>
+      'Create a new empty conversation with the same members and director settings.';
+
+  @override
+  String get groupChatDuplicateDone => 'Group chat duplicated';
+
+  @override
   String get groupChatDeleteConfirm =>
       'Delete this group chat? It will move to Trash.';
 

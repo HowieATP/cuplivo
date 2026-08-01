@@ -11924,6 +11924,30 @@ abstract class AppLocalizations {
   /// **'Delete group chat'**
   String get groupChatDelete;
 
+  /// No description provided for @groupChatDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate group chat'**
+  String get groupChatDuplicate;
+
+  /// No description provided for @groupChatDuplicateConfigOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy config only'**
+  String get groupChatDuplicateConfigOnly;
+
+  /// No description provided for @groupChatDuplicateConfigOnlyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new empty conversation with the same members and director settings.'**
+  String get groupChatDuplicateConfigOnlyDesc;
+
+  /// No description provided for @groupChatDuplicateDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Group chat duplicated'**
+  String get groupChatDuplicateDone;
+
   /// No description provided for @groupChatDeleteConfirm.
   ///
   /// In en, this message translates to:

@@ -6269,6 +6269,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupChatDelete => '删除群聊';
 
   @override
+  String get groupChatDuplicate => '复制群聊';
+
+  @override
+  String get groupChatDuplicateConfigOnly => '仅复制配置';
+
+  @override
+  String get groupChatDuplicateConfigOnlyDesc => '创建一个新的空会话,成员与导演配置相同。';
+
+  @override
+  String get groupChatDuplicateDone => '群聊已复制';
+
+  @override
   String get groupChatDeleteConfirm => '确定删除该群聊？将移入回收站。';
 
   @override
@@ -12624,6 +12636,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get groupChatDelete => '删除群聊';
 
   @override
+  String get groupChatDuplicate => '复制群聊';
+
+  @override
+  String get groupChatDuplicateConfigOnly => '仅复制配置';
+
+  @override
+  String get groupChatDuplicateConfigOnlyDesc => '创建一个新的空会话，成员与导演配置相同。';
+
+  @override
+  String get groupChatDuplicateDone => '群聊已复制';
+
+  @override
   String get groupChatDeleteConfirm => '确定删除该群聊？将移入回收站。';
 
   @override
@@ -18977,6 +19001,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get groupChatDelete => '刪除群聊';
+
+  @override
+  String get groupChatDuplicate => '複製群聊';
+
+  @override
+  String get groupChatDuplicateConfigOnly => '僅複製設定';
+
+  @override
+  String get groupChatDuplicateConfigOnlyDesc => '建立一個新的空會話，成員與導演設定相同。';
+
+  @override
+  String get groupChatDuplicateDone => '群聊已複製';
 
   @override
   String get groupChatDeleteConfirm => '確定刪除該群聊？將移入回收站。';

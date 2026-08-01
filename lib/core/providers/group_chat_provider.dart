@@ -102,6 +102,47 @@ class GroupChatProvider extends ChangeNotifier {
     return group;
   }
 
+  /// Duplicate a group chat (config only): a new group + a fresh empty
+  /// conversation with the same members, director model and prompt settings.
+  /// Per-round runtime state (pending cap message, assistant count) resets.
+  Future<GroupChat> duplicateGroup(GroupChat source) async {
+    final conversation = await _chatService.createConversation(
+      title: source.name,
+      assistantId: null,
+      conversationKind: Conversation.kindGroup,
+      setAsCurrent: false,
+    );
+
+    final copy = GroupChat(
+      name: source.name,
+      conversationId: conversation.id,
+      directorModelProvider: source.directorModelProvider,
+      directorModelId: source.directorModelId,
+      directorSystemPrompt: source.directorSystemPrompt,
+      maxAssistantMessagesPerRound: source.maxAssistantMessagesPerRound,
+      assistantDetailInjectionMode: source.assistantDetailInjectionMode,
+      assistantDetailInjectionN: source.assistantDetailInjectionN,
+    );
+
+    await _chatService.repo.putGroupChat(copy);
+    final members = membersOf(source.id)
+        .map(
+          (m) => GroupChatMember(
+            groupChatId: copy.id,
+            memberKey: m.memberKey,
+            assistantId: m.assistantId,
+            sortOrder: m.sortOrder,
+          ),
+        )
+        .toList();
+    await _chatService.repo.putGroupMembers(copy.id, members);
+
+    _groups.insert(0, copy);
+    _membersByGroup[copy.id] = members;
+    notifyListeners();
+    return copy;
+  }
+
   Future<void> updateGroup(GroupChat group) async {
     final updated = group.copyWith(updatedAt: DateTime.now());
     await _chatService.repo.putGroupChat(updated);

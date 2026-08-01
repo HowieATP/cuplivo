@@ -150,6 +150,17 @@ class _GroupChatSettingsPageState extends State<GroupChatSettingsPage> {
           const SizedBox(height: 16),
           FilledButton.tonal(
             style: FilledButton.styleFrom(
+              foregroundColor: cs.onSurface,
+              backgroundColor: cs.surfaceContainerHighest.withValues(
+                alpha: 0.6,
+              ),
+            ),
+            onPressed: () => _confirmDuplicate(context, group),
+            child: Text(l10n.groupChatDuplicate),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
               foregroundColor: cs.error,
               backgroundColor: cs.error.withValues(alpha: 0.12),
             ),
@@ -211,6 +222,32 @@ class _GroupChatSettingsPageState extends State<GroupChatSettingsPage> {
         showAppSnackBar(context, message: l10n.groupChatMemberHardCapReached);
       }
     }
+  }
+
+  Future<void> _confirmDuplicate(BuildContext context, GroupChat group) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.groupChatDuplicate),
+        content: Text(l10n.groupChatDuplicateConfigOnlyDesc),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.groupChatCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.groupChatDuplicateConfigOnly),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await context.read<GroupChatProvider>().duplicateGroup(group);
+    if (!context.mounted) return;
+    showAppSnackBar(context, message: l10n.groupChatDuplicateDone);
+    Navigator.of(context).pop();
   }
 
   Future<void> _confirmDelete(BuildContext context, GroupChat group) async {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.0] - 2026-08-01
+
+### Added
+
+- Multi-assistant group chat: a background director model decides which assistant speaks (#150)
+
 ## [2.3.0] - 2026-07-31
 
 ### Added

@@ -152,6 +152,7 @@ class GroupChatStreamExecutor {
     final active = _activeStreams.remove(streamKey);
     if (active != null) {
       // Mirror normal chat cancelStreaming: keep partial content, mark done.
+      await _finishReasoningState(active.messageId);
       await chatService.updateMessage(active.messageId, isStreaming: false);
       _complete(active);
     }
@@ -240,6 +241,48 @@ class GroupChatStreamExecutor {
     }
 
     if (chunkContent.isNotEmpty && !state.finishHandled) {
+      // Record the thinking→body split for interleaved display, mirroring
+      // chat_actions._handleContentChunk. Without it the reasoning card
+      // renders below the body.
+      if (state.hadThinkingBlock) {
+        state.contentSplitOffsets.add(state.fullContentRaw.length);
+        state.reasoningCountAtSplit.add(
+          streamController.getReasoningSegmentCount(messageId),
+        );
+        state.toolCountAtSplit.add(
+          streamController.getToolPartsCount(messageId),
+        );
+        state.hadThinkingBlock = false;
+        streamController.setContentSplitData(
+          messageId,
+          stream_ctrl.ContentSplitData(
+            offsets: List<int>.of(state.contentSplitOffsets),
+            reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
+            toolCounts: List<int>.of(state.toolCountAtSplit),
+          ),
+        );
+      }
+
+      // The thinking phase ends when the body starts: stop the elapsed
+      // timer and persist reasoningFinishedAt (mirror chat_actions).
+      await streamController.finishReasoningAndPersist(
+        messageId,
+        updateReasoningInDb:
+            (
+              String mid, {
+              String? reasoningText,
+              DateTime? reasoningFinishedAt,
+              String? reasoningSegmentsJson,
+            }) async {
+              await chatService.updateMessageSilent(
+                mid,
+                reasoningText: reasoningText,
+                reasoningFinishedAt: reasoningFinishedAt,
+                reasoningSegmentsJson: reasoningSegmentsJson,
+              );
+            },
+      );
+
       state.fullContentRaw += chunkContent;
       state.streamStartedAt ??= DateTime.now();
       if (chunk.totalTokens > 0) {
@@ -267,6 +310,28 @@ class GroupChatStreamExecutor {
     }
   }
 
+  /// Set reasoningFinishedAt (in-memory + DB) so the elapsed time shows the
+  /// real thinking duration instead of 0.0s. Idempotent.
+  Future<void> _finishReasoningState(String messageId) async {
+    await streamController.finishReasoningAndPersist(
+      messageId,
+      updateReasoningInDb:
+          (
+            String mid, {
+            String? reasoningText,
+            DateTime? reasoningFinishedAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            await chatService.updateMessageSilent(
+              mid,
+              reasoningText: reasoningText,
+              reasoningFinishedAt: reasoningFinishedAt,
+              reasoningSegmentsJson: reasoningSegmentsJson,
+            );
+          },
+    );
+  }
+
   Future<void> _finish(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -277,6 +342,7 @@ class GroupChatStreamExecutor {
       state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
       state.totalTokens = state.usage!.totalTokens;
     }
+    await _finishReasoningState(state.messageId);
     await chatService.updateMessage(
       state.messageId,
       content: state.fullContentRaw,
@@ -296,6 +362,7 @@ class GroupChatStreamExecutor {
     debugPrint('[GroupChatStreamExecutor] stream error: $error');
     if (!state.finishHandled) {
       state.finishHandled = true;
+      await _finishReasoningState(state.messageId);
       final existing = state.fullContentRaw;
       // Mirror chat_actions.dart: raw error text, no prefix.
       await chatService.updateMessage(
@@ -311,6 +378,7 @@ class GroupChatStreamExecutor {
   Future<void> _handleDone(stream_ctrl.StreamingState state) async {
     if (state.finishHandled) return;
     state.finishHandled = true;
+    await _finishReasoningState(state.messageId);
     await chatService.updateMessage(
       state.messageId,
       content: state.fullContentRaw,

@@ -153,6 +153,16 @@ class _GroupChatPageState extends State<GroupChatPage> {
     if (convo != null) {
       _chatController.setCurrentConversation(convo);
     }
+    // KNOWN GAP: normal chat restores per-message UI state (reasoning text /
+    // timers, tool events, content splits, gemini thought signatures) on
+    // conversation open via home_view_model._restoreMessageUiState ->
+    // StreamController.restoreMessageUiState, which copies the persisted
+    // message-row fields back into the in-memory maps the widgets read.
+    // This page never calls it, so reopening a group chat loses the
+    // reasoning panels of historical assistant messages. The equivalent
+    // hook here is _bindConversation (NOT _refreshList, which would clobber
+    // live streaming state). Not fixed yet — tracked as a comment per user
+    // decision.
   }
 
   void _refreshList() {

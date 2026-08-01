@@ -3011,6 +3011,109 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpServerEditSheetAddHeader => 'Add Header';
 
   @override
+  String get mcpOAuthSectionTitle => 'OAuth Authorization';
+
+  @override
+  String get mcpOAuthAuthEndpointLabel => 'Authorization Endpoint';
+
+  @override
+  String get mcpOAuthTokenEndpointLabel => 'Token Endpoint';
+
+  @override
+  String get mcpOAuthClientIdLabel => 'Client ID';
+
+  @override
+  String get mcpOAuthClientSecretLabel => 'Client Secret (optional)';
+
+  @override
+  String get mcpOAuthScopesLabel => 'Scopes (optional, space-separated)';
+
+  @override
+  String get mcpOAuthRedirectUriLabel => 'Redirect URI (optional)';
+
+  @override
+  String get mcpOAuthStartButton => 'Start Authorization';
+
+  @override
+  String get mcpOAuthPasteHint => 'Paste the code or the full redirect URL';
+
+  @override
+  String get mcpOAuthCompleteButton => 'Complete';
+
+  @override
+  String mcpOAuthStatusAuthorized(Object time) {
+    return 'Authorized · expires at $time';
+  }
+
+  @override
+  String get mcpOAuthStatusUnauthorized => 'Not authorized';
+
+  @override
+  String get mcpOAuthReauthorizeButton => 'Re-authorize';
+
+  @override
+  String get mcpOAuthClearTokenButton => 'Clear Token';
+
+  @override
+  String get mcpOAuthUrlCopied => 'Authorization URL copied to clipboard';
+
+  @override
+  String get mcpOAuthBrowserHint =>
+      'Complete the authorization in your browser, then paste the code back';
+
+  @override
+  String get mcpOAuthConfigIncomplete =>
+      'Fill in Authorization Endpoint, Token Endpoint and Client ID first';
+
+  @override
+  String get mcpOAuthSuccess => 'OAuth authorization successful';
+
+  @override
+  String get mcpOAuthTokenCleared => 'OAuth token cleared';
+
+  @override
+  String get mcpOAuthErrorNoSession =>
+      'No active authorization flow. Please start again.';
+
+  @override
+  String get mcpOAuthErrorNoCode =>
+      'No authorization code found. Paste the code or the full redirect URL.';
+
+  @override
+  String get mcpOAuthErrorStateMismatch =>
+      'State mismatch — the pasted content does not belong to this request. Please start again.';
+
+  @override
+  String get mcpOAuthErrorVerifierLost =>
+      'PKCE verifier lost. Please start again.';
+
+  @override
+  String get mcpOAuthErrorExchangeFailed =>
+      'Token exchange failed. Check your endpoints and Client ID.';
+
+  @override
+  String get mcpOAuthManualModeHint =>
+      'Auto callback unavailable — open the URL, authorize, then paste the code back';
+
+  @override
+  String get mcpOAuthAutoWaitHint =>
+      'Waiting for the browser callback... If it doesn\'t redirect automatically, paste the code below';
+
+  @override
+  String get mcpOAuthErrorCallbackTimeout =>
+      'No callback received. Paste the code manually or start again.';
+
+  @override
+  String get mcpOAuthErrorAuthorizationDenied =>
+      'Authorization was denied or failed. Please try again.';
+
+  @override
+  String get mcpOAuthAdvancedConfig => 'Advanced Config';
+
+  @override
+  String get mcpOAuthStatusExpired => 'Token expired — re-authorize';
+
+  @override
   String get mcpServerEditSheetTitleEdit => 'Edit MCP';
 
   @override

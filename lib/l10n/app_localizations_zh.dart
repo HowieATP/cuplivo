@@ -2912,6 +2912,98 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetAddHeader => '添加请求头';
 
   @override
+  String get mcpOAuthSectionTitle => 'OAuth 授权';
+
+  @override
+  String get mcpOAuthAuthEndpointLabel => '授权端点';
+
+  @override
+  String get mcpOAuthTokenEndpointLabel => '令牌端点';
+
+  @override
+  String get mcpOAuthClientIdLabel => 'Client ID';
+
+  @override
+  String get mcpOAuthClientSecretLabel => 'Client Secret（可选）';
+
+  @override
+  String get mcpOAuthScopesLabel => 'Scopes（可选，空格分隔）';
+
+  @override
+  String get mcpOAuthRedirectUriLabel => '重定向地址（可选）';
+
+  @override
+  String get mcpOAuthStartButton => '开始授权';
+
+  @override
+  String get mcpOAuthPasteHint => '粘贴 code 或完整回调 URL';
+
+  @override
+  String get mcpOAuthCompleteButton => '完成';
+
+  @override
+  String mcpOAuthStatusAuthorized(Object time) {
+    return '已授权 · 有效期至 $time';
+  }
+
+  @override
+  String get mcpOAuthStatusUnauthorized => '未授权';
+
+  @override
+  String get mcpOAuthReauthorizeButton => '重新授权';
+
+  @override
+  String get mcpOAuthClearTokenButton => '清除令牌';
+
+  @override
+  String get mcpOAuthUrlCopied => '授权 URL 已复制到剪贴板';
+
+  @override
+  String get mcpOAuthBrowserHint => '请在浏览器中完成授权，然后将 code 粘贴回来';
+
+  @override
+  String get mcpOAuthConfigIncomplete => '请先填写授权端点、令牌端点和 Client ID';
+
+  @override
+  String get mcpOAuthSuccess => 'OAuth 授权成功';
+
+  @override
+  String get mcpOAuthTokenCleared => 'OAuth 令牌已清除';
+
+  @override
+  String get mcpOAuthErrorNoSession => '没有进行中的授权流程，请重新开始';
+
+  @override
+  String get mcpOAuthErrorNoCode => '未找到授权码，请粘贴 code 或完整回调 URL';
+
+  @override
+  String get mcpOAuthErrorStateMismatch => '状态校验失败——粘贴内容不属于本次请求，请重新开始';
+
+  @override
+  String get mcpOAuthErrorVerifierLost => 'PKCE 校验器丢失，请重新开始';
+
+  @override
+  String get mcpOAuthErrorExchangeFailed => '令牌交换失败，请检查端点和 Client ID';
+
+  @override
+  String get mcpOAuthManualModeHint => '自动回调不可用——请打开链接完成授权，然后把 code 粘贴回来';
+
+  @override
+  String get mcpOAuthAutoWaitHint => '正在等待浏览器回调……若未自动跳转，请在下方粘贴 code';
+
+  @override
+  String get mcpOAuthErrorCallbackTimeout => '未收到回调。请手动粘贴 code，或重新开始授权';
+
+  @override
+  String get mcpOAuthErrorAuthorizationDenied => '授权被拒绝或失败，请重试';
+
+  @override
+  String get mcpOAuthAdvancedConfig => '高级配置';
+
+  @override
+  String get mcpOAuthStatusExpired => '令牌已过期——请重新授权';
+
+  @override
   String get mcpServerEditSheetTitleEdit => '编辑 MCP';
 
   @override
@@ -9279,6 +9371,98 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetAddHeader => '添加请求头';
 
   @override
+  String get mcpOAuthSectionTitle => 'OAuth 授权';
+
+  @override
+  String get mcpOAuthAuthEndpointLabel => '授权端点';
+
+  @override
+  String get mcpOAuthTokenEndpointLabel => '令牌端点';
+
+  @override
+  String get mcpOAuthClientIdLabel => 'Client ID';
+
+  @override
+  String get mcpOAuthClientSecretLabel => 'Client Secret（可选）';
+
+  @override
+  String get mcpOAuthScopesLabel => 'Scopes（可选，空格分隔）';
+
+  @override
+  String get mcpOAuthRedirectUriLabel => '重定向地址（可选）';
+
+  @override
+  String get mcpOAuthStartButton => '开始授权';
+
+  @override
+  String get mcpOAuthPasteHint => '粘贴 code 或完整回调 URL';
+
+  @override
+  String get mcpOAuthCompleteButton => '完成';
+
+  @override
+  String mcpOAuthStatusAuthorized(Object time) {
+    return '已授权 · 有效期至 $time';
+  }
+
+  @override
+  String get mcpOAuthStatusUnauthorized => '未授权';
+
+  @override
+  String get mcpOAuthReauthorizeButton => '重新授权';
+
+  @override
+  String get mcpOAuthClearTokenButton => '清除令牌';
+
+  @override
+  String get mcpOAuthUrlCopied => '授权 URL 已复制到剪贴板';
+
+  @override
+  String get mcpOAuthBrowserHint => '请在浏览器中完成授权，然后将 code 粘贴回来';
+
+  @override
+  String get mcpOAuthConfigIncomplete => '请先填写授权端点、令牌端点和 Client ID';
+
+  @override
+  String get mcpOAuthSuccess => 'OAuth 授权成功';
+
+  @override
+  String get mcpOAuthTokenCleared => 'OAuth 令牌已清除';
+
+  @override
+  String get mcpOAuthErrorNoSession => '没有进行中的授权流程，请重新开始';
+
+  @override
+  String get mcpOAuthErrorNoCode => '未找到授权码，请粘贴 code 或完整回调 URL';
+
+  @override
+  String get mcpOAuthErrorStateMismatch => '状态校验失败——粘贴内容不属于本次请求，请重新开始';
+
+  @override
+  String get mcpOAuthErrorVerifierLost => 'PKCE 校验器丢失，请重新开始';
+
+  @override
+  String get mcpOAuthErrorExchangeFailed => '令牌交换失败，请检查端点和 Client ID';
+
+  @override
+  String get mcpOAuthManualModeHint => '自动回调不可用——请打开链接完成授权，然后把 code 粘贴回来';
+
+  @override
+  String get mcpOAuthAutoWaitHint => '正在等待浏览器回调……若未自动跳转，请在下方粘贴 code';
+
+  @override
+  String get mcpOAuthErrorCallbackTimeout => '未收到回调。请手动粘贴 code，或重新开始授权';
+
+  @override
+  String get mcpOAuthErrorAuthorizationDenied => '授权被拒绝或失败，请重试';
+
+  @override
+  String get mcpOAuthAdvancedConfig => '高级配置';
+
+  @override
+  String get mcpOAuthStatusExpired => '令牌已过期——请重新授权';
+
+  @override
   String get mcpServerEditSheetTitleEdit => '编辑 MCP';
 
   @override
@@ -15643,6 +15827,98 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetAddHeader => '新增請求標頭';
+
+  @override
+  String get mcpOAuthSectionTitle => 'OAuth 授權';
+
+  @override
+  String get mcpOAuthAuthEndpointLabel => '授權端點';
+
+  @override
+  String get mcpOAuthTokenEndpointLabel => '令牌端點';
+
+  @override
+  String get mcpOAuthClientIdLabel => 'Client ID';
+
+  @override
+  String get mcpOAuthClientSecretLabel => 'Client Secret（可選）';
+
+  @override
+  String get mcpOAuthScopesLabel => 'Scopes（可選，空格分隔）';
+
+  @override
+  String get mcpOAuthRedirectUriLabel => '重定向地址（可選）';
+
+  @override
+  String get mcpOAuthStartButton => '開始授權';
+
+  @override
+  String get mcpOAuthPasteHint => '貼上 code 或完整回調 URL';
+
+  @override
+  String get mcpOAuthCompleteButton => '完成';
+
+  @override
+  String mcpOAuthStatusAuthorized(Object time) {
+    return '已授權 · 有效期至 $time';
+  }
+
+  @override
+  String get mcpOAuthStatusUnauthorized => '未授權';
+
+  @override
+  String get mcpOAuthReauthorizeButton => '重新授權';
+
+  @override
+  String get mcpOAuthClearTokenButton => '清除令牌';
+
+  @override
+  String get mcpOAuthUrlCopied => '授權 URL 已複製到剪貼板';
+
+  @override
+  String get mcpOAuthBrowserHint => '請在瀏覽器中完成授權，然後將 code 貼回來';
+
+  @override
+  String get mcpOAuthConfigIncomplete => '請先填寫授權端點、令牌端點和 Client ID';
+
+  @override
+  String get mcpOAuthSuccess => 'OAuth 授權成功';
+
+  @override
+  String get mcpOAuthTokenCleared => 'OAuth 令牌已清除';
+
+  @override
+  String get mcpOAuthErrorNoSession => '沒有進行中的授權流程，請重新開始';
+
+  @override
+  String get mcpOAuthErrorNoCode => '未找到授權碼，請貼上 code 或完整回調 URL';
+
+  @override
+  String get mcpOAuthErrorStateMismatch => '狀態校驗失敗——貼上內容不屬於本次請求，請重新開始';
+
+  @override
+  String get mcpOAuthErrorVerifierLost => 'PKCE 校驗器丟失，請重新開始';
+
+  @override
+  String get mcpOAuthErrorExchangeFailed => '令牌交換失敗，請檢查端點和 Client ID';
+
+  @override
+  String get mcpOAuthManualModeHint => '自動回調不可用——請開啟連結完成授權，然後把 code 貼回來';
+
+  @override
+  String get mcpOAuthAutoWaitHint => '正在等待瀏覽器回調……若未自動跳轉，請在下方貼上 code';
+
+  @override
+  String get mcpOAuthErrorCallbackTimeout => '未收到回調。請手動貼上 code，或重新開始授權';
+
+  @override
+  String get mcpOAuthErrorAuthorizationDenied => '授權被拒絕或失敗，請重試';
+
+  @override
+  String get mcpOAuthAdvancedConfig => '進階設定';
+
+  @override
+  String get mcpOAuthStatusExpired => '令牌已過期——請重新授權';
 
   @override
   String get mcpServerEditSheetTitleEdit => '編輯 MCP';

@@ -5621,6 +5621,186 @@ abstract class AppLocalizations {
   /// **'Add Header'**
   String get mcpServerEditSheetAddHeader;
 
+  /// No description provided for @mcpOAuthSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth Authorization'**
+  String get mcpOAuthSectionTitle;
+
+  /// No description provided for @mcpOAuthAuthEndpointLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization Endpoint'**
+  String get mcpOAuthAuthEndpointLabel;
+
+  /// No description provided for @mcpOAuthTokenEndpointLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Token Endpoint'**
+  String get mcpOAuthTokenEndpointLabel;
+
+  /// No description provided for @mcpOAuthClientIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Client ID'**
+  String get mcpOAuthClientIdLabel;
+
+  /// No description provided for @mcpOAuthClientSecretLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Client Secret (optional)'**
+  String get mcpOAuthClientSecretLabel;
+
+  /// No description provided for @mcpOAuthScopesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scopes (optional, space-separated)'**
+  String get mcpOAuthScopesLabel;
+
+  /// No description provided for @mcpOAuthRedirectUriLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Redirect URI (optional)'**
+  String get mcpOAuthRedirectUriLabel;
+
+  /// No description provided for @mcpOAuthStartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Authorization'**
+  String get mcpOAuthStartButton;
+
+  /// No description provided for @mcpOAuthPasteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the code or the full redirect URL'**
+  String get mcpOAuthPasteHint;
+
+  /// No description provided for @mcpOAuthCompleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get mcpOAuthCompleteButton;
+
+  /// No description provided for @mcpOAuthStatusAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorized · expires at {time}'**
+  String mcpOAuthStatusAuthorized(Object time);
+
+  /// No description provided for @mcpOAuthStatusUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Not authorized'**
+  String get mcpOAuthStatusUnauthorized;
+
+  /// No description provided for @mcpOAuthReauthorizeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-authorize'**
+  String get mcpOAuthReauthorizeButton;
+
+  /// No description provided for @mcpOAuthClearTokenButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Token'**
+  String get mcpOAuthClearTokenButton;
+
+  /// No description provided for @mcpOAuthUrlCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization URL copied to clipboard'**
+  String get mcpOAuthUrlCopied;
+
+  /// No description provided for @mcpOAuthBrowserHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the authorization in your browser, then paste the code back'**
+  String get mcpOAuthBrowserHint;
+
+  /// No description provided for @mcpOAuthConfigIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in Authorization Endpoint, Token Endpoint and Client ID first'**
+  String get mcpOAuthConfigIncomplete;
+
+  /// No description provided for @mcpOAuthSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth authorization successful'**
+  String get mcpOAuthSuccess;
+
+  /// No description provided for @mcpOAuthTokenCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth token cleared'**
+  String get mcpOAuthTokenCleared;
+
+  /// No description provided for @mcpOAuthErrorNoSession.
+  ///
+  /// In en, this message translates to:
+  /// **'No active authorization flow. Please start again.'**
+  String get mcpOAuthErrorNoSession;
+
+  /// No description provided for @mcpOAuthErrorNoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'No authorization code found. Paste the code or the full redirect URL.'**
+  String get mcpOAuthErrorNoCode;
+
+  /// No description provided for @mcpOAuthErrorStateMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'State mismatch — the pasted content does not belong to this request. Please start again.'**
+  String get mcpOAuthErrorStateMismatch;
+
+  /// No description provided for @mcpOAuthErrorVerifierLost.
+  ///
+  /// In en, this message translates to:
+  /// **'PKCE verifier lost. Please start again.'**
+  String get mcpOAuthErrorVerifierLost;
+
+  /// No description provided for @mcpOAuthErrorExchangeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Token exchange failed. Check your endpoints and Client ID.'**
+  String get mcpOAuthErrorExchangeFailed;
+
+  /// No description provided for @mcpOAuthManualModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto callback unavailable — open the URL, authorize, then paste the code back'**
+  String get mcpOAuthManualModeHint;
+
+  /// No description provided for @mcpOAuthAutoWaitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the browser callback... If it doesn\'t redirect automatically, paste the code below'**
+  String get mcpOAuthAutoWaitHint;
+
+  /// No description provided for @mcpOAuthErrorCallbackTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'No callback received. Paste the code manually or start again.'**
+  String get mcpOAuthErrorCallbackTimeout;
+
+  /// No description provided for @mcpOAuthErrorAuthorizationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization was denied or failed. Please try again.'**
+  String get mcpOAuthErrorAuthorizationDenied;
+
+  /// No description provided for @mcpOAuthAdvancedConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Config'**
+  String get mcpOAuthAdvancedConfig;
+
+  /// No description provided for @mcpOAuthStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Token expired — re-authorize'**
+  String get mcpOAuthStatusExpired;
+
   /// No description provided for @mcpServerEditSheetTitleEdit.
   ///
   /// In en, this message translates to:

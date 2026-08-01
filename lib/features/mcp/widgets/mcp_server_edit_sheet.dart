@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
 import '../../../core/services/haptics.dart';
+import '../../../core/services/oauth/oauth_flow_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -10,6 +14,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
+import 'mcp_oauth_section_controller.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -58,6 +63,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final List<_HeaderEntry> _headers = [];
   int _heartbeatIntervalSeconds = 12;
   final _toolPrefixCtrl = TextEditingController();
+  // OAuth section: shared logic lives in McpOAuthSectionController
+  // (mobile sheet + desktop dialog reuse it). Built in
+  // didChangeDependencies — constructing it needs AppLocalizations
+  // (an inherited widget), which is illegal inside initState.
+  late final McpOAuthSectionController _oauth;
+  bool _oauthInitialized = false;
 
   @override
   void initState() {
@@ -83,6 +94,103 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     }
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_oauthInitialized) return;
+    _oauthInitialized = true;
+    _oauth =
+        McpOAuthSectionController(
+            beginFlowOp: (serverId) =>
+                context.read<McpProvider>().beginOAuthFlow(serverId),
+            completeFlowOp: (serverId, pasted) =>
+                context.read<McpProvider>().completeOAuthFlow(serverId, pasted),
+            clearTokenOp: (serverId) =>
+                context.read<McpProvider>().clearOAuthToken(serverId),
+            ensureServerIdOp: _ensureServerId,
+            notify: (message, {isError = false}) {
+              if (!mounted) return;
+              showAppSnackBar(
+                context,
+                message: message,
+                type: isError ? NotificationType.error : NotificationType.info,
+              );
+            },
+            launch: (url) =>
+                launchUrl(url, mode: LaunchMode.externalApplication),
+            copyText: (text) => Clipboard.setData(ClipboardData(text: text)),
+            errorMessage: _oauthErrorMessage,
+            messages: _oauthMessages(context),
+          )
+          ..onChanged = () {
+            if (mounted) setState(() {});
+          };
+    if (isEdit) {
+      final server = context.read<McpProvider>().getById(widget.serverId!)!;
+      _oauth.initFrom(server.oauth);
+    }
+  }
+
+  /// Localized messages for the OAuth section.
+  OAuthSectionMessages _oauthMessages(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return OAuthSectionMessages(
+      notConfigured: l10n.mcpOAuthConfigIncomplete,
+      urlCopied: l10n.mcpOAuthUrlCopied,
+      flowStartFailed: l10n.mcpOAuthConfigIncomplete,
+      success: l10n.mcpOAuthSuccess,
+      tokenCleared: l10n.mcpOAuthTokenCleared,
+    );
+  }
+
+  /// Maps an OAuth error code (plus server detail) to a localized message.
+  String _oauthErrorMessage(OAuthFlowErrorCode code, String detail) {
+    final l10n = AppLocalizations.of(context)!;
+    final base = switch (code) {
+      OAuthFlowErrorCode.noSession => l10n.mcpOAuthErrorNoSession,
+      OAuthFlowErrorCode.noCode => l10n.mcpOAuthErrorNoCode,
+      OAuthFlowErrorCode.stateMismatch => l10n.mcpOAuthErrorStateMismatch,
+      OAuthFlowErrorCode.verifierLost => l10n.mcpOAuthErrorVerifierLost,
+      OAuthFlowErrorCode.exchangeFailed => l10n.mcpOAuthErrorExchangeFailed,
+      OAuthFlowErrorCode.callbackTimeout => l10n.mcpOAuthErrorCallbackTimeout,
+      OAuthFlowErrorCode.authorizationDenied =>
+        l10n.mcpOAuthErrorAuthorizationDenied,
+    };
+    // Show the raw server detail (error_description) for exchange
+    // failures — the generic message hides the root cause.
+    if (code == OAuthFlowErrorCode.exchangeFailed && detail.isNotEmpty) {
+      return '$base\n$detail';
+    }
+    return base;
+  }
+
+  /// Persists the current form so an OAuth flow has a server id.
+  /// No-op when already editing an existing server.
+  Future<String> _ensureServerId(McpOAuthConfig oauth) async {
+    if (isEdit) return widget.serverId!;
+    final existing = _oauth.createdId;
+    if (existing != null) return existing;
+    final mcp = context.read<McpProvider>();
+    final id = await mcp.addServer(
+      enabled: _enabled,
+      name: _nameCtrl.text.trim().isEmpty ? 'MCP' : _nameCtrl.text.trim(),
+      transport: _transport,
+      url: _urlCtrl.text.trim(),
+      headers: {
+        for (final h in _headers)
+          if (h.key.text.trim().isNotEmpty)
+            h.key.text.trim(): h.value.text.trim(),
+      },
+      heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
+          ? null
+          : _heartbeatIntervalSeconds,
+      toolPrefix: _toolPrefixCtrl.text.trim(),
+      oauth: oauth,
+    );
+    _oauth.createdId = id;
+    return id;
+  }
+
   void _onTabChanged() {
     if (mounted) setState(() {});
   }
@@ -97,6 +205,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       h.dispose();
     }
     _toolPrefixCtrl.dispose();
+    _oauth.dispose();
     super.dispose();
   }
 
@@ -307,6 +416,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 ? 'http://localhost:3000/sse'
                 : 'http://localhost:3000',
           ),
+          _oauthSection(),
           const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetHeartbeatLabel,
@@ -432,6 +542,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           h.key.text.trim(): h.value.text.trim(),
     };
     final toolPrefix = _toolPrefixCtrl.text.trim();
+    final oauth = _oauth.buildConfig();
     if (isEdit) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServer(
@@ -444,6 +555,30 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
           clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
           toolPrefix: toolPrefix,
+          oauth: oauth,
+          clearOauth: oauth == null,
+          // A token without an OAuth config is dead data — drop it when
+          // the switch is turned off.
+          clearOauthToken: oauth == null,
+        ),
+      );
+    } else if (_oauth.createdId != null) {
+      // The flow already persisted this server (开始授权) — update it in
+      // place instead of creating a second copy.
+      final created = mcp.getById(_oauth.createdId!)!;
+      await mcp.updateServer(
+        created.copyWith(
+          enabled: _enabled,
+          name: name,
+          transport: _transport,
+          url: url,
+          headers: headers,
+          heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
+          clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
+          toolPrefix: toolPrefix,
+          oauth: oauth,
+          clearOauth: oauth == null,
+          clearOauthToken: oauth == null,
         ),
       );
     } else {
@@ -457,9 +592,222 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             ? null
             : _heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
+        oauth: oauth,
       );
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Formats the expiry as time-only when it falls on today, otherwise
+  /// date + time (a short-lived token authorized near midnight would
+  /// otherwise look like a past time).
+  String _formatExpiry(BuildContext context, DateTime expires) {
+    final loc = MaterialLocalizations.of(context);
+    final now = DateTime.now();
+    final time = loc.formatTimeOfDay(TimeOfDay.fromDateTime(expires));
+    final sameDay =
+        expires.year == now.year &&
+        expires.month == now.month &&
+        expires.day == now.day;
+    if (sameDay) return time;
+    return '${expires.month}/${expires.day} $time';
+  }
+
+  /// OAuth authorization section (HTTP/SSE only).
+  ///
+  /// Gated by an explicit switch: when off the whole section collapses and
+  /// saving clears both config and token. When on the primary action
+  /// ([开始授权]) shows first; the advanced fields collapse behind
+  /// "高级配置" and are only needed when auto-discovery fails.
+  Widget _oauthSection() {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final mcp = context.watch<McpProvider>();
+    final server = isEdit
+        ? mcp.getById(widget.serverId!)
+        : (_oauth.createdId != null ? mcp.getById(_oauth.createdId!) : null);
+    final token = server?.oauthToken;
+    final expires = token?.expiresAt;
+    final expired = _oauth.isTokenExpired(expires);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.mcpOAuthSectionTitle,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+            ),
+            IosSwitch(
+              value: _oauth.enabled,
+              onChanged: (v) => setState(() => _oauth.enabled = v),
+            ),
+          ],
+        ),
+        if (_oauth.enabled) ...[
+          const SizedBox(height: 8),
+          if (server != null && server.oauth != null) ...[
+            Row(
+              children: [
+                Icon(
+                  token == null || expired
+                      ? Lucide.TriangleAlert
+                      : Lucide.circleCheckBig,
+                  size: 14,
+                  color: token == null || expired ? cs.error : Colors.green,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    token == null
+                        ? l10n.mcpOAuthStatusUnauthorized
+                        : expired
+                        ? l10n.mcpOAuthStatusExpired
+                        : l10n.mcpOAuthStatusAuthorized(
+                            expires == null
+                                ? '--:--'
+                                : _formatExpiry(context, expires),
+                          ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: token == null || expired
+                          ? cs.error
+                          : cs.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+                if (token != null)
+                  _TactileIconButton(
+                    icon: Lucide.KeyRound,
+                    color: cs.onSurface,
+                    semanticLabel: l10n.mcpOAuthClearTokenButton,
+                    onTap: () => _oauth.clearTokenFor(server),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (_oauth.flowStarted) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _oauth.autoMode
+                    ? l10n.mcpOAuthAutoWaitHint
+                    : l10n.mcpOAuthBrowserHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            _inputRow(
+              label: l10n.mcpOAuthCompleteButton,
+              controller: _oauth.pasteCtrl,
+              hint: l10n.mcpOAuthPasteHint,
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: IosTileButton(
+                icon: Lucide.Check,
+                label: l10n.mcpOAuthCompleteButton,
+                backgroundColor: cs.primary,
+                enabled: !_oauth.completing,
+                onTap: () => _oauth.completeFlow(
+                  _oauth.createdId ?? widget.serverId ?? '',
+                ),
+              ),
+            ),
+          ] else ...[
+            // Primary action first: one-tap start for normal users.
+            SizedBox(
+              width: double.infinity,
+              child: IosTileButton(
+                icon: Lucide.Shield,
+                label: token == null
+                    ? l10n.mcpOAuthStartButton
+                    : l10n.mcpOAuthReauthorizeButton,
+                backgroundColor: cs.primary,
+                onTap: _oauth.startFlow,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Advanced config collapsed below; only needed when the server
+            // does not support auto-discovery / auto-registration.
+            _TactileRow(
+              onTap: () => setState(
+                () => _oauth.advancedExpanded = !_oauth.advancedExpanded,
+              ),
+              builder: (pressed) => Row(
+                children: [
+                  Icon(
+                    _oauth.advancedExpanded
+                        ? Lucide.ChevronDown
+                        : Lucide.ChevronRight,
+                    size: 16,
+                    color: pressed
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.mcpOAuthAdvancedConfig,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: pressed
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_oauth.advancedExpanded) ...[
+              const SizedBox(height: 8),
+              _inputRow(
+                label: l10n.mcpOAuthAuthEndpointLabel,
+                controller: _oauth.authEndpointCtrl,
+                hint: 'https://auth.example.com/authorize',
+              ),
+              const SizedBox(height: 10),
+              _inputRow(
+                label: l10n.mcpOAuthTokenEndpointLabel,
+                controller: _oauth.tokenEndpointCtrl,
+                hint: 'https://auth.example.com/token',
+              ),
+              const SizedBox(height: 10),
+              _inputRow(
+                label: l10n.mcpOAuthClientIdLabel,
+                controller: _oauth.clientIdCtrl,
+              ),
+              const SizedBox(height: 10),
+              _inputRow(
+                label: l10n.mcpOAuthClientSecretLabel,
+                controller: _oauth.clientSecretCtrl,
+              ),
+              const SizedBox(height: 10),
+              _inputRow(
+                label: l10n.mcpOAuthScopesLabel,
+                controller: _oauth.scopesCtrl,
+              ),
+              const SizedBox(height: 10),
+              _inputRow(
+                label: l10n.mcpOAuthRedirectUriLabel,
+                controller: _oauth.redirectUriCtrl,
+              ),
+            ],
+          ],
+        ],
+      ],
+    );
   }
 
   @override

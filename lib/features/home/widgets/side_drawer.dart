@@ -25,11 +25,9 @@ import 'package:flutter/services.dart';
 import 'dart:io' show File;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animations/animations.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -50,6 +48,7 @@ import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
+import '../../../shared/dialogs/update_changelog_dialog.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -1464,6 +1463,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         .toList();
     final groups = _groupByDate(context, rest);
 
+    // 移动端底部用户栏可见；桌面端隐藏并由侧栏底部的新版本入口替代
+    final showBottom =
+        widget.showBottomBar && (!widget.embedded || !_isDesktop);
+
     // Avatar renderer: emoji / url / file / default initial
     Widget avatarWidget(String name, UserProvider up, {double size = 40}) {
       final type = up.avatarType;
@@ -2278,7 +2281,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         chatService,
                         pinnedList,
                         groups,
-                        includeUpdateBanner: true,
                       ),
                     );
                   }
@@ -2308,7 +2310,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           chatService,
                           pinnedList,
                           groups,
-                          includeUpdateBanner: true,
                         ),
                       ],
                     );
@@ -2326,13 +2327,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       chatService,
                       pinnedList,
                       groups,
-                      includeUpdateBanner: true,
                     ),
                   );
                 }(),
               ),
 
-              if (widget.showBottomBar && (!widget.embedded || !_isDesktop))
+              // 移动端底部栏（用户头像/昵称行）
+              if (showBottom)
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                   decoration: BoxDecoration(
@@ -2341,6 +2342,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _buildUpdateEntryRow(context),
                       Row(
                         children: [
                           const SizedBox(width: 6),
@@ -2428,6 +2430,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
+                ),
+
+              // 桌面端无底部用户栏：更新入口放侧栏最底部。
+              // 右侧话题面板（desktopTopicsOnly）不渲染入口，避免与主左栏重复。
+              if (!showBottom && !widget.desktopTopicsOnly)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 2, 8, 10),
+                  child: _buildUpdateEntryRow(context),
                 ),
             ],
           ),
@@ -3484,102 +3494,86 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
   }
 
-  // Build conversations list area, optionally including the update banner.
+  // 新版本入口行：原会话列表顶部 banner 的替代。移动端置于底部用户栏上方，
+  // 桌面端置于侧栏最底部。点击展示 changelog 弹层；行尾 X 为 session 级关闭
+  // （内存标志，重启后恢复提示）。
+  Widget _buildUpdateEntryRow(BuildContext context) {
+    return Builder(
+      builder: (context) {
+        final settings = context.watch<SettingsProvider>();
+        final upd = context.watch<UpdateProvider>();
+        if (!settings.showAppUpdates) return const SizedBox.shrink();
+        final info = upd.available;
+        if (info == null || upd.dismissed) return const SizedBox.shrink();
+        final url = info.bestDownloadUrl();
+        if (url == null || url.isEmpty) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context)!;
+        final cs = Theme.of(context).colorScheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final version = info.build != null
+            ? l10n.sideDrawerUpdateTitleWithBuild(info.version, info.build!)
+            : l10n.sideDrawerUpdateTitle(info.version);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: IosCardPress(
+            borderRadius: BorderRadius.circular(12),
+            baseColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+            padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+            onTap: () {
+              if (_isDesktop) {
+                UpdateChangelogDialog.show(context, info: info);
+              } else {
+                UpdateChangelogDialog.showSheet(context, info: info);
+              }
+            },
+            child: Row(
+              children: [
+                Icon(Lucide.BadgeInfo, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    version,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ),
+                IosIconButton(
+                  icon: Lucide.X,
+                  size: 15,
+                  color: cs.onSurface.withValues(alpha: 0.45),
+                  padding: const EdgeInsets.all(6),
+                  semanticLabel: l10n.updateDismissTooltip,
+                  onTap: () => context.read<UpdateProvider>().dismiss(),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Lucide.ChevronRight,
+                  size: 16,
+                  color: cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Build conversations list area.
   Widget _buildConversationsList(
     BuildContext context,
     ColorScheme cs,
     Color textBase,
     ChatService chatService,
     List<ChatItem> pinnedList,
-    List<_ChatGroup> groups, {
-    bool includeUpdateBanner = false,
-  }) {
+    List<_ChatGroup> groups,
+  ) {
     final children = <Widget>[];
-    if (includeUpdateBanner) {
-      children.add(
-        Builder(
-          builder: (context) {
-            final settings = context.watch<SettingsProvider>();
-            final upd = context.watch<UpdateProvider>();
-            if (!settings.showAppUpdates) return const SizedBox.shrink();
-            final info = upd.available;
-            if (upd.checking && info == null) return const SizedBox.shrink();
-            if (info == null) return const SizedBox.shrink();
-            final url = info.bestDownloadUrl();
-            if (url == null || url.isEmpty) return const SizedBox.shrink();
-            final ver = info.version;
-            final build = info.build;
-            final l10n = AppLocalizations.of(context)!;
-            final title = build != null
-                ? l10n.sideDrawerUpdateTitleWithBuild(ver, build)
-                : l10n.sideDrawerUpdateTitle(ver);
-            final cs2 = Theme.of(context).colorScheme;
-            final isDark2 = Theme.of(context).brightness == Brightness.dark;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Material(
-                color: isDark2 ? Colors.white10 : const Color(0xFFF2F3F5),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () async {
-                    final uri = Uri.parse(url);
-                    try {
-                      // ignore: deprecated_member_use
-                      await launchUrl(uri);
-                    } catch (_) {
-                      Clipboard.setData(ClipboardData(text: url));
-                      if (!context.mounted) return;
-                      showAppSnackBar(
-                        context,
-                        message: l10n.sideDrawerLinkCopied,
-                        type: NotificationType.success,
-                      );
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Lucide.BadgeInfo,
-                              size: 18,
-                              color: cs2.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                title,
-                                style: TextStyle(
-                                  fontWeight: AppFontWeights.emphasis,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if ((info.notes ?? '').trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          GptMarkdown(
-                            info.notes!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs2.onSurface.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
 
     if (_selectMode) {
       final l10n = AppLocalizations.of(context)!;

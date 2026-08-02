@@ -125,8 +125,18 @@ class UpdateProvider extends ChangeNotifier {
   UpdateInfo? get available => _available;
   bool _checking = false;
   bool get checking => _checking;
+  bool _dismissed = false;
+  bool get dismissed => _dismissed;
   String? _error;
   String? get error => _error;
+
+  /// Session-scoped dismiss: hides the update entry until the next app launch.
+  /// Not persisted — the provider is recreated on startup, so a still-pending
+  /// update reappears after restart.
+  void dismiss() {
+    _dismissed = true;
+    notifyListeners();
+  }
 
   Future<void> checkForUpdates() async {
     if (_checking) return;

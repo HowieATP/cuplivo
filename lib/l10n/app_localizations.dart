@@ -5099,6 +5099,24 @@ abstract class AppLocalizations {
   /// **'Link copied'**
   String get sideDrawerLinkCopied;
 
+  /// No description provided for @updateDownloadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownloadButton;
+
+  /// No description provided for @updateDismissTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get updateDismissTooltip;
+
+  /// No description provided for @updateCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get updateCloseTooltip;
+
   /// No description provided for @sideDrawerPinnedLabel.
   ///
   /// In en, this message translates to:

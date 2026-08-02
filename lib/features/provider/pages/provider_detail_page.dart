@@ -1277,8 +1277,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           if (_kind == ProviderKind.openai &&
               !_multiKeyEnabled &&
               CodexDeviceCodeController.showEntryFor(liveCfg)) ...[
-            const SizedBox(height: 12),
             CodexAccountEntry(cfg: liveCfg),
+            // The API Key block above already ends with a 12px gap; keep the
+            // same rhythm before the next row.
+            const SizedBox(height: 12),
           ],
           _inputRow(
             context,

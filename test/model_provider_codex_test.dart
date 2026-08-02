@@ -7,11 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/model_provider.dart';
 
-/// Scripted client for the controller's auth traffic. The ProviderManager
-/// methods under test create their own LLM clients, but the auth guard must
-/// fire before any of those is used, so this client stays untouched when the
-/// guard behaves.
-class _ScriptedClient extends http.BaseClient {
+/// Client that records every request and rejects them all. The
+/// ProviderManager methods under test create their own LLM clients, but the
+/// auth guard must fire before any of those is used, so this client stays
+/// untouched when the guard behaves.
+class _RejectingClient extends http.BaseClient {
   final List<http.Request> requests = [];
 
   @override
@@ -26,12 +26,12 @@ class _ScriptedClient extends http.BaseClient {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late _ScriptedClient client;
+  late _RejectingClient client;
   late CodexDeviceCodeController controller;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    client = _ScriptedClient();
+    client = _RejectingClient();
     controller = CodexDeviceCodeController(clientFactory: (proxy) => client);
     CodexDeviceCodeController.debugOverrideInstance(controller);
   });

@@ -113,7 +113,7 @@ void main() {
     });
 
     test(
-      'stale credential refreshes once then fails without an LLM request',
+      'absolutely expired credential refreshes once then fails without an LLM request',
       () async {
         controller.credential = _expiredCred('acc-1');
         controller.status = CodexAuthStatus.expired;
@@ -148,6 +148,31 @@ void main() {
         expect(client.requests.single.url.toString(), kCodexTokenEndpoint);
       },
     );
+
+    test('grace-period token passes the guard and injects headers', () async {
+      controller.credential = CodexOAuthCredential(
+        accessToken: _jwtWithAccount('acc-1'),
+        refreshToken: 'rt-old',
+        expiresAt: DateTime.now().add(const Duration(seconds: 30)),
+        accountId: 'acc-1',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+      client.handlers.add((_) async => _json(500, {'error': 'boom'}));
+
+      // Not fresh (past the 60s grace) but not absolutely expired: a failing
+      // refresh must not kill the session, and the guard lets the request
+      // through without any network traffic.
+      expect(controller.isFresh, isFalse);
+      expect(controller.isUsable, isTrue);
+
+      await CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig());
+
+      expect(client.requests, isEmpty);
+
+      final h = controller.maybeCodexHeaders(codexProviderConfig());
+      expect(h['Authorization'], 'Bearer ${_jwtWithAccount('acc-1')}');
+      expect(h['chatgpt-account-id'], 'acc-1');
+    });
   });
 
   group('generateText auth guard for codex hosts', () {
@@ -173,7 +198,7 @@ void main() {
     });
 
     test(
-      'stale credential refresh rejection propagates as HttpException',
+      'absolutely expired credential refresh rejection propagates as HttpException',
       () async {
         controller.credential = _expiredCred('acc-1');
         controller.status = CodexAuthStatus.expired;

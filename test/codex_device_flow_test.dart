@@ -16,6 +16,9 @@ class _ScriptedClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    // Limitation: only http.Request bodies are copied. StreamedRequest /
+    // MultipartRequest payloads are dropped (the controller's traffic is all
+    // client.post with a String body, so this is fine for now).
     final req = http.Request(request.method, request.url)
       ..headers.addAll(request.headers);
     if (request is http.Request) {
@@ -101,6 +104,15 @@ CodexOAuthCredential _expiredCred(String accountId) => CodexOAuthCredential(
   accountId: accountId,
 );
 
+/// Token still inside the absolute validity window but past the 60s refresh
+/// grace: [isFresh] is false while [isUsable] stays true.
+CodexOAuthCredential _graceCred(String accountId) => CodexOAuthCredential(
+  accessToken: _jwtWithAccount(accountId),
+  refreshToken: 'rt-old',
+  expiresAt: DateTime.now().add(const Duration(seconds: 30)),
+  accountId: accountId,
+);
+
 String? _headerOf(http.Request req, String name) {
   for (final e in req.headers.entries) {
     if (e.key.toLowerCase() == name.toLowerCase()) return e.value;
@@ -150,7 +162,7 @@ void main() {
         (_) async => _json(200, {
           'device_auth_id': 'da-1',
           'user_code': 'ABC-DEF',
-          'interval': '5',
+          'interval': '2',
         }),
       );
       client.handlers.add((_) async {
@@ -208,11 +220,12 @@ void main() {
       );
       expect(exchangeReq.body, contains('client_id=$kCodexClientId'));
 
-      // string interval '5' honored: ~5s wait between pending polls
-      expect(
-        poll2At!.difference(poll1At!),
-        greaterThanOrEqualTo(const Duration(seconds: 4)),
-      );
+      // String interval '2' honored: the wait lands in [1s, 4s), which the
+      // 5s default (>= 4s) and the 1s minimum clamp (exactly ~1s) cannot
+      // satisfy, so this window pins the server value.
+      final pollGap = poll2At!.difference(poll1At!);
+      expect(pollGap, greaterThanOrEqualTo(const Duration(seconds: 1)));
+      expect(pollGap, lessThan(const Duration(seconds: 4)));
 
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(kCodexPrefsKey);
@@ -472,6 +485,37 @@ void main() {
       expect(client.requests.length, 2);
     });
 
+    test('403 slow_down keeps polling instead of failing fast', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async => _json(403, {
+          'error': {'code': 'slow_down'},
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      // slow_down must not be swallowed by the unknown-code fail-fast: a
+      // subsequent poll request proves the loop kept going.
+      expect(client.requests.length, 4);
+      expect(client.requests[2].url.toString(), kCodexPollEndpoint);
+    });
+
     test('slow_down grows the poll interval', () async {
       DateTime? poll1At;
       DateTime? poll2At;
@@ -608,6 +652,38 @@ void main() {
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
 
+    test('exchange 200 with non-JSON body fails without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => http.Response('OK', 200));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      // A 200 with a non-JSON body is treated as a missing-fields response:
+      // fail cleanly instead of crashing on the decode.
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.errorMessage, contains('missing fields'));
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
     test('exchange SocketException fails without persisting', () async {
       client.handlers.add(
         (_) async => _json(200, {
@@ -733,6 +809,7 @@ void main() {
       );
       client.handlers.add((_) async => http.Response('{}', 403));
 
+      final sw = Stopwatch()..start();
       final flow = controller.startFlow(
         cfg: codexProviderConfig(),
         onAuthenticated: () async {
@@ -742,15 +819,20 @@ void main() {
       await _waitForRequests(client, 2);
       controller.cancel();
       final outcome = await flow;
+      sw.stop();
 
       expect(outcome, CodexFlowOutcome.cancelled);
       expect(controller.status, CodexAuthStatus.signedOut);
       expect(onAuthenticatedCalls, 0);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(kCodexPrefsKey), isNull);
+      // interval '5' would sleep ~5s if the cancel did not wake the poll
+      // loop; the interrupt must end the flow well before that.
+      expect(sw.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
     test('cancel during exchange discards credential', () async {
+      final exchangeGate = Completer<http.Response>();
       client.handlers.add(
         (_) async => _json(200, {
           'device_auth_id': 'da-1',
@@ -762,10 +844,7 @@ void main() {
         (_) async =>
             _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
       );
-      client.handlers.add((_) async {
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        return _json(200, _tokenBody('acc-1'));
-      });
+      client.handlers.add((_) => exchangeGate.future);
 
       final flow = controller.startFlow(
         cfg: codexProviderConfig(),
@@ -775,6 +854,9 @@ void main() {
       );
       await _waitForRequests(client, 3);
       controller.cancel();
+      // Release the exchange response only after the cancel landed, so the
+      // ordering is deterministic instead of racing a fixed delay.
+      exchangeGate.complete(_json(200, _tokenBody('acc-1')));
       final outcome = await flow;
 
       expect(outcome, CodexFlowOutcome.cancelled);
@@ -930,6 +1012,23 @@ void main() {
       },
     );
 
+    test(
+      'refresh 200 with non-JSON body keeps credential and status',
+      () async {
+        controller.credential = _expiredCred('acc-1');
+        controller.status = CodexAuthStatus.expired;
+        client.handlers.add((_) async => http.Response('OK', 200));
+
+        await controller.ensureFresh();
+
+        // A 200 that cannot be decoded is a missing-fields response: the
+        // credential and status survive untouched instead of crashing.
+        expect(controller.credential, isNotNull);
+        expect(controller.credential!.accountId, 'acc-1');
+        expect(controller.status, CodexAuthStatus.expired);
+      },
+    );
+
     test('is single-flight under concurrency', () async {
       controller.credential = _expiredCred('acc-1');
       client.handlers.add((_) async {
@@ -1015,6 +1114,20 @@ void main() {
 
       expect(controller.isFresh, isTrue);
       expect(controller.credential!.accountId, 'acc-2');
+    });
+
+    test('grace-period token passes without refresh traffic', () async {
+      controller.credential = _graceCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
+      client.handlers.add((_) async => _json(500, {'error': 'boom'}));
+
+      await CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig());
+
+      // Not fresh (grace window passed) but still usable: the guard must not
+      // throw and must not even attempt a refresh.
+      expect(controller.isFresh, isFalse);
+      expect(controller.isUsable, isTrue);
+      expect(client.requests, isEmpty);
     });
   });
 
@@ -1224,6 +1337,19 @@ void main() {
         'Authorization': 'Bearer ${_jwtWithAccount('acc-1')}',
         'chatgpt-account-id': 'acc-1',
       });
+    });
+
+    test('grace-period token still injects headers', () {
+      controller.credential = _graceCred('acc-1');
+
+      final h = controller.maybeCodexHeaders(codexProviderConfig());
+
+      // isFresh is false but the token has not absolutely expired: headers
+      // are injected instead of triggering a background refresh.
+      expect(controller.isFresh, isFalse);
+      expect(h['Authorization'], 'Bearer ${_jwtWithAccount('acc-1')}');
+      expect(h['chatgpt-account-id'], 'acc-1');
+      expect(client.requests, isEmpty);
     });
 
     test(
@@ -1504,16 +1630,18 @@ void main() {
     test(
       'signOut during an in-flight refresh leaves the credential cleared',
       () async {
+        final refreshGate = Completer<http.Response>();
         controller.credential = _expiredCred('acc-1');
         controller.status = CodexAuthStatus.expired;
-        client.handlers.add((_) async {
-          await Future<void>.delayed(const Duration(milliseconds: 150));
-          return _json(200, _tokenBody('acc-2'));
-        });
+        client.handlers.add((_) => refreshGate.future);
 
         final refreshing = controller.ensureFresh();
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        await controller.signOut();
+        await _waitForRequests(client, 1);
+        final signOutFuture = controller.signOut();
+        // signOut awaits the in-flight refresh; release its response only
+        // after signOut has started, so the ordering is deterministic.
+        refreshGate.complete(_json(200, _tokenBody('acc-2')));
+        await signOutFuture;
         await refreshing;
 
         expect(controller.credential, isNull);
@@ -1554,6 +1682,7 @@ void main() {
     test(
       'signOut during the exchange then success response leaves prefs clean',
       () async {
+        final exchangeGate = Completer<http.Response>();
         client.handlers.add(
           (_) async => _json(200, {
             'device_auth_id': 'da-1',
@@ -1567,10 +1696,7 @@ void main() {
             'code_verifier': 'cv-1',
           }),
         );
-        client.handlers.add((_) async {
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-          return _json(200, _tokenBody('acc-1'));
-        });
+        client.handlers.add((_) => exchangeGate.future);
 
         final flow = controller.startFlow(
           cfg: codexProviderConfig(),
@@ -1582,6 +1708,7 @@ void main() {
         // then succeeds, which is the last moment the flow could persist.
         await _waitForRequests(client, 3);
         await controller.signOut();
+        exchangeGate.complete(_json(200, _tokenBody('acc-1')));
         final outcome = await flow;
 
         expect(outcome, CodexFlowOutcome.cancelled);

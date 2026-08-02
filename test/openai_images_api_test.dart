@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
+import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 
@@ -221,6 +222,79 @@ void main() {
       expect(requestUri.path, '/v1/chat/completions');
       expect(requestBody['model'], 'gpt-image-2');
       expect(chunks.single.content, 'chat route');
+    });
+
+    test('codex hosts never route image models to the Images API', () {
+      // A codex host must keep image models on the chat/responses path: the
+      // Images API has no Codex OAuth support.
+      expect(
+        ChatApiService.supportsOpenAIImagesApiRouting(
+          codexProviderConfig(),
+          'gpt-image-1',
+        ),
+        isFalse,
+      );
+      expect(
+        ChatApiService.supportsOpenAIImagesApiRouting(
+          _openAiConfig('https://api.openai.com/v1'),
+          'gpt-image-1',
+        ),
+        isTrue,
+      );
+    });
+
+    test('images requests never carry codex account headers', () async {
+      final controller = CodexDeviceCodeController();
+      CodexDeviceCodeController.debugOverrideInstance(controller);
+      addTearDown(controller.resetForTest);
+      addTearDown(
+        () => CodexDeviceCodeController.debugOverrideInstance(
+          CodexDeviceCodeController(),
+        ),
+      );
+      controller.credential = CodexOAuthCredential(
+        accessToken: 'at-codex',
+        refreshToken: 'rt-codex',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        accountId: 'acc-codex',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+
+      late String? authorization;
+      late String? accountHeader;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        authorization = request.headers.value(HttpHeaders.authorizationHeader);
+        accountHeader = request.headers.value('chatgpt-account-id');
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/codex-free.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-1',
+        messages: const [
+          {'role': 'user', 'content': 'draw a cat'},
+        ],
+      ).toList();
+
+      // The Images API path never merges Codex OAuth headers, even when a
+      // codex account is signed in.
+      expect(authorization, 'Bearer test-key');
+      expect(accountHeader, isNull);
     });
 
     test(

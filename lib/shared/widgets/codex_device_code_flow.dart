@@ -54,6 +54,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   DateTime? _deadline;
   Duration _remaining = kCodexFlowDeadline;
   bool _countdownExpired = false;
+  bool _starting = false;
   bool _providerWriteError = false;
   String? _providerWriteErrorDetail;
   late final SettingsProvider _settings;
@@ -83,6 +84,11 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     _countdownExpired = false;
     _providerWriteError = false;
     _providerWriteErrorDetail = null;
+    // Cover the deferred startFlow window: until _runFlow actually starts the
+    // flow, the controller still reports its previous terminal state and the
+    // first frame would flash it.
+    _starting = true;
+    if (mounted) setState(() {});
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
@@ -125,6 +131,9 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     // while a route (bottom sheet / dialog) is still mounting.
     await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
+    if (_starting) {
+      setState(() => _starting = false);
+    }
     try {
       await _controller.startFlow(
         cfg: widget.cfg,
@@ -253,8 +262,10 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
               textAlign: TextAlign.center,
             ),
             CodexAuthStatus.signedOut =>
-              (controller.errorMessage != null &&
-                      controller.errorMessage!.isNotEmpty)
+              _starting
+                  ? _buildWaiting(controller, l10n, cs)
+                  : (controller.errorMessage != null &&
+                        controller.errorMessage!.isNotEmpty)
                   ? _buildFailed(controller, l10n, l10n.codexLoginStatusFailed)
                   : _buildSignedOutEnd(l10n, cs),
           };
@@ -484,6 +495,13 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
+            // While the controller is still polling (e.g. the local countdown
+            // hit zero before the controller deadline fired), a retry would
+            // be swallowed by the startFlow reentrancy guard; keep it
+            // disabled until the poll loop actually ended.
+            enabled:
+                controller.status != CodexAuthStatus.waitingForUser &&
+                controller.status != CodexAuthStatus.polling,
             onTap: _start,
           ),
         ),

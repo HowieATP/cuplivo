@@ -147,7 +147,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
     _refreshing = null;
     _signInProxy = null;
     _cancelled = false;
-    _cancelSignal = Completer<void>();
+    _cancelListeners.clear();
     credential = null;
     status = CodexAuthStatus.signedOut;
     usercode = null;
@@ -170,7 +170,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
   CodexOAuthCredential? credential;
 
   bool _cancelled = false;
-  Completer<void> _cancelSignal = Completer<void>();
+  final List<void Function()> _cancelListeners = [];
   Future<void>? _refreshing;
   NetworkProxyConfig? _signInProxy;
 
@@ -194,16 +194,27 @@ class CodexDeviceCodeController extends ChangeNotifier {
             path.startsWith('/backend-api/codex/'));
   }
 
-  /// Ensures a fresh Codex session for codex hosts. Throws a clear
-  /// [HttpException] when the account is not signed in or the session
-  /// cannot be refreshed, so callers fail fast instead of sending an
-  /// unauthenticated request.
+  /// Ensures a usable Codex session for codex hosts. Throws a clear
+  /// [HttpException] when the account is not signed in or the session has
+  /// absolutely expired and cannot be refreshed, so callers fail fast instead
+  /// of sending an unauthenticated request. A token inside the refresh grace
+  /// window is still usable and passes through without a refresh attempt.
   static Future<void> ensureFreshOrThrow(ProviderConfig cfg) async {
     if (!isCodexHost(cfg)) return;
-    await instance.ensureFresh();
-    if (!instance.isFresh) {
-      final c = instance.credential;
-      final message = c == null
+    final controller = instance;
+    if (controller.credential == null) {
+      throw HttpException(
+        'Codex account is not signed in. Please sign in first.',
+        uri: Uri.tryParse(cfg.baseUrl),
+      );
+    }
+    // A token that has not absolutely expired is still valid even when the
+    // refresh grace window has passed: a transient refresh failure must not
+    // kill an otherwise-usable session.
+    if (controller.isUsable) return;
+    await controller.ensureFresh();
+    if (!controller.isUsable) {
+      final message = controller.credential == null
           ? 'Codex account is not signed in. Please sign in first.'
           : 'Codex session expired, please sign in again.';
       throw HttpException(message, uri: Uri.tryParse(cfg.baseUrl));
@@ -306,11 +317,20 @@ class CodexDeviceCodeController extends ChangeNotifier {
     // A real Timer so an interrupted sleep leaves no pending delayed future
     // behind (Future.any kept the delay timer alive after cancellation).
     final timer = Timer(duration, complete);
-    _cancelSignal.future.then((_) {
+    // Registered on the cancel-listener list instead of a one-shot signal
+    // future: a 15-minute poll registers one listener per sleep, which would
+    // otherwise accumulate on a completed signal.
+    void onCancel() {
       timer.cancel();
       complete();
-    });
-    await done.future;
+    }
+
+    _cancelListeners.add(onCancel);
+    try {
+      await done.future;
+    } finally {
+      _cancelListeners.remove(onCancel);
+    }
   }
 
   /// Flow ended without a successful login: restore a neutral state.
@@ -381,7 +401,6 @@ class CodexDeviceCodeController extends ChangeNotifier {
       return CodexFlowOutcome.failed;
     }
     _cancelled = false;
-    _cancelSignal = Completer<void>();
     _signInProxy = null;
     status = CodexAuthStatus.waitingForUser;
     errorMessage = null;
@@ -473,20 +492,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
         }
         if (resp.statusCode == 403 || resp.statusCode == 404) {
           final errCode = _extractErrorCode(resp);
-          if (errCode == 'access_denied' ||
-              errCode == 'expired_token' ||
-              errCode == 'deviceauth_authorization_denied') {
-            _fail('Codex device auth was denied or expired');
-            return CodexFlowOutcome.failed;
-          }
-          if (errCode != null && errCode.isNotEmpty) {
-            // Unknown rejection code: fail fast instead of polling until the
-            // deadline. A null errCode (no body / no error field, e.g. a bare
-            // 403) stays pending per the device-auth semantics.
-            _fail('Codex device auth rejected with code: $errCode');
-            return CodexFlowOutcome.failed;
-          }
           if (errCode == 'slow_down') {
+            // slow_down must be handled before the unknown-code fail-fast:
+            // it is a non-empty code that means "keep polling, slower".
             intervalSeconds =
                 (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
                     .clamp(kCodexMinInterval.inSeconds, 60)
@@ -494,6 +502,17 @@ class CodexDeviceCodeController extends ChangeNotifier {
             debugPrint(
               '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
             );
+          } else if (errCode == 'access_denied' ||
+              errCode == 'expired_token' ||
+              errCode == 'deviceauth_authorization_denied') {
+            _fail('Codex device auth was denied or expired');
+            return CodexFlowOutcome.failed;
+          } else if (errCode != null && errCode.isNotEmpty) {
+            // Unknown rejection code: fail fast instead of polling until the
+            // deadline. A null errCode (no body / no error field, e.g. a bare
+            // 403) stays pending per the device-auth semantics.
+            _fail('Codex device auth rejected with code: $errCode');
+            return CodexFlowOutcome.failed;
           }
         }
         if (resp.statusCode != 403 && resp.statusCode != 404) {
@@ -613,7 +632,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
       return CodexFlowOutcome.success;
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow failed: $e\n$st');
-      _fail('Codex device login failed: $e');
+      // The raw exception is already logged above; the UI-facing message must
+      // stay free of transient network noise.
+      _fail('Codex device login failed');
       return CodexFlowOutcome.failed;
     } finally {
       client.close();
@@ -636,8 +657,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
 
   void cancel() {
     _cancelled = true;
-    if (!_cancelSignal.isCompleted) {
-      _cancelSignal.complete();
+    final listeners = List<void Function()>.from(_cancelListeners);
+    _cancelListeners.clear();
+    for (final listener in listeners) {
+      listener();
     }
   }
 
@@ -645,6 +668,16 @@ class CodexDeviceCodeController extends ChangeNotifier {
     final c = credential;
     if (c == null) return false;
     return c.expiresAt.subtract(kCodexRefreshGrace).isAfter(DateTime.now());
+  }
+
+  /// Whether the stored credential is still valid in absolute terms, i.e.
+  /// [expiresAt] lies in the future. Unlike [isFresh] this ignores the
+  /// refresh grace window, so a transient refresh failure inside the grace
+  /// period does not kill an otherwise-usable session.
+  bool get isUsable {
+    final c = credential;
+    if (c == null) return false;
+    return c.expiresAt.isAfter(DateTime.now());
   }
 
   Future<void> ensureFresh() async {
@@ -749,10 +782,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
   Future<void> signOut() async {
     // Abort any in-flight device-code poll loop so it cannot keep running
     // after sign-out and resurrect the credential.
-    _cancelled = true;
-    if (!_cancelSignal.isCompleted) {
-      _cancelSignal.complete();
-    }
+    cancel();
     final inFlight = _refreshing;
     if (inFlight != null) {
       // Wait for an in-flight refresh to finish so it cannot re-persist the
@@ -776,10 +806,15 @@ class CodexDeviceCodeController extends ChangeNotifier {
   /// distinct situations:
   ///   1. [cfg] is not a codex host (see [isCodexHost]) - nothing to add.
   ///   2. No credential is stored - the account is signed out.
-  ///   3. The credential is stale - a background refresh is kicked off and
-  ///      this request intentionally goes out WITHOUT auth headers.
+  ///   3. The credential has absolutely expired (past [expiresAt]) - a
+  ///      background refresh is kicked off and this request intentionally
+  ///      goes out WITHOUT auth headers.
+  /// A token that has not absolutely expired injects its headers even when
+  /// the refresh grace window has passed, so a transient refresh failure
+  /// inside the grace period cannot kill an otherwise-usable session.
   /// Callers MUST call [ensureFreshOrThrow] before building their headers so
-  /// a stale session is refreshed (or rejected) before any request is sent.
+  /// an absolutely expired session is refreshed (or rejected) before any
+  /// request is sent.
   /// The stream entry points (sendMessageStream / generateText /
   /// testConnection) and the tool-call follow-up rounds already do this;
   /// any new call site that merges [_customHeaders]-style maps must follow
@@ -795,7 +830,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
       if (!isCodexHost(cfg)) return const {};
       final c = credential;
       if (c == null) return const {};
-      if (isFresh) {
+      if (isUsable) {
         final out = <String, String>{
           'Authorization': 'Bearer ${c.accessToken}',
           'chatgpt-account-id': c.accountId,
@@ -805,8 +840,8 @@ class CodexDeviceCodeController extends ChangeNotifier {
         }
         return out;
       }
-      // Stale credential: kick off a background refresh and send no auth
-      // headers for this request.
+      // Absolutely expired credential: kick off a background refresh and send
+      // no auth headers for this request.
       // NOTE: deliberately NOT async/await. The three call entries
       // (sendMessageStream / generateText / testConnection) already await
       // ensureFresh() synchronously before reaching here, so this branch only

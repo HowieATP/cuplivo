@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.5.0] - 2026-08-03
+
+### Added
+
+- OAuth account sign-in: Grok xAI (#164) and OpenAI Codex (#157)
+- MCP new standard support: OAuth v2.1 (#156)
+- MCP image enhancement: send MCP tool result images back to LLM providers (#159)
+- Rendering enhancement: reading mode for long assistant answers to reduce fatigue (#160)
+- Skills enhancement: category mechanism, improved entry discoverability, optimized selection experience (#161)
+- Logging enhancement: request logs now cover MCP, TTS, and search services (#162)
+
+### Fixed
+
+- Database intelligent self-healing: prevents permanent database version drift caused by a single failed migration or version anomaly
+
 ## [2.4.0] - 2026-08-01
 
 ### Added

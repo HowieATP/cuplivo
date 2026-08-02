@@ -316,7 +316,7 @@ flutter analyze
   - `README.md` → ✨ **New Features** section (Cuplivo vs Kelivo differences)
   - `README_ZH_CN.md` → ✨ **新功能** 章节
 - This ensures users can always see what distinguishes Cuplivo from upstream Kelivo.
-- Features items are ordered by **descending importance** (most important first). Before inserting a new item, always ask the user which two existing items it should go between, and renumber all items accordingly in both README files.
+- Features items are organized into **importance-ordered categories** (most important category first, items within a category in descending importance). Before inserting a new item, always ask the user which category it belongs to and where in that category it should go; renumber items **within that category only** in both README files. The category headers must stay in sync between the two README files.
 
 ### 3.19 `copyWith` and the Null-Clear Trap
 

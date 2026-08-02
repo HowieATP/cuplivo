@@ -28,63 +28,85 @@ We are aware that the upstream Kelivo repository is undergoing a major data stor
 
 Unlike most personal-customization or single-feature forks, Cuplivo aims to add multiple features for a broader audience to try out. Some items may be removed as upstream (Kelivo) adds their counterparts.
 
+### Backup & Sync Enhancements
+
 1. **Incremental backup & LAN sync** — Uploads only conversations, messages and related attachments since a selected date; quickly sync two devices' state over LAN.
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
    - *Note*: Periodic full snapshots are still recommended.
 
-2. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context (#150).
-3. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
+2. **Deletion recovery (trash bin)** — Deleted conversations go to a trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries deletion markers so content removed on one side is promptly purged on the other (#137).
+
+### Signature Chat Experience
+
+1. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
    - *Android-only*: background alarm + notification channel; alarm persists through force-stop
 
-4. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
+2. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context (#150).
+
+3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
    - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
-5. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via an MCP tool (fire-and-forget). True result-returning subagents are planned for a future release (#140).
-
-6. **Skills** — GitHub import from public repositories, and auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups.
-
-7. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
+4. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
    - *Tip*: For best cache performance, disable Recent Chats Reference, switch to On Demand mode, and enable time injection.
 
-8. **Multi-key rotation for web search** — Configure multiple API keys for the search service; keys rotate automatically on rate limit to raise effective quotas (#139).
+### Agent Capabilities
 
-9. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+1. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via an MCP tool (fire-and-forget). True result-returning subagents are planned for a future release (#140).
 
-10. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
+2. **Skills** — Import skills from public GitHub repositories, plus auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups. v3 adds categories, a master toggle, and chat-level skill entry (#161).
 
-11. **Deletion recovery (trash bin)** — Deleted conversations go to a trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries deletion markers so content removed on one side is promptly purged on the other (#137).
+### API & Provider Control
 
-12. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
+1. **OAuth account sign-in** — Device-code sign-in for Grok xAI (#164) and OpenAI Codex (#157); MCP OAuth v2 auto flow with authorization server discovery, dynamic client registration, and loopback callback (#156).
 
-13. **Storage space manager** — Sort stored files by time or size, find unreferenced images/files (orphans), and reverse-locate which chat record a stored file belongs to (#128).
+2. **Multi-key rotation for web search** — Configure multiple API keys for the search service; keys rotate automatically on rate limit to raise effective quotas (#139).
 
-14. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
+3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
 
-15. **TTS audio: save locally + speak selection** — Save cloud-generated TTS audio to a local file from the floating player (#131); right-click / long-press selected assistant message text to speak it (#130).
+4. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
 
-16. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
+5. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-17. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+6. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
-18. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
+7. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
 
-19. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+### Practical Utilities
 
-20. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+1. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
 
-21. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+2. **Storage space manager** — Sort stored files by time or size, find unreferenced images/files (orphans), and reverse-locate which chat record a stored file belongs to (#128).
 
-22. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+3. **TTS audio: save locally + speak selection** — Save cloud-generated TTS audio to a local file from the floating player (#131); right-click / long-press selected assistant message text to speak it (#130).
 
-23. **Additional fixes across the repo**
-    - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
-    - **Cross-MCP same-name tool conflicts** — Fixed: when multiple MCP servers expose tools with the same name, the collision is now detected and resolved (disable or rename) instead of causing ambiguous tool calls
-    - Accurate Gemini cached-token reporting
-    - Optimized title generation logic (auto-retry on first failure)
-    - Large base64 images no longer cause regex stack overflow
-    - Win+V clipboard history paste fix for Flutter engine bug on Windows
-    - Various other stability improvements
+4. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
+
+5. **Multi-category request logging** — Request logs now cover MCP, TTS, and search services, each in its own category with independent toggles and history (#162).
+
+### UI & Rendering
+
+1. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
+
+2. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+
+3. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+
+4. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
+
+5. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+
+6. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+
+### Additional Fixes
+
+- **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
+- **Cross-MCP same-name tool conflicts** — Fixed: when multiple MCP servers expose tools with the same name, the collision is now detected and resolved (disable or rename) instead of causing ambiguous tool calls
+- Accurate Gemini cached-token reporting
+- Optimized title generation logic (auto-retry on first failure)
+- Large base64 images no longer cause regex stack overflow
+- Win+V clipboard history paste fix for Flutter engine bug on Windows
+- Various other stability improvements
 
 ## ⚠️ Note
 

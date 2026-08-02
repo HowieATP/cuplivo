@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
+import '../../providers/codex_device_code_controller.dart';
 import '../../models/token_usage.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
@@ -148,8 +149,9 @@ class ChatApiService {
   /// Keep both in sync when changing header merge order.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
-    String modelId,
-  ) {
+    String modelId, {
+    bool includeCodexAuth = true,
+  }) {
     final ov = _modelOverride(cfg, modelId);
     final out = <String, String>{
       ...providerDefaultHeaders(cfg),
@@ -161,6 +163,15 @@ class ChatApiService {
     // AIhubmix promo header (opt-in per-provider)
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
       out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
+    }
+    // Codex OAuth bearer + account headers. An empty map here means one of:
+    // non-codex host / no stored credential / stale credential (in which
+    // case a background refresh is kicked off and this request goes out
+    // without auth). Callers must have run ensureFreshOrThrow before
+    // building headers; see CodexDeviceCodeController.maybeCodexHeaders.
+    if (includeCodexAuth) {
+      final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
+      if (h.isNotEmpty) out.addAll(h);
     }
     return out;
   }
@@ -547,25 +558,28 @@ class ChatApiService {
     return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
+  /// Test-only injection point for the per-request http client. When set,
+  /// [_clientFor] hands the factory's client to every request instead of a
+  /// real DioHttpClient; production code leaves this null so the regular
+  /// proxy/cancel-token construction is untouched.
+  ///
+  /// Process-global mutable test seam, not a configuration surface:
+  /// - Tests must restore it to null in tearDown (`addTearDown`) or it leaks
+  ///   into every later test in the same process.
+  /// - The injected client bypasses the [CancelToken] plumbing, so
+  ///   [ChatApiService.cancelRequest] becomes a no-op while it is set.
+  @visibleForTesting
+  static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
+  debugClientFactory;
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-        cancelToken: cancelToken,
-      );
+    final proxy = CodexDeviceCodeController.proxyFromConfig(cfg);
+    final dbg = debugClientFactory;
+    if (dbg != null) {
+      return dbg(cfg, proxy: proxy);
+    }
+    if (proxy != null) {
+      return DioHttpClient(proxy: proxy, cancelToken: cancelToken);
     }
     return DioHttpClient(cancelToken: cancelToken);
   }
@@ -778,6 +792,7 @@ class ChatApiService {
     final safePrompt = UnicodeSanitizer.sanitize(prompt);
     try {
       if (kind == ProviderKind.openai) {
+        await CodexDeviceCodeController.ensureFreshOrThrow(config);
         final url = _openAICompatibleUrl(config);
         Map<String, dynamic> body;
         final effectiveInfo = _effectiveModelInfo(config, modelId);
@@ -935,6 +950,45 @@ class ChatApiService {
           upstreamModelId,
           fallbackEffort: effort,
         );
+        CodexDeviceCodeController.applyCodexResponseBodyDefaults(body, config);
+        if (CodexDeviceCodeController.isCodexHost(config)) {
+          // The codex /responses endpoint requires stream:true for
+          // subscription OAuth tokens and answers with SSE, not JSON.
+          body['stream'] = true;
+          headers['Accept'] = 'text/event-stream';
+          final req = http.Request('POST', url)
+            ..headers.addAll(headers)
+            ..body = jsonEncode(body);
+          final sseResp = await client.send(req);
+          if (sseResp.statusCode < 200 || sseResp.statusCode >= 300) {
+            final errorBody = await sseResp.stream.bytesToString();
+            throw HttpException('HTTP ${sseResp.statusCode}: $errorBody');
+          }
+          final s = sseResp.stream.transform(utf8.decoder);
+          final textBuf = StringBuffer();
+          String pending = '';
+          await for (final ch in _ensureTrailingNewline(s)) {
+            pending += ch;
+            final lines = pending.split('\n');
+            pending = lines.last;
+            for (final l in lines.take(lines.length - 1)) {
+              final trimmed = l.trim();
+              if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+              final d = trimmed.substring(5).trimLeft();
+              if (d == '[DONE]') continue;
+              try {
+                final o = jsonDecode(d);
+                if (o is Map && o['type'] == 'response.output_text.delta') {
+                  final delta = o['delta'];
+                  if (delta is String && delta.isNotEmpty) {
+                    textBuf.write(delta);
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+          return textBuf.toString();
+        }
         final resp = await client.post(
           url,
           headers: headers,

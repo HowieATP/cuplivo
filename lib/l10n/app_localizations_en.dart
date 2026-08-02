@@ -6754,4 +6754,80 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get groupChatAssistantNoModel =>
       'Selected assistant has no model configured.';
+
+  @override
+  String get codexLoginTitle => 'Codex Account Login';
+
+  @override
+  String get codexLoginSubtitle =>
+      'Sign in with your ChatGPT account to access Codex models.';
+
+  @override
+  String get codexLoginSignInButton => 'Sign in with your ChatGPT account';
+
+  @override
+  String get codexLoginSignOutButton => 'Sign out';
+
+  @override
+  String get codexLoginSignOutConfirm =>
+      'This removes the saved ChatGPT credentials from this device.';
+
+  @override
+  String get codexLoginCloseButton => 'Close';
+
+  @override
+  String get codexLoginStatusSignedIn => 'Signed in';
+
+  @override
+  String get codexLoginStatusSignedOut => 'Not signed in';
+
+  @override
+  String get codexLoginStatusWaiting => 'Waiting for authorization...';
+
+  @override
+  String get codexLoginStatusPolling => 'Waiting for sign-in...';
+
+  @override
+  String get codexLoginStatusExpired => 'Authorization expired';
+
+  @override
+  String get codexLoginStatusFailed => 'Sign-in failed';
+
+  @override
+  String get codexLoginUsercodeLabel => 'Your verification code';
+
+  @override
+  String get codexLoginOpenPageButton => 'Open authorization page';
+
+  @override
+  String get codexLoginCopyCodeButton => 'Copy code';
+
+  @override
+  String get codexLoginCopiedToast => 'Code copied to clipboard';
+
+  @override
+  String get codexLoginCopyFailed => 'Failed to copy the code.';
+
+  @override
+  String get codexLoginCancelButton => 'Cancel';
+
+  @override
+  String get codexLoginAccountLabel => 'ChatGPT account';
+
+  @override
+  String get codexLoginExpiresLabel => 'Token expires';
+
+  @override
+  String get codexLoginSignedOutToast => 'Signed out';
+
+  @override
+  String get codexLoginHelpText =>
+      'Open the ChatGPT authorization page and enter the verification code to authorize Codex access.';
+
+  @override
+  String get codexLoginNetworkError => 'Network error, please retry';
+
+  @override
+  String get codexLoginNotEnabled =>
+      'Codex device sign-in is not available for this account.';
 }

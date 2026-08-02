@@ -12313,6 +12313,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Selected assistant has no model configured.'**
   String get groupChatAssistantNoModel;
+
+  /// No description provided for @codexLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex Account Login'**
+  String get codexLoginTitle;
+
+  /// No description provided for @codexLoginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your ChatGPT account to access Codex models.'**
+  String get codexLoginSubtitle;
+
+  /// No description provided for @codexLoginSignInButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your ChatGPT account'**
+  String get codexLoginSignInButton;
+
+  /// No description provided for @codexLoginSignOutButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get codexLoginSignOutButton;
+
+  /// No description provided for @codexLoginSignOutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the saved ChatGPT credentials from this device.'**
+  String get codexLoginSignOutConfirm;
+
+  /// No description provided for @codexLoginCloseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get codexLoginCloseButton;
+
+  /// No description provided for @codexLoginStatusSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get codexLoginStatusSignedIn;
+
+  /// No description provided for @codexLoginStatusSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in'**
+  String get codexLoginStatusSignedOut;
+
+  /// No description provided for @codexLoginStatusWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for authorization...'**
+  String get codexLoginStatusWaiting;
+
+  /// No description provided for @codexLoginStatusPolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for sign-in...'**
+  String get codexLoginStatusPolling;
+
+  /// No description provided for @codexLoginStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization expired'**
+  String get codexLoginStatusExpired;
+
+  /// No description provided for @codexLoginStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed'**
+  String get codexLoginStatusFailed;
+
+  /// No description provided for @codexLoginUsercodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your verification code'**
+  String get codexLoginUsercodeLabel;
+
+  /// No description provided for @codexLoginOpenPageButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authorization page'**
+  String get codexLoginOpenPageButton;
+
+  /// No description provided for @codexLoginCopyCodeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get codexLoginCopyCodeButton;
+
+  /// No description provided for @codexLoginCopiedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied to clipboard'**
+  String get codexLoginCopiedToast;
+
+  /// No description provided for @codexLoginCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to copy the code.'**
+  String get codexLoginCopyFailed;
+
+  /// No description provided for @codexLoginCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get codexLoginCancelButton;
+
+  /// No description provided for @codexLoginAccountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'ChatGPT account'**
+  String get codexLoginAccountLabel;
+
+  /// No description provided for @codexLoginExpiresLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Token expires'**
+  String get codexLoginExpiresLabel;
+
+  /// No description provided for @codexLoginSignedOutToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out'**
+  String get codexLoginSignedOutToast;
+
+  /// No description provided for @codexLoginHelpText.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the ChatGPT authorization page and enter the verification code to authorize Codex access.'**
+  String get codexLoginHelpText;
+
+  /// No description provided for @codexLoginNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error, please retry'**
+  String get codexLoginNetworkError;
+
+  /// No description provided for @codexLoginNotEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex device sign-in is not available for this account.'**
+  String get codexLoginNotEnabled;
 }
 
 class _AppLocalizationsDelegate

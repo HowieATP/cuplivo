@@ -4,6 +4,7 @@
 
 ### Added
 
+- Codex device-code sign-in on the OpenAI provider detail page: sign in with your ChatGPT account and a Codex provider is created automatically
 - Multi-assistant group chat: a background director model decides which assistant speaks (#150)
 
 ## [2.3.0] - 2026-07-31

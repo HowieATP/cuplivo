@@ -2,8 +2,10 @@ export '../models/model_types.dart';
 
 import 'dart:convert';
 import 'dart:io' show HttpException;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
+import 'codex_device_code_controller.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
@@ -125,31 +127,51 @@ abstract class BaseProvider {
 
 class _Http {
   static http.Client clientFor(ProviderConfig cfg) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-      );
+    // Mirrors ChatApiService.debugClientFactory: test-only injection that
+    // replaces the real DioHttpClient; production keeps this null.
+    final dbg = ProviderManager.debugClientFactory;
+    if (dbg != null) {
+      return dbg(cfg, proxy: CodexDeviceCodeController.proxyFromConfig(cfg));
     }
-    return DioHttpClient();
+    // Same proxy semantics as ChatApiService: an unparseable or out-of-range
+    // port degrades to a direct connection instead of a magic default port.
+    final proxy = CodexDeviceCodeController.proxyFromConfig(cfg);
+    if (proxy == null) {
+      if (cfg.proxyEnabled == true) {
+        debugPrint(
+          '[ModelProvider] proxy enabled but host/port invalid '
+          '(${cfg.proxyHost}:${cfg.proxyPort}); falling back to direct '
+          'connection',
+        );
+      }
+      return DioHttpClient();
+    }
+    return DioHttpClient(proxy: proxy);
   }
 }
 
 class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+    if (CodexDeviceCodeController.isCodexHost(cfg)) {
+      // Codex hosts have no public /models endpoint; surface the fixed
+      // built-in model set so the model picker / fetch dialog stays useful.
+      // The models are text-only chat models with tool + reasoning
+      // abilities; they are constructed explicitly because
+      // ModelRegistry.infer's vision regex would misclassify the 'gpt-5*'
+      // ids as image-capable.
+      return [
+        for (final id in kCodexModels)
+          ModelInfo(
+            id: id,
+            displayName: id,
+            type: ModelType.chat,
+            input: const [Modality.text],
+            output: const [Modality.text],
+            abilities: const [ModelAbility.tool, ModelAbility.reasoning],
+          ),
+      ];
+    }
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
@@ -332,6 +354,19 @@ class GoogleProvider extends BaseProvider {
 }
 
 class ProviderManager {
+  /// Test-only injection point for the LLM http client, mirroring
+  /// [ChatApiService.debugClientFactory]. When set, [_Http.clientFor]
+  /// returns the factory's client; production code leaves this null.
+  ///
+  /// Process-global mutable test seam, not a configuration surface:
+  /// - Tests must restore it to null in tearDown (`addTearDown`) or it leaks
+  ///   into every later test in the same process.
+  /// - The injected client bypasses the [CancelToken] plumbing, so
+  ///   [ChatApiService.cancelRequest] becomes a no-op while it is set.
+  @visibleForTesting
+  static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
+  debugClientFactory;
+
   static String _effectiveApiKey(ProviderConfig cfg) {
     try {
       if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
@@ -355,18 +390,30 @@ class ProviderManager {
 
   /// Mirrors [ChatApiService._customHeaders] in chat_api_service.dart.
   /// Keep both in sync when changing header merge order.
+  /// `includeCodexAuth` defaults to true purely to mirror the symmetric
+  /// default in ChatApiService (where openai_images passes false). No caller
+  /// here passes false today -- model listing never reaches a codex host
+  /// (see OpenAIProvider.listModels) -- so the flag is kept only for mirror
+  /// symmetry, not dead code.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
-    String modelId,
-  ) {
+    String modelId, {
+    bool includeCodexAuth = true,
+  }) {
     final ov = _modelOverride(cfg, modelId);
-    return <String, String>{
+    final out = <String, String>{
       ...providerDefaultHeaders(cfg),
       ...ModelOverridePayloadParser.customHeaders({
         'headers': cfg.customHeaders,
       }),
       ...ModelOverridePayloadParser.customHeaders(ov),
     };
+    // Codex OAuth bearer + account headers
+    if (includeCodexAuth) {
+      final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
+      if (h.isNotEmpty) out.addAll(h);
+    }
+    return out;
   }
 
   /// Mirrors [ChatApiService._customBody] in chat_api_service.dart.
@@ -410,6 +457,7 @@ class ProviderManager {
     final client = _Http.clientFor(cfg);
     try {
       if (kind == ProviderKind.openai) {
+        await CodexDeviceCodeController.ensureFreshOrThrow(cfg);
         final base = cfg.baseUrl.endsWith('/')
             ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
             : cfg.baseUrl;
@@ -443,6 +491,10 @@ class ProviderManager {
         // Merge custom body overrides
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
+        CodexDeviceCodeController.applyCodexResponseBodyDefaults(
+          body as Map<String, dynamic>,
+          cfg,
+        );
         // Merge custom headers overrides
         // SiliconFlow fallback key for built-in free models when no API key provided
         String apiKey = _effectiveApiKey(cfg);

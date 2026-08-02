@@ -19,6 +19,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'core/providers/chat_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
+import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
@@ -120,6 +121,7 @@ Future<void> main() async {
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
       await SkillManager.initRoot();
+      await CodexDeviceCodeController.instance.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Android: start AlarmManager service for proactive care exact alarms
@@ -167,6 +169,9 @@ class MyApp extends StatelessWidget {
             unawaited(settings.incrementAppLaunchCount());
             return settings;
           },
+        ),
+        ChangeNotifierProvider<CodexDeviceCodeController>.value(
+          value: CodexDeviceCodeController.instance,
         ),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => McpToolService()),

@@ -1,6 +1,7 @@
 part of '../chat_api_service.dart';
 
 bool _shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
+  if (CodexDeviceCodeController.isCodexHost(config)) return false;
   final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
   return _supportsOpenAIImageGenerations(upstreamModelId);
 }
@@ -408,7 +409,7 @@ Map<String, String> _openAIImagesJsonHeaders(
   return <String, String>{
     'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
     'Content-Type': 'application/json',
-    ..._customHeaders(config, modelId),
+    ..._customHeaders(config, modelId, includeCodexAuth: false),
     if (extraHeaders != null) ...extraHeaders,
   };
 }
@@ -420,7 +421,7 @@ Map<String, String> _openAIImagesMultipartHeaders(
 }) {
   final headers = <String, String>{
     'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-    ..._customHeaders(config, modelId),
+    ..._customHeaders(config, modelId, includeCodexAuth: false),
     if (extraHeaders != null) ...extraHeaders,
   };
   headers.removeWhere((key, _) => key.toLowerCase() == 'content-type');

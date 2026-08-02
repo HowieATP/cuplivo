@@ -1487,6 +1487,12 @@ class _DesktopProviderDetailPaneState
                       ),
                     ),
                   ),
+                if (kind == ProviderKind.openai &&
+                    !(cfg.multiKeyEnabled == true) &&
+                    CodexDeviceCodeController.showEntryFor(cfg)) ...[
+                  const SizedBox(height: 14),
+                  CodexAccountEntry(cfg: cfg),
+                ],
                 const SizedBox(height: 14),
               ],
 

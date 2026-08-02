@@ -6689,7 +6689,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get grokLoginAccountLabel => 'xAI 账号';
 
   @override
-  String get grokLoginExpiresLabel => '令牌过期时间';
+  String get grokLoginSessionHint => '保持登录；访问令牌会在后台自动续期，无需重新登录。';
 
   @override
   String get grokLoginSignedOutToast => '已退出登录';
@@ -13386,7 +13386,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get grokLoginAccountLabel => 'xAI 账号';
 
   @override
-  String get grokLoginExpiresLabel => '令牌过期时间';
+  String get grokLoginSessionHint => '保持登录；访问令牌会在后台自动续期，无需重新登录。';
 
   @override
   String get grokLoginSignedOutToast => '已退出登录';
@@ -20084,7 +20084,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get grokLoginAccountLabel => 'xAI 帳號';
 
   @override
-  String get grokLoginExpiresLabel => '權杖過期時間';
+  String get grokLoginSessionHint => '保持登入；存取權杖會在背景自動續期，無需重新登入。';
 
   @override
   String get grokLoginSignedOutToast => '已登出';

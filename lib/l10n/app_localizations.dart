@@ -12752,11 +12752,11 @@ abstract class AppLocalizations {
   /// **'xAI account'**
   String get grokLoginAccountLabel;
 
-  /// No description provided for @grokLoginExpiresLabel.
+  /// No description provided for @grokLoginSessionHint.
   ///
   /// In en, this message translates to:
-  /// **'Token expires'**
-  String get grokLoginExpiresLabel;
+  /// **'Stays signed in; access renews automatically in the background.'**
+  String get grokLoginSessionHint;
 
   /// No description provided for @grokLoginSignedOutToast.
   ///

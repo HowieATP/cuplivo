@@ -2711,7 +2711,7 @@
   "grokLoginCopyFailed": "複製代碼失敗。",
   "grokLoginCancelButton": "取消",
   "grokLoginAccountLabel": "xAI 帳號",
-  "grokLoginExpiresLabel": "權杖過期時間",
+  "grokLoginSessionHint": "保持登入；存取權杖會在背景自動續期，無需重新登入。",
   "grokLoginSignedOutToast": "已登出",
   "grokLoginHelpText": "開啟 xAI 授權頁面，輸入驗證碼完成 Grok 授權。",
   "grokLoginNetworkError": "網路錯誤，請重試"

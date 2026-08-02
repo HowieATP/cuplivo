@@ -3261,7 +3261,7 @@
   "grokLoginCopyFailed": "Failed to copy the code.",
   "grokLoginCancelButton": "Cancel",
   "grokLoginAccountLabel": "xAI account",
-  "grokLoginExpiresLabel": "Token expires",
+  "grokLoginSessionHint": "Stays signed in; access renews automatically in the background.",
   "grokLoginSignedOutToast": "Signed out",
   "grokLoginHelpText": "Open the xAI authorization page and enter the verification code to authorize Grok access.",
   "grokLoginNetworkError": "Network error, please retry"

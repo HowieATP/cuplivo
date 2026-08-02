@@ -6985,7 +6985,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get grokLoginAccountLabel => 'xAI account';
 
   @override
-  String get grokLoginExpiresLabel => 'Token expires';
+  String get grokLoginSessionHint =>
+      'Stays signed in; access renews automatically in the background.';
 
   @override
   String get grokLoginSignedOutToast => 'Signed out';

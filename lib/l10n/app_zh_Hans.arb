@@ -2683,7 +2683,7 @@
   "grokLoginCopyFailed": "复制代码失败。",
   "grokLoginCancelButton": "取消",
   "grokLoginAccountLabel": "xAI 账号",
-  "grokLoginExpiresLabel": "令牌过期时间",
+  "grokLoginSessionHint": "保持登录；访问令牌会在后台自动续期，无需重新登录。",
   "grokLoginSignedOutToast": "已退出登录",
   "grokLoginHelpText": "打开 xAI 授权页面，输入验证码完成 Grok 授权。",
   "grokLoginNetworkError": "网络错误，请重试"

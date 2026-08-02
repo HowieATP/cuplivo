@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Cuplivo/core/providers/grok_device_code_controller.dart';
@@ -16,8 +15,6 @@ import 'snackbar.dart';
 /// Inline Grok account status card for provider settings pages.
 class GrokAccountEntry extends StatelessWidget {
   const GrokAccountEntry({super.key, required this.cfg});
-
-  static final DateFormat _expiryFormat = DateFormat('yyyy-MM-dd HH:mm');
 
   final ProviderConfig cfg;
 
@@ -148,7 +145,7 @@ class GrokAccountEntry extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${l10n.grokLoginExpiresLabel}: ${_expiryFormat.format(cred.expiresAt.toLocal())}',
+          l10n.grokLoginSessionHint,
           style: TextStyle(
             fontSize: 13,
             color: cs.onSurface.withValues(alpha: 0.7),

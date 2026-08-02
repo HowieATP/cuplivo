@@ -63,6 +63,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   bool _localFlowFailed = false;
   String _localFlowTitle = '';
   bool _providerWriteError = false;
+  bool _providerWriteRetrying = false;
   // The flow future of the current startFlow invocation, so a retry can wait
   // for the previous flow to fully exit (poll loop terminated, status
   // terminal) before restarting; restarting while the old flow is still
@@ -96,6 +97,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     _localFlowFailed = false;
     _localFlowTitle = '';
     _providerWriteError = false;
+    _providerWriteRetrying = false;
     // Cover the deferred startFlow window: until _runFlow actually starts the
     // flow, the controller still reports its previous terminal state and the
     // first frame would flash it.
@@ -231,6 +233,8 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   /// already persisted and signedIn, so this must not restart the device-code
   /// flow; a success pops the sheet, a failure keeps the error view.
   Future<void> _retryProviderWrite() async {
+    if (_providerWriteRetrying) return;
+    setState(() => _providerWriteRetrying = true);
     try {
       await _settings.setProviderConfig(
         kCodexProviderKey,
@@ -239,6 +243,8 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     } catch (e, st) {
       debugPrint('[CodexOAuth] setProviderConfig retry failed: $e\n$st');
       return;
+    } finally {
+      if (mounted) setState(() => _providerWriteRetrying = false);
     }
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -512,6 +518,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
+            enabled: !_providerWriteRetrying,
             onTap: _retryProviderWrite,
           ),
         ),

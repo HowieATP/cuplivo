@@ -57,10 +57,8 @@ class _ThrowingSignOutController extends CodexDeviceCodeController {
 /// exchange requests in order.
 class _ScriptedFlowClient extends http.BaseClient {
   final List<http.Response Function(http.Request)> handlers = [];
-  // Records poll requests that hit the pending fallback instead of a
-  // scripted handler: a sequence drift in the scripted handlers surfaces as
-  // a failing assertion instead of silently polling until the fake
-  // deadline.
+  // Records poll requests that have no scripted handler so a sequence drift
+  // can be asserted separately from the flow's terminal error state.
   final List<String> unexpectedPolls = [];
 
   @override
@@ -71,19 +69,8 @@ class _ScriptedFlowClient extends http.BaseClient {
       req.body = request.body;
     }
     if (handlers.isEmpty) {
-      // Pending fallback for the poll endpoint: a sequence drift in the
-      // scripted handlers must not blow the flow into an opaque failure
-      // (StateError would be swallowed by startFlow's catch into the failed
-      // view). An extra poll keeps the loop alive until a scripted terminal
-      // response is popped; a 403 with no error code means "still pending".
       if (req.url.toString() == kCodexPollEndpoint) {
         unexpectedPolls.add(req.url.toString());
-        final resp = http.Response('{}', 403);
-        return http.StreamedResponse(
-          Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
-          resp.statusCode,
-          headers: resp.headers,
-        );
       }
       throw StateError('No scripted handler for ${req.url}');
     }
@@ -96,11 +83,18 @@ class _ScriptedFlowClient extends http.BaseClient {
   }
 }
 
-/// SettingsProvider whose provider-config write always fails, simulating a
-/// persistence problem after the OAuth credential was saved.
-class _ThrowingSettingsProvider extends SettingsProvider {
+/// SettingsProvider whose initial provider-config write fails, then parks a
+/// retry until the test releases it. This makes duplicate retry taps
+/// observable while the first retry is still in flight.
+class _RetryGatedSettingsProvider extends SettingsProvider {
+  int calls = 0;
+  final Completer<void> retryGate = Completer<void>();
+
   @override
   Future<void> setProviderConfig(String key, ProviderConfig config) async {
+    calls++;
+    if (calls == 1) throw Exception('disk full');
+    await retryGate.future;
     throw Exception('disk full');
   }
 }
@@ -413,7 +407,7 @@ void main() {
       );
       CodexDeviceCodeController.debugOverrideInstance(flowController);
       addTearDown(flowController.resetForTest);
-      final settings = _ThrowingSettingsProvider();
+      final settings = _RetryGatedSettingsProvider();
       addTearDown(settings.dispose);
 
       await tester.pumpWidget(
@@ -446,8 +440,13 @@ void main() {
       expect(flowController.credential, isNotNull);
       expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
 
-      // Retrying the write fails again and keeps the error view.
+      // While the first retry is still writing, a second tap must be ignored.
       await tester.tap(find.text(_l10n.codexLoginSignInButton));
+      await tester.pump();
+      await tester.tap(find.text(_l10n.codexLoginSignInButton));
+      await tester.pump();
+      expect(settings.calls, 2); // initial write + exactly one retry
+      settings.retryGate.complete();
       await tester.pump();
       expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
 

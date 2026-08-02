@@ -210,10 +210,12 @@ Future<void> _waitForRequests(
 void main() {
   late _ScriptedClient client;
   late CodexDeviceCodeController controller;
+  late SharedPreferencesStorePlatform defaultPrefsStore;
   int onAuthenticatedCalls = 0;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    defaultPrefsStore = SharedPreferencesStorePlatform.instance;
     client = _ScriptedClient();
     controller = CodexDeviceCodeController(
       clientFactory: (proxy) => client,
@@ -224,6 +226,7 @@ void main() {
   });
 
   tearDown(() {
+    SharedPreferencesStorePlatform.instance = defaultPrefsStore;
     controller.resetForTest();
     CodexDeviceCodeController.debugOverrideInstance(
       CodexDeviceCodeController(),
@@ -1231,6 +1234,26 @@ void main() {
         CodexFlowOutcome.cancelled,
       );
     });
+
+    test('cancelled flow reports cancelled when the request throws', () async {
+      final usercodeGate = Completer<http.Response>();
+      client.handlers.add((_) => usercodeGate.future);
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+      await _waitForRequests(client, 1);
+      controller.cancel();
+      usercodeGate.completeError(StateError('request cancelled'));
+
+      expect(
+        await flow.timeout(const Duration(seconds: 5)),
+        CodexFlowOutcome.cancelled,
+      );
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(controller.errorMessage, isNull);
+    });
   });
 
   group('ensureFresh', () {
@@ -1294,6 +1317,40 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
+
+    test(
+      'rejected refresh cannot clear a newer in-memory credential',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final gated = _GatedPrefsStore();
+        SharedPreferencesStorePlatform.instance = gated;
+        final prefs = await SharedPreferences.getInstance();
+        final oldCredential = _expiredCred('acc-old');
+        controller.credential = oldCredential;
+        controller.status = CodexAuthStatus.expired;
+        await prefs.setString(
+          kCodexPrefsKey,
+          jsonEncode(oldCredential.toJson()),
+        );
+        client.handlers.add(
+          (_) async => _json(400, {'error': 'invalid_grant'}),
+        );
+
+        gated.parkRemove();
+        final refreshing = controller.ensureFresh();
+        await _waitForRequests(client, 1);
+        await gated.removeStarted.timeout(const Duration(seconds: 5));
+
+        final newerCredential = _freshCred('acc-new');
+        controller.credential = newerCredential;
+        controller.status = CodexAuthStatus.signedIn;
+        gated.releaseRemove();
+        await refreshing.timeout(const Duration(seconds: 5));
+
+        expect(identical(controller.credential, newerCredential), isTrue);
+        expect(controller.status, CodexAuthStatus.signedIn);
+      },
+    );
 
     test('keeps credential and status on server error', () async {
       controller.credential = _expiredCred('acc-1');

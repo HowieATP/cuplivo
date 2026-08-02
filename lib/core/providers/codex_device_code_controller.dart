@@ -10,6 +10,10 @@ import '../models/api_keys.dart';
 import '../services/network/dio_http_client.dart';
 import 'settings_provider.dart';
 
+// The device-code protocol is adapted from earendil-works/pi's
+// packages/ai/src/auth/oauth/openai-codex.ts. See THIRD_PARTY_LICENSES.md for
+// the required MIT copyright and permission notice.
+
 const String kCodexClientId = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const String kCodexUsercodeEndpoint =
     'https://auth.openai.com/api/accounts/deviceauth/usercode';
@@ -693,6 +697,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
       return CodexFlowOutcome.success;
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow failed: $e\n$st');
+      if (_cancelled) {
+        _flowEnded();
+        return CodexFlowOutcome.cancelled;
+      }
       // The raw exception is already logged above; the UI-facing message must
       // stay free of transient network noise.
       _fail('Codex device login failed');
@@ -834,8 +842,23 @@ class CodexDeviceCodeController extends ChangeNotifier {
           (errCode == 'invalid_grant' ||
               errCode == 'invalid_token' ||
               errCode == 'expired')) {
+        // A sign-out or a newer login may have replaced this credential while
+        // the rejected refresh was in flight. The old refresh must not clear
+        // the newer session or overwrite its status.
+        if (_cancelled ||
+            _signOutEpoch != epochAtStart ||
+            !identical(credential, c)) {
+          debugPrint('[CodexOAuth] rejected refresh commit aborted');
+          return;
+        }
         debugPrint('[CodexOAuth] refresh rejected: clearing credential');
         await _removeStoredCredential();
+        if (_cancelled ||
+            _signOutEpoch != epochAtStart ||
+            !identical(credential, c)) {
+          debugPrint('[CodexOAuth] rejected refresh state update aborted');
+          return;
+        }
         credential = null;
         status = CodexAuthStatus.expired;
         notifyListeners();

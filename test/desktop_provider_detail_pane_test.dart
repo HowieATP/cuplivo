@@ -1,7 +1,9 @@
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
+import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/desktop/desktop_settings_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
 import 'package:Cuplivo/shared/widgets/ios_checkbox.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +38,7 @@ ProviderConfig _providerConfig(String id) {
 Widget _harness(
   SettingsProvider settings, {
   required String initialProviderKey,
+  CodexDeviceCodeController? controller,
 }) {
   return MultiProvider(
     providers: [
@@ -43,6 +46,10 @@ Widget _harness(
       ChangeNotifierProvider<AssistantProvider>(
         create: (_) => AssistantProvider(),
       ),
+      if (controller != null)
+        ChangeNotifierProvider<CodexDeviceCodeController>.value(
+          value: controller,
+        ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -187,5 +194,110 @@ void main() {
     final cfg = settings.getProviderConfig('ProviderA');
     expect(cfg.avatarType, 'lobehub');
     expect(cfg.avatarValue, 'openai');
+  });
+
+  group('desktop providers pane codex gate', () {
+    Future<SettingsProvider> buildSettings(
+      WidgetTester tester, {
+      required String key,
+      required ProviderConfig cfg,
+    }) async {
+      SharedPreferences.setMockInitialValues(const {});
+      final settings = SettingsProvider();
+      await tester.runAsync(_waitForSettingsLoad);
+      await settings.setProviderConfig(key, cfg);
+      await settings.setProvidersOrder([key]);
+      return settings;
+    }
+
+    Future<void> pumpProvider(
+      WidgetTester tester,
+      SettingsProvider settings,
+      String key,
+    ) async {
+      tester.view.physicalSize = const Size(1400, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = CodexDeviceCodeController();
+      addTearDown(controller.resetForTest);
+      await tester.pumpWidget(
+        _harness(settings, initialProviderKey: key, controller: controller),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+    }
+
+    ProviderConfig openAiConfig(String id, {bool multiKey = false}) =>
+        ProviderConfig(
+          id: id,
+          enabled: true,
+          name: id,
+          apiKey: 'test-key',
+          baseUrl: 'https://api.openai.com/v1',
+          providerType: ProviderKind.openai,
+          models: const ['gpt-4o'],
+          multiKeyEnabled: multiKey,
+        );
+
+    testWidgets('built-in OpenAI shows the Codex account entry', (
+      tester,
+    ) async {
+      final settings = await buildSettings(
+        tester,
+        key: 'OpenAI',
+        cfg: openAiConfig('OpenAI'),
+      );
+      addTearDown(settings.dispose);
+
+      await pumpProvider(tester, settings, 'OpenAI');
+
+      expect(
+        find.byType(CodexAccountEntry, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('multiKey OpenAI hides the Codex account entry', (
+      tester,
+    ) async {
+      final settings = await buildSettings(
+        tester,
+        key: 'OpenAI',
+        cfg: openAiConfig('OpenAI', multiKey: true),
+      );
+      addTearDown(settings.dispose);
+
+      await pumpProvider(tester, settings, 'OpenAI');
+
+      expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('non-openai provider hides the Codex account entry', (
+      tester,
+    ) async {
+      final settings = await buildSettings(
+        tester,
+        key: 'Claude',
+        cfg: ProviderConfig(
+          id: 'Claude',
+          enabled: true,
+          name: 'Claude',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.anthropic.com/v1',
+          providerType: ProviderKind.claude,
+          models: const ['claude-opus-4'],
+        ),
+      );
+      addTearDown(settings.dispose);
+
+      await pumpProvider(tester, settings, 'Claude');
+
+      expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

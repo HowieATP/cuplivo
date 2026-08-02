@@ -345,6 +345,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
     // otherwise route through a proxy belonging to a flow that already
     // ended (failed / cancelled / timed out).
     _signInProxy = null;
+    // A cancel()/signOut() sets _cancelled to abort the poll loop; once the
+    // flow has actually ended the flag has served its purpose. Keeping it set
+    // would block the commit guard in _doRefresh for later legitimate
+    // refreshes (the refresh guard relies on _cancelled only while a sign-out
+    // is in progress, when no flow is running to call _flowEnded).
+    _cancelled = false;
     if (status != CodexAuthStatus.signedIn) {
       status = CodexAuthStatus.signedOut;
     }
@@ -777,6 +783,14 @@ class CodexDeviceCodeController extends ChangeNotifier {
           accountId: accountId ?? c.accountId,
           proxy: c.proxy ?? _signInProxy,
         );
+        // TOCTOU guard: signOut() reads _refreshing once and parks on its
+        // prefs removal, an async gap in which a fresh ensureFresh() can
+        // start a new _doRefresh from a still-non-null credential. Committing
+        // here would resurrect the session the sign-out just cleared.
+        if (_cancelled || !identical(credential, c)) {
+          debugPrint('[CodexOAuth] refresh commit aborted (signed out)');
+          return;
+        }
         await _persistCredential(cred);
         credential = cred;
         status = CodexAuthStatus.signedIn;

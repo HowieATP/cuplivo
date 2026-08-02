@@ -101,7 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(CodexAccountEntry), findsOneWidget);
+    expect(find.byType(CodexAccountEntry, skipOffstage: false), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -203,7 +203,42 @@ void main() {
 
       // A user-added openai provider pointed at the codex host is treated
       // like the built-in codex provider.
-      expect(find.byType(CodexAccountEntry), findsOneWidget);
+      expect(
+        find.byType(CodexAccountEntry, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'custom openai provider on a non-codex host hides the account entry',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = await _createSettings(
+        tester,
+        keyName: 'MyProxy',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://myproxy.example.com/v1',
+      );
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        _harness(
+          settings,
+          controller,
+          keyName: 'MyProxy',
+          displayName: 'MyProxy',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // A user-added openai provider on an ordinary proxy host is neither
+      // the built-in OpenAI id nor a codex host: no account entry may appear.
+      expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

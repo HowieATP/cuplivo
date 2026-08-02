@@ -133,25 +133,10 @@ class _Http {
     if (dbg != null) {
       return dbg(cfg, proxy: CodexDeviceCodeController.proxyFromConfig(cfg));
     }
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-      );
-    }
-    return DioHttpClient();
+    // Same proxy semantics as ChatApiService: an unparseable or out-of-range
+    // port degrades to a direct connection instead of a magic default port.
+    final proxy = CodexDeviceCodeController.proxyFromConfig(cfg);
+    return proxy == null ? DioHttpClient() : DioHttpClient(proxy: proxy);
   }
 }
 
@@ -161,9 +146,20 @@ class OpenAIProvider extends BaseProvider {
     if (CodexDeviceCodeController.isCodexHost(cfg)) {
       // Codex hosts have no public /models endpoint; surface the fixed
       // built-in model set so the model picker / fetch dialog stays useful.
+      // The models are text-only chat models with tool + reasoning
+      // abilities; they are constructed explicitly because
+      // ModelRegistry.infer's vision regex would misclassify the 'gpt-5*'
+      // ids as image-capable.
       return [
         for (final id in kCodexModels)
-          ModelRegistry.infer(ModelInfo(id: id, displayName: id)),
+          ModelInfo(
+            id: id,
+            displayName: id,
+            type: ModelType.chat,
+            input: const [Modality.text],
+            output: const [Modality.text],
+            abilities: const [ModelAbility.tool, ModelAbility.reasoning],
+          ),
       ];
     }
     final key = ProviderManager._effectiveApiKey(cfg);

@@ -293,8 +293,12 @@ void main() {
         ],
       ).toList();
 
-      // The Images API path never merges Codex OAuth headers, even when a
-      // codex account is signed in.
+      // The signed-in codex account above never touches this request: the
+      // host is 127.0.0.1, which is not a codex host, so this is a non-codex
+      // E2E guard proving the ordinary images path merges no codex headers.
+      // Codex hosts never reach the Images API at all (routing is disabled
+      // for them), and the codex header composition itself is covered by the
+      // maybeCodexHeaders unit tests.
       expect(requestUri.path, '/v1/images/generations');
       expect(authorization, 'Bearer test-key');
       expect(accountHeader, isNull);

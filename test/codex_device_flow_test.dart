@@ -49,6 +49,8 @@ class _GatedPrefsStore extends SharedPreferencesStorePlatform {
   final Map<String, Object> data = {};
   final Completer<void> _writeStarted = Completer<void>();
   Completer<void>? _writeGate;
+  final Completer<void> _removeStarted = Completer<void>();
+  Completer<void>? _removeGate;
 
   void parkWrite() {
     _writeGate = Completer<void>();
@@ -60,6 +62,17 @@ class _GatedPrefsStore extends SharedPreferencesStorePlatform {
 
   /// Completes when the parked write has actually been invoked.
   Future<void> get writeStarted => _writeStarted.future;
+
+  void parkRemove() {
+    _removeGate = Completer<void>();
+  }
+
+  void releaseRemove() {
+    _removeGate?.complete();
+  }
+
+  /// Completes when the parked remove has actually been invoked.
+  Future<void> get removeStarted => _removeStarted.future;
 
   @override
   Future<bool> setValue(String valueType, String key, Object value) async {
@@ -80,6 +93,12 @@ class _GatedPrefsStore extends SharedPreferencesStorePlatform {
 
   @override
   Future<bool> remove(String key) async {
+    final gate = _removeGate;
+    if (gate != null) {
+      if (!_removeStarted.isCompleted) _removeStarted.complete();
+      await gate.future;
+      _removeGate = null;
+    }
     data.remove(key);
     return true;
   }
@@ -277,13 +296,14 @@ void main() {
       );
       expect(exchangeReq.body, contains('client_id=$kCodexClientId'));
 
-      // String interval '2' honored: the wait lands in [1.5s, 4s), which the
-      // 5s default (>= 4s) and the 1s minimum clamp (~1s) cannot satisfy, so
-      // this window pins the server value (1500ms lower bound excludes a
-      // regression to the 1s clamp).
+      // String interval '2' honored: the wait lands in [1.5s, 4.5s), which
+      // the 5s default (>= 4.5s) and the 1s minimum clamp (~1s) cannot
+      // satisfy, so this window pins the server value (1500ms lower bound
+      // excludes a regression to the 1s clamp; the 4.5s upper bound leaves
+      // slack for the 2s sleep's scheduling noise).
       final pollGap = poll2At!.difference(poll1At!);
       expect(pollGap, greaterThanOrEqualTo(const Duration(milliseconds: 1500)));
-      expect(pollGap, lessThan(const Duration(seconds: 4)));
+      expect(pollGap, lessThan(const Duration(milliseconds: 4500)));
 
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(kCodexPrefsKey);
@@ -1646,6 +1666,59 @@ void main() {
         expect(proxied.credential!.accountId, 'acc-2');
       },
     );
+
+    test(
+      'a timed-out flow no longer routes refreshes through the sign-in proxy',
+      () async {
+        NetworkProxyConfig? factoryProxy;
+        final proxiedClient = _ScriptedClient();
+        final proxied = CodexDeviceCodeController(
+          clientFactory: (proxy) {
+            factoryProxy = proxy;
+            return proxiedClient;
+          },
+          pollDeadline: const Duration(milliseconds: 300),
+        );
+        CodexDeviceCodeController.debugOverrideInstance(proxied);
+        proxiedClient.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        proxiedClient.handlers.add((_) async => http.Response('{}', 403));
+
+        final outcome = await proxied.startFlow(
+          cfg: _cfg(
+            id: 'Codex',
+            baseUrl: kCodexBaseUrl,
+            proxyEnabled: true,
+            proxyHost: '127.0.0.1',
+            proxyPort: '1080',
+          ),
+          onAuthenticated: () async {},
+        );
+
+        expect(outcome, CodexFlowOutcome.timedOut);
+        expect(proxied.status, CodexAuthStatus.signedOut);
+
+        // Same lifecycle rule as the failed / cancelled variants: a timeout
+        // also clears _signInProxy, so a later refresh of a proxy-less
+        // credential must not reuse the dead flow's proxy.
+        proxied.credential = _expiredCred('acc-1');
+        proxied.status = CodexAuthStatus.expired;
+        factoryProxy = null;
+        proxiedClient.handlers.add(
+          (_) async => _json(200, _tokenBody('acc-2')),
+        );
+
+        await proxied.ensureFresh();
+
+        expect(factoryProxy, isNull);
+        expect(proxied.credential!.accountId, 'acc-2');
+      },
+    );
   });
 
   group('maybeCodexHeaders', () {
@@ -2036,6 +2109,46 @@ void main() {
         expect(prefs.getString(kCodexPrefsKey), isNull);
       },
     );
+
+    test('a refresh starting during signOut prefs removal cannot resurrect '
+        'the session', () async {
+      // Park signOut's prefs removal: the async gap in which a fresh
+      // ensureFresh() (e.g. maybeCodexHeaders' unawaited kick-off) can
+      // start a _doRefresh from a still-non-null credential.
+      SharedPreferences.setMockInitialValues({});
+      final gated = _GatedPrefsStore();
+      SharedPreferencesStorePlatform.instance = gated;
+      final prefs = await SharedPreferences.getInstance();
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode(controller.credential!.toJson()),
+      );
+
+      final refreshGate = Completer<http.Response>();
+      client.handlers.add((_) => refreshGate.future);
+
+      gated.parkRemove();
+      final signOutFuture = controller.signOut();
+      await gated.removeStarted.timeout(const Duration(seconds: 5));
+      // signOut is parked inside the removal; _refreshing is still null and
+      // the credential not yet cleared, so the refresh starts.
+      final refreshing = controller.ensureFresh();
+      await _waitForRequests(client, 1);
+      gated.releaseRemove();
+      await signOutFuture.timeout(const Duration(seconds: 5));
+      // The refresh response lands only after sign-out committed: its
+      // commit must be aborted instead of re-persisting / flipping back to
+      // signedIn.
+      refreshGate.complete(_json(200, _tokenBody('acc-2')));
+      await refreshing.timeout(const Duration(seconds: 5));
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      final storedPrefs = await SharedPreferences.getInstance();
+      expect(storedPrefs.getString(kCodexPrefsKey), isNull);
+    });
 
     test('signOut aborts an in-flight device-code flow', () async {
       client.handlers.add(

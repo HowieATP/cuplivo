@@ -66,6 +66,19 @@ class _ScriptedFlowClient extends http.BaseClient {
       req.body = request.body;
     }
     if (handlers.isEmpty) {
+      // Pending fallback for the poll endpoint: a sequence drift in the
+      // scripted handlers must not blow the flow into an opaque failure
+      // (StateError would be swallowed by startFlow's catch into the failed
+      // view). An extra poll keeps the loop alive until a scripted terminal
+      // response is popped; a 403 with no error code means "still pending".
+      if (req.url.toString() == kCodexPollEndpoint) {
+        final resp = http.Response('{}', 403);
+        return http.StreamedResponse(
+          Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
+          resp.statusCode,
+          headers: resp.headers,
+        );
+      }
       throw StateError('No scripted handler for ${req.url}');
     }
     final resp = await Future.value(handlers.removeAt(0)(req));

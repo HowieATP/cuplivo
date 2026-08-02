@@ -221,7 +221,18 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   }
 
   Future<void> _openAuthPage(Uri? uri, String errorMessage) async {
-    final target = uri ?? Uri.parse(kCodexVerificationUri);
+    var target = uri ?? Uri.parse(kCodexVerificationUri);
+    // Defensive hardening: only ever open the trusted OpenAI auth origin.
+    // A corrupted controller value or a future call site forwarding an
+    // arbitrary URL must not drive the external browser to an untrusted
+    // host.
+    final host = target.host.toLowerCase();
+    final trusted =
+        target.scheme == 'https' &&
+        (host == 'auth.openai.com' || host.endsWith('.openai.com'));
+    if (!trusted) {
+      target = Uri.parse(kCodexVerificationUri);
+    }
     try {
       final ok = await launchUrl(target, mode: LaunchMode.externalApplication);
       if (!ok && mounted) {
@@ -242,7 +253,18 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   }
 
   Future<void> _copyUsercode(String code, String toast) async {
-    await Clipboard.setData(ClipboardData(text: code));
+    try {
+      await Clipboard.setData(ClipboardData(text: code));
+    } catch (e, st) {
+      debugPrint('[CodexOAuth] clipboard copy failed: $e\n$st');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.codexLoginNetworkError,
+        type: NotificationType.error,
+      );
+      return;
+    }
     if (!mounted) return;
     showAppSnackBar(context, message: toast, type: NotificationType.success);
   }
@@ -509,7 +531,13 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            onTap: _start,
+            // Same cancel-first semantics as _buildFailed: while a stale poll
+            // loop is still running, a plain retry would be swallowed by the
+            // startFlow reentrancy guard and appear dead.
+            onTap: () {
+              _controller.cancel();
+              _start();
+            },
           ),
         ),
         const SizedBox(height: 4),

@@ -2646,6 +2646,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sideDrawerLinkCopied => '已复制下载链接';
 
   @override
+  String get updateDownloadButton => '下载';
+
+  @override
+  String get updateDismissTooltip => '关闭提示';
+
+  @override
+  String get updateCloseTooltip => '关闭';
+
+  @override
   String get sideDrawerPinnedLabel => '置顶';
 
   @override
@@ -9180,6 +9189,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sideDrawerLinkCopied => '已复制下载链接';
 
   @override
+  String get updateDownloadButton => '下载';
+
+  @override
+  String get updateDismissTooltip => '关闭提示';
+
+  @override
+  String get updateCloseTooltip => '关闭';
+
+  @override
   String get sideDrawerPinnedLabel => '置顶';
 
   @override
@@ -15711,6 +15729,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get sideDrawerLinkCopied => '已複製下載連結';
+
+  @override
+  String get updateDownloadButton => '下載';
+
+  @override
+  String get updateDismissTooltip => '關閉提示';
+
+  @override
+  String get updateCloseTooltip => '關閉';
 
   @override
   String get sideDrawerPinnedLabel => '置頂';

@@ -1241,6 +1241,9 @@
     }
   },
   "sideDrawerLinkCopied": "Link copied",
+  "updateDownloadButton": "Download",
+  "updateDismissTooltip": "Dismiss",
+  "updateCloseTooltip": "Close",
   "sideDrawerPinnedLabel": "Pinned",
   "sideDrawerHistory": "History",
   "sideDrawerSettings": "Settings",

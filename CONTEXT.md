@@ -47,6 +47,12 @@
 - **Restore**: On cold start only, in `_ChatInputBarState._restoreDraft()`. Sets `TextEditingController.text` + media lists.
 - **Clear**: On send success or when input is fully empty. Debounce skips empty content.
 
+## App Update Notice (新版本提示)
+
+- **Update entry (新版本入口)**: A compact single row (icon + `发现新版本：{version}` + dismiss X + chevron) that replaces the old full-changelog banner at the top of the conversation list. Placement: mobile drawer bottom bar, above the user avatar/nickname row; desktop sidebar bottom (below the conversation list — desktop hides the user row, `showBottomBar: false`). Exactly one entry per configuration: the right topics panel (`desktopTopicsOnly`, topics-on-right mode) never renders the entry, so it stays at the main left sidebar bottom. Visible only when `UpdateProvider.available != null`, `settings.showAppUpdates` is on, `!UpdateProvider.dismissed`, and a platform download URL exists (`bestDownloadUrl()`).
+- **Changelog dialog (更新日志弹层)**: Shared dual-shell component (`UpdateChangelogDialog.show` desktop centered Dialog / `showSheet` mobile bottom sheet — same "same content, different shell" pattern as `ImageCompressionDialog`). Header row: close X + version + [下载] button; below: scrollable release notes markdown. Download failure falls back to copying the URL + snackbar (reuses `sideDrawerLinkCopied`).
+- **Session-scoped dismiss (会话级关闭)**: `UpdateProvider.dismiss()` sets an in-memory flag that hides the entry until the next app launch. NOT persisted — the provider is recreated on startup, so a still-pending update reappears after restart. The dismiss never blocks the entry after restart.
+
 ## Incremental Backup (Experimental)
 
 - **Data scope**: Chat data (conversations + messages + toolEvents + geminiThoughtSigs). Optionally includes files (upload/, images/, avatars/, fonts/) when `includeFiles=true`, filtered by mtime >= since.

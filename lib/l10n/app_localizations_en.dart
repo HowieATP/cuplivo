@@ -2738,6 +2738,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerLinkCopied => 'Link copied';
 
   @override
+  String get updateDownloadButton => 'Download';
+
+  @override
+  String get updateDismissTooltip => 'Dismiss';
+
+  @override
+  String get updateCloseTooltip => 'Close';
+
+  @override
   String get sideDrawerPinnedLabel => 'Pinned';
 
   @override

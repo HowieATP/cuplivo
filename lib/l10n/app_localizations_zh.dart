@@ -6526,7 +6526,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexLoginSignedOutToast => '已退出登录';
 
   @override
-  String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
+  String get codexLoginHelpText => '打开 ChatGPT 授权页面，输入验证码完成 Codex 授权。';
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
@@ -13054,7 +13054,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get codexLoginSignedOutToast => '已退出登录';
 
   @override
-  String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
+  String get codexLoginHelpText => '打开 ChatGPT 授权页面，输入验证码完成 Codex 授权。';
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
@@ -19583,7 +19583,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get codexLoginSignedOutToast => '已登出';
 
   @override
-  String get codexLoginHelpText => '你將被引導至 ChatGPT 網站授權 Codex 存取。';
+  String get codexLoginHelpText => '開啟 ChatGPT 授權頁面，輸入驗證碼完成 Codex 授權。';
 
   @override
   String get codexLoginNetworkError => '網路錯誤，請重試';

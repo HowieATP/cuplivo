@@ -3188,6 +3188,6 @@
   "codexLoginAccountLabel": "ChatGPT account",
   "codexLoginExpiresLabel": "Token expires",
   "codexLoginSignedOutToast": "Signed out",
-  "codexLoginHelpText": "You will be redirected to the ChatGPT site to authorize Codex access.",
+  "codexLoginHelpText": "Open the ChatGPT authorization page and enter the verification code to authorize Codex access.",
   "codexLoginNetworkError": "Network error, please retry"
 }

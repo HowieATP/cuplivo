@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/l10n/app_localizations_en.dart';
 import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
+import 'package:Cuplivo/shared/widgets/codex_device_code_flow.dart';
 import 'package:Cuplivo/shared/widgets/snackbar.dart';
 
 final AppLocalizations _l10n = AppLocalizationsEn();
@@ -49,6 +51,59 @@ class _ThrowingSignOutController extends CodexDeviceCodeController {
   Future<void> signOut() async {
     throw Exception('signOut boom');
   }
+}
+
+/// Scripted client that answers the device-code flow's usercode / poll /
+/// exchange requests in order.
+class _ScriptedFlowClient extends http.BaseClient {
+  final List<http.Response Function(http.Request)> handlers = [];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final req = http.Request(request.method, request.url)
+      ..headers.addAll(request.headers);
+    if (request is http.Request) {
+      req.body = request.body;
+    }
+    if (handlers.isEmpty) {
+      throw StateError('No scripted handler for ${req.url}');
+    }
+    final resp = await Future.value(handlers.removeAt(0)(req));
+    return http.StreamedResponse(
+      Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
+      resp.statusCode,
+      headers: resp.headers,
+    );
+  }
+}
+
+/// SettingsProvider whose provider-config write always fails, simulating a
+/// persistence problem after the OAuth credential was saved.
+class _ThrowingSettingsProvider extends SettingsProvider {
+  @override
+  Future<void> setProviderConfig(String key, ProviderConfig config) async {
+    throw Exception('disk full');
+  }
+}
+
+http.Response _flowJson(int status, Map<String, dynamic> body) => http.Response(
+  jsonEncode(body),
+  status,
+  headers: {'content-type': 'application/json'},
+);
+
+String _jwtWithAccount(String accountId) {
+  final payload = base64Url
+      .encode(
+        utf8.encode(
+          jsonEncode({
+            'iss': 'https://auth.openai.com',
+            'https://api.openai.com/auth': {'chatgpt_account_id': accountId},
+          }),
+        ),
+      )
+      .replaceAll('=', '');
+  return 'eyJhbGciOiJub25lIn0.$payload.c2ln';
 }
 
 CodexOAuthCredential _cred(String accountId) => CodexOAuthCredential(
@@ -247,4 +302,74 @@ void main() {
     }
     await tester.pump();
   });
+
+  testWidgets(
+    'provider-config write failure keeps the flow open with a retry view',
+    (tester) async {
+      final flowClient = _ScriptedFlowClient()
+        ..handlers.add(
+          (_) => _flowJson(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        )
+        ..handlers.add(
+          (_) => _flowJson(200, {
+            'authorization_code': 'ac-1',
+            'code_verifier': 'cv-1',
+          }),
+        )
+        ..handlers.add(
+          (_) => _flowJson(200, {
+            'access_token': _jwtWithAccount('acc-1'),
+            'refresh_token': 'rt-1',
+            'expires_in': 3600,
+          }),
+        );
+      final flowController = CodexDeviceCodeController(
+        clientFactory: (_) => flowClient,
+      );
+      CodexDeviceCodeController.debugOverrideInstance(flowController);
+      addTearDown(flowController.resetForTest);
+      final settings = _ThrowingSettingsProvider();
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<CodexDeviceCodeController>.value(
+              value: flowController,
+            ),
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: CodexDeviceCodeFlow(cfg: codexProviderConfig()),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      // Let the periodic countdown timer observe signedIn and cancel itself.
+      await tester.pump(const Duration(seconds: 1));
+
+      // The credential landed but the provider write failed: the flow stays
+      // open on the error view instead of popping into an orphan state.
+      expect(flowController.status, CodexAuthStatus.signedIn);
+      expect(flowController.credential, isNotNull);
+      expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
+      expect(find.textContaining('disk full'), findsOneWidget);
+
+      // Retrying the write fails again and keeps the error view.
+      await tester.tap(find.text(_l10n.codexLoginSignInButton));
+      await tester.pump();
+      expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
+      expect(find.textContaining('disk full'), findsOneWidget);
+    },
+  );
 }

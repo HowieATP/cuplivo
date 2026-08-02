@@ -251,7 +251,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
       final raw = prefs.getString(kCodexPrefsKey);
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
-      if (decoded is! Map) return;
+      if (decoded is! Map) {
+        // Corrupt payload (e.g. JSON array): self-heal by dropping it so
+        // every launch does not repeat the failed parse.
+        await _removeStoredCredential();
+        return;
+      }
       final restored = CodexOAuthCredential.fromJson(
         decoded.cast<String, dynamic>(),
       );
@@ -271,6 +276,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
       notifyListeners();
     } catch (e, st) {
       debugPrint('[CodexOAuth] init restore failed: $e\n$st');
+      // Self-heal: a persisted value that cannot be parsed would otherwise
+      // fail on every launch.
+      try {
+        await _removeStoredCredential();
+      } catch (removeErr, removeSt) {
+        debugPrint('[CodexOAuth] init cleanup failed: $removeErr\n$removeSt');
+      }
     }
   }
 
@@ -286,10 +298,19 @@ class CodexDeviceCodeController extends ChangeNotifier {
 
   Future<void> _sleepInterruptible(Duration duration) async {
     if (_cancelled) return;
-    await Future.any<void>([
-      Future<void>.delayed(duration),
-      _cancelSignal.future,
-    ]);
+    final done = Completer<void>();
+    void complete() {
+      if (!done.isCompleted) done.complete();
+    }
+
+    // A real Timer so an interrupted sleep leaves no pending delayed future
+    // behind (Future.any kept the delay timer alive after cancellation).
+    final timer = Timer(duration, complete);
+    _cancelSignal.future.then((_) {
+      timer.cancel();
+      complete();
+    });
+    await done.future;
   }
 
   /// Flow ended without a successful login: restore a neutral state.
@@ -458,6 +479,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
             _fail('Codex device auth was denied or expired');
             return CodexFlowOutcome.failed;
           }
+          if (errCode != null && errCode.isNotEmpty) {
+            // Unknown rejection code: fail fast instead of polling until the
+            // deadline. A null errCode (no body / no error field, e.g. a bare
+            // 403) stays pending per the device-auth semantics.
+            _fail('Codex device auth rejected with code: $errCode');
+            return CodexFlowOutcome.failed;
+          }
           if (errCode == 'slow_down') {
             intervalSeconds =
                 (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
@@ -473,7 +501,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
           if (errCode == 'deviceauth_authorization_pending') {
             // still pending
           } else if (errCode == 'slow_down') {
-            intervalSeconds += kCodexSlowDownIncrement.inSeconds;
+            intervalSeconds =
+                (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
+                    .clamp(kCodexMinInterval.inSeconds, 60)
+                    .toInt();
             debugPrint(
               '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
             );
@@ -547,6 +578,20 @@ class CodexDeviceCodeController extends ChangeNotifier {
         proxy: proxyFromConfig(cfg),
       );
       await _persistCredential(cred);
+      // A cancel()/signOut() may have landed while the credential was being
+      // persisted: the session must not resurrect. Drop the entry the persist
+      // just wrote and report cancelled without restoring the in-memory
+      // credential or the signedIn status (signOut already cleared both).
+      if (_cancelled) {
+        try {
+          await _removeStoredCredential();
+        } catch (e, st) {
+          debugPrint(
+            '[CodexOAuth] post-persist cancel cleanup failed: $e\n$st',
+          );
+        }
+        return CodexFlowOutcome.cancelled;
+      }
       credential = cred;
       status = CodexAuthStatus.signedIn;
       usercode = null;
@@ -643,7 +688,11 @@ class CodexDeviceCodeController extends ChangeNotifier {
         final refresh = json?['refresh_token'];
         final expiresIn = json?['expires_in'];
         if (access is! String || access.isEmpty || expiresIn is! num) {
-          debugPrint('[CodexOAuth] refresh response missing fields: $json');
+          // Only log the field names, never the raw body: it may contain
+          // access/refresh tokens.
+          debugPrint(
+            '[CodexOAuth] refresh response missing fields: ${json?.keys.toList()}',
+          );
           return;
         }
         final accountId = _accountIdFromAccessToken(access);
@@ -737,6 +786,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
   /// the same order.
   Map<String, String> maybeCodexHeaders(ProviderConfig cfg) {
     try {
+      // Provider-kind gate: a claude/google provider pointed at a chatgpt.com
+      // codex host must never receive Codex OAuth credentials.
+      if (ProviderConfig.classify(cfg.id, explicitType: cfg.providerType) !=
+          ProviderKind.openai) {
+        return const {};
+      }
       if (!isCodexHost(cfg)) return const {};
       final c = credential;
       if (c == null) return const {};

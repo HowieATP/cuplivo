@@ -2638,6 +2638,6 @@
   "codexLoginAccountLabel": "ChatGPT 帳號",
   "codexLoginExpiresLabel": "令牌過期時間",
   "codexLoginSignedOutToast": "已登出",
-  "codexLoginHelpText": "你將被引導至 ChatGPT 網站授權 Codex 存取。",
+  "codexLoginHelpText": "開啟 ChatGPT 授權頁面，輸入驗證碼完成 Codex 授權。",
   "codexLoginNetworkError": "網路錯誤，請重試"
 }

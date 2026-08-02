@@ -16,6 +16,7 @@ void main() {
           'open_settings=cmd+comma',
         ],
         'desktop_hotkeys_enabled_v1': ['close_window=1', 'open_settings=1'],
+        'codex_oauth_v1': '{"accessToken":"at","refreshToken":"rt"}',
       });
 
       final prefs = await backup_sync.SharedPreferencesAsync.instance;
@@ -24,6 +25,7 @@ void main() {
       expect(snapshot.containsKey('display_chat_font_scale_v1'), isFalse);
       expect(snapshot.containsKey('desktop_hotkeys_commands_v1'), isFalse);
       expect(snapshot.containsKey('desktop_hotkeys_enabled_v1'), isFalse);
+      expect(snapshot.containsKey('codex_oauth_v1'), isFalse);
       expect(snapshot['display_auto_scroll_enabled_v1'], isFalse);
     });
 
@@ -85,6 +87,34 @@ void main() {
         'close_window=1',
         'open_settings=0',
       ]);
+    });
+
+    test('restore ignores codex oauth credential entries', () async {
+      SharedPreferences.setMockInitialValues({
+        'codex_oauth_v1': '{"accessToken":"old"}',
+      });
+
+      final prefs = await backup_sync.SharedPreferencesAsync.instance;
+      await prefs.restore({
+        'codex_oauth_v1': '{"accessToken":"new"}',
+        'display_auto_scroll_enabled_v1': true,
+      });
+
+      final rawPrefs = await SharedPreferences.getInstance();
+      expect(rawPrefs.getString('codex_oauth_v1'), '{"accessToken":"old"}');
+      expect(rawPrefs.getBool('display_auto_scroll_enabled_v1'), isTrue);
+    });
+
+    test('restoreSingle ignores codex oauth credential entries', () async {
+      SharedPreferences.setMockInitialValues({
+        'codex_oauth_v1': '{"accessToken":"old"}',
+      });
+
+      final prefs = await backup_sync.SharedPreferencesAsync.instance;
+      await prefs.restoreSingle('codex_oauth_v1', '{"accessToken":"new"}');
+
+      final rawPrefs = await SharedPreferences.getInstance();
+      expect(rawPrefs.getString('codex_oauth_v1'), '{"accessToken":"old"}');
     });
   });
 }

@@ -25,8 +25,11 @@ class _ScriptedClient extends http.BaseClient {
       req.body = request.body;
     }
     requests.add(req);
-    final handler = handlers.isEmpty ? null : handlers.removeAt(0);
-    final respOrFuture = handler?.call(req) ?? http.Response('{}', 500);
+    if (handlers.isEmpty) {
+      throw StateError('No scripted handler for ${req.url}');
+    }
+    final handler = handlers.removeAt(0);
+    final respOrFuture = handler(req);
     final resp = await Future.value(respOrFuture);
     return http.StreamedResponse(
       Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
@@ -145,5 +148,75 @@ void main() {
         expect(client.requests.single.url.toString(), kCodexTokenEndpoint);
       },
     );
+  });
+
+  group('generateText auth guard for codex hosts', () {
+    test('signed-out codex host fails fast with zero HTTP requests', () async {
+      await expectLater(
+        ChatApiService.generateText(
+          config: codexProviderConfig(),
+          modelId: kCodexModels.first,
+          prompt: 'hello',
+        ),
+        throwsA(
+          isA<HttpException>().having(
+            (e) => e.message,
+            'message',
+            contains('not signed in'),
+          ),
+        ),
+      );
+
+      // ensureFreshOrThrow fires before any request is dispatched, so no
+      // usercode/poll/refresh/LLM traffic may ever happen.
+      expect(client.requests, isEmpty);
+    });
+
+    test(
+      'stale credential refresh rejection propagates as HttpException',
+      () async {
+        controller.credential = _expiredCred('acc-1');
+        controller.status = CodexAuthStatus.expired;
+        client.handlers.add(
+          (_) async => _json(400, {'error': 'invalid_grant'}),
+        );
+
+        await expectLater(
+          ChatApiService.generateText(
+            config: codexProviderConfig(),
+            modelId: kCodexModels.first,
+            prompt: 'hello',
+          ),
+          throwsA(
+            isA<HttpException>().having(
+              (e) => e.message,
+              'message',
+              contains('not signed in'),
+            ),
+          ),
+        );
+
+        expect(controller.credential, isNull);
+        // Exactly one refresh attempt, and no codex LLM request.
+        expect(client.requests.length, 1);
+        expect(client.requests.single.url.toString(), kCodexTokenEndpoint);
+      },
+    );
+
+    test('fresh credential passes the guard without network traffic', () async {
+      controller.credential = CodexOAuthCredential(
+        accessToken: _jwtWithAccount('acc-1'),
+        refreshToken: 'rt-old',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        accountId: 'acc-1',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+
+      await CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig());
+
+      // Fresh session: no refresh and no LLM traffic from the guard.
+      expect(client.requests, isEmpty);
+      expect(controller.isFresh, isTrue);
+    });
   });
 }

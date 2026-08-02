@@ -364,6 +364,11 @@ class ProviderManager {
 
   /// Mirrors [ChatApiService._customHeaders] in chat_api_service.dart.
   /// Keep both in sync when changing header merge order.
+  /// `includeCodexAuth` defaults to true purely to mirror the symmetric
+  /// default in ChatApiService (where openai_images passes false). No caller
+  /// here passes false today -- model listing never reaches a codex host
+  /// (see OpenAIProvider.listModels) -- so the flag is kept only for mirror
+  /// symmetry, not dead code.
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
     String modelId, {

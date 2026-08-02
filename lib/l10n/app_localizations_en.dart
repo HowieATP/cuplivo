@@ -6819,7 +6819,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get codexLoginHelpText =>
-      'You will be redirected to the ChatGPT site to authorize Codex access.';
+      'Open the ChatGPT authorization page and enter the verification code to authorize Codex access.';
 
   @override
   String get codexLoginNetworkError => 'Network error, please retry';

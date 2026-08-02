@@ -12437,7 +12437,7 @@ abstract class AppLocalizations {
   /// No description provided for @codexLoginHelpText.
   ///
   /// In en, this message translates to:
-  /// **'You will be redirected to the ChatGPT site to authorize Codex access.'**
+  /// **'Open the ChatGPT authorization page and enter the verification code to authorize Codex access.'**
   String get codexLoginHelpText;
 
   /// No description provided for @codexLoginNetworkError.

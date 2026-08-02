@@ -816,6 +816,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final groupName = gid == null
         ? l10n.providerGroupsOther
         : (sp.groupById(gid)?.name ?? l10n.providerGroupsOther);
+    // Live config (not the _cfg snapshot) so the Codex entry gate and the
+    // account card follow the current id/baseUrl/providerType edits.
+    final liveCfg = sp.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -1270,9 +1276,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ],
           if (_kind == ProviderKind.openai &&
               !_multiKeyEnabled &&
-              CodexDeviceCodeController.showEntryFor(_cfg)) ...[
+              CodexDeviceCodeController.showEntryFor(liveCfg)) ...[
             const SizedBox(height: 12),
-            CodexAccountEntry(cfg: _cfg),
+            CodexAccountEntry(cfg: liveCfg),
           ],
           _inputRow(
             context,

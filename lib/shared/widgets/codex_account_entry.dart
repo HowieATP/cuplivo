@@ -19,6 +19,8 @@ import 'snackbar.dart';
 class CodexAccountEntry extends StatelessWidget {
   const CodexAccountEntry({super.key, required this.cfg});
 
+  static final DateFormat _expiryFormat = DateFormat('yyyy-MM-dd HH:mm');
+
   final ProviderConfig cfg;
 
   @override
@@ -146,7 +148,7 @@ class CodexAccountEntry extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '${l10n.codexLoginExpiresLabel}: ${DateFormat('yyyy-MM-dd HH:mm').format(cred.expiresAt.toLocal())}',
+          '${l10n.codexLoginExpiresLabel}: ${_expiryFormat.format(cred.expiresAt.toLocal())}',
           style: TextStyle(
             fontSize: 13,
             color: cs.onSurface.withValues(alpha: 0.7),

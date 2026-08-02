@@ -22,8 +22,11 @@ class _ScriptedClient extends http.BaseClient {
       req.body = request.body;
     }
     requests.add(req);
-    final handler = handlers.isEmpty ? null : handlers.removeAt(0);
-    final respOrFuture = handler?.call(req) ?? http.Response('{}', 500);
+    if (handlers.isEmpty) {
+      throw StateError('No scripted handler for ${req.url}');
+    }
+    final handler = handlers.removeAt(0);
+    final respOrFuture = handler(req);
     final resp = await Future.value(respOrFuture);
     return http.StreamedResponse(
       Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
@@ -441,6 +444,34 @@ void main() {
       expect(client.requests.length, 2);
     });
 
+    test('403 with an unknown rejection code fails fast', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async => _json(403, {
+          'error': {'code': 'some_unknown_rejection'},
+        }),
+      );
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(
+        controller.errorMessage,
+        contains('rejected with code: some_unknown_rejection'),
+      );
+      expect(client.requests.length, 2);
+    });
+
     test('slow_down grows the poll interval', () async {
       DateTime? poll1At;
       DateTime? poll2At;
@@ -517,6 +548,122 @@ void main() {
       expect(outcome, CodexFlowOutcome.failed);
       expect(controller.status, CodexAuthStatus.failed);
       expect(onAuthenticatedCalls, 0);
+    });
+
+    test('exchange 400 fails without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(400, {'error': 'invalid_grant'}));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('exchange 500 fails without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => http.Response('oops', 500));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('exchange SocketException fails without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => throw const SocketException('refused'));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('exchange TimeoutException fails without persisting', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => throw TimeoutException('slow'));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
     });
 
     test('usercode SocketException returns failed', () async {
@@ -976,6 +1123,20 @@ void main() {
 
       expect(controller.credential, isNull);
       expect(controller.status, CodexAuthStatus.signedOut);
+      // Self-healing: the corrupt entry is dropped so every launch does not
+      // repeat the failed parse.
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('init() clears persisted JSON that is not an object', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(kCodexPrefsKey, '[1,2,3]');
+
+      await controller.init();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(prefs.getString(kCodexPrefsKey), isNull);
     });
 
     test('_doRefresh uses the persisted proxy after init()', () async {
@@ -1389,5 +1550,47 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
+
+    test(
+      'signOut during the exchange then success response leaves prefs clean',
+      () async {
+        client.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        client.handlers.add(
+          (_) async => _json(200, {
+            'authorization_code': 'ac-1',
+            'code_verifier': 'cv-1',
+          }),
+        );
+        client.handlers.add((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+          return _json(200, _tokenBody('acc-1'));
+        });
+
+        final flow = controller.startFlow(
+          cfg: codexProviderConfig(),
+          onAuthenticated: () async {
+            onAuthenticatedCalls++;
+          },
+        );
+        // Sign out while the exchange request is in flight; the exchange
+        // then succeeds, which is the last moment the flow could persist.
+        await _waitForRequests(client, 3);
+        await controller.signOut();
+        final outcome = await flow;
+
+        expect(outcome, CodexFlowOutcome.cancelled);
+        expect(controller.status, CodexAuthStatus.signedOut);
+        expect(controller.credential, isNull);
+        expect(onAuthenticatedCalls, 0);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString(kCodexPrefsKey), isNull);
+      },
+    );
   });
 }

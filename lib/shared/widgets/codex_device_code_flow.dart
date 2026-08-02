@@ -53,6 +53,9 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   Timer? _timer;
   DateTime? _deadline;
   Duration _remaining = kCodexFlowDeadline;
+  bool _countdownExpired = false;
+  bool _providerWriteError = false;
+  String? _providerWriteErrorDetail;
   late final SettingsProvider _settings;
   late final CodexDeviceCodeController _controller;
 
@@ -77,6 +80,9 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   void _start() {
     _deadline = DateTime.now().add(kCodexFlowDeadline);
     _remaining = kCodexFlowDeadline;
+    _countdownExpired = false;
+    _providerWriteError = false;
+    _providerWriteErrorDetail = null;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
@@ -94,7 +100,17 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       final left = _deadline!.difference(DateTime.now());
       final next = left.isNegative ? Duration.zero : left;
       if (next == _remaining) return;
-      setState(() => _remaining = next);
+      setState(() {
+        _remaining = next;
+        if (next == Duration.zero &&
+            (status == CodexAuthStatus.waitingForUser ||
+                status == CodexAuthStatus.polling)) {
+          // The controller deadline fires at the same instant, but render the
+          // expired state locally instead of freezing at 00:00 until its
+          // notification lands.
+          _countdownExpired = true;
+        }
+      });
       if (next == Duration.zero) _timer?.cancel();
     });
     unawaited(_runFlow());
@@ -132,19 +148,39 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
         codexProviderConfig(),
       );
     } catch (e, st) {
+      // Provider-config write failure is a persistence problem, not a
+      // network problem: keep the flow open on an error view instead of
+      // popping into an orphan state (credential persisted but the provider
+      // never created).
       debugPrint('[CodexOAuth] setProviderConfig failed: $e\n$st');
       if (mounted) {
-        showAppSnackBar(
-          context,
-          // Provider-config write failure is a persistence problem, not a
-          // network problem.
-          message: AppLocalizations.of(context)!.codexLoginStatusFailed,
-          type: NotificationType.error,
-        );
+        setState(() {
+          _providerWriteError = true;
+          _providerWriteErrorDetail = '$e';
+        });
       }
+      return;
     }
-    // The credential is already persisted and signedIn: pop even when the
-    // provider-config write failed so the panel does not stay stuck.
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  /// Retries the provider-config write after a failure. The credential is
+  /// already persisted and signedIn, so this must not restart the device-code
+  /// flow; a success pops the sheet, a failure keeps the error view.
+  Future<void> _retryProviderWrite() async {
+    try {
+      await _settings.setProviderConfig(
+        kCodexProviderKey,
+        codexProviderConfig(),
+      );
+    } catch (e, st) {
+      debugPrint('[CodexOAuth] setProviderConfig retry failed: $e\n$st');
+      if (mounted) {
+        setState(() => _providerWriteErrorDetail = '$e');
+      }
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -194,29 +230,34 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    final Widget content = switch (controller.status) {
-      CodexAuthStatus.waitingForUser ||
-      CodexAuthStatus.polling => _buildWaiting(controller, l10n, cs),
-      CodexAuthStatus.expired => _buildFailed(
-        controller,
-        l10n,
-        l10n.codexLoginStatusExpired,
-      ),
-      CodexAuthStatus.failed => _buildFailed(
-        controller,
-        l10n,
-        l10n.codexLoginStatusFailed,
-      ),
-      CodexAuthStatus.signedIn => Text(
-        l10n.codexLoginStatusSignedIn,
-        style: TextStyle(fontSize: 14, color: cs.onSurface),
-        textAlign: TextAlign.center,
-      ),
-      CodexAuthStatus.signedOut =>
-        (controller.errorMessage != null && controller.errorMessage!.isNotEmpty)
-            ? _buildFailed(controller, l10n, l10n.codexLoginStatusFailed)
-            : _buildSignedOutEnd(l10n, cs),
-    };
+    final Widget content = _providerWriteError
+        ? _buildProviderWriteError(l10n, cs)
+        : switch (controller.status) {
+            CodexAuthStatus.waitingForUser || CodexAuthStatus.polling =>
+              _countdownExpired
+                  ? _buildFailed(controller, l10n, l10n.codexLoginStatusExpired)
+                  : _buildWaiting(controller, l10n, cs),
+            CodexAuthStatus.expired => _buildFailed(
+              controller,
+              l10n,
+              l10n.codexLoginStatusExpired,
+            ),
+            CodexAuthStatus.failed => _buildFailed(
+              controller,
+              l10n,
+              l10n.codexLoginStatusFailed,
+            ),
+            CodexAuthStatus.signedIn => Text(
+              l10n.codexLoginStatusSignedIn,
+              style: TextStyle(fontSize: 14, color: cs.onSurface),
+              textAlign: TextAlign.center,
+            ),
+            CodexAuthStatus.signedOut =>
+              (controller.errorMessage != null &&
+                      controller.errorMessage!.isNotEmpty)
+                  ? _buildFailed(controller, l10n, l10n.codexLoginStatusFailed)
+                  : _buildSignedOutEnd(l10n, cs),
+          };
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -352,6 +393,53 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
         ),
         const SizedBox(height: 18),
         TextButton(onPressed: _cancel, child: Text(l10n.codexLoginCloseButton)),
+      ],
+    );
+  }
+
+  /// Shown when the credential persisted but writing the provider config
+  /// failed. Closing accepts the orphan state (credential stays signed in;
+  /// it can be removed from the account entry's sign-out button).
+  Widget _buildProviderWriteError(AppLocalizations l10n, ColorScheme cs) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Lucide.TriangleAlert, size: 28, color: cs.error),
+        const SizedBox(height: 12),
+        Text(
+          l10n.codexLoginStatusFailed,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _providerWriteErrorDetail ?? '',
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.error.withValues(alpha: 0.9),
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: IosTileButton(
+            icon: Lucide.RefreshCw,
+            label: l10n.codexLoginSignInButton,
+            backgroundColor: cs.primary,
+            onTap: _retryProviderWrite,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextButton(
+          onPressed: _cancel,
+          child: Text(l10n.codexLoginCancelButton),
+        ),
       ],
     );
   }

@@ -2205,6 +2205,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetRenderWebView => 'Render Web View';
 
   @override
+  String get messageMoreSheetReadingMode => 'Reading Mode';
+
+  @override
+  String get readingModePageCopyAll => 'Copy All';
+
+  @override
+  String get readingModeFontIncrease => 'Increase font size';
+
+  @override
+  String get readingModeFontDecrease => 'Decrease font size';
+
+  @override
+  String get readingModeAssistantFallback => 'Assistant';
+
+  @override
   String get messageMoreSheetNotImplemented => 'Not yet implemented';
 
   @override
@@ -2736,6 +2751,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sideDrawerLinkCopied => 'Link copied';
+
+  @override
+  String get updateDownloadButton => 'Download';
+
+  @override
+  String get updateDismissTooltip => 'Dismiss';
+
+  @override
+  String get updateCloseTooltip => 'Close';
 
   @override
   String get sideDrawerPinnedLabel => 'Pinned';

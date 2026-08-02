@@ -2138,6 +2138,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetRenderWebView => '网页视图渲染';
 
   @override
+  String get messageMoreSheetReadingMode => '阅读模式';
+
+  @override
+  String get readingModePageCopyAll => '复制全部';
+
+  @override
+  String get readingModeFontIncrease => '增大字号';
+
+  @override
+  String get readingModeFontDecrease => '减小字号';
+
+  @override
+  String get readingModeAssistantFallback => '助手';
+
+  @override
   String get messageMoreSheetNotImplemented => '暂未实现';
 
   @override
@@ -2644,6 +2659,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sideDrawerLinkCopied => '已复制下载链接';
+
+  @override
+  String get updateDownloadButton => '下载';
+
+  @override
+  String get updateDismissTooltip => '关闭提示';
+
+  @override
+  String get updateCloseTooltip => '关闭';
 
   @override
   String get sideDrawerPinnedLabel => '置顶';
@@ -8696,6 +8720,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetRenderWebView => '网页视图渲染';
 
   @override
+  String get messageMoreSheetReadingMode => '阅读模式';
+
+  @override
+  String get readingModePageCopyAll => '复制全部';
+
+  @override
+  String get readingModeFontIncrease => '增大字号';
+
+  @override
+  String get readingModeFontDecrease => '减小字号';
+
+  @override
+  String get readingModeAssistantFallback => '助手';
+
+  @override
   String get messageMoreSheetNotImplemented => '暂未实现';
 
   @override
@@ -9202,6 +9241,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get sideDrawerLinkCopied => '已复制下载链接';
+
+  @override
+  String get updateDownloadButton => '下载';
+
+  @override
+  String get updateDismissTooltip => '关闭提示';
+
+  @override
+  String get updateCloseTooltip => '关闭';
 
   @override
   String get sideDrawerPinnedLabel => '置顶';
@@ -15253,6 +15301,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetRenderWebView => '網頁視圖渲染';
 
   @override
+  String get messageMoreSheetReadingMode => '閱讀模式';
+
+  @override
+  String get readingModePageCopyAll => '複製全部';
+
+  @override
+  String get readingModeFontIncrease => '增大字號';
+
+  @override
+  String get readingModeFontDecrease => '減小字號';
+
+  @override
+  String get readingModeAssistantFallback => '助手';
+
+  @override
   String get messageMoreSheetNotImplemented => '暫未實現';
 
   @override
@@ -15759,6 +15822,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get sideDrawerLinkCopied => '已複製下載連結';
+
+  @override
+  String get updateDownloadButton => '下載';
+
+  @override
+  String get updateDismissTooltip => '關閉提示';
+
+  @override
+  String get updateCloseTooltip => '關閉';
 
   @override
   String get sideDrawerPinnedLabel => '置頂';

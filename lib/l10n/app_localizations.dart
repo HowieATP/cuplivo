@@ -4199,6 +4199,36 @@ abstract class AppLocalizations {
   /// **'Render Web View'**
   String get messageMoreSheetRenderWebView;
 
+  /// No description provided for @messageMoreSheetReadingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading Mode'**
+  String get messageMoreSheetReadingMode;
+
+  /// No description provided for @readingModePageCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy All'**
+  String get readingModePageCopyAll;
+
+  /// No description provided for @readingModeFontIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase font size'**
+  String get readingModeFontIncrease;
+
+  /// No description provided for @readingModeFontDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease font size'**
+  String get readingModeFontDecrease;
+
+  /// No description provided for @readingModeAssistantFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get readingModeAssistantFallback;
+
   /// No description provided for @messageMoreSheetNotImplemented.
   ///
   /// In en, this message translates to:
@@ -5098,6 +5128,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Link copied'**
   String get sideDrawerLinkCopied;
+
+  /// No description provided for @updateDownloadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownloadButton;
+
+  /// No description provided for @updateDismissTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get updateDismissTooltip;
+
+  /// No description provided for @updateCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get updateCloseTooltip;
 
   /// No description provided for @sideDrawerPinnedLabel.
   ///

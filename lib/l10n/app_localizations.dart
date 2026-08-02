@@ -12637,6 +12637,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Codex device sign-in is not available for this account.'**
   String get codexLoginNotEnabled;
+
+  /// No description provided for @grokLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok Account Login'**
+  String get grokLoginTitle;
+
+  /// No description provided for @grokLoginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with SuperGrok or X Premium to access Grok models.'**
+  String get grokLoginSubtitle;
+
+  /// No description provided for @grokLoginSignInButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with your xAI account'**
+  String get grokLoginSignInButton;
+
+  /// No description provided for @grokLoginSignOutButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get grokLoginSignOutButton;
+
+  /// No description provided for @grokLoginSignOutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the saved xAI credentials from this device.'**
+  String get grokLoginSignOutConfirm;
+
+  /// No description provided for @grokLoginCloseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get grokLoginCloseButton;
+
+  /// No description provided for @grokLoginStatusSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get grokLoginStatusSignedIn;
+
+  /// No description provided for @grokLoginStatusSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in'**
+  String get grokLoginStatusSignedOut;
+
+  /// No description provided for @grokLoginStatusWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for authorization...'**
+  String get grokLoginStatusWaiting;
+
+  /// No description provided for @grokLoginStatusPolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for sign-in...'**
+  String get grokLoginStatusPolling;
+
+  /// No description provided for @grokLoginStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization expired'**
+  String get grokLoginStatusExpired;
+
+  /// No description provided for @grokLoginStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed'**
+  String get grokLoginStatusFailed;
+
+  /// No description provided for @grokLoginUsercodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your verification code'**
+  String get grokLoginUsercodeLabel;
+
+  /// No description provided for @grokLoginOpenPageButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authorization page'**
+  String get grokLoginOpenPageButton;
+
+  /// No description provided for @grokLoginCopyCodeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get grokLoginCopyCodeButton;
+
+  /// No description provided for @grokLoginCopiedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied to clipboard'**
+  String get grokLoginCopiedToast;
+
+  /// No description provided for @grokLoginCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to copy the code.'**
+  String get grokLoginCopyFailed;
+
+  /// No description provided for @grokLoginCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get grokLoginCancelButton;
+
+  /// No description provided for @grokLoginAccountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'xAI account'**
+  String get grokLoginAccountLabel;
+
+  /// No description provided for @grokLoginExpiresLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Token expires'**
+  String get grokLoginExpiresLabel;
+
+  /// No description provided for @grokLoginSignedOutToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out'**
+  String get grokLoginSignedOutToast;
+
+  /// No description provided for @grokLoginHelpText.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the xAI authorization page and enter the verification code to authorize Grok access.'**
+  String get grokLoginHelpText;
+
+  /// No description provided for @grokLoginNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error, please retry'**
+  String get grokLoginNetworkError;
 }
 
 class _AppLocalizationsDelegate

@@ -1057,6 +1057,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   bool stream = true,
 }) async* {
   await CodexDeviceCodeController.ensureFreshOrThrow(config);
+  await GrokDeviceCodeController.ensureFreshOrThrow(config);
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
@@ -1765,6 +1766,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Follow-up request
           // Re-check freshness: the access token may have expired mid-session.
           await CodexDeviceCodeController.ensureFreshOrThrow(config);
+          await GrokDeviceCodeController.ensureFreshOrThrow(config);
           final req = http.Request('POST', url);
           final headers2 = <String, String>{
             'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -2103,6 +2105,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             // Follow-up round: re-check freshness in case the token expired
             // mid-session.
             await CodexDeviceCodeController.ensureFreshOrThrow(config);
+            await GrokDeviceCodeController.ensureFreshOrThrow(config);
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
               'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -2848,6 +2851,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 // Follow-up round: re-check freshness in case the token
                 // expired mid-session.
                 await CodexDeviceCodeController.ensureFreshOrThrow(config);
+                await GrokDeviceCodeController.ensureFreshOrThrow(config);
                 CodexDeviceCodeController.applyCodexResponseBodyDefaults(
                   body2,
                   config,
@@ -3600,6 +3604,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             // Follow-up round: re-check freshness in case the token expired
             // mid-session.
             await CodexDeviceCodeController.ensureFreshOrThrow(config);
+            await GrokDeviceCodeController.ensureFreshOrThrow(config);
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
               'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -4118,6 +4123,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 // Follow-up round: re-check freshness in case the token
                 // expired mid-session.
                 await CodexDeviceCodeController.ensureFreshOrThrow(config);
+                await GrokDeviceCodeController.ensureFreshOrThrow(config);
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
                   'Authorization':

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
 import 'codex_device_code_controller.dart';
+import 'grok_device_code_controller.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
@@ -178,6 +179,9 @@ class OpenAIProvider extends BaseProvider {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+      // Grok OAuth bearer overwrites API key when a credential exists.
+      final grokH = GrokDeviceCodeController.instance.maybeGrokHeaders(cfg);
+      if (grokH.isNotEmpty) headers.addAll(grokH);
       final res = await client.get(uri, headers: headers);
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
@@ -413,6 +417,9 @@ class ProviderManager {
       final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
       if (h.isNotEmpty) out.addAll(h);
     }
+    // Grok OAuth outside Codex gate (see ChatApiService._customHeaders).
+    final grokH = GrokDeviceCodeController.instance.maybeGrokHeaders(cfg);
+    if (grokH.isNotEmpty) out.addAll(grokH);
     return out;
   }
 
@@ -458,6 +465,7 @@ class ProviderManager {
     try {
       if (kind == ProviderKind.openai) {
         await CodexDeviceCodeController.ensureFreshOrThrow(cfg);
+        await GrokDeviceCodeController.ensureFreshOrThrow(cfg);
         final base = cfg.baseUrl.endsWith('/')
             ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
             : cfg.baseUrl;

@@ -20,6 +20,7 @@ import 'core/providers/chat_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/codex_device_code_controller.dart';
+import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
@@ -122,6 +123,7 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       await SkillManager.initRoot();
       await CodexDeviceCodeController.instance.init();
+      await GrokDeviceCodeController.instance.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Android: start AlarmManager service for proactive care exact alarms
@@ -172,6 +174,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<CodexDeviceCodeController>.value(
           value: CodexDeviceCodeController.instance,
+        ),
+        ChangeNotifierProvider<GrokDeviceCodeController>.value(
+          value: GrokDeviceCodeController.instance,
         ),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => McpToolService()),

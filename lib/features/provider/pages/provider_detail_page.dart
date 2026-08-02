@@ -9,7 +9,9 @@ import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/codex_device_code_controller.dart';
+import '../../../core/providers/grok_device_code_controller.dart';
 import '../../../shared/widgets/codex_account_entry.dart';
+import '../../../shared/widgets/grok_account_entry.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -1280,6 +1282,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             CodexAccountEntry(cfg: liveCfg),
             // The API Key block above already ends with a 12px gap; keep the
             // same rhythm before the next row.
+            const SizedBox(height: 12),
+          ],
+          if (_kind == ProviderKind.openai &&
+              !_multiKeyEnabled &&
+              GrokDeviceCodeController.showEntryFor(liveCfg)) ...[
+            GrokAccountEntry(cfg: liveCfg),
             const SizedBox(height: 12),
           ],
           _inputRow(

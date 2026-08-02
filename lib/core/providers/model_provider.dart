@@ -421,16 +421,7 @@ class ProviderManager {
     final client = _Http.clientFor(cfg);
     try {
       if (kind == ProviderKind.openai) {
-        if (CodexDeviceCodeController.isCodexHost(cfg)) {
-          await CodexDeviceCodeController.instance.ensureFresh();
-          if (!CodexDeviceCodeController.instance.isFresh) {
-            // Avoid sending an unauthenticated request that would 401 for sure.
-            throw HttpException(
-              'Codex session expired, please sign in again',
-              uri: Uri.parse(cfg.baseUrl),
-            );
-          }
-        }
+        await CodexDeviceCodeController.ensureFreshOrThrow(cfg);
         final base = cfg.baseUrl.endsWith('/')
             ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
             : cfg.baseUrl;

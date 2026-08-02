@@ -89,11 +89,21 @@ class CodexAccountEntry extends StatelessWidget {
             icon: Lucide.KeyRound,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            onTap: () => showCodexDeviceCodeFlow(context, cfg),
+            onTap: () => _openFlow(context),
           ),
         ),
       ],
     );
+  }
+
+  /// Reads the live provider config instead of the page snapshot so the flow
+  /// starts with the current proxy / endpoint settings.
+  void _openFlow(BuildContext context) {
+    final latest = context.read<SettingsProvider>().getProviderConfig(
+      cfg.id,
+      defaultName: cfg.name,
+    );
+    showCodexDeviceCodeFlow(context, latest);
   }
 
   Widget _buildSignedIn(
@@ -189,7 +199,7 @@ class CodexAccountEntry extends StatelessWidget {
             icon: Lucide.KeyRound,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            onTap: () => showCodexDeviceCodeFlow(context, cfg),
+            onTap: () => _openFlow(context),
           ),
         ),
       ],

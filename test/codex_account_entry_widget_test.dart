@@ -1,12 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/l10n/app_localizations_en.dart';
 import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
+import 'package:Cuplivo/shared/widgets/snackbar.dart';
+
+final AppLocalizations _l10n = AppLocalizationsEn();
+
+class _HangingClient extends http.BaseClient {
+  final List<Completer<http.StreamedResponse>> _pending = [];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    final completer = Completer<http.StreamedResponse>();
+    _pending.add(completer);
+    return completer.future;
+  }
+
+  /// Completes every pending request with an error so in-flight timeouts and
+  /// the flow's poll loop wind down before the test tears the tree down.
+  void releaseAll() {
+    for (final c in _pending) {
+      if (!c.isCompleted) {
+        c.completeError(http.ClientException('cancelled by test'));
+      }
+    }
+    _pending.clear();
+  }
+}
+
+class _ThrowingSignOutController extends CodexDeviceCodeController {
+  @override
+  Future<void> signOut() async {
+    throw Exception('signOut boom');
+  }
+}
 
 CodexOAuthCredential _cred(String accountId) => CodexOAuthCredential(
   accessToken: 'at-1',
@@ -15,31 +51,24 @@ CodexOAuthCredential _cred(String accountId) => CodexOAuthCredential(
   accountId: accountId,
 );
 
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
-
-Future<SettingsProvider> _buildSettings(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues(const {});
-  final settings = SettingsProvider();
-  await tester.runAsync(_waitForSettingsLoad);
-  return settings;
-}
-
-Widget _harness(SettingsProvider settings, CodexDeviceCodeController controller) {
+Widget _harness(
+  CodexDeviceCodeController controller, {
+  SettingsProvider? settings,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<CodexDeviceCodeController>.value(
         value: controller,
       ),
-      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      if (settings != null)
+        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(body: CodexAccountEntry(cfg: codexProviderConfig())),
+      home: AppSnackBarOverlay(
+        child: Scaffold(body: CodexAccountEntry(cfg: codexProviderConfig())),
+      ),
     ),
   );
 }
@@ -50,62 +79,70 @@ void main() {
   late CodexDeviceCodeController controller;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues(const {});
     controller = CodexDeviceCodeController();
     CodexDeviceCodeController.debugOverrideInstance(controller);
   });
 
   tearDown(() {
     controller.resetForTest();
+    CodexDeviceCodeController.debugOverrideInstance(
+      CodexDeviceCodeController(),
+    );
   });
 
   testWidgets('signedOut state shows the sign-in button', (tester) async {
-    final settings = await _buildSettings(tester);
-    addTearDown(settings.dispose);
-
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(_harness(controller));
     await tester.pump();
 
     expect(controller.status, CodexAuthStatus.signedOut);
-    expect(find.text('Sign in with Codex'), findsOneWidget);
-    expect(find.text('Sign out'), findsNothing);
+    expect(find.text(_l10n.codexLoginSignInButton), findsOneWidget);
+    expect(find.text(_l10n.codexLoginSignOutButton), findsNothing);
   });
 
   testWidgets('signedIn state shows account id and sign-out button', (
     tester,
   ) async {
-    final settings = await _buildSettings(tester);
-    addTearDown(settings.dispose);
     controller.credential = _cred('acc-1');
     controller.status = CodexAuthStatus.signedIn;
 
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(_harness(controller));
     await tester.pump();
 
-    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text(_l10n.codexLoginStatusSignedIn), findsOneWidget);
     expect(find.textContaining('acc-1'), findsOneWidget);
-    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text(_l10n.codexLoginSignOutButton), findsOneWidget);
+  });
+
+  testWidgets('expired state shows expired copy and re-login button', (
+    tester,
+  ) async {
+    controller.status = CodexAuthStatus.expired;
+
+    await tester.pumpWidget(_harness(controller));
+    await tester.pump();
+
+    expect(find.text(_l10n.codexLoginStatusExpired), findsOneWidget);
+    expect(find.text(_l10n.codexLoginSignInButton), findsOneWidget);
   });
 
   testWidgets('sign-out confirm dialog uses confirm copy and calls signOut', (
     tester,
   ) async {
-    final settings = await _buildSettings(tester);
-    addTearDown(settings.dispose);
     controller.credential = _cred('acc-1');
     controller.status = CodexAuthStatus.signedIn;
 
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(_harness(controller));
     await tester.pump();
 
-    await tester.tap(find.text('Sign out'));
+    await tester.tap(find.text(_l10n.codexLoginSignOutButton));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('This removes the saved ChatGPT credentials from this device.'),
-      findsOneWidget,
-    );
+    expect(find.text(_l10n.codexLoginSignOutConfirm), findsOneWidget);
 
-    await tester.tap(find.text('Sign out').last);
+    await tester.tap(
+      find.widgetWithText(TextButton, _l10n.codexLoginSignOutButton),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.status, CodexAuthStatus.signedOut);
@@ -116,22 +153,79 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('signOut failure shows the network-error snackbar', (
+    tester,
+  ) async {
+    final throwing = _ThrowingSignOutController();
+    CodexDeviceCodeController.debugOverrideInstance(throwing);
+    addTearDown(throwing.resetForTest);
+    throwing.credential = _cred('acc-1');
+    throwing.status = CodexAuthStatus.signedIn;
+
+    await tester.pumpWidget(_harness(throwing));
+    await tester.pump();
+
+    await tester.tap(find.text(_l10n.codexLoginSignOutButton));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(TextButton, _l10n.codexLoginSignOutButton),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(_l10n.codexLoginNetworkError), findsOneWidget);
+    expect(throwing.status, CodexAuthStatus.signedIn);
+    expect(throwing.credential, isNotNull);
+
+    // Let the snackbar timer elapse so no timers are left pending.
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
   testWidgets('sign-out confirm dialog cancel keeps signed in', (tester) async {
-    final settings = await _buildSettings(tester);
-    addTearDown(settings.dispose);
     controller.credential = _cred('acc-1');
     controller.status = CodexAuthStatus.signedIn;
 
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(_harness(controller));
     await tester.pump();
 
-    await tester.tap(find.text('Sign out'));
+    await tester.tap(find.text(_l10n.codexLoginSignOutButton));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.text(_l10n.codexLoginCancelButton));
     await tester.pumpAndSettle();
 
     expect(controller.status, CodexAuthStatus.signedIn);
     expect(controller.credential, isNotNull);
+  });
+
+  testWidgets('tapping the sign-in button opens the flow', (tester) async {
+    final hangingClient = _HangingClient();
+    final hanging = CodexDeviceCodeController(
+      clientFactory: (_) => hangingClient,
+    );
+    CodexDeviceCodeController.debugOverrideInstance(hanging);
+    addTearDown(hanging.resetForTest);
+    final settings = SettingsProvider();
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(_harness(hanging, settings: settings));
+    await tester.pump();
+
+    await tester.tap(find.text(_l10n.codexLoginSignInButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(hanging.status, CodexAuthStatus.waitingForUser);
+    // Usercode label only exists inside the flow's waiting screen.
+    expect(find.text(_l10n.codexLoginUsercodeLabel), findsOneWidget);
+
+    // Dispose the flow so its countdown timer and cancel signal are cleaned up.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    // Release the in-flight usercode request so no 30s timeout timer is left
+    // pending after the tree is gone.
+    hangingClient.releaseAll();
+    await tester.pump();
   });
 }

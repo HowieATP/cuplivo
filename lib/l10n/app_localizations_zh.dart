@@ -6523,16 +6523,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexLoginExpiresLabel => '令牌过期时间';
 
   @override
-  String get codexLoginRefreshFailedToast => '令牌刷新失败，请重新登录';
-
-  @override
   String get codexLoginSignedOutToast => '已退出登录';
 
   @override
   String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
-
-  @override
-  String get codexLoginExpiredToast => '登录已过期，请重新开始';
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
@@ -13057,16 +13051,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get codexLoginExpiresLabel => '令牌过期时间';
 
   @override
-  String get codexLoginRefreshFailedToast => '令牌刷新失败，请重新登录';
-
-  @override
   String get codexLoginSignedOutToast => '已退出登录';
 
   @override
   String get codexLoginHelpText => '你将被引导至 ChatGPT 网站授权 Codex 访问。';
-
-  @override
-  String get codexLoginExpiredToast => '登录已过期，请重新开始';
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
@@ -19592,16 +19580,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get codexLoginExpiresLabel => '令牌過期時間';
 
   @override
-  String get codexLoginRefreshFailedToast => '令牌刷新失敗，請重新登入';
-
-  @override
   String get codexLoginSignedOutToast => '已登出';
 
   @override
   String get codexLoginHelpText => '你將被引導至 ChatGPT 網站授權 Codex 存取。';
-
-  @override
-  String get codexLoginExpiredToast => '登入已過期，請重新開始';
 
   @override
   String get codexLoginNetworkError => '網路錯誤，請重試';

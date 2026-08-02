@@ -3187,9 +3187,7 @@
   "codexLoginCancelButton": "Cancel",
   "codexLoginAccountLabel": "ChatGPT account",
   "codexLoginExpiresLabel": "Token expires",
-  "codexLoginRefreshFailedToast": "Token refresh failed, please sign in again",
   "codexLoginSignedOutToast": "Signed out",
   "codexLoginHelpText": "You will be redirected to the ChatGPT site to authorize Codex access.",
-  "codexLoginExpiredToast": "Sign-in expired, please start over",
   "codexLoginNetworkError": "Network error, please retry"
 }

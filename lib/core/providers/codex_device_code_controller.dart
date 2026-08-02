@@ -41,12 +41,14 @@ class CodexOAuthCredential {
   final String refreshToken;
   final DateTime expiresAt;
   final String accountId;
+  final NetworkProxyConfig? proxy;
 
   const CodexOAuthCredential({
     required this.accessToken,
     required this.refreshToken,
     required this.expiresAt,
     required this.accountId,
+    this.proxy,
   });
 
   Map<String, dynamic> toJson() => {
@@ -54,6 +56,15 @@ class CodexOAuthCredential {
     'refreshToken': refreshToken,
     'expiresAt': expiresAt.millisecondsSinceEpoch,
     'accountId': accountId,
+    'proxy': proxy == null
+        ? null
+        : {
+            'type': proxy!.type,
+            'host': proxy!.host,
+            'port': proxy!.port,
+            'username': proxy!.username,
+            'password': proxy!.password,
+          },
   };
 
   factory CodexOAuthCredential.fromJson(Map<String, dynamic> json) =>
@@ -64,7 +75,33 @@ class CodexOAuthCredential {
           (json['expiresAt'] as num?)?.toInt() ?? 0,
         ),
         accountId: json['accountId'] as String? ?? '',
+        proxy: _proxyFromJson(json['proxy']),
       );
+
+  /// Tolerantly parses the persisted proxy block; missing or malformed values
+  /// degrade to a direct connection instead of failing the whole restore.
+  static NetworkProxyConfig? _proxyFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    try {
+      final host = raw['host'];
+      final port = raw['port'];
+      if (host is! String || host.isEmpty || port is! num || port <= 0) {
+        return null;
+      }
+      return NetworkProxyConfig(
+        enabled: true,
+        type: (raw['type'] is String && (raw['type'] as String).isNotEmpty)
+            ? raw['type'] as String
+            : 'http',
+        host: host,
+        port: port.toInt(),
+        username: raw['username'] as String?,
+        password: raw['password'] as String?,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 enum CodexAuthStatus {
@@ -146,7 +183,24 @@ class CodexDeviceCodeController extends ChangeNotifier {
     if (uri == null) return false;
     final host = uri.host.toLowerCase();
     final path = uri.path.toLowerCase();
-    return host.contains('chatgpt.com') && path.contains('codex');
+    return (host == 'chatgpt.com' || host.endsWith('.chatgpt.com')) &&
+        path.contains('codex');
+  }
+
+  /// Ensures a fresh Codex session for codex hosts. Throws a clear
+  /// [HttpException] when the account is not signed in or the session
+  /// cannot be refreshed, so callers fail fast instead of sending an
+  /// unauthenticated request.
+  static Future<void> ensureFreshOrThrow(ProviderConfig cfg) async {
+    if (!isCodexHost(cfg)) return;
+    await instance.ensureFresh();
+    if (!instance.isFresh) {
+      final c = instance.credential;
+      final message = c == null
+          ? 'Codex account is not signed in. Please sign in first.'
+          : 'Codex session expired, please sign in again.';
+      throw HttpException(message, uri: Uri.tryParse(cfg.baseUrl));
+    }
   }
 
   static bool showEntryFor(ProviderConfig cfg) {
@@ -386,6 +440,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
             _fail('Codex device auth was denied or expired');
             return CodexFlowOutcome.failed;
           }
+          if (errCode == 'slow_down') {
+            intervalSeconds += kCodexSlowDownIncrement.inSeconds;
+            debugPrint(
+              '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
+            );
+          }
         }
         if (resp.statusCode != 403 && resp.statusCode != 404) {
           final errCode = _extractErrorCode(resp);
@@ -463,6 +523,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
           Duration(milliseconds: (expiresIn * 1000).round()),
         ),
         accountId: accountId,
+        proxy: proxyFromConfig(cfg),
       );
       await _persistCredential(cred);
       credential = cred;
@@ -475,7 +536,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
         _flowEnded();
         return CodexFlowOutcome.cancelled;
       }
-      await onAuthenticated();
+      try {
+        await onAuthenticated();
+      } catch (e, st) {
+        // The credential is already persisted and signedIn; a failing
+        // callback must not flip the account back to signedOut.
+        debugPrint('[CodexOAuth] onAuthenticated failed: $e\n$st');
+      }
       return CodexFlowOutcome.success;
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow failed: $e\n$st');
@@ -535,7 +602,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
   Future<void> _doRefresh() async {
     final c = credential;
     if (c == null) return;
-    final client = _clientFactory(_signInProxy);
+    final client = _clientFactory(c.proxy ?? _signInProxy);
     try {
       final resp = await client
           .post(
@@ -569,6 +636,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
             Duration(milliseconds: (expiresIn * 1000).round()),
           ),
           accountId: accountId ?? c.accountId,
+          proxy: c.proxy ?? _signInProxy,
         );
         await _persistCredential(cred);
         credential = cred;

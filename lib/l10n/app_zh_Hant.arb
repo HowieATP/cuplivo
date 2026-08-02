@@ -2637,9 +2637,7 @@
   "codexLoginCancelButton": "取消",
   "codexLoginAccountLabel": "ChatGPT 帳號",
   "codexLoginExpiresLabel": "令牌過期時間",
-  "codexLoginRefreshFailedToast": "令牌刷新失敗，請重新登入",
   "codexLoginSignedOutToast": "已登出",
   "codexLoginHelpText": "你將被引導至 ChatGPT 網站授權 Codex 存取。",
-  "codexLoginExpiredToast": "登入已過期，請重新開始",
   "codexLoginNetworkError": "網路錯誤，請重試"
 }

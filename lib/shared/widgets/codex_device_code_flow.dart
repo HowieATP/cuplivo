@@ -54,21 +54,22 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   DateTime? _deadline;
   Duration _remaining = kCodexFlowDeadline;
   late final SettingsProvider _settings;
+  late final CodexDeviceCodeController _controller;
 
   @override
   void initState() {
     super.initState();
     _settings = context.read<SettingsProvider>();
+    _controller = context.read<CodexDeviceCodeController>();
     _start();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    final c = CodexDeviceCodeController.instance;
-    if (c.status == CodexAuthStatus.waitingForUser ||
-        c.status == CodexAuthStatus.polling) {
-      c.cancel();
+    if (_controller.status == CodexAuthStatus.waitingForUser ||
+        _controller.status == CodexAuthStatus.polling) {
+      _controller.cancel();
     }
     super.dispose();
   }
@@ -82,7 +83,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
         _timer?.cancel();
         return;
       }
-      final status = CodexDeviceCodeController.instance.status;
+      final status = _controller.status;
       if (status == CodexAuthStatus.signedIn ||
           status == CodexAuthStatus.signedOut ||
           status == CodexAuthStatus.failed ||
@@ -96,16 +97,51 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       setState(() => _remaining = next);
       if (next == Duration.zero) _timer?.cancel();
     });
-    unawaited(
-      CodexDeviceCodeController.instance.startFlow(
+    unawaited(_runFlow());
+  }
+
+  /// Runs the flow; `startFlow` already handles most failures internally, so
+  /// this is a last-resort guard for pre-await exceptions (e.g. a client
+  /// factory throwing) that would otherwise surface as an unhandled future.
+  Future<void> _runFlow() async {
+    // startFlow() notifies synchronously up to its first await; defer past the
+    // build phase so initState-triggered flows never mark dependents dirty
+    // while a route (bottom sheet / dialog) is still mounting.
+    await Future<void>.delayed(Duration.zero);
+    try {
+      await _controller.startFlow(
         cfg: widget.cfg,
         onAuthenticated: _onAuthenticated,
-      ),
-    );
+      );
+    } catch (e, st) {
+      debugPrint('[CodexOAuth] startFlow threw: $e\n$st');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.codexLoginStatusFailed,
+        type: NotificationType.error,
+      );
+    }
   }
 
   Future<void> _onAuthenticated() async {
-    await _settings.setProviderConfig(kCodexProviderKey, codexProviderConfig());
+    try {
+      await _settings.setProviderConfig(
+        kCodexProviderKey,
+        codexProviderConfig(),
+      );
+    } catch (e, st) {
+      debugPrint('[CodexOAuth] setProviderConfig failed: $e\n$st');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.codexLoginNetworkError,
+          type: NotificationType.error,
+        );
+      }
+    }
+    // The credential is already persisted and signedIn: pop even when the
+    // provider-config write failed so the panel does not stay stuck.
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -149,6 +185,8 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
 
   @override
   Widget build(BuildContext context) {
+    // watch: subscribes to the same instance captured in [initState] so the
+    // UI rebuilds on status changes; no second instance source.
     final controller = context.watch<CodexDeviceCodeController>();
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;

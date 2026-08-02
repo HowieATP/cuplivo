@@ -12428,12 +12428,6 @@ abstract class AppLocalizations {
   /// **'Token expires'**
   String get codexLoginExpiresLabel;
 
-  /// No description provided for @codexLoginRefreshFailedToast.
-  ///
-  /// In en, this message translates to:
-  /// **'Token refresh failed, please sign in again'**
-  String get codexLoginRefreshFailedToast;
-
   /// No description provided for @codexLoginSignedOutToast.
   ///
   /// In en, this message translates to:
@@ -12445,12 +12439,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You will be redirected to the ChatGPT site to authorize Codex access.'**
   String get codexLoginHelpText;
-
-  /// No description provided for @codexLoginExpiredToast.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign-in expired, please start over'**
-  String get codexLoginExpiredToast;
 
   /// No description provided for @codexLoginNetworkError.
   ///

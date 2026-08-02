@@ -1056,16 +1056,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
-  if (CodexDeviceCodeController.isCodexHost(config)) {
-    await CodexDeviceCodeController.instance.ensureFresh();
-    if (!CodexDeviceCodeController.instance.isFresh) {
-      // Avoid sending an unauthenticated request that would 401 for sure.
-      throw HttpException(
-        'Codex session expired, please sign in again',
-        uri: Uri.parse(config.baseUrl),
-      );
-    }
-  }
+  await CodexDeviceCodeController.ensureFreshOrThrow(config);
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');

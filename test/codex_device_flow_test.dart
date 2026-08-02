@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/core/services/network/dio_http_client.dart';
 
 class _ScriptedClient extends http.BaseClient {
   final List<FutureOr<http.Response> Function(http.Request)> handlers = [];
@@ -61,6 +63,11 @@ ProviderConfig _cfg({
   ProviderKind? kind,
   bool? multiKey,
   bool? useResponseApi,
+  bool? proxyEnabled,
+  String proxyHost = '',
+  String proxyPort = '',
+  String proxyUsername = '',
+  String proxyPassword = '',
 }) => ProviderConfig(
   id: id,
   enabled: true,
@@ -70,6 +77,11 @@ ProviderConfig _cfg({
   providerType: kind,
   multiKeyEnabled: multiKey,
   useResponseApi: useResponseApi,
+  proxyEnabled: proxyEnabled,
+  proxyHost: proxyHost,
+  proxyPort: proxyPort,
+  proxyUsername: proxyUsername,
+  proxyPassword: proxyPassword,
 );
 
 CodexOAuthCredential _freshCred(String accountId) => CodexOAuthCredential(
@@ -122,6 +134,9 @@ void main() {
 
   tearDown(() {
     controller.resetForTest();
+    CodexDeviceCodeController.debugOverrideInstance(
+      CodexDeviceCodeController(),
+    );
   });
 
   group('startFlow', () {
@@ -197,7 +212,61 @@ void main() {
       );
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString(kCodexPrefsKey), isNotNull);
+      final raw = prefs.getString(kCodexPrefsKey);
+      expect(raw, isNotNull);
+      final decoded = jsonDecode(raw!) as Map<String, dynamic>;
+      expect(decoded['accountId'], 'acc-1');
+      expect(decoded['refreshToken'], 'rt-1');
+      expect(decoded['expiresAt'], isA<num>());
+      expect(decoded['proxy'], isNull);
+    });
+
+    test('happy path persists the sign-in proxy in prefs', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: _cfg(
+          id: 'Codex',
+          baseUrl: kCodexBaseUrl,
+          proxyEnabled: true,
+          proxyHost: '127.0.0.1',
+          proxyPort: '1080',
+          proxyUsername: 'user',
+          proxyPassword: 'pass',
+        ),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(controller.credential!.proxy, isNotNull);
+      expect(controller.credential!.proxy!.host, '127.0.0.1');
+      expect(controller.credential!.proxy!.port, 1080);
+      expect(controller.credential!.proxy!.type, 'http');
+      expect(controller.credential!.proxy!.username, 'user');
+      expect(controller.credential!.proxy!.password, 'pass');
+
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kCodexPrefsKey);
+      expect(raw, isNotNull);
+      final decoded = jsonDecode(raw!) as Map<String, dynamic>;
+      expect(decoded['proxy'], {
+        'type': 'http',
+        'host': '127.0.0.1',
+        'port': 1080,
+        'username': 'user',
+        'password': 'pass',
+      });
     });
 
     test('usercode 404 returns notEnabled with zero polls', () async {
@@ -542,7 +611,7 @@ void main() {
       );
       expect(second, CodexFlowOutcome.failed);
       controller.cancel();
-      await flow;
+      expect(await flow, CodexFlowOutcome.cancelled);
     });
   });
 
@@ -600,17 +669,19 @@ void main() {
       expect(controller.status, CodexAuthStatus.signedIn);
     });
 
-    test('keeps credential and status when refresh response is malformed',
-        () async {
-          controller.credential = _expiredCred('acc-1');
-          controller.status = CodexAuthStatus.signedIn;
-          client.handlers.add((_) async => _json(200, {'access_token': 'x'}));
+    test(
+      'keeps credential and status when refresh response is malformed',
+      () async {
+        controller.credential = _expiredCred('acc-1');
+        controller.status = CodexAuthStatus.signedIn;
+        client.handlers.add((_) async => _json(200, {'access_token': 'x'}));
 
-          await controller.ensureFresh();
+        await controller.ensureFresh();
 
-          expect(controller.credential, isNotNull);
-          expect(controller.status, CodexAuthStatus.signedIn);
-        });
+        expect(controller.credential, isNotNull);
+        expect(controller.status, CodexAuthStatus.signedIn);
+      },
+    );
 
     test('is single-flight under concurrency', () async {
       controller.credential = _expiredCred('acc-1');
@@ -626,6 +697,166 @@ void main() {
       ]);
 
       expect(client.requests.length, 1);
+    });
+
+    test('keeps credential and status on SocketException', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode(controller.credential!.toJson()),
+      );
+      client.handlers.add((_) async => throw const SocketException('refused'));
+
+      await controller.ensureFresh();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.status, CodexAuthStatus.signedIn);
+      expect(prefs.getString(kCodexPrefsKey), isNotNull);
+    });
+
+    test('keeps credential and status on TimeoutException', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
+      client.handlers.add((_) async => throw TimeoutException('slow response'));
+
+      await controller.ensureFresh();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.status, CodexAuthStatus.signedIn);
+    });
+  });
+
+  group('ensureFreshOrThrow', () {
+    test('returns immediately for non-codex hosts', () async {
+      await CodexDeviceCodeController.ensureFreshOrThrow(
+        _cfg(id: 'OpenAI', baseUrl: 'https://api.openai.com/v1'),
+      );
+
+      expect(client.requests, isEmpty);
+    });
+
+    test('throws HttpException when no credential exists', () async {
+      controller.status = CodexAuthStatus.signedOut;
+
+      await expectLater(
+        CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig()),
+        throwsA(isA<HttpException>()),
+      );
+      expect(client.requests, isEmpty);
+    });
+
+    test('throws HttpException when refresh is rejected', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      client.handlers.add((_) async => _json(400, {'error': 'invalid_grant'}));
+
+      await expectLater(
+        CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig()),
+        throwsA(isA<HttpException>()),
+      );
+      expect(controller.credential, isNull);
+    });
+
+    test('passes when refresh succeeds', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-2')));
+
+      await CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig());
+
+      expect(controller.isFresh, isTrue);
+      expect(controller.credential!.accountId, 'acc-2');
+    });
+  });
+
+  group('credential proxy persistence', () {
+    test('init() restores the proxy from prefs', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode({
+          'accessToken': _jwtWithAccount('acc-1'),
+          'refreshToken': 'rt-old',
+          'expiresAt': DateTime.now()
+              .subtract(const Duration(seconds: 1))
+              .millisecondsSinceEpoch,
+          'accountId': 'acc-1',
+          'proxy': {
+            'type': 'socks5',
+            'host': '127.0.0.1',
+            'port': 1080,
+            'username': 'user',
+            'password': 'pass',
+          },
+        }),
+      );
+
+      await controller.init();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.credential!.proxy, isNotNull);
+      expect(controller.credential!.proxy!.type, 'socks5');
+      expect(controller.credential!.proxy!.host, '127.0.0.1');
+      expect(controller.credential!.proxy!.port, 1080);
+      expect(controller.credential!.proxy!.username, 'user');
+      expect(controller.credential!.proxy!.password, 'pass');
+      expect(controller.status, CodexAuthStatus.expired);
+    });
+
+    test('init() tolerates a missing or malformed proxy block', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode({
+          'accessToken': _jwtWithAccount('acc-1'),
+          'refreshToken': 'rt-old',
+          'expiresAt': DateTime.now()
+              .subtract(const Duration(seconds: 1))
+              .millisecondsSinceEpoch,
+          'accountId': 'acc-1',
+          'proxy': {'host': '', 'port': 'not-a-number'},
+        }),
+      );
+
+      await controller.init();
+
+      expect(controller.credential, isNotNull);
+      expect(controller.credential!.proxy, isNull);
+    });
+
+    test('_doRefresh uses the persisted proxy after init()', () async {
+      NetworkProxyConfig? factoryProxy;
+      final proxiedClient = _ScriptedClient();
+      final restored = CodexDeviceCodeController(
+        clientFactory: (proxy) {
+          factoryProxy = proxy;
+          return proxiedClient;
+        },
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode({
+          'accessToken': _jwtWithAccount('acc-1'),
+          'refreshToken': 'rt-old',
+          'expiresAt': DateTime.now()
+              .subtract(const Duration(seconds: 1))
+              .millisecondsSinceEpoch,
+          'accountId': 'acc-1',
+          'proxy': {'type': 'http', 'host': 'proxy.example.com', 'port': 3128},
+        }),
+      );
+      await restored.init();
+      proxiedClient.handlers.add((_) async => _json(200, _tokenBody('acc-2')));
+
+      await restored.ensureFresh();
+
+      expect(factoryProxy, isNotNull);
+      expect(factoryProxy!.host, 'proxy.example.com');
+      expect(factoryProxy!.port, 3128);
+      expect(restored.credential!.accountId, 'acc-2');
     });
   });
 
@@ -722,6 +953,39 @@ void main() {
       expect(
         CodexDeviceCodeController.isCodexHost(
           _cfg(id: 'X', baseUrl: 'https://chatgpt.com/somewhere'),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex'),
+        ),
+        isTrue,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://www.chatgpt.com/backend-api/codex'),
+        ),
+        isTrue,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://notchatgpt.com/backend-api/codex'),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(
+            id: 'X',
+            baseUrl: 'https://chatgpt.com.evil.com/backend-api/codex',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://evil-chatgpt.com/backend-api/codex'),
         ),
         isFalse,
       );
@@ -899,5 +1163,27 @@ void main() {
       expect(controller.status, CodexAuthStatus.signedOut);
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
+
+    test(
+      'signOut during an in-flight refresh leaves the credential cleared',
+      () async {
+        controller.credential = _expiredCred('acc-1');
+        controller.status = CodexAuthStatus.expired;
+        client.handlers.add((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+          return _json(200, _tokenBody('acc-2'));
+        });
+
+        final refreshing = controller.ensureFresh();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await controller.signOut();
+        await refreshing;
+
+        expect(controller.credential, isNull);
+        expect(controller.status, CodexAuthStatus.signedOut);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString(kCodexPrefsKey), isNull);
+      },
+    );
   });
 }

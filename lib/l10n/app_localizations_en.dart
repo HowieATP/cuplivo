@@ -6815,18 +6815,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexLoginExpiresLabel => 'Token expires';
 
   @override
-  String get codexLoginRefreshFailedToast =>
-      'Token refresh failed, please sign in again';
-
-  @override
   String get codexLoginSignedOutToast => 'Signed out';
 
   @override
   String get codexLoginHelpText =>
       'You will be redirected to the ChatGPT site to authorize Codex access.';
-
-  @override
-  String get codexLoginExpiredToast => 'Sign-in expired, please start over';
 
   @override
   String get codexLoginNetworkError => 'Network error, please retry';

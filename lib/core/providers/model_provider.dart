@@ -351,6 +351,12 @@ class ProviderManager {
   /// Test-only injection point for the LLM http client, mirroring
   /// [ChatApiService.debugClientFactory]. When set, [_Http.clientFor]
   /// returns the factory's client; production code leaves this null.
+  ///
+  /// Process-global mutable test seam, not a configuration surface:
+  /// - Tests must restore it to null in tearDown (`addTearDown`) or it leaks
+  ///   into every later test in the same process.
+  /// - The injected client bypasses the [CancelToken] plumbing, so
+  ///   [ChatApiService.cancelRequest] becomes a no-op while it is set.
   @visibleForTesting
   static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
   debugClientFactory;

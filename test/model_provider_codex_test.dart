@@ -90,6 +90,12 @@ void main() {
     test(
       'testConnection on a codex host without sign-in throws and never sends a request',
       () async {
+        // Route the LLM client through the rejecting client too, so a
+        // regression that moved the guard after client construction fails
+        // loudly instead of silently using a real DioHttpClient.
+        ProviderManager.debugClientFactory = (cfg, {proxy}) => client;
+        addTearDown(() => ProviderManager.debugClientFactory = null);
+
         await expectLater(
           ProviderManager.testConnection(
             codexProviderConfig(),
@@ -111,10 +117,16 @@ void main() {
     );
 
     test('listModels on a codex host returns the fixed model set', () async {
+      // Same lock as testConnection: the codex-host branch must return the
+      // fixed model set with zero network traffic.
+      ProviderManager.debugClientFactory = (cfg, {proxy}) => client;
+      addTearDown(() => ProviderManager.debugClientFactory = null);
+
       final models = await ProviderManager.listModels(codexProviderConfig());
 
       expect(models.length, kCodexModels.length);
       expect(models.map((m) => m.id).toSet(), kCodexModels.toSet());
+      expect(client.requests, isEmpty);
     });
 
     test(

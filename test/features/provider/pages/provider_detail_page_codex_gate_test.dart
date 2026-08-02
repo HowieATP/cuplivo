@@ -12,7 +12,10 @@ import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
 
 Future<SettingsProvider> _createSettings(
   WidgetTester tester, {
-  required bool multiKey,
+  required String keyName,
+  required ProviderKind kind,
+  required String baseUrl,
+  bool multiKey = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final settings = SettingsProvider();
@@ -21,14 +24,14 @@ Future<SettingsProvider> _createSettings(
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
   await settings.setProviderConfig(
-    'OpenAI',
+    keyName,
     ProviderConfig(
-      id: 'OpenAI',
+      id: keyName,
       enabled: true,
-      name: 'OpenAI',
+      name: keyName,
       apiKey: 'test-key',
-      baseUrl: 'https://api.openai.com/v1',
-      providerType: ProviderKind.openai,
+      baseUrl: baseUrl,
+      providerType: kind,
       multiKeyEnabled: multiKey,
       models: const ['gpt-4o'],
     ),
@@ -38,8 +41,10 @@ Future<SettingsProvider> _createSettings(
 
 Widget _harness(
   SettingsProvider settings,
-  CodexDeviceCodeController controller,
-) {
+  CodexDeviceCodeController controller, {
+  required String keyName,
+  required String displayName,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
@@ -53,7 +58,7 @@ Widget _harness(
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const ProviderDetailPage(keyName: 'OpenAI', displayName: 'OpenAI'),
+      home: ProviderDetailPage(keyName: keyName, displayName: displayName),
     ),
   );
 }
@@ -83,10 +88,17 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final settings = await _createSettings(tester, multiKey: false);
+    final settings = await _createSettings(
+      tester,
+      keyName: 'OpenAI',
+      kind: ProviderKind.openai,
+      baseUrl: 'https://api.openai.com/v1',
+    );
     addTearDown(settings.dispose);
 
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(
+      _harness(settings, controller, keyName: 'OpenAI', displayName: 'OpenAI'),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(CodexAccountEntry), findsOneWidget);
@@ -98,13 +110,101 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final settings = await _createSettings(tester, multiKey: true);
+    final settings = await _createSettings(
+      tester,
+      keyName: 'OpenAI',
+      kind: ProviderKind.openai,
+      baseUrl: 'https://api.openai.com/v1',
+      multiKey: true,
+    );
     addTearDown(settings.dispose);
 
-    await tester.pumpWidget(_harness(settings, controller));
+    await tester.pumpWidget(
+      _harness(settings, controller, keyName: 'OpenAI', displayName: 'OpenAI'),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('claude provider never shows the Codex account entry', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final settings = await _createSettings(
+      tester,
+      keyName: 'Claude',
+      kind: ProviderKind.claude,
+      baseUrl: 'https://api.anthropic.com/v1',
+    );
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(
+      _harness(settings, controller, keyName: 'Claude', displayName: 'Claude'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('gemini provider never shows the Codex account entry', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final settings = await _createSettings(
+      tester,
+      keyName: 'Gemini',
+      kind: ProviderKind.google,
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    );
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(
+      _harness(settings, controller, keyName: 'Gemini', displayName: 'Gemini'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'custom openai provider on a codex host shows the account entry',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = await _createSettings(
+        tester,
+        keyName: 'MyCodex',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://chatgpt.com/backend-api/codex',
+      );
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        _harness(
+          settings,
+          controller,
+          keyName: 'MyCodex',
+          displayName: 'MyCodex',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // A user-added openai provider pointed at the codex host is treated
+      // like the built-in codex provider.
+      expect(find.byType(CodexAccountEntry), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

@@ -12329,7 +12329,7 @@ abstract class AppLocalizations {
   /// No description provided for @codexLoginSignInButton.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with your Codex account'**
+  /// **'Sign in with your ChatGPT account'**
   String get codexLoginSignInButton;
 
   /// No description provided for @codexLoginSignOutButton.

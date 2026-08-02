@@ -155,6 +155,21 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
           _localFlowFailed = true;
           _localFlowTitle = AppLocalizations.of(context)!.codexLoginNotEnabled;
         });
+      } else if (outcome == CodexFlowOutcome.failed &&
+          _controller.status != CodexAuthStatus.failed) {
+        // startFlow failed without a terminal controller status (e.g. the
+        // reentrancy guard swallowed a restart while the previous flow was
+        // still polling): the controller would otherwise keep rendering a
+        // code-less waiting view forever. The local failed view keeps the
+        // retry/close buttons reachable. Genuine flow failures already set
+        // status=failed and render the controller-driven error view with the
+        // detail message, so they are not shadowed here.
+        setState(() {
+          _localFlowFailed = true;
+          _localFlowTitle = AppLocalizations.of(
+            context,
+          )!.codexLoginStatusFailed;
+        });
       }
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow threw: $e\n$st');
@@ -547,13 +562,25 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
             // While the controller is still polling (e.g. the local countdown
-            // hit zero before the controller deadline fired), a retry would
-            // be swallowed by the startFlow reentrancy guard; keep it
-            // disabled until the poll loop actually ended.
+            // hit zero before the controller deadline fired), a plain retry
+            // would be swallowed by the startFlow reentrancy guard; the
+            // cancel-first handler below stops the old loop so startFlow can
+            // re-enter. A guard rejection is covered by the local failed
+            // fallback instead of a dead waiting view.
             enabled:
-                controller.status != CodexAuthStatus.waitingForUser &&
-                controller.status != CodexAuthStatus.polling,
-            onTap: _start,
+                (controller.status != CodexAuthStatus.waitingForUser &&
+                    controller.status != CodexAuthStatus.polling) ||
+                _countdownExpired,
+            onTap: () {
+              if (_countdownExpired) {
+                // The local countdown expired while the controller-side flow
+                // may still be running: cancel it (the flow exits back to
+                // signedOut) before restarting, otherwise the restart is
+                // swallowed by the reentrancy guard.
+                _controller.cancel();
+              }
+              _start();
+            },
           ),
         ),
         const SizedBox(height: 4),

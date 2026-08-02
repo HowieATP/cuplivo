@@ -562,6 +562,12 @@ class ChatApiService {
   /// [_clientFor] hands the factory's client to every request instead of a
   /// real DioHttpClient; production code leaves this null so the regular
   /// proxy/cancel-token construction is untouched.
+  ///
+  /// Process-global mutable test seam, not a configuration surface:
+  /// - Tests must restore it to null in tearDown (`addTearDown`) or it leaks
+  ///   into every later test in the same process.
+  /// - The injected client bypasses the [CancelToken] plumbing, so
+  ///   [ChatApiService.cancelRequest] becomes a no-op while it is set.
   @visibleForTesting
   static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
   debugClientFactory;

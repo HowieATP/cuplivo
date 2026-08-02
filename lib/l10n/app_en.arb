@@ -3170,7 +3170,7 @@
   "groupChatAssistantNoModel": "Selected assistant has no model configured.",
   "codexLoginTitle": "Codex Account Login",
   "codexLoginSubtitle": "Sign in with your ChatGPT account to access Codex models.",
-  "codexLoginSignInButton": "Sign in with your Codex account",
+  "codexLoginSignInButton": "Sign in with your ChatGPT account",
   "codexLoginSignOutButton": "Sign out",
   "codexLoginSignOutConfirm": "This removes the saved ChatGPT credentials from this device.",
   "codexLoginCloseButton": "Close",

@@ -6763,7 +6763,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Sign in with your ChatGPT account to access Codex models.';
 
   @override
-  String get codexLoginSignInButton => 'Sign in with your Codex account';
+  String get codexLoginSignInButton => 'Sign in with your ChatGPT account';
 
   @override
   String get codexLoginSignOutButton => 'Sign out';

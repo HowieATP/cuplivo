@@ -181,6 +181,11 @@ Future<void> _waitForRequests(
   while (client.requests.length < count && DateTime.now().isBefore(deadline)) {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
+  if (client.requests.length < count) {
+    throw StateError(
+      'Timed out waiting for $count requests; got ${client.requests.length}',
+    );
+  }
 }
 
 void main() {
@@ -538,6 +543,131 @@ void main() {
       expect(client.requests.length, 2);
     });
 
+    test('403 with pending error code keeps polling', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async => _json(403, {'error': 'deviceauth_authorization_pending'}),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      // The pending code must not be swallowed by the unknown-code fail-fast:
+      // a subsequent poll request proves the loop kept going.
+      expect(outcome, CodexFlowOutcome.success);
+      expect(client.requests.length, 4);
+      expect(client.requests[2].url.toString(), kCodexPollEndpoint);
+    });
+
+    test('429 poll keeps polling instead of failing fast', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => _json(429, {'error': 'server_busy'}));
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      // A transient rate limit must not kill the login: the loop keeps
+      // polling until a success or the deadline.
+      expect(outcome, CodexFlowOutcome.success);
+      expect(client.requests.length, 4);
+      expect(client.requests[2].url.toString(), kCodexPollEndpoint);
+    });
+
+    test('500 poll keeps polling instead of failing fast', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => http.Response('oops', 500));
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(client.requests.length, 4);
+      expect(client.requests[2].url.toString(), kCodexPollEndpoint);
+    });
+
+    test('502 poll with an error code keeps polling too', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => _json(502, {'error': 'bad_gateway'}));
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(client.requests.length, 4);
+    });
+
+    test('400 with an unknown error code still fails fast', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => _json(400, {'error': 'bad_request'}));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(client.requests.length, 2);
+    });
+
     test('403 slow_down keeps polling instead of failing fast', () async {
       client.handlers.add(
         (_) async => _json(200, {
@@ -871,7 +1001,7 @@ void main() {
       );
       await _waitForRequests(client, 2);
       controller.cancel();
-      final outcome = await flow;
+      final outcome = await flow.timeout(const Duration(seconds: 5));
       sw.stop();
 
       expect(outcome, CodexFlowOutcome.cancelled);
@@ -910,7 +1040,7 @@ void main() {
       // Release the exchange response only after the cancel landed, so the
       // ordering is deterministic instead of racing a fixed delay.
       exchangeGate.complete(_json(200, _tokenBody('acc-1')));
-      final outcome = await flow;
+      final outcome = await flow.timeout(const Duration(seconds: 5));
 
       expect(outcome, CodexFlowOutcome.cancelled);
       expect(controller.status, CodexAuthStatus.signedOut);
@@ -950,10 +1080,10 @@ void main() {
       );
       // The exchange has completed and the credential write is parked on
       // the gate: this is "cancel during persist".
-      await gated.writeStarted;
+      await gated.writeStarted.timeout(const Duration(seconds: 5));
       controller.cancel();
       gated.releaseWrite();
-      final outcome = await flow;
+      final outcome = await flow.timeout(const Duration(seconds: 5));
 
       expect(outcome, CodexFlowOutcome.cancelled);
       expect(controller.status, CodexAuthStatus.signedOut);
@@ -1041,7 +1171,10 @@ void main() {
       );
       expect(second, CodexFlowOutcome.failed);
       controller.cancel();
-      expect(await flow, CodexFlowOutcome.cancelled);
+      expect(
+        await flow.timeout(const Duration(seconds: 5)),
+        CodexFlowOutcome.cancelled,
+      );
     });
   });
 
@@ -1406,6 +1539,115 @@ void main() {
     });
   });
 
+  group('sign-in proxy lifecycle', () {
+    test(
+      'a failed flow no longer routes refreshes through the sign-in proxy',
+      () async {
+        NetworkProxyConfig? factoryProxy;
+        final proxiedClient = _ScriptedClient();
+        final proxied = CodexDeviceCodeController(
+          clientFactory: (proxy) {
+            factoryProxy = proxy;
+            return proxiedClient;
+          },
+        );
+        CodexDeviceCodeController.debugOverrideInstance(proxied);
+        proxiedClient.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        proxiedClient.handlers.add(
+          (_) async => _json(403, {
+            'error': {'code': 'access_denied'},
+          }),
+        );
+
+        final outcome = await proxied.startFlow(
+          cfg: _cfg(
+            id: 'Codex',
+            baseUrl: kCodexBaseUrl,
+            proxyEnabled: true,
+            proxyHost: '127.0.0.1',
+            proxyPort: '1080',
+          ),
+          onAuthenticated: () async {},
+        );
+
+        expect(outcome, CodexFlowOutcome.failed);
+        expect(proxied.status, CodexAuthStatus.failed);
+
+        // A later refresh of a proxy-less credential must not reuse the
+        // failed flow's proxy: _fail() clears _signInProxy.
+        proxied.credential = _expiredCred('acc-1');
+        proxied.status = CodexAuthStatus.expired;
+        factoryProxy = null;
+        proxiedClient.handlers.add(
+          (_) async => _json(200, _tokenBody('acc-2')),
+        );
+
+        await proxied.ensureFresh();
+
+        expect(factoryProxy, isNull);
+        expect(proxied.credential!.accountId, 'acc-2');
+      },
+    );
+
+    test(
+      'a cancelled flow no longer routes refreshes through the sign-in proxy',
+      () async {
+        NetworkProxyConfig? factoryProxy;
+        final proxiedClient = _ScriptedClient();
+        final proxied = CodexDeviceCodeController(
+          clientFactory: (proxy) {
+            factoryProxy = proxy;
+            return proxiedClient;
+          },
+        );
+        CodexDeviceCodeController.debugOverrideInstance(proxied);
+        proxiedClient.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '5',
+          }),
+        );
+        proxiedClient.handlers.add((_) async => http.Response('{}', 403));
+
+        final flow = proxied.startFlow(
+          cfg: _cfg(
+            id: 'Codex',
+            baseUrl: kCodexBaseUrl,
+            proxyEnabled: true,
+            proxyHost: '127.0.0.1',
+            proxyPort: '1080',
+          ),
+          onAuthenticated: () async {},
+        );
+        await _waitForRequests(proxiedClient, 2);
+        proxied.cancel();
+        final outcome = await flow.timeout(const Duration(seconds: 5));
+
+        expect(outcome, CodexFlowOutcome.cancelled);
+        expect(proxied.status, CodexAuthStatus.signedOut);
+
+        proxied.credential = _expiredCred('acc-1');
+        proxied.status = CodexAuthStatus.expired;
+        factoryProxy = null;
+        proxiedClient.handlers.add(
+          (_) async => _json(200, _tokenBody('acc-2')),
+        );
+
+        await proxied.ensureFresh();
+
+        expect(factoryProxy, isNull);
+        expect(proxied.credential!.accountId, 'acc-2');
+      },
+    );
+  });
+
   group('maybeCodexHeaders', () {
     test('empty for non-codex hosts', () {
       controller.credential = _freshCred('acc-1');
@@ -1615,6 +1857,30 @@ void main() {
       );
       expect(CodexDeviceCodeController.showEntryFor(_cfg(id: 'X')), isFalse);
     });
+
+    test('proxyFromConfig rejects unparseable or out-of-range ports', () {
+      NetworkProxyConfig? proxyOf(String port) =>
+          CodexDeviceCodeController.proxyFromConfig(
+            _cfg(
+              id: 'X',
+              baseUrl: kCodexBaseUrl,
+              proxyEnabled: true,
+              proxyHost: '127.0.0.1',
+              proxyPort: port,
+            ),
+          );
+
+      // A non-numeric port must be "no proxy", not a silent 8080 default.
+      expect(proxyOf('not-a-number'), isNull);
+      expect(proxyOf(''), isNull);
+      expect(proxyOf('0'), isNull);
+      expect(proxyOf('-1'), isNull);
+      expect(proxyOf('65536'), isNull);
+      // Boundary values stay valid.
+      expect(proxyOf('1'), isNotNull);
+      expect(proxyOf('65535'), isNotNull);
+      expect(proxyOf('1080'), isNotNull);
+    });
   });
 
   group('codexProviderConfig', () {
@@ -1761,8 +2027,8 @@ void main() {
         // signOut awaits the in-flight refresh; release its response only
         // after signOut has started, so the ordering is deterministic.
         refreshGate.complete(_json(200, _tokenBody('acc-2')));
-        await signOutFuture;
-        await refreshing;
+        await signOutFuture.timeout(const Duration(seconds: 5));
+        await refreshing.timeout(const Duration(seconds: 5));
 
         expect(controller.credential, isNull);
         expect(controller.status, CodexAuthStatus.signedOut);
@@ -1829,7 +2095,7 @@ void main() {
         await _waitForRequests(client, 3);
         await controller.signOut();
         exchangeGate.complete(_json(200, _tokenBody('acc-1')));
-        final outcome = await flow;
+        final outcome = await flow.timeout(const Duration(seconds: 5));
 
         expect(outcome, CodexFlowOutcome.cancelled);
         expect(controller.status, CodexAuthStatus.signedOut);
@@ -1863,7 +2129,7 @@ void main() {
             'interval': '1',
           }),
         );
-        final outcome = await flow;
+        final outcome = await flow.timeout(const Duration(seconds: 5));
 
         expect(outcome, CodexFlowOutcome.cancelled);
         expect(controller.status, CodexAuthStatus.signedOut);

@@ -241,7 +241,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
     final user = (cfg.proxyUsername ?? '').trim();
     final pass = (cfg.proxyPassword ?? '').trim();
     if (!enabled || host.isEmpty || portStr.isEmpty) return null;
-    final port = int.tryParse(portStr) ?? 8080;
+    final port = int.tryParse(portStr);
+    // An unparseable or out-of-range port is treated as "no proxy" instead
+    // of silently substituting a magic default port.
+    if (port == null || port <= 0 || port > 65535) return null;
     return NetworkProxyConfig(
       enabled: true,
       type: ProviderConfig.resolveProxyType(cfg.proxyType),
@@ -338,6 +341,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
   void _flowEnded() {
     usercode = null;
     verificationUri = null;
+    // The sign-in proxy must not outlive its flow: a later refresh would
+    // otherwise route through a proxy belonging to a flow that already
+    // ended (failed / cancelled / timed out).
+    _signInProxy = null;
     if (status != CodexAuthStatus.signedIn) {
       status = CodexAuthStatus.signedOut;
     }
@@ -348,6 +355,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
     errorMessage = message;
     usercode = null;
     verificationUri = null;
+    // Same lifecycle rule as _flowEnded: a refresh triggered after the flow
+    // failed (credential unchanged, ensureFresh may still fire) must not
+    // reuse the aborted flow's proxy.
+    _signInProxy = null;
     status = CodexAuthStatus.failed;
     notifyListeners();
   }
@@ -510,6 +521,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
             debugPrint(
               '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
             );
+          } else if (errCode == 'deviceauth_authorization_pending') {
+            // Pending keeps polling even on a 403/404 envelope: the device
+            // flow can surface the pending code under either status.
           } else if (errCode == 'access_denied' ||
               errCode == 'expired_token' ||
               errCode == 'deviceauth_authorization_denied') {
@@ -522,8 +536,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
             _fail('Codex device auth rejected with code: $errCode');
             return CodexFlowOutcome.failed;
           }
-        }
-        if (resp.statusCode != 403 && resp.statusCode != 404) {
+        } else {
           final errCode = _extractErrorCode(resp);
           if (errCode == 'deviceauth_authorization_pending') {
             // still pending
@@ -534,6 +547,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
                     .toInt();
             debugPrint(
               '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
+            );
+          } else if (resp.statusCode == 429 || resp.statusCode >= 500) {
+            // Transient server errors (rate limit / 5xx) must not kill the
+            // login: keep polling until the next attempt or the deadline.
+            debugPrint(
+              '[CodexOAuth] poll transient status ${resp.statusCode}, '
+              'keeping polling',
             );
           } else {
             _fail('Codex device auth failed with status ${resp.statusCode}');

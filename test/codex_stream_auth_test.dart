@@ -361,5 +361,51 @@ void main() {
       expect(_headerOf(req, 'chatgpt-account-id'), 'acc-1');
       expect(_headerOf(req, 'OpenAI-Beta'), isNull);
     });
+
+    test('non-codex host never receives codex auth headers', () async {
+      controller.credential = CodexOAuthCredential(
+        accessToken: _jwtWithAccount('acc-1'),
+        refreshToken: 'rt-old',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        accountId: 'acc-1',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+      final recorded = _RecordingClient();
+      ChatApiService.debugClientFactory = (cfg, {proxy}) => recorded;
+      addTearDown(() => ChatApiService.debugClientFactory = null);
+
+      // A signed-in Codex controller must not leak OAuth credentials to a
+      // plain openai endpoint even when the provider kind is openai.
+      await expectLater(
+        ChatApiService.sendMessageStream(
+          config: ProviderConfig(
+            id: 'OpenAI',
+            enabled: true,
+            name: 'OpenAI',
+            apiKey: 'sk-test',
+            baseUrl: 'https://api.openai.com/v1',
+            providerType: ProviderKind.openai,
+            models: const ['gpt-4o'],
+          ),
+          modelId: 'gpt-4o',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          stream: true,
+        ).toList(),
+        throwsA(isA<HttpException>()),
+      );
+
+      expect(recorded.requests, hasLength(1));
+      final req = recorded.requests.single;
+      expect(req.url.host, 'api.openai.com');
+      expect(
+        _headerOf(req, 'Authorization'),
+        isNot('Bearer ${_jwtWithAccount('acc-1')}'),
+      );
+      expect(_headerOf(req, 'chatgpt-account-id'), isNull);
+      // The regular api-key path is untouched.
+      expect(_headerOf(req, 'Authorization'), 'Bearer sk-test');
+    });
   });
 }

@@ -6530,6 +6530,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get codexLoginNotEnabled => '该账号暂不支持 Codex 设备码登录。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13058,6 +13061,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get codexLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get codexLoginNotEnabled => '该账号暂不支持 Codex 设备码登录。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -19587,4 +19593,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codexLoginNetworkError => '網路錯誤，請重試';
+
+  @override
+  String get codexLoginNotEnabled => '該帳號暫不支援 Codex 裝置碼登入。';
 }

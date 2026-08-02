@@ -16,6 +16,8 @@ Future<SettingsProvider> _createSettings(
 }) async {
   SharedPreferences.setMockInitialValues({});
   final settings = SettingsProvider();
+  // Drain the async _load() kicked off by the SettingsProvider constructor so
+  // the setProviderConfig below does not race an in-flight load.
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
   await settings.setProviderConfig(

@@ -359,17 +359,16 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       // The credential landed but the provider write failed: the flow stays
-      // open on the error view instead of popping into an orphan state.
+      // open on the error view instead of popping into an orphan state. The
+      // view shows only the localized failure copy, never the raw exception.
       expect(flowController.status, CodexAuthStatus.signedIn);
       expect(flowController.credential, isNotNull);
       expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
-      expect(find.textContaining('disk full'), findsOneWidget);
 
       // Retrying the write fails again and keeps the error view.
       await tester.tap(find.text(_l10n.codexLoginSignInButton));
       await tester.pump();
       expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
-      expect(find.textContaining('disk full'), findsOneWidget);
     },
   );
 }

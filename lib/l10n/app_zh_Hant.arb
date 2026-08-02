@@ -2639,5 +2639,6 @@
   "codexLoginExpiresLabel": "令牌過期時間",
   "codexLoginSignedOutToast": "已登出",
   "codexLoginHelpText": "開啟 ChatGPT 授權頁面，輸入驗證碼完成 Codex 授權。",
-  "codexLoginNetworkError": "網路錯誤，請重試"
+  "codexLoginNetworkError": "網路錯誤，請重試",
+  "codexLoginNotEnabled": "該帳號暫不支援 Codex 裝置碼登入。"
 }

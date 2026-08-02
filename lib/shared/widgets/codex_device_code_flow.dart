@@ -55,8 +55,14 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   Duration _remaining = kCodexFlowDeadline;
   bool _countdownExpired = false;
   bool _starting = false;
+  // Local failure state for failures that leave the controller without a
+  // terminal status (e.g. a synchronous throw from startFlow's client
+  // factory before its first await, or a notEnabled outcome): the controller
+  // would otherwise sit in waitingForUser with no errorMessage, rendering a
+  // permanent spinner.
+  bool _localFlowFailed = false;
+  String _localFlowTitle = '';
   bool _providerWriteError = false;
-  String? _providerWriteErrorDetail;
   late final SettingsProvider _settings;
   late final CodexDeviceCodeController _controller;
 
@@ -82,8 +88,9 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     _deadline = DateTime.now().add(kCodexFlowDeadline);
     _remaining = kCodexFlowDeadline;
     _countdownExpired = false;
+    _localFlowFailed = false;
+    _localFlowTitle = '';
     _providerWriteError = false;
-    _providerWriteErrorDetail = null;
     // Cover the deferred startFlow window: until _runFlow actually starts the
     // flow, the controller still reports its previous terminal state and the
     // first frame would flash it.
@@ -135,18 +142,27 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       setState(() => _starting = false);
     }
     try {
-      await _controller.startFlow(
+      final outcome = await _controller.startFlow(
         cfg: widget.cfg,
         onAuthenticated: _onAuthenticated,
       );
+      if (!mounted) return;
+      if (outcome == CodexFlowOutcome.notEnabled) {
+        // The controller is already back to signedOut; surface the
+        // account-level rejection on a retryable local error view instead of
+        // the bare "not signed in" end state.
+        setState(() {
+          _localFlowFailed = true;
+          _localFlowTitle = AppLocalizations.of(context)!.codexLoginNotEnabled;
+        });
+      }
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow threw: $e\n$st');
       if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: AppLocalizations.of(context)!.codexLoginStatusFailed,
-        type: NotificationType.error,
-      );
+      setState(() {
+        _localFlowFailed = true;
+        _localFlowTitle = AppLocalizations.of(context)!.codexLoginStatusFailed;
+      });
     }
   }
 
@@ -160,13 +176,11 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       // Provider-config write failure is a persistence problem, not a
       // network problem: keep the flow open on an error view instead of
       // popping into an orphan state (credential persisted but the provider
-      // never created).
+      // never created). The raw exception stays in the log; the view shows
+      // only the localized failure copy.
       debugPrint('[CodexOAuth] setProviderConfig failed: $e\n$st');
       if (mounted) {
-        setState(() {
-          _providerWriteError = true;
-          _providerWriteErrorDetail = '$e';
-        });
+        setState(() => _providerWriteError = true);
       }
       return;
     }
@@ -185,9 +199,6 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       );
     } catch (e, st) {
       debugPrint('[CodexOAuth] setProviderConfig retry failed: $e\n$st');
-      if (mounted) {
-        setState(() => _providerWriteErrorDetail = '$e');
-      }
       return;
     }
     if (!mounted) return;
@@ -239,7 +250,15 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    final Widget content = _providerWriteError
+    final Widget content = _localFlowFailed
+        ? _buildLocalFailed(
+            l10n,
+            cs,
+            _localFlowTitle.isEmpty
+                ? l10n.codexLoginStatusFailed
+                : _localFlowTitle,
+          )
+        : _providerWriteError
         ? _buildProviderWriteError(l10n, cs)
         : switch (controller.status) {
             CodexAuthStatus.waitingForUser || CodexAuthStatus.polling =>
@@ -426,13 +445,45 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: IosTileButton(
+            icon: Lucide.RefreshCw,
+            label: l10n.codexLoginSignInButton,
+            backgroundColor: cs.primary,
+            onTap: _retryProviderWrite,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextButton(
+          onPressed: _cancel,
+          child: Text(l10n.codexLoginCancelButton),
+        ),
+      ],
+    );
+  }
+
+  /// Local failure view for errors that never reached the controller's
+  /// terminal statuses: the retry is always enabled because the controller
+  /// may be stuck in a pre-flow state that the controller-driven failed view
+  /// would keep disabled.
+  Widget _buildLocalFailed(
+    AppLocalizations l10n,
+    ColorScheme cs,
+    String title,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Lucide.TriangleAlert, size: 28, color: cs.error),
+        const SizedBox(height: 12),
         Text(
-          _providerWriteErrorDetail ?? '',
+          title,
           style: TextStyle(
-            fontSize: 12,
-            color: cs.error.withValues(alpha: 0.9),
-            height: 1.4,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
           ),
           textAlign: TextAlign.center,
         ),
@@ -443,7 +494,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            onTap: _retryProviderWrite,
+            onTap: _start,
           ),
         ),
         const SizedBox(height: 4),

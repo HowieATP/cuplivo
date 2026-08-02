@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -36,6 +38,56 @@ class _ScriptedClient extends http.BaseClient {
       resp.statusCode,
       headers: resp.headers,
     );
+  }
+}
+
+/// SharedPreferences store that can park a write on a gate. Lets a test land
+/// a cancel() deterministically while the controller's credential persist is
+/// still in flight - the one race window the poll-loop and exchange cancel
+/// checks cannot observe from the scripted client side.
+class _GatedPrefsStore extends SharedPreferencesStorePlatform {
+  final Map<String, Object> data = {};
+  final Completer<void> _writeStarted = Completer<void>();
+  Completer<void>? _writeGate;
+
+  void parkWrite() {
+    _writeGate = Completer<void>();
+  }
+
+  void releaseWrite() {
+    _writeGate?.complete();
+  }
+
+  /// Completes when the parked write has actually been invoked.
+  Future<void> get writeStarted => _writeStarted.future;
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async {
+    final gate = _writeGate;
+    if (gate != null) {
+      if (!_writeStarted.isCompleted) _writeStarted.complete();
+      await gate.future;
+      // Only clear after the release so releaseWrite can still complete the
+      // gate while this write is parked on it.
+      _writeGate = null;
+    }
+    data[key] = value;
+    return true;
+  }
+
+  @override
+  Future<Map<String, Object>> getAll() async => Map<String, Object>.of(data);
+
+  @override
+  Future<bool> remove(String key) async {
+    data.remove(key);
+    return true;
+  }
+
+  @override
+  Future<bool> clear() async {
+    data.clear();
+    return true;
   }
 }
 
@@ -220,11 +272,12 @@ void main() {
       );
       expect(exchangeReq.body, contains('client_id=$kCodexClientId'));
 
-      // String interval '2' honored: the wait lands in [1s, 4s), which the
-      // 5s default (>= 4s) and the 1s minimum clamp (exactly ~1s) cannot
-      // satisfy, so this window pins the server value.
+      // String interval '2' honored: the wait lands in [1.5s, 4s), which the
+      // 5s default (>= 4s) and the 1s minimum clamp (~1s) cannot satisfy, so
+      // this window pins the server value (1500ms lower bound excludes a
+      // regression to the 1s clamp).
       final pollGap = poll2At!.difference(poll1At!);
-      expect(pollGap, greaterThanOrEqualTo(const Duration(seconds: 1)));
+      expect(pollGap, greaterThanOrEqualTo(const Duration(milliseconds: 1500)));
       expect(pollGap, lessThan(const Duration(seconds: 4)));
 
       final prefs = await SharedPreferences.getInstance();
@@ -865,6 +918,73 @@ void main() {
       expect(onAuthenticatedCalls, 0);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('cancel landing while the credential persist is in flight resets the '
+        'flow for reentry', () async {
+      // Park the persist write so the cancel lands exactly inside
+      // _persistCredential: the one window neither the poll-loop nor the
+      // exchange cancel checks can observe from the scripted client.
+      SharedPreferences.setMockInitialValues({});
+      final gated = _GatedPrefsStore();
+      SharedPreferencesStorePlatform.instance = gated;
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+      gated.parkWrite();
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+      // The exchange has completed and the credential write is parked on
+      // the gate: this is "cancel during persist".
+      await gated.writeStarted;
+      controller.cancel();
+      gated.releaseWrite();
+      final outcome = await flow;
+
+      expect(outcome, CodexFlowOutcome.cancelled);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+
+      // Reentrancy: a fresh flow must start after the cancelled one, not be
+      // blocked by a lingering polling status or a stale _cancelled flag.
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-2',
+          'user_code': 'DEF-GHI',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-2', 'code_verifier': 'cv-2'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-2')));
+
+      final second = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(second, CodexFlowOutcome.success);
+      expect(controller.status, CodexAuthStatus.signedIn);
+      expect(controller.credential!.accountId, 'acc-2');
     });
 
     test('cancel after credential persist still returns success', () async {
@@ -1717,6 +1837,43 @@ void main() {
         expect(onAuthenticatedCalls, 0);
         final prefs = await SharedPreferences.getInstance();
         expect(prefs.getString(kCodexPrefsKey), isNull);
+      },
+    );
+
+    test(
+      'signOut while the usercode request is in flight never flips to polling',
+      () async {
+        final usercodeGate = Completer<http.Response>();
+        client.handlers.add((_) => usercodeGate.future);
+
+        final statuses = <CodexAuthStatus>[];
+        controller.addListener(() => statuses.add(controller.status));
+        final flow = controller.startFlow(
+          cfg: codexProviderConfig(),
+          onAuthenticated: () async {
+            onAuthenticatedCalls++;
+          },
+        );
+        await _waitForRequests(client, 1);
+        await controller.signOut();
+        usercodeGate.complete(
+          _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        final outcome = await flow;
+
+        expect(outcome, CodexFlowOutcome.cancelled);
+        expect(controller.status, CodexAuthStatus.signedOut);
+        // The cancelled flow must not publish the code or flip into polling:
+        // a late usercode response must not resurrect the flow state.
+        expect(controller.usercode, isNull);
+        expect(controller.verificationUri, isNull);
+        expect(controller.errorMessage, isNull);
+        expect(onAuthenticatedCalls, 0);
+        expect(statuses, isNot(contains(CodexAuthStatus.polling)));
       },
     );
   });

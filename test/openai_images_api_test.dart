@@ -262,12 +262,14 @@ void main() {
 
       late String? authorization;
       late String? accountHeader;
+      late Uri requestUri;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
       });
 
       server.listen((request) async {
+        requestUri = request.uri;
         authorization = request.headers.value(HttpHeaders.authorizationHeader);
         accountHeader = request.headers.value('chatgpt-account-id');
         await request.drain<void>();
@@ -293,6 +295,7 @@ void main() {
 
       // The Images API path never merges Codex OAuth headers, even when a
       // codex account is signed in.
+      expect(requestUri.path, '/v1/images/generations');
       expect(authorization, 'Bearer test-key');
       expect(accountHeader, isNull);
     });

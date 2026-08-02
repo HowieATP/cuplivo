@@ -2639,5 +2639,6 @@
   "codexLoginExpiresLabel": "令牌过期时间",
   "codexLoginSignedOutToast": "已退出登录",
   "codexLoginHelpText": "打开 ChatGPT 授权页面，输入验证码完成 Codex 授权。",
-  "codexLoginNetworkError": "网络错误，请重试"
+  "codexLoginNetworkError": "网络错误，请重试",
+  "codexLoginNotEnabled": "该账号暂不支持 Codex 设备码登录。"
 }

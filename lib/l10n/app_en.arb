@@ -3170,7 +3170,7 @@
   "groupChatAssistantNoModel": "Selected assistant has no model configured.",
   "codexLoginTitle": "Codex Account Login",
   "codexLoginSubtitle": "Sign in with your ChatGPT account to access Codex models.",
-  "codexLoginSignInButton": "Sign in with Codex",
+  "codexLoginSignInButton": "Sign in with your Codex account",
   "codexLoginSignOutButton": "Sign out",
   "codexLoginSignOutConfirm": "This removes the saved ChatGPT credentials from this device.",
   "codexLoginCloseButton": "Close",
@@ -3189,5 +3189,6 @@
   "codexLoginExpiresLabel": "Token expires",
   "codexLoginSignedOutToast": "Signed out",
   "codexLoginHelpText": "Open the ChatGPT authorization page and enter the verification code to authorize Codex access.",
-  "codexLoginNetworkError": "Network error, please retry"
+  "codexLoginNetworkError": "Network error, please retry",
+  "codexLoginNotEnabled": "Codex device sign-in is not available for this account."
 }

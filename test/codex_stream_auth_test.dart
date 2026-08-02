@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
+import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 
 /// Scripted http client for the controller's usercode/poll/refresh traffic.
@@ -37,6 +38,35 @@ class _ScriptedClient extends http.BaseClient {
       headers: resp.headers,
     );
   }
+}
+
+/// Records every request and answers with a fixed failing status, so tests
+/// can assert what was actually put on the wire via the ChatApiService
+/// debug client factory without a live server.
+class _RecordingClient extends http.BaseClient {
+  final List<http.Request> requests = [];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final req = http.Request(request.method, request.url)
+      ..headers.addAll(request.headers);
+    if (request is http.Request) {
+      req.body = request.body;
+    }
+    requests.add(req);
+    return http.StreamedResponse(
+      Stream<List<int>>.empty(),
+      500,
+      headers: {'content-type': 'application/json'},
+    );
+  }
+}
+
+String? _headerOf(http.Request req, String name) {
+  for (final e in req.headers.entries) {
+    if (e.key.toLowerCase() == name.toLowerCase()) return e.value;
+  }
+  return null;
 }
 
 http.Response _json(int status, Map<String, dynamic> body) => http.Response(
@@ -149,20 +179,20 @@ void main() {
       },
     );
 
-    test('grace-period token passes the guard and injects headers', () async {
+    test('fresh token passes the guard and injects headers', () async {
       controller.credential = CodexOAuthCredential(
         accessToken: _jwtWithAccount('acc-1'),
         refreshToken: 'rt-old',
-        expiresAt: DateTime.now().add(const Duration(seconds: 30)),
+        expiresAt: DateTime.now().add(const Duration(minutes: 5)),
         accountId: 'acc-1',
       );
       controller.status = CodexAuthStatus.signedIn;
-      client.handlers.add((_) async => _json(500, {'error': 'boom'}));
 
-      // Not fresh (past the 60s grace) but not absolutely expired: a failing
-      // refresh must not kill the session, and the guard lets the request
-      // through without any network traffic.
-      expect(controller.isFresh, isFalse);
+      // Well inside the freshness window: the guard must pass without any
+      // refresh traffic. (The old 30s margin sat inside the 60s grace window
+      // and fed a 500 handler that was never consumed; grace-window behavior
+      // is covered by codex_device_flow_test's grace-period tests.)
+      expect(controller.isFresh, isTrue);
       expect(controller.isUsable, isTrue);
 
       await CodexDeviceCodeController.ensureFreshOrThrow(codexProviderConfig());
@@ -242,6 +272,94 @@ void main() {
       // Fresh session: no refresh and no LLM traffic from the guard.
       expect(client.requests, isEmpty);
       expect(controller.isFresh, isTrue);
+    });
+  });
+
+  group('codex headers on the wire via the debug client factory', () {
+    test(
+      'stream request sends codex auth headers with no api-key residue',
+      () async {
+        controller.credential = CodexOAuthCredential(
+          accessToken: _jwtWithAccount('acc-1'),
+          refreshToken: 'rt-old',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          accountId: 'acc-1',
+        );
+        controller.status = CodexAuthStatus.signedIn;
+        final recorded = _RecordingClient();
+        ChatApiService.debugClientFactory = (cfg, {proxy}) => recorded;
+        addTearDown(() => ChatApiService.debugClientFactory = null);
+
+        // The recording client answers 500 so the stream errors out; the
+        // assertions only care about the headers that were actually sent.
+        await expectLater(
+          ChatApiService.sendMessageStream(
+            config: codexProviderConfig(),
+            modelId: kCodexModels.first,
+            messages: const [
+              {'role': 'user', 'content': 'hello'},
+            ],
+            stream: true,
+          ).toList(),
+          throwsA(isA<HttpException>()),
+        );
+
+        expect(recorded.requests, hasLength(1));
+        final req = recorded.requests.single;
+        expect(req.url.host, 'chatgpt.com');
+        expect(
+          _headerOf(req, 'Authorization'),
+          'Bearer ${_jwtWithAccount('acc-1')}',
+        );
+        expect(_headerOf(req, 'chatgpt-account-id'), 'acc-1');
+        // Responses API path: the OpenAI-Beta header must ride along.
+        expect(_headerOf(req, 'OpenAI-Beta'), 'responses=experimental');
+        // The codex provider's empty API key must not leak a dangling
+        // 'Bearer ' prefix: the codex headers overwrite the placeholder.
+        expect(_headerOf(req, 'Authorization'), isNot('Bearer '));
+      },
+    );
+
+    test('stream request without responses api omits OpenAI-Beta', () async {
+      controller.credential = CodexOAuthCredential(
+        accessToken: _jwtWithAccount('acc-1'),
+        refreshToken: 'rt-old',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        accountId: 'acc-1',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+      final recorded = _RecordingClient();
+      ChatApiService.debugClientFactory = (cfg, {proxy}) => recorded;
+      addTearDown(() => ChatApiService.debugClientFactory = null);
+
+      await expectLater(
+        ChatApiService.sendMessageStream(
+          config: ProviderConfig(
+            id: 'Codex',
+            enabled: true,
+            name: 'Codex',
+            apiKey: '',
+            baseUrl: kCodexBaseUrl,
+            providerType: ProviderKind.openai,
+            useResponseApi: false,
+            models: kCodexModels,
+          ),
+          modelId: kCodexModels.first,
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          stream: true,
+        ).toList(),
+        throwsA(isA<HttpException>()),
+      );
+
+      final req = recorded.requests.single;
+      expect(
+        _headerOf(req, 'Authorization'),
+        'Bearer ${_jwtWithAccount('acc-1')}',
+      );
+      expect(_headerOf(req, 'chatgpt-account-id'), 'acc-1');
+      expect(_headerOf(req, 'OpenAI-Beta'), isNull);
     });
   });
 }

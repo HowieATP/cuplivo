@@ -2,6 +2,7 @@ export '../models/model_types.dart';
 
 import 'dart:convert';
 import 'dart:io' show HttpException;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
 import 'codex_device_code_controller.dart';
@@ -126,6 +127,12 @@ abstract class BaseProvider {
 
 class _Http {
   static http.Client clientFor(ProviderConfig cfg) {
+    // Mirrors ChatApiService.debugClientFactory: test-only injection that
+    // replaces the real DioHttpClient; production keeps this null.
+    final dbg = ProviderManager.debugClientFactory;
+    if (dbg != null) {
+      return dbg(cfg, proxy: CodexDeviceCodeController.proxyFromConfig(cfg));
+    }
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
     final portStr = (cfg.proxyPort ?? '').trim();
@@ -341,6 +348,13 @@ class GoogleProvider extends BaseProvider {
 }
 
 class ProviderManager {
+  /// Test-only injection point for the LLM http client, mirroring
+  /// [ChatApiService.debugClientFactory]. When set, [_Http.clientFor]
+  /// returns the factory's client; production code leaves this null.
+  @visibleForTesting
+  static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
+  debugClientFactory;
+
   static String _effectiveApiKey(ProviderConfig cfg) {
     try {
       if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {

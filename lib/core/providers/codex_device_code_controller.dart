@@ -405,8 +405,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
     status = CodexAuthStatus.waitingForUser;
     errorMessage = null;
     notifyListeners();
-    final client = _clientFor(cfg);
+    http.Client? client;
     try {
+      client = _clientFor(cfg);
       final usercodeResp = await _postJson(client, kCodexUsercodeEndpoint, {
         'client_id': kCodexClientId,
       });
@@ -445,6 +446,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
             .round()
             .clamp(kCodexMinInterval.inSeconds, 60)
             .toInt();
+      }
+      // A cancel()/signOut() may have landed while the usercode request was
+      // in flight: do not publish the code, flip into polling, or let a
+      // later _fail re-drive the status. Report cancelled and stay signedOut.
+      if (_cancelled) {
+        _flowEnded();
+        return CodexFlowOutcome.cancelled;
       }
       usercode = rawUserCode;
       verificationUri = Uri.parse(kCodexVerificationUri);
@@ -609,6 +617,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
             '[CodexOAuth] post-persist cancel cleanup failed: $e\n$st',
           );
         }
+        // Reset the flow state before reporting cancelled: a cancel landing
+        // while the persist was in flight used to leave the status stuck at
+        // polling with _cancelled true, which permanently blocked the
+        // startFlow reentrancy guard and wedged the UI on a spinner.
+        _flowEnded();
+        _cancelled = false;
         return CodexFlowOutcome.cancelled;
       }
       credential = cred;
@@ -637,7 +651,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
       _fail('Codex device login failed');
       return CodexFlowOutcome.failed;
     } finally {
-      client.close();
+      client?.close();
     }
   }
 
@@ -798,6 +812,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
     }
     credential = null;
     status = CodexAuthStatus.signedOut;
+    usercode = null;
+    verificationUri = null;
+    errorMessage = null;
     _signInProxy = null;
     notifyListeners();
   }

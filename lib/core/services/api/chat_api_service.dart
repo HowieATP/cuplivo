@@ -558,25 +558,22 @@ class ChatApiService {
     return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
+  /// Test-only injection point for the per-request http client. When set,
+  /// [_clientFor] hands the factory's client to every request instead of a
+  /// real DioHttpClient; production code leaves this null so the regular
+  /// proxy/cancel-token construction is untouched.
+  @visibleForTesting
+  static http.Client Function(ProviderConfig cfg, {NetworkProxyConfig? proxy})?
+  debugClientFactory;
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-        cancelToken: cancelToken,
-      );
+    final proxy = CodexDeviceCodeController.proxyFromConfig(cfg);
+    final dbg = debugClientFactory;
+    if (dbg != null) {
+      return dbg(cfg, proxy: proxy);
+    }
+    if (proxy != null) {
+      return DioHttpClient(proxy: proxy, cancelToken: cancelToken);
     }
     return DioHttpClient(cancelToken: cancelToken);
   }

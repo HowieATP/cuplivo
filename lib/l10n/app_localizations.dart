@@ -12329,7 +12329,7 @@ abstract class AppLocalizations {
   /// No description provided for @codexLoginSignInButton.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with Codex'**
+  /// **'Sign in with your Codex account'**
   String get codexLoginSignInButton;
 
   /// No description provided for @codexLoginSignOutButton.
@@ -12445,6 +12445,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Network error, please retry'**
   String get codexLoginNetworkError;
+
+  /// No description provided for @codexLoginNotEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex device sign-in is not available for this account.'**
+  String get codexLoginNotEnabled;
 }
 
 class _AppLocalizationsDelegate

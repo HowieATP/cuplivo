@@ -1566,6 +1566,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     isReasoning: isReasoning,
     thinkingBudget: thinkingBudget,
   );
+  CodexDeviceCodeController.applyCodexResponseBodyDefaults(body, config);
   request.body = jsonEncode(body);
 
   final response = await client.send(request);
@@ -2847,6 +2848,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 // Follow-up round: re-check freshness in case the token
                 // expired mid-session.
                 await CodexDeviceCodeController.ensureFreshOrThrow(config);
+                CodexDeviceCodeController.applyCodexResponseBodyDefaults(
+                  body2,
+                  config,
+                );
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
                   'Authorization':

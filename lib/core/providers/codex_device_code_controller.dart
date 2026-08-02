@@ -939,6 +939,26 @@ class CodexDeviceCodeController extends ChangeNotifier {
       return const {};
     }
   }
+
+  /// Enforces backend constraints on request bodies sent to codex hosts.
+  ///
+  /// The ChatGPT `/backend-api/codex/responses` endpoint hard-requires
+  /// `store: false` for subscription OAuth tokens: an absent or `true` value
+  /// is rejected with `400 {"detail":"Store must be set to false"}`. Sampling
+  /// parameters (`temperature`, `top_p`, `logprobs`) are not supported at all
+  /// and are rejected with `400 unsupported parameter`. Callers must invoke
+  /// this AFTER merging user custom-body overrides so the backend constraints
+  /// always win.
+  static void applyCodexResponseBodyDefaults(
+    Map<String, dynamic> body,
+    ProviderConfig cfg,
+  ) {
+    if (!isCodexHost(cfg)) return;
+    body['store'] = false;
+    body.remove('temperature');
+    body.remove('top_p');
+    body.remove('logprobs');
+  }
 }
 
 ProviderConfig codexProviderConfig() => ProviderConfig(

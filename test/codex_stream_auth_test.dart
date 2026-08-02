@@ -300,6 +300,7 @@ void main() {
               {'role': 'user', 'content': 'hello'},
             ],
             stream: true,
+            temperature: 0.7,
           ).toList(),
           throwsA(isA<HttpException>()),
         );
@@ -317,6 +318,12 @@ void main() {
         // The codex provider's empty API key must not leak a dangling
         // 'Bearer ' prefix: the codex headers overwrite the placeholder.
         expect(_headerOf(req, 'Authorization'), isNot('Bearer '));
+        // The codex /responses endpoint hard-requires store:false in the
+        // request body for subscription OAuth tokens and rejects sampling
+        // parameters such as temperature.
+        final sentBody = jsonDecode(req.body) as Map<String, dynamic>;
+        expect(sentBody['store'], isFalse);
+        expect(sentBody.containsKey('temperature'), isFalse);
       },
     );
 
@@ -406,6 +413,51 @@ void main() {
       expect(_headerOf(req, 'chatgpt-account-id'), isNull);
       // The regular api-key path is untouched.
       expect(_headerOf(req, 'Authorization'), 'Bearer sk-test');
+      // The codex-only store constraint must not leak to other hosts.
+      final sentBody = jsonDecode(req.body) as Map<String, dynamic>;
+      expect(sentBody.containsKey('store'), isFalse);
     });
+
+    test(
+      'generateText on a codex host sends store:false and parses SSE',
+      () async {
+        controller.credential = CodexOAuthCredential(
+          accessToken: _jwtWithAccount('acc-1'),
+          refreshToken: 'rt-old',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          accountId: 'acc-1',
+        );
+        controller.status = CodexAuthStatus.signedIn;
+        // The codex endpoint answers the forced stream with SSE, not JSON.
+        client.handlers.add(
+          (_) => http.Response(
+            'data: {"type":"response.output_text.delta","delta":"Hello"}\n\n'
+            'data: {"type":"response.output_text.delta","delta":" World"}\n\n'
+            'data: [DONE]\n\n',
+            200,
+            headers: {'content-type': 'text/event-stream'},
+          ),
+        );
+        ChatApiService.debugClientFactory = (cfg, {proxy}) => client;
+        addTearDown(() => ChatApiService.debugClientFactory = null);
+
+        final text = await ChatApiService.generateText(
+          config: codexProviderConfig(),
+          modelId: kCodexModels.first,
+          prompt: 'hello',
+        );
+
+        expect(text, 'Hello World');
+        final req = client.requests.single;
+        expect(
+          req.url.toString(),
+          'https://chatgpt.com/backend-api/codex/responses',
+        );
+        final sentBody = jsonDecode(req.body) as Map<String, dynamic>;
+        expect(sentBody['store'], isFalse);
+        expect(sentBody['stream'], isTrue);
+        expect(_headerOf(req, 'Accept'), 'text/event-stream');
+      },
+    );
   });
 }

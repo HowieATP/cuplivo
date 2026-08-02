@@ -950,6 +950,45 @@ class ChatApiService {
           upstreamModelId,
           fallbackEffort: effort,
         );
+        CodexDeviceCodeController.applyCodexResponseBodyDefaults(body, config);
+        if (CodexDeviceCodeController.isCodexHost(config)) {
+          // The codex /responses endpoint requires stream:true for
+          // subscription OAuth tokens and answers with SSE, not JSON.
+          body['stream'] = true;
+          headers['Accept'] = 'text/event-stream';
+          final req = http.Request('POST', url)
+            ..headers.addAll(headers)
+            ..body = jsonEncode(body);
+          final sseResp = await client.send(req);
+          if (sseResp.statusCode < 200 || sseResp.statusCode >= 300) {
+            final errorBody = await sseResp.stream.bytesToString();
+            throw HttpException('HTTP ${sseResp.statusCode}: $errorBody');
+          }
+          final s = sseResp.stream.transform(utf8.decoder);
+          final textBuf = StringBuffer();
+          String pending = '';
+          await for (final ch in _ensureTrailingNewline(s)) {
+            pending += ch;
+            final lines = pending.split('\n');
+            pending = lines.last;
+            for (final l in lines.take(lines.length - 1)) {
+              final trimmed = l.trim();
+              if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+              final d = trimmed.substring(5).trimLeft();
+              if (d == '[DONE]') continue;
+              try {
+                final o = jsonDecode(d);
+                if (o is Map && o['type'] == 'response.output_text.delta') {
+                  final delta = o['delta'];
+                  if (delta is String && delta.isNotEmpty) {
+                    textBuf.write(delta);
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+          return textBuf.toString();
+        }
         final resp = await client.post(
           url,
           headers: headers,

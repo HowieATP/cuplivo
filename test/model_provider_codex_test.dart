@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/model_provider.dart';
+import 'package:Cuplivo/core/providers/settings_provider.dart';
 
 /// Client that records every request and rejects them all. The
 /// ProviderManager methods under test create their own LLM clients, but the
@@ -87,6 +88,41 @@ void main() {
   });
 
   group('ProviderManager codex branches', () {
+    test('codex body defaults strip unsupported sampling params', () {
+      final body = <String, dynamic>{
+        'model': 'gpt-5.4',
+        'temperature': 0.7,
+        'top_p': 0.9,
+        'logprobs': true,
+      };
+      CodexDeviceCodeController.applyCodexResponseBodyDefaults(
+        body,
+        codexProviderConfig(),
+      );
+      expect(body['store'], isFalse);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+      expect(body.containsKey('logprobs'), isFalse);
+    });
+
+    test('codex body defaults never touch non-codex hosts', () {
+      final body = <String, dynamic>{'model': 'gpt-4o', 'temperature': 0.7};
+      CodexDeviceCodeController.applyCodexResponseBodyDefaults(
+        body,
+        ProviderConfig(
+          id: 'OpenAI',
+          enabled: true,
+          name: 'OpenAI',
+          apiKey: 'sk-test',
+          baseUrl: 'https://api.openai.com/v1',
+          providerType: ProviderKind.openai,
+          models: const ['gpt-4o'],
+        ),
+      );
+      expect(body.containsKey('store'), isFalse);
+      expect(body['temperature'], 0.7);
+    });
+
     test(
       'testConnection on a codex host without sign-in throws and never sends a request',
       () async {
@@ -161,7 +197,45 @@ void main() {
         );
         expect(_headerOf(req, 'chatgpt-account-id'), 'acc-1');
         expect(_headerOf(req, 'OpenAI-Beta'), 'responses=experimental');
+        // The codex /responses endpoint hard-requires store:false.
+        final sentBody = jsonDecode(req.body) as Map<String, dynamic>;
+        expect(sentBody['store'], isFalse);
       },
     );
+
+    test('testConnection on a non-codex host never injects store', () async {
+      controller.credential = CodexOAuthCredential(
+        accessToken: _jwtWithAccount('acc-1'),
+        refreshToken: 'rt-old',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        accountId: 'acc-1',
+      );
+      controller.status = CodexAuthStatus.signedIn;
+      final recorded = _RecordingClient();
+      ProviderManager.debugClientFactory = (cfg, {proxy}) => recorded;
+      addTearDown(() => ProviderManager.debugClientFactory = null);
+
+      await expectLater(
+        ProviderManager.testConnection(
+          ProviderConfig(
+            id: 'OpenAI',
+            enabled: true,
+            name: 'OpenAI',
+            apiKey: 'sk-test',
+            baseUrl: 'https://api.openai.com/v1',
+            providerType: ProviderKind.openai,
+            models: const ['gpt-4o'],
+          ),
+          'gpt-4o',
+        ),
+        throwsA(isA<HttpException>()),
+      );
+
+      expect(recorded.requests, hasLength(1));
+      final req = recorded.requests.single;
+      expect(req.url.host, 'api.openai.com');
+      final sentBody = jsonDecode(req.body) as Map<String, dynamic>;
+      expect(sentBody.containsKey('store'), isFalse);
+    });
   });
 }

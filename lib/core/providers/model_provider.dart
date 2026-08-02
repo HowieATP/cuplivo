@@ -491,6 +491,10 @@ class ProviderManager {
         // Merge custom body overrides
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
+        CodexDeviceCodeController.applyCodexResponseBodyDefaults(
+          body as Map<String, dynamic>,
+          cfg,
+        );
         // Merge custom headers overrides
         // SiliconFlow fallback key for built-in free models when no API key provided
         String apiKey = _effectiveApiKey(cfg);

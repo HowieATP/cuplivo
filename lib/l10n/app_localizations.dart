@@ -10478,6 +10478,54 @@ abstract class AppLocalizations {
   /// **'Log response body content (may use significant storage)'**
   String get logSettingsSaveOutputSubtitle;
 
+  /// No description provided for @logSettingsMcpEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP Request Logging'**
+  String get logSettingsMcpEnabled;
+
+  /// No description provided for @logSettingsTtsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS Request Logging'**
+  String get logSettingsTtsEnabled;
+
+  /// No description provided for @logSettingsSearchEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Request Logging'**
+  String get logSettingsSearchEnabled;
+
+  /// No description provided for @logViewerFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get logViewerFilterAll;
+
+  /// No description provided for @logViewerFilterLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM'**
+  String get logViewerFilterLlm;
+
+  /// No description provided for @logViewerFilterMcp.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP'**
+  String get logViewerFilterMcp;
+
+  /// No description provided for @logViewerFilterTts.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS'**
+  String get logViewerFilterTts;
+
+  /// No description provided for @logViewerFilterSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get logViewerFilterSearch;
+
   /// No description provided for @logSettingsAutoDelete.
   ///
   /// In en, this message translates to:

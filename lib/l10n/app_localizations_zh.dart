@@ -5461,6 +5461,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get logSettingsSaveOutputSubtitle => '记录响应体内容（可能占用较多存储空间）';
 
   @override
+  String get logSettingsMcpEnabled => 'MCP 请求日志打印';
+
+  @override
+  String get logSettingsTtsEnabled => 'TTS 请求日志打印';
+
+  @override
+  String get logSettingsSearchEnabled => '搜索请求日志打印';
+
+  @override
+  String get logViewerFilterAll => '全部';
+
+  @override
+  String get logViewerFilterLlm => 'LLM';
+
+  @override
+  String get logViewerFilterMcp => 'MCP';
+
+  @override
+  String get logViewerFilterTts => 'TTS';
+
+  @override
+  String get logViewerFilterSearch => '搜索';
+
+  @override
   String get logSettingsAutoDelete => '自动删除';
 
   @override
@@ -11995,6 +12019,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get logSettingsSaveOutputSubtitle => '记录响应体内容（可能占用较多存储空间）';
 
   @override
+  String get logSettingsMcpEnabled => 'MCP 请求日志打印';
+
+  @override
+  String get logSettingsTtsEnabled => 'TTS 请求日志打印';
+
+  @override
+  String get logSettingsSearchEnabled => '搜索请求日志打印';
+
+  @override
+  String get logViewerFilterAll => '全部';
+
+  @override
+  String get logViewerFilterLlm => 'LLM';
+
+  @override
+  String get logViewerFilterMcp => 'MCP';
+
+  @override
+  String get logViewerFilterTts => 'TTS';
+
+  @override
+  String get logViewerFilterSearch => '搜索';
+
+  @override
   String get logSettingsAutoDelete => '自动删除';
 
   @override
@@ -18527,6 +18575,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logSettingsSaveOutputSubtitle => '記錄回應本文內容（可能佔用較多儲存空間）';
+
+  @override
+  String get logSettingsMcpEnabled => 'MCP 請求日誌列印';
+
+  @override
+  String get logSettingsTtsEnabled => 'TTS 請求日誌列印';
+
+  @override
+  String get logSettingsSearchEnabled => '搜尋請求日誌列印';
+
+  @override
+  String get logViewerFilterAll => '全部';
+
+  @override
+  String get logViewerFilterLlm => 'LLM';
+
+  @override
+  String get logViewerFilterMcp => 'MCP';
+
+  @override
+  String get logViewerFilterTts => 'TTS';
+
+  @override
+  String get logViewerFilterSearch => '搜尋';
 
   @override
   String get logSettingsAutoDelete => '自動刪除';

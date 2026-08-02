@@ -11918,6 +11918,90 @@ abstract class AppLocalizations {
   /// **'Skills'**
   String get settingsPageSkills;
 
+  /// No description provided for @skillsUncategorizedGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get skillsUncategorizedGroup;
+
+  /// No description provided for @skillsEditCategoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Category'**
+  String get skillsEditCategoryTitle;
+
+  /// No description provided for @skillsCategoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. coding, writing, research'**
+  String get skillsCategoryHint;
+
+  /// No description provided for @skillsCategoryClear.
+  ///
+  /// In en, this message translates to:
+  /// **'No category'**
+  String get skillsCategoryClear;
+
+  /// No description provided for @skillsEnableAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable all'**
+  String get skillsEnableAll;
+
+  /// No description provided for @skillsEnabledCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled {enabled} of {total}'**
+  String skillsEnabledCount(int enabled, int total);
+
+  /// No description provided for @skillsSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get skillsSelectAll;
+
+  /// No description provided for @skillsDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get skillsDeselectAll;
+
+  /// No description provided for @skillsEnableImportedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable skills?'**
+  String get skillsEnableImportedTitle;
+
+  /// No description provided for @skillsEnableImportedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable {count} imported skill(s) for \"{assistantName}\"?'**
+  String skillsEnableImportedMessage(int count, String assistantName);
+
+  /// No description provided for @skillsEnableImportedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get skillsEnableImportedAction;
+
+  /// No description provided for @skillsEnableImportedDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get skillsEnableImportedDismiss;
+
+  /// No description provided for @skillsSheetManageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage skills'**
+  String get skillsSheetManageAction;
+
+  /// No description provided for @skillsSheetImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import skills'**
+  String get skillsSheetImportAction;
+
   /// No description provided for @responseTruncated.
   ///
   /// In en, this message translates to:

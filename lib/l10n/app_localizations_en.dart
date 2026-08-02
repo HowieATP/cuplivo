@@ -6534,6 +6534,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageSkills => 'Skills';
 
   @override
+  String get skillsUncategorizedGroup => 'Uncategorized';
+
+  @override
+  String get skillsEditCategoryTitle => 'Edit Category';
+
+  @override
+  String get skillsCategoryHint => 'e.g. coding, writing, research';
+
+  @override
+  String get skillsCategoryClear => 'No category';
+
+  @override
+  String get skillsEnableAll => 'Enable all';
+
+  @override
+  String skillsEnabledCount(int enabled, int total) {
+    return 'Enabled $enabled of $total';
+  }
+
+  @override
+  String get skillsSelectAll => 'Select all';
+
+  @override
+  String get skillsDeselectAll => 'Deselect all';
+
+  @override
+  String get skillsEnableImportedTitle => 'Enable skills?';
+
+  @override
+  String skillsEnableImportedMessage(int count, String assistantName) {
+    return 'Enable $count imported skill(s) for \"$assistantName\"?';
+  }
+
+  @override
+  String get skillsEnableImportedAction => 'Enable';
+
+  @override
+  String get skillsEnableImportedDismiss => 'Not now';
+
+  @override
+  String get skillsSheetManageAction => 'Manage skills';
+
+  @override
+  String get skillsSheetImportAction => 'Import skills';
+
+  @override
   String responseTruncated(String reason) {
     return 'Response was truncated ($reason). The content may be incomplete.';
   }

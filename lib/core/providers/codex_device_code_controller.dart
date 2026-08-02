@@ -182,9 +182,16 @@ class CodexDeviceCodeController extends ChangeNotifier {
     final uri = Uri.tryParse(cfg.baseUrl);
     if (uri == null) return false;
     final host = uri.host.toLowerCase();
-    final path = uri.path.toLowerCase();
+    // Exact path match: 'contains' would mis-hit siblings such as
+    // '/backend-api/notcodex' or '/precodex-gateway' and leak OAuth
+    // credentials to non-codex endpoints.
+    var path = uri.path.toLowerCase();
+    if (path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
     return (host == 'chatgpt.com' || host.endsWith('.chatgpt.com')) &&
-        path.contains('codex');
+        (path == '/backend-api/codex' ||
+            path.startsWith('/backend-api/codex/'));
   }
 
   /// Ensures a fresh Codex session for codex hosts. Throws a clear
@@ -209,7 +216,8 @@ class CodexDeviceCodeController extends ChangeNotifier {
       explicitType: cfg.providerType,
     );
     if (kind != ProviderKind.openai) return false;
-    if (cfg.multiKeyEnabled == true) return false;
+    // multiKey gating intentionally lives at the call sites, which hold the
+    // live page state; cfg.multiKeyEnabled here is only a snapshot.
     return cfg.id == 'OpenAI' ||
         cfg.id == kCodexProviderKey ||
         isCodexHost(cfg);
@@ -244,9 +252,19 @@ class CodexDeviceCodeController extends ChangeNotifier {
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
       if (decoded is! Map) return;
-      credential = CodexOAuthCredential.fromJson(
+      final restored = CodexOAuthCredential.fromJson(
         decoded.cast<String, dynamic>(),
       );
+      if (restored.accessToken.isEmpty ||
+          restored.refreshToken.isEmpty ||
+          restored.accountId.isEmpty) {
+        // Partial or corrupt persisted credential (fromJson defaults missing
+        // fields to ''): drop it and stay signedOut instead of resurrecting
+        // a broken session.
+        await _removeStoredCredential();
+        return;
+      }
+      credential = restored;
       status = credential!.expiresAt.isBefore(DateTime.now())
           ? CodexAuthStatus.expired
           : CodexAuthStatus.signedIn;
@@ -441,7 +459,10 @@ class CodexDeviceCodeController extends ChangeNotifier {
             return CodexFlowOutcome.failed;
           }
           if (errCode == 'slow_down') {
-            intervalSeconds += kCodexSlowDownIncrement.inSeconds;
+            intervalSeconds =
+                (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
+                    .clamp(kCodexMinInterval.inSeconds, 60)
+                    .toInt();
             debugPrint(
               '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
             );
@@ -532,10 +553,11 @@ class CodexDeviceCodeController extends ChangeNotifier {
       verificationUri = null;
       notifyListeners();
       debugPrint('[CodexOAuth] signed in as accountId=$accountId');
-      if (_cancelled) {
-        _flowEnded();
-        return CodexFlowOutcome.cancelled;
-      }
+      // NOTE: no cancellation check here. Once the credential is persisted
+      // and status flipped to signedIn, a late cancel() must not report a
+      // cancelled login for a session that exists; the UI would show a
+      // signed-in account behind a "cancelled" result. Cancel semantics only
+      // apply to the pre-persist stages of the flow.
       try {
         await onAuthenticated();
       } catch (e, st) {
@@ -620,18 +642,19 @@ class CodexDeviceCodeController extends ChangeNotifier {
         final access = json?['access_token'];
         final refresh = json?['refresh_token'];
         final expiresIn = json?['expires_in'];
-        if (access is! String ||
-            access.isEmpty ||
-            refresh is! String ||
-            refresh.isEmpty ||
-            expiresIn is! num) {
+        if (access is! String || access.isEmpty || expiresIn is! num) {
           debugPrint('[CodexOAuth] refresh response missing fields: $json');
           return;
         }
         final accountId = _accountIdFromAccessToken(access);
+        // RFC 6749 allows the refresh token to be omitted on rotation; keep
+        // the previous one in that case instead of discarding the response.
+        final newRefresh = (refresh is String && refresh.isNotEmpty)
+            ? refresh
+            : c.refreshToken;
         final cred = CodexOAuthCredential(
           accessToken: access,
-          refreshToken: refresh,
+          refreshToken: newRefresh,
           expiresAt: DateTime.now().add(
             Duration(milliseconds: (expiresIn * 1000).round()),
           ),
@@ -675,6 +698,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    // Abort any in-flight device-code poll loop so it cannot keep running
+    // after sign-out and resurrect the credential.
+    _cancelled = true;
+    if (!_cancelSignal.isCompleted) {
+      _cancelSignal.complete();
+    }
     final inFlight = _refreshing;
     if (inFlight != null) {
       // Wait for an in-flight refresh to finish so it cannot re-persist the
@@ -694,6 +723,18 @@ class CodexDeviceCodeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Resolves Codex OAuth headers for [cfg]. Returns an empty map in three
+  /// distinct situations:
+  ///   1. [cfg] is not a codex host (see [isCodexHost]) - nothing to add.
+  ///   2. No credential is stored - the account is signed out.
+  ///   3. The credential is stale - a background refresh is kicked off and
+  ///      this request intentionally goes out WITHOUT auth headers.
+  /// Callers MUST call [ensureFreshOrThrow] before building their headers so
+  /// a stale session is refreshed (or rejected) before any request is sent.
+  /// The stream entry points (sendMessageStream / generateText /
+  /// testConnection) and the tool-call follow-up rounds already do this;
+  /// any new call site that merges [_customHeaders]-style maps must follow
+  /// the same order.
   Map<String, String> maybeCodexHeaders(ProviderConfig cfg) {
     try {
       if (!isCodexHost(cfg)) return const {};

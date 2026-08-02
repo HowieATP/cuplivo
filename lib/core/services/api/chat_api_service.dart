@@ -164,7 +164,11 @@ class ChatApiService {
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
       out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
     }
-    // Codex OAuth bearer + account headers
+    // Codex OAuth bearer + account headers. An empty map here means one of:
+    // non-codex host / no stored credential / stale credential (in which
+    // case a background refresh is kicked off and this request goes out
+    // without auth). Callers must have run ensureFreshOrThrow before
+    // building headers; see CodexDeviceCodeController.maybeCodexHeaders.
     if (includeCodexAuth) {
       final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
       if (h.isNotEmpty) out.addAll(h);

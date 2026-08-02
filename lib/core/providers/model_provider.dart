@@ -152,7 +152,12 @@ class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
     if (CodexDeviceCodeController.isCodexHost(cfg)) {
-      return const <ModelInfo>[];
+      // Codex hosts have no public /models endpoint; surface the fixed
+      // built-in model set so the model picker / fetch dialog stays useful.
+      return [
+        for (final id in kCodexModels)
+          ModelRegistry.infer(ModelInfo(id: id, displayName: id)),
+      ];
     }
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);

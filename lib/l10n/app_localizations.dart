@@ -12365,13 +12365,13 @@ abstract class AppLocalizations {
   /// No description provided for @codexLoginStatusWaiting.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for authorization…'**
+  /// **'Waiting for authorization...'**
   String get codexLoginStatusWaiting;
 
   /// No description provided for @codexLoginStatusPolling.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for sign-in…'**
+  /// **'Waiting for sign-in...'**
   String get codexLoginStatusPolling;
 
   /// No description provided for @codexLoginStatusExpired.

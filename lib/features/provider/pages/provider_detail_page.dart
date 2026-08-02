@@ -1269,8 +1269,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             const SizedBox(height: 12),
           ],
           if (_kind == ProviderKind.openai &&
-              CodexDeviceCodeController.showEntryFor(_cfg) &&
-              !_multiKeyEnabled) ...[
+              !_multiKeyEnabled &&
+              CodexDeviceCodeController.showEntryFor(_cfg)) ...[
             const SizedBox(height: 12),
             CodexAccountEntry(cfg: _cfg),
           ],

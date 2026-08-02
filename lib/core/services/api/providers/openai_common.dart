@@ -1762,6 +1762,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
           }
           // Follow-up request
+          // Re-check freshness: the access token may have expired mid-session.
+          await CodexDeviceCodeController.ensureFreshOrThrow(config);
           final req = http.Request('POST', url);
           final headers2 = <String, String>{
             'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -2097,6 +2099,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               thinkingBudget: thinkingBudget,
             );
 
+            // Follow-up round: re-check freshness in case the token expired
+            // mid-session.
+            await CodexDeviceCodeController.ensureFreshOrThrow(config);
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
               'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -2839,6 +2844,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   fallbackEffort: effort,
                 );
 
+                // Follow-up round: re-check freshness in case the token
+                // expired mid-session.
+                await CodexDeviceCodeController.ensureFreshOrThrow(config);
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
                   'Authorization':
@@ -3584,6 +3592,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               isReasoning: isReasoning,
               thinkingBudget: thinkingBudget,
             );
+            // Follow-up round: re-check freshness in case the token expired
+            // mid-session.
+            await CodexDeviceCodeController.ensureFreshOrThrow(config);
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
               'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -4099,6 +4110,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isReasoning: isReasoning,
                   thinkingBudget: thinkingBudget,
                 );
+                // Follow-up round: re-check freshness in case the token
+                // expired mid-session.
+                await CodexDeviceCodeController.ensureFreshOrThrow(config);
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
                   'Authorization':

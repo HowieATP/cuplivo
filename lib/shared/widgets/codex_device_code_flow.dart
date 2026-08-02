@@ -108,6 +108,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     // build phase so initState-triggered flows never mark dependents dirty
     // while a route (bottom sheet / dialog) is still mounting.
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
     try {
       await _controller.startFlow(
         cfg: widget.cfg,
@@ -135,7 +136,9 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: AppLocalizations.of(context)!.codexLoginNetworkError,
+          // Provider-config write failure is a persistence problem, not a
+          // network problem.
+          message: AppLocalizations.of(context)!.codexLoginStatusFailed,
           type: NotificationType.error,
         );
       }

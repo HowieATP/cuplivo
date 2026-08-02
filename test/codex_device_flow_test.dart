@@ -499,6 +499,54 @@ void main() {
       expect(onAuthenticatedCalls, 0);
     });
 
+    test('poll 200 missing authorization_code fails', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => _json(200, {'code_verifier': 'cv-1'}));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(onAuthenticatedCalls, 0);
+    });
+
+    test('usercode SocketException returns failed', () async {
+      client.handlers.add((_) async => throw const SocketException('refused'));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+    });
+
+    test('usercode TimeoutException returns failed', () async {
+      client.handlers.add((_) async => throw TimeoutException('slow'));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+    });
+
     test('poll deadline exceeded returns timedOut', () async {
       final shortController = CodexDeviceCodeController(
         clientFactory: (proxy) => client,
@@ -590,6 +638,39 @@ void main() {
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
 
+    test('cancel after credential persist still returns success', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async =>
+            _json(200, {'authorization_code': 'ac-1', 'code_verifier': 'cv-1'}),
+      );
+      client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+          // Cancel lands after the credential is persisted and status is
+          // already signedIn: the flow must still report success so the UI
+          // does not show a cancelled login for a session that exists.
+          controller.cancel();
+        },
+      );
+
+      expect(outcome, CodexFlowOutcome.success);
+      expect(controller.status, CodexAuthStatus.signedIn);
+      expect(controller.credential, isNotNull);
+      expect(onAuthenticatedCalls, 1);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNotNull);
+    });
+
     test('startFlow is not reentrant while polling', () async {
       client.handlers.add(
         (_) async => _json(200, {
@@ -643,6 +724,25 @@ void main() {
       expect(controller.status, CodexAuthStatus.signedIn);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString(kCodexPrefsKey), isNotNull);
+    });
+
+    test('refresh without refresh_token keeps the previous one', () async {
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      client.handlers.add(
+        (_) async => _json(200, {
+          'access_token': _jwtWithAccount('acc-2'),
+          'expires_in': 3600,
+        }),
+      );
+
+      await controller.ensureFresh();
+
+      expect(client.requests.length, 1);
+      expect(controller.credential!.accessToken, _jwtWithAccount('acc-2'));
+      expect(controller.credential!.refreshToken, 'rt-old');
+      expect(controller.credential!.accountId, 'acc-2');
+      expect(controller.status, CodexAuthStatus.signedIn);
     });
 
     test('clears credential on invalid_grant', () async {
@@ -826,6 +926,58 @@ void main() {
       expect(controller.credential!.proxy, isNull);
     });
 
+    test('init() clears a persisted credential with empty fields', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode({
+          'accessToken': '',
+          'refreshToken': 'rt-1',
+          'expiresAt': DateTime.now()
+              .add(const Duration(hours: 1))
+              .millisecondsSinceEpoch,
+          'accountId': 'acc-1',
+        }),
+      );
+
+      await controller.init();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('init() clears a persisted credential missing accountId', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode({
+          'accessToken': _jwtWithAccount('acc-1'),
+          'refreshToken': 'rt-1',
+          'expiresAt': DateTime.now()
+              .add(const Duration(hours: 1))
+              .millisecondsSinceEpoch,
+          'accountId': '',
+        }),
+      );
+
+      await controller.init();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('init() tolerates non-JSON prefs and stays signedOut', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(kCodexPrefsKey, 'not-json{');
+
+      await controller.init();
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+    });
+
     test('_doRefresh uses the persisted proxy after init()', () async {
       NetworkProxyConfig? factoryProxy;
       final proxiedClient = _ScriptedClient();
@@ -952,15 +1104,36 @@ void main() {
       );
       expect(
         CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex/'),
+        ),
+        isTrue,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
           _cfg(id: 'X', baseUrl: 'https://chatgpt.com/somewhere'),
         ),
         isFalse,
       );
       expect(
         CodexDeviceCodeController.isCodexHost(
-          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex'),
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/notcodex'),
         ),
-        isTrue,
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'X', baseUrl: 'https://chatgpt.com/precodex-gateway'),
+        ),
+        isFalse,
+      );
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(
+            id: 'X',
+            baseUrl: 'https://chatgpt.com/backend-api/codex-proxy/foo',
+          ),
+        ),
+        isFalse,
       );
       expect(
         CodexDeviceCodeController.isCodexHost(
@@ -1029,7 +1202,9 @@ void main() {
         CodexDeviceCodeController.showEntryFor(
           _cfg(id: 'OpenAI', multiKey: true),
         ),
-        isFalse,
+        // multiKey gating moved to the call sites, which hold the live page
+        // state; showEntryFor only decides kind/id/host.
+        isTrue,
       );
       expect(CodexDeviceCodeController.showEntryFor(_cfg(id: 'X')), isFalse);
     });
@@ -1046,10 +1221,11 @@ void main() {
       expect(cfg.baseUrl, kCodexBaseUrl);
       expect(cfg.providerType, ProviderKind.openai);
       expect(cfg.useResponseApi, isTrue);
-      expect(cfg.models.length, 7);
-      expect(cfg.models, contains('gpt-5.3-codex-spark'));
-      expect(cfg.models, contains('gpt-5.6-terra'));
-      expect(cfg.modelOverrides.length, 7);
+      expect(cfg.models.length, kCodexModels.length);
+      for (final m in kCodexModels) {
+        expect(cfg.models, contains(m));
+      }
+      expect(cfg.modelOverrides.length, kCodexModels.length);
       for (final ov in cfg.modelOverrides.values) {
         expect(ov['type'], 'chat');
         expect(ov['input'], ['text']);
@@ -1185,5 +1361,33 @@ void main() {
         expect(prefs.getString(kCodexPrefsKey), isNull);
       },
     );
+
+    test('signOut aborts an in-flight device-code flow', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '5',
+        }),
+      );
+      client.handlers.add((_) async => http.Response('{}', 403));
+
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {
+          onAuthenticatedCalls++;
+        },
+      );
+      await _waitForRequests(client, 2);
+      await controller.signOut();
+      final outcome = await flow;
+
+      expect(outcome, CodexFlowOutcome.cancelled);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      expect(controller.credential, isNull);
+      expect(onAuthenticatedCalls, 0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(kCodexPrefsKey), isNull);
+    });
   });
 }

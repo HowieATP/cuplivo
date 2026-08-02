@@ -6782,10 +6782,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexLoginStatusSignedOut => 'Not signed in';
 
   @override
-  String get codexLoginStatusWaiting => 'Waiting for authorization…';
+  String get codexLoginStatusWaiting => 'Waiting for authorization...';
 
   @override
-  String get codexLoginStatusPolling => 'Waiting for sign-in…';
+  String get codexLoginStatusPolling => 'Waiting for sign-in...';
 
   @override
   String get codexLoginStatusExpired => 'Authorization expired';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -97,13 +99,14 @@ class CodexAccountEntry extends StatelessWidget {
   }
 
   /// Reads the live provider config instead of the page snapshot so the flow
-  /// starts with the current proxy / endpoint settings.
+  /// starts with the current proxy / endpoint settings. The flow future is
+  /// deliberately not awaited here; it guards its own errors.
   void _openFlow(BuildContext context) {
     final latest = context.read<SettingsProvider>().getProviderConfig(
       cfg.id,
       defaultName: cfg.name,
     );
-    showCodexDeviceCodeFlow(context, latest);
+    unawaited(showCodexDeviceCodeFlow(context, latest));
   }
 
   Widget _buildSignedIn(
@@ -185,6 +188,8 @@ class CodexAccountEntry extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             controller.errorMessage!,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
               color: cs.onSurface.withValues(alpha: 0.6),

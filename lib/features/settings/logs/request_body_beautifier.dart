@@ -141,8 +141,28 @@ BeautifiedBody _parseOpenAIChat(Map<String, dynamic> body) {
     // Tool-role messages: content IS the tool result, no separate text part.
     if (role == TurnRole.tool) {
       final toolName = (msg['name'] as String?) ?? 'tool';
-      final resultStr = content is String ? content : _prettyOrRaw(content);
-      parts.add(ToolResultPart(toolName, resultStr));
+      if (content is List) {
+        // Content-parts array (image-bearing tool results): keep text in the
+        // result part and surface image parts alongside.
+        final texts = <String>[];
+        final mediaParts = <TurnPart>[];
+        for (final part in content) {
+          if (part is! Map<String, dynamic>) continue;
+          final p = _parseOpenAIChatContentPart(part);
+          if (p is TextPart) {
+            texts.add(p.text);
+          } else if (p != null) {
+            mediaParts.add(p);
+          }
+        }
+        if (texts.isNotEmpty) {
+          parts.add(ToolResultPart(toolName, texts.join('\n')));
+        }
+        parts.addAll(mediaParts);
+      } else {
+        final resultStr = content is String ? content : _prettyOrRaw(content);
+        parts.add(ToolResultPart(toolName, resultStr));
+      }
     } else if (content is String && content.isNotEmpty) {
       parts.add(TextPart(content));
     } else if (content is List) {
@@ -300,14 +320,43 @@ BeautifiedBody _parseOpenAIResponses(Map<String, dynamic> body) {
         continue;
       }
       if (type == 'function_call_output') {
-        turns.add(
-          BeautifiedTurn(TurnRole.tool, [
-            ToolResultPart(
-              (item['call_id'] as String?) ?? 'tool',
-              _prettyOrRaw(item['output']),
-            ),
-          ]),
-        );
+        final output = item['output'];
+        if (output is List) {
+          // Content-parts array (image-bearing function outputs).
+          final texts = <String>[];
+          final mediaParts = <TurnPart>[];
+          for (final part in output) {
+            if (part is! Map<String, dynamic>) continue;
+            final p = _parseOpenAIResponsesContentPart(part);
+            if (p is TextPart) {
+              texts.add(p.text);
+            } else if (p != null) {
+              mediaParts.add(p);
+            }
+          }
+          final parts = <TurnPart>[];
+          if (texts.isNotEmpty) {
+            parts.add(
+              ToolResultPart(
+                (item['call_id'] as String?) ?? 'tool',
+                texts.join('\n'),
+              ),
+            );
+          }
+          parts.addAll(mediaParts);
+          if (parts.isNotEmpty) {
+            turns.add(BeautifiedTurn(TurnRole.tool, parts));
+          }
+        } else {
+          turns.add(
+            BeautifiedTurn(TurnRole.tool, [
+              ToolResultPart(
+                (item['call_id'] as String?) ?? 'tool',
+                _prettyOrRaw(output),
+              ),
+            ]),
+          );
+        }
         continue;
       }
 
@@ -425,6 +474,16 @@ TurnPart? _parseClaudeContentBlock(Map<String, dynamic> block) {
           if (sub is! Map<String, dynamic>) continue;
           if (sub['type'] == 'text' && sub['text'] is String) {
             texts.add(sub['text'] as String);
+          } else if (sub['type'] == 'image') {
+            final source = sub['source'] as Map<String, dynamic>?;
+            final mediaType = (source?['media_type'] as String?) ?? 'image';
+            final data = source?['data'] as String?;
+            final label = ImagePart(
+              mime: mediaType,
+              isBase64: true,
+              byteLength: data != null ? _base64ByteLength(data) : 0,
+            ).displayLabel;
+            texts.add('[$label]');
           } else {
             texts.add('[${sub['type'] ?? 'block'}]');
           }

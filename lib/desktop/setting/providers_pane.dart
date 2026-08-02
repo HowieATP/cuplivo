@@ -2346,6 +2346,7 @@ class _DesktopProviderDetailPaneState
                     );
                 final multiNow = cfgNow.multiKeyEnabled ?? false;
                 final respNow = cfgNow.useResponseApi ?? false;
+                final toolImagesNow = cfgNow.enableToolResultImages;
                 final vertexNow = cfgNow.vertexAI ?? false;
                 final balanceEnabledNow = cfgNow.balanceEnabled ?? false;
                 final proxyEnabledNow = cfgNow.proxyEnabled ?? false;
@@ -2773,26 +2774,95 @@ class _DesktopProviderDetailPaneState
                                 if (kindNow == ProviderKind.openai) {
                                   return KeyedSubtree(
                                     key: const ValueKey('openai-resp'),
-                                    child: row(
-                                      l10n.providerDetailPageResponseApiTitle,
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: IosSwitch(
-                                          value: respNow,
-                                          onChanged: (v) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        row(
+                                          l10n.providerDetailPageResponseApiTitle,
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: IosSwitch(
+                                              value: respNow,
+                                              onChanged: (v) async {
+                                                final old = spWatch
+                                                    .getProviderConfig(
+                                                      widget.providerKey,
+                                                      defaultName:
+                                                          widget.displayName,
+                                                    );
+                                                await spWatch.setProviderConfig(
                                                   widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
+                                                  old.copyWith(
+                                                    useResponseApi: v,
+                                                  ),
                                                 );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(useResponseApi: v),
-                                            );
-                                          },
+                                              },
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(height: 4),
+                                        row(
+                                          l10n.providerDetailPageToolResultImagesTitle,
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: DesktopSelectDropdown<String>(
+                                              value: toolImagesNow == null
+                                                  ? 'auto'
+                                                  : (toolImagesNow
+                                                            ? 'on'
+                                                            : 'off'),
+                                              options: [
+                                                DesktopSelectOption(
+                                                  value: 'auto',
+                                                  label: l10n
+                                                      .providerDetailPageToolResultImagesAuto,
+                                                ),
+                                                DesktopSelectOption(
+                                                  value: 'on',
+                                                  label: l10n
+                                                      .providerDetailPageToolResultImagesOn,
+                                                ),
+                                                DesktopSelectOption(
+                                                  value: 'off',
+                                                  label: l10n
+                                                      .providerDetailPageToolResultImagesOff,
+                                                ),
+                                              ],
+                                              maxLabelWidth: 150,
+                                              triggerFillColor:
+                                                  Theme.of(ctx).brightness ==
+                                                      Brightness.dark
+                                                  ? Colors.white10
+                                                  : const Color(0xFFF7F7F9),
+                                              onSelected: (v) async {
+                                                final old = spWatch
+                                                    .getProviderConfig(
+                                                      widget.providerKey,
+                                                      defaultName:
+                                                          widget.displayName,
+                                                    );
+                                                final bool? next;
+                                                if (v == 'on') {
+                                                  next = true;
+                                                } else if (v == 'off') {
+                                                  next = false;
+                                                } else {
+                                                  next = null;
+                                                }
+                                                await spWatch.setProviderConfig(
+                                                  widget.providerKey,
+                                                  old.copyWith(
+                                                    enableToolResultImages:
+                                                        next,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }

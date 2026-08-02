@@ -3461,6 +3461,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPageToolResultImagesTitle => '工具结果图片';
+
+  @override
+  String get providerDetailPageToolResultImagesAuto => '自动';
+
+  @override
+  String get providerDetailPageToolResultImagesOn => '开启';
+
+  @override
+  String get providerDetailPageToolResultImagesOff => '关闭';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
 
   @override
@@ -10089,6 +10101,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPageToolResultImagesTitle => '工具结果图片';
+
+  @override
+  String get providerDetailPageToolResultImagesAuto => '自动';
+
+  @override
+  String get providerDetailPageToolResultImagesOn => '开启';
+
+  @override
+  String get providerDetailPageToolResultImagesOff => '关闭';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
 
   @override
@@ -16714,6 +16738,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPageToolResultImagesTitle => '工具結果圖片';
+
+  @override
+  String get providerDetailPageToolResultImagesAuto => '自動';
+
+  @override
+  String get providerDetailPageToolResultImagesOn => '開啟';
+
+  @override
+  String get providerDetailPageToolResultImagesOff => '關閉';
 
   @override
   String get providerDetailPageAihubmixAppCodeLabel => '應用 Code（享 10% 優惠）';

@@ -401,6 +401,23 @@ bool _shouldUseLongCatOmniPayload(
   return config.useResponseApi != true && isLongCatOmniModelId(upstreamModelId);
 }
 
+/// Whether tool results containing `[image:...]` markers should be converted
+/// into provider-specific content parts for this request.
+///
+/// Explicit `ProviderConfig.enableToolResultImages` wins. Otherwise the
+/// allowlist decides: only providers whose tool-message content arrays have
+/// been verified against a real API are enabled by default (OpenAI official,
+/// OpenRouter, LongCat). Unverified OpenAI-compatible vendors stay on plain
+/// text until a user explicitly opts in. See docs/adr/0017.
+bool _shouldSendToolResultImages(ProviderConfig config, String modelId) {
+  final explicit = config.enableToolResultImages;
+  if (explicit != null) return explicit;
+  final upstreamModelId = _apiModelId(config, modelId);
+  if (_shouldUseLongCatOmniPayload(config, upstreamModelId)) return true;
+  final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
+  return host == 'api.openai.com' || host.endsWith('openrouter.ai');
+}
+
 bool _shouldIncludeStreamingUsageOptions(
   String host, {
   required String upstreamModelId,
@@ -586,6 +603,7 @@ Future<Map<String, dynamic>?> _buildLongCatOmniAttachmentPart(
 Future<List<Map<String, dynamic>>> _buildLongCatOmniMessages(
   List<Map<String, dynamic>> messages, {
   List<String>? userMediaPaths,
+  bool sendToolResultImages = false,
 }) async {
   int lastUserIndex = -1;
   for (int i = messages.length - 1; i >= 0; i--) {
@@ -618,10 +636,48 @@ Future<List<Map<String, dynamic>>> _buildLongCatOmniMessages(
       continue;
     }
 
-    if (role == 'tool' ||
-        (role == 'assistant' &&
-            outMsg['tool_calls'] is List &&
-            (outMsg['tool_calls'] as List).isNotEmpty)) {
+    if (role == 'tool') {
+      final hasToolResultImages =
+          raw.contains('[image:') || (raw.contains('![') && raw.contains(']('));
+      if (sendToolResultImages && hasToolResultImages) {
+        final parsed = await _parseTextAndImages(
+          raw,
+          allowRemoteImages: true,
+          allowLocalImages: true,
+          allowDataImages: true,
+          keepRemoteMarkdownText: false,
+          keepDisallowedImageText: true,
+        );
+        if (parsed.images.isNotEmpty) {
+          final parts = <Map<String, dynamic>>[];
+          if (parsed.text.isNotEmpty) {
+            parts.add({'type': 'text', 'text': parsed.text});
+          }
+          final seenSources = <String>{};
+          for (final ref in parsed.images) {
+            final normalized = _normalizeOpenAICompatibleSource(ref.src);
+            if (!seenSources.add(normalized)) continue;
+            final source = ref.kind == 'path' ? normalized : ref.src;
+            final part = await _buildLongCatOmniAttachmentPart(source);
+            if (part != null) {
+              parts.add(part);
+            }
+          }
+          if (parts.isNotEmpty) {
+            outMsg['content'] = parts;
+            out.add(outMsg);
+            continue;
+          }
+        }
+      }
+      outMsg['content'] = raw;
+      out.add(outMsg);
+      continue;
+    }
+
+    if (role == 'assistant' &&
+        outMsg['tool_calls'] is List &&
+        (outMsg['tool_calls'] as List).isNotEmpty) {
       outMsg['content'] = raw;
       out.add(outMsg);
       continue;
@@ -681,11 +737,56 @@ Future<List<Map<String, dynamic>>> _buildLongCatOmniMessages(
   return out;
 }
 
+/// Converts a tool result string into a `function_call_output.output` value.
+///
+/// Returns the original string unchanged when there are no image references
+/// (byte-identical request bodies for marker-free tool results). When image
+/// refs are present, returns a content-parts array (`input_text` + `input_image`).
+Future<dynamic> _buildResponsesToolResultOutput(
+  String res, {
+  required bool allowRemoteImages,
+}) async {
+  if (!res.contains('[image:') && !(res.contains('![') && res.contains(']('))) {
+    return res;
+  }
+  final parsed = await _parseTextAndImages(
+    res,
+    allowRemoteImages: allowRemoteImages,
+    allowLocalImages: true,
+    allowDataImages: true,
+    keepRemoteMarkdownText: false,
+    keepDisallowedImageText: true,
+  );
+  if (parsed.images.isEmpty) return res;
+  final parts = <Map<String, dynamic>>[];
+  if (parsed.text.isNotEmpty) {
+    parts.add({'type': 'input_text', 'text': parsed.text});
+  }
+  final seenSources = <String>{};
+  for (final ref in parsed.images) {
+    final normalized = _normalizeOpenAICompatibleSource(ref.src);
+    if (!seenSources.add(normalized)) continue;
+    final String url;
+    if (ref.kind == 'data') {
+      url = ref.src;
+    } else if (ref.kind == 'path') {
+      url = await _encodeBase64File(ref.src, withPrefix: true);
+    } else {
+      url = ref.src;
+    }
+    if (url.isEmpty) continue;
+    if (!allowRemoteImages && _isRemoteHttpUrl(url)) continue;
+    parts.add({'type': 'input_image', 'image_url': url});
+  }
+  return parts.isEmpty ? res : parts;
+}
+
 Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   List<Map<String, dynamic>> messages, {
   List<String>? userMediaPaths,
   required bool canImageInput,
   required bool allowRemoteImages,
+  bool sendToolResultImages = false,
   bool stripUnsignedReasoningContent = false,
 }) async {
   int lastUserIndex = -1;
@@ -741,10 +842,57 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       continue;
     }
 
-    if (role == 'tool' ||
-        (role == 'assistant' &&
-            outMsg['tool_calls'] is List &&
-            (outMsg['tool_calls'] as List).isNotEmpty)) {
+    if (role == 'tool') {
+      final hasToolResultImages =
+          raw.contains('[image:') || (raw.contains('![') && raw.contains(']('));
+      if (sendToolResultImages && canImageInput && hasToolResultImages) {
+        final parsed = await _parseTextAndImages(
+          raw,
+          allowRemoteImages: allowRemoteImages,
+          allowLocalImages: true,
+          allowDataImages: true,
+          keepRemoteMarkdownText: false,
+          keepDisallowedImageText: true,
+        );
+        if (parsed.images.isNotEmpty) {
+          final parts = <Map<String, dynamic>>[];
+          if (parsed.text.isNotEmpty) {
+            parts.add({'type': 'text', 'text': parsed.text});
+          }
+          final seenSources = <String>{};
+          for (final ref in parsed.images) {
+            final normalized = _normalizeOpenAICompatibleSource(ref.src);
+            if (!seenSources.add(normalized)) continue;
+            final String url;
+            if (ref.kind == 'data') {
+              url = ref.src;
+            } else if (ref.kind == 'path') {
+              url = await _encodeBase64File(ref.src, withPrefix: true);
+            } else {
+              url = ref.src;
+            }
+            if (url.isEmpty) continue;
+            if (!allowRemoteImages && _isRemoteHttpUrl(url)) continue;
+            parts.add({
+              'type': 'image_url',
+              'image_url': {'url': url},
+            });
+          }
+          if (parts.isNotEmpty) {
+            outMsg['content'] = parts;
+            out.add(outMsg);
+            continue;
+          }
+        }
+      }
+      outMsg['content'] = raw;
+      out.add(outMsg);
+      continue;
+    }
+
+    if (role == 'assistant' &&
+        outMsg['tool_calls'] is List &&
+        (outMsg['tool_calls'] as List).isNotEmpty) {
       outMsg['content'] = raw;
       out.add(outMsg);
       continue;
@@ -1067,6 +1215,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
   final bool allowRemoteImages =
       canImageInput && !_isKimiK3Model(upstreamModelId);
+  final sendToolResultImages = _shouldSendToolResultImages(config, modelId);
 
   final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
   final info = _OpenAIProviderInfo(
@@ -1210,7 +1359,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           input.add({
             'type': 'function_call_output',
             'call_id': toolCallId,
-            'output': content,
+            'output': await _buildResponsesToolResultOutput(
+              content,
+              allowRemoteImages: allowRemoteImages,
+            ),
           });
         }
         continue;
@@ -1461,6 +1613,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         'messages': await _buildLongCatOmniMessages(
           messages,
           userMediaPaths: userMediaPaths,
+          sendToolResultImages: sendToolResultImages,
         ),
         'stream': stream,
         'output_modalities': const ['text'],
@@ -1478,6 +1631,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         userMediaPaths: userMediaPaths,
         canImageInput: canImageInput,
         allowRemoteImages: allowRemoteImages,
+        sendToolResultImages: sendToolResultImages,
         stripUnsignedReasoningContent: isClaudeUpstream,
       );
       body = {
@@ -1808,12 +1962,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               ? await _buildLongCatOmniMessages(
                   next,
                   userMediaPaths: userMediaPaths,
+                  sendToolResultImages: sendToolResultImages,
                 )
               : await _buildOpenAIChatCompletionMessages(
                   next,
                   userMediaPaths: userMediaPaths,
                   canImageInput: canImageInput,
                   allowRemoteImages: allowRemoteImages,
+                  sendToolResultImages: sendToolResultImages,
                   stripUnsignedReasoningContent: isClaudeUpstream,
                 );
           reqBody.remove('stream');
@@ -2023,6 +2179,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'messages': await _buildLongCatOmniMessages(
                       currentMessages,
                       userMediaPaths: userMediaPaths,
+                      sendToolResultImages: sendToolResultImages,
                     ),
                     'stream': true,
                     'output_modalities': const ['text'],
@@ -2042,6 +2199,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       userMediaPaths: userMediaPaths,
                       canImageInput: canImageInput,
                       allowRemoteImages: allowRemoteImages,
+                      sendToolResultImages: sendToolResultImages,
                       stripUnsignedReasoningContent: isClaudeUpstream,
                     ),
                     'stream': true,
@@ -2759,7 +2917,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 followUpOutputs.add({
                   'type': 'function_call_output',
                   'call_id': id2,
-                  'output': res,
+                  'output': await _buildResponsesToolResultOutput(
+                    res,
+                    allowRemoteImages: allowRemoteImages,
+                  ),
                 });
               }
               if (resultsInfo.isNotEmpty) {
@@ -3060,7 +3221,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   followUpOutputs2.add({
                     'type': 'function_call_output',
                     'call_id': id2,
-                    'output': res2,
+                    'output': await _buildResponsesToolResultOutput(
+                      res2,
+                      allowRemoteImages: allowRemoteImages,
+                    ),
                   });
                 }
                 if (resultsInfo2.isNotEmpty) {
@@ -3527,6 +3691,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'messages': await _buildLongCatOmniMessages(
                       currentMessages,
                       userMediaPaths: userMediaPaths,
+                      sendToolResultImages: sendToolResultImages,
                     ),
                     'stream': true,
                     'output_modalities': const ['text'],
@@ -3546,6 +3711,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       userMediaPaths: userMediaPaths,
                       canImageInput: canImageInput,
                       allowRemoteImages: allowRemoteImages,
+                      sendToolResultImages: sendToolResultImages,
                       stripUnsignedReasoningContent: isClaudeUpstream,
                     ),
                     'stream': true,
@@ -4045,6 +4211,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         'messages': await _buildLongCatOmniMessages(
                           currentMessages,
                           userMediaPaths: userMediaPaths,
+                          sendToolResultImages: sendToolResultImages,
                         ),
                         'stream': true,
                         'output_modalities': const ['text'],
@@ -4064,6 +4231,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           userMediaPaths: userMediaPaths,
                           canImageInput: canImageInput,
                           allowRemoteImages: allowRemoteImages,
+                          sendToolResultImages: sendToolResultImages,
                           stripUnsignedReasoningContent: isClaudeUpstream,
                         ),
                         'stream': true,

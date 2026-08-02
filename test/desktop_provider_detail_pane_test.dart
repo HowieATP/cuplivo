@@ -135,6 +135,8 @@ void main() {
     final portField = find.byKey(
       const ValueKey('desktop-provider-proxy-port-field'),
     );
+    await tester.ensureVisible(portField);
+    await tester.pumpAndSettle();
     await tester.tap(portField);
     await tester.pump();
     await tester.enterText(portField, '1');

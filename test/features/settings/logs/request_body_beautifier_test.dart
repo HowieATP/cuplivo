@@ -160,6 +160,73 @@ void main() {
         expect(imagePart.displayLabel, contains('(base64)'));
         expect(imagePart.displayLabel, contains('B'));
       });
+
+      test('parses image-bearing tool message content arrays', () {
+        final body = jsonEncode({
+          'model': 'gpt-4o',
+          'messages': [
+            {
+              'role': 'tool',
+              'tool_call_id': 'call_1',
+              'name': 'lookup',
+              'content': [
+                {'type': 'text', 'text': 'here is the chart'},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/png;base64,AQIDBA=='},
+                },
+              ],
+            },
+          ],
+        });
+
+        final result = tryBeautify(body);
+        expect(result, isNotNull);
+        final turn = result!.turns.single;
+        expect(turn.role, TurnRole.tool);
+        expect(turn.parts[0] is ToolResultPart, isTrue);
+        expect((turn.parts[0] as ToolResultPart).output, 'here is the chart');
+        expect(turn.parts[1] is ImagePart, isTrue);
+        expect((turn.parts[1] as ImagePart).isBase64, isTrue);
+        expect((turn.parts[1] as ImagePart).byteLength, 4);
+      });
+
+      test('parses Claude tool_result with image block', () {
+        final body = jsonEncode({
+          'model': 'claude-sonnet-5',
+          'system': 'be concise',
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'tool_result',
+                  'tool_use_id': 'toolu_1',
+                  'content': [
+                    {'type': 'text', 'text': 'here is the chart'},
+                    {
+                      'type': 'image',
+                      'source': {
+                        'type': 'base64',
+                        'media_type': 'image/png',
+                        'data': 'AQIDBA==',
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        });
+
+        final result = tryBeautify(body);
+        expect(result, isNotNull);
+        final turn = result!.turns.last;
+        final toolResult = turn.parts[0] as ToolResultPart;
+        expect(toolResult.output, contains('here is the chart'));
+        expect(toolResult.output, contains('image/png'));
+        expect(toolResult.output, contains('(base64)'));
+      });
     });
 
     group('Claude', () {
@@ -488,6 +555,41 @@ void main() {
 
         expect(result.turns[1].parts[0] is ToolCallPart, isTrue);
         expect(result.turns[2].parts[0] is ToolResultPart, isTrue);
+      });
+
+      test('parses image-bearing function_call_output output arrays', () {
+        final body = jsonEncode({
+          'model': 'gpt-4o',
+          'input': [
+            {
+              'type': 'function_call',
+              'call_id': 'call_1',
+              'name': 'get_weather',
+              'arguments': '{}',
+            },
+            {
+              'type': 'function_call_output',
+              'call_id': 'call_1',
+              'output': [
+                {'type': 'input_text', 'text': 'here is the chart'},
+                {
+                  'type': 'input_image',
+                  'image_url': 'data:image/png;base64,AQIDBA==',
+                },
+              ],
+            },
+          ],
+        });
+
+        final result = tryBeautify(body);
+        expect(result, isNotNull);
+        final turn = result!.turns.last;
+        expect(turn.role, TurnRole.tool);
+        expect(turn.parts[0] is ToolResultPart, isTrue);
+        expect((turn.parts[0] as ToolResultPart).output, 'here is the chart');
+        expect(turn.parts[1] is ImagePart, isTrue);
+        expect((turn.parts[1] as ImagePart).isBase64, isTrue);
+        expect((turn.parts[1] as ImagePart).byteLength, 4);
       });
     });
 

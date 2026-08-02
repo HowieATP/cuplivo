@@ -6662,6 +6662,30 @@ abstract class AppLocalizations {
   /// **'Response API (/responses)'**
   String get providerDetailPageResponseApiTitle;
 
+  /// No description provided for @providerDetailPageToolResultImagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Result Images'**
+  String get providerDetailPageToolResultImagesTitle;
+
+  /// No description provided for @providerDetailPageToolResultImagesAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get providerDetailPageToolResultImagesAuto;
+
+  /// No description provided for @providerDetailPageToolResultImagesOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get providerDetailPageToolResultImagesOn;
+
+  /// No description provided for @providerDetailPageToolResultImagesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get providerDetailPageToolResultImagesOff;
+
   /// No description provided for @providerDetailPageAihubmixAppCodeLabel.
   ///
   /// In en, this message translates to:

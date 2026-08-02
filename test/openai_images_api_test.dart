@@ -246,12 +246,15 @@ void main() {
     test('images requests never carry codex account headers', () async {
       final controller = CodexDeviceCodeController();
       CodexDeviceCodeController.debugOverrideInstance(controller);
-      addTearDown(controller.resetForTest);
-      addTearDown(
-        () => CodexDeviceCodeController.debugOverrideInstance(
+      // Single tearDown (LIFO would otherwise re-order the reset vs. the
+      // singleton swap): reset the controller first, then restore the
+      // default instance.
+      addTearDown(() {
+        controller.resetForTest();
+        CodexDeviceCodeController.debugOverrideInstance(
           CodexDeviceCodeController(),
-        ),
-      );
+        );
+      });
       controller.credential = CodexOAuthCredential(
         accessToken: 'at-codex',
         refreshToken: 'rt-codex',

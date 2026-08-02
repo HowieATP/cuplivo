@@ -6806,6 +6806,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexLoginCopiedToast => 'Code copied to clipboard';
 
   @override
+  String get codexLoginCopyFailed => 'Failed to copy the code.';
+
+  @override
   String get codexLoginCancelButton => 'Cancel';
 
   @override

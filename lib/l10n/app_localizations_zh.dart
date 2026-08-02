@@ -6514,6 +6514,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexLoginCopiedToast => '验证码已复制到剪贴板';
 
   @override
+  String get codexLoginCopyFailed => '复制代码失败。';
+
+  @override
   String get codexLoginCancelButton => '取消';
 
   @override
@@ -13043,6 +13046,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get codexLoginCopiedToast => '验证码已复制到剪贴板';
+
+  @override
+  String get codexLoginCopyFailed => '复制代码失败。';
 
   @override
   String get codexLoginCancelButton => '取消';
@@ -19575,6 +19581,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codexLoginCopiedToast => '驗證碼已複製到剪貼簿';
+
+  @override
+  String get codexLoginCopyFailed => '複製代碼失敗。';
 
   @override
   String get codexLoginCancelButton => '取消';

@@ -57,6 +57,11 @@ class _ThrowingSignOutController extends CodexDeviceCodeController {
 /// exchange requests in order.
 class _ScriptedFlowClient extends http.BaseClient {
   final List<http.Response Function(http.Request)> handlers = [];
+  // Records poll requests that hit the pending fallback instead of a
+  // scripted handler: a sequence drift in the scripted handlers surfaces as
+  // a failing assertion instead of silently polling until the fake
+  // deadline.
+  final List<String> unexpectedPolls = [];
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -72,6 +77,7 @@ class _ScriptedFlowClient extends http.BaseClient {
       // view). An extra poll keeps the loop alive until a scripted terminal
       // response is popped; a 403 with no error code means "still pending".
       if (req.url.toString() == kCodexPollEndpoint) {
+        unexpectedPolls.add(req.url.toString());
         final resp = http.Response('{}', 403);
         return http.StreamedResponse(
           Stream<List<int>>.fromIterable([utf8.encode(resp.body)]),
@@ -185,7 +191,7 @@ void main() {
     await tester.pump();
 
     expect(find.text(_l10n.codexLoginStatusSignedIn), findsOneWidget);
-    expect(find.textContaining('acc-1'), findsOneWidget);
+    expect(find.text('${_l10n.codexLoginAccountLabel}: acc-1'), findsOneWidget);
     expect(find.text(_l10n.codexLoginSignOutButton), findsOneWidget);
   });
 
@@ -210,6 +216,68 @@ void main() {
     expect(find.text(_l10n.codexLoginStatusWaiting), findsOneWidget);
     expect(find.text(_l10n.codexLoginSignInButton), findsNothing);
   });
+
+  testWidgets('failed state shows the error message and re-login button', (
+    tester,
+  ) async {
+    controller.status = CodexAuthStatus.failed;
+    controller.errorMessage = 'Codex device auth was denied or expired';
+
+    await tester.pumpWidget(_harness(controller));
+    await tester.pump();
+
+    expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
+    expect(
+      find.text('Codex device auth was denied or expired'),
+      findsOneWidget,
+    );
+    expect(find.text(_l10n.codexLoginSignInButton), findsOneWidget);
+  });
+
+  testWidgets(
+    'flow opened while the controller is already polling renders the local '
+    'failed fallback with a retry button',
+    (tester) async {
+      // Pre-existing flow state (e.g. a stale poll loop from a previous
+      // attempt): the reentrancy guard rejects the new startFlow, and the
+      // widget must fall back to a local failed view with a reachable retry
+      // instead of wedging on a permanent waiting spinner.
+      controller.status = CodexAuthStatus.polling;
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<CodexDeviceCodeController>.value(
+              value: controller,
+            ),
+            ChangeNotifierProvider<SettingsProvider>(
+              create: (_) => SettingsProvider(),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: CodexDeviceCodeFlow(cfg: codexProviderConfig()),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      // Non-zero pumps: the deferred startFlow call (Future.delayed
+      // Duration.zero) only fires when the fake clock actually advances.
+      await tester.pump(const Duration(milliseconds: 10));
+      await tester.pump(const Duration(milliseconds: 10));
+
+      expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
+      expect(find.text(_l10n.codexLoginSignInButton), findsOneWidget);
+
+      // Dispose the flow so its countdown timer and cancel signal are
+      // cleaned up before the test ends.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    },
+  );
 
   testWidgets('sign-out confirm dialog uses confirm copy and calls signOut', (
     tester,
@@ -382,6 +450,10 @@ void main() {
       await tester.tap(find.text(_l10n.codexLoginSignInButton));
       await tester.pump();
       expect(find.text(_l10n.codexLoginStatusFailed), findsOneWidget);
+
+      // No poll request may have drifted onto the pending fallback: a
+      // sequence mismatch would surface here instead of silently polling.
+      expect(flowClient.unexpectedPolls, isEmpty);
     },
   );
 }

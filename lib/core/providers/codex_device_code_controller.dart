@@ -147,6 +147,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
     _refreshing = null;
     _signInProxy = null;
     _cancelled = false;
+    _signOutEpoch = 0;
     _cancelListeners.clear();
     credential = null;
     status = CodexAuthStatus.signedOut;
@@ -170,6 +171,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
   CodexOAuthCredential? credential;
 
   bool _cancelled = false;
+  // Monotonic sign-out epoch: signOut() bumps it once per call. Unlike
+  // _cancelled (which _flowEnded() resets when a poll flow exits), the epoch
+  // is never reset by flow lifecycle, so a refresh in flight across a
+  // sign-out cannot slip through the commit guard just because the poll
+  // loop happened to call _flowEnded() and clear the cancel flag.
+  int _signOutEpoch = 0;
   final List<void Function()> _cancelListeners = [];
   Future<void>? _refreshing;
   NetworkProxyConfig? _signInProxy;
@@ -494,76 +501,90 @@ class CodexDeviceCodeController extends ChangeNotifier {
           _flowEnded();
           return CodexFlowOutcome.timedOut;
         }
-        final resp = await _postJson(client, kCodexPollEndpoint, {
-          'device_auth_id': deviceAuthId,
-          'user_code': rawUserCode,
-        });
+        // A poll network failure (timeout / socket / other) must not kill the
+        // login: log it and keep polling until the next attempt or the
+        // deadline, mirroring the transient-status handling below.
+        http.Response? resp;
+        try {
+          resp = await _postJson(client, kCodexPollEndpoint, {
+            'device_auth_id': deviceAuthId,
+            'user_code': rawUserCode,
+          });
+        } on TimeoutException catch (e) {
+          debugPrint('[CodexOAuth] poll TimeoutException: $e, keeping polling');
+        } on SocketException catch (e) {
+          debugPrint('[CodexOAuth] poll SocketException: $e, keeping polling');
+        } catch (e, st) {
+          debugPrint('[CodexOAuth] poll failed: $e\n$st, keeping polling');
+        }
         if (_cancelled) {
           _flowEnded();
           return CodexFlowOutcome.cancelled;
         }
-        debugPrint('[CodexOAuth] poll status=${resp.statusCode}');
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          final json = _tryDecodeJson(resp);
-          final authCode = json?['authorization_code'];
-          final verifier = json?['code_verifier'];
-          if (authCode is String && verifier is String) {
-            authorizationCode = authCode;
-            codeVerifier = verifier;
-            break;
-          }
-          _fail('Invalid Codex device auth token response');
-          return CodexFlowOutcome.failed;
-        }
-        if (resp.statusCode == 403 || resp.statusCode == 404) {
-          final errCode = _extractErrorCode(resp);
-          if (errCode == 'slow_down') {
-            // slow_down must be handled before the unknown-code fail-fast:
-            // it is a non-empty code that means "keep polling, slower".
-            intervalSeconds =
-                (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
-                    .clamp(kCodexMinInterval.inSeconds, 60)
-                    .toInt();
-            debugPrint(
-              '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
-            );
-          } else if (errCode == 'deviceauth_authorization_pending') {
-            // Pending keeps polling even on a 403/404 envelope: the device
-            // flow can surface the pending code under either status.
-          } else if (errCode == 'access_denied' ||
-              errCode == 'expired_token' ||
-              errCode == 'deviceauth_authorization_denied') {
-            _fail('Codex device auth was denied or expired');
-            return CodexFlowOutcome.failed;
-          } else if (errCode != null && errCode.isNotEmpty) {
-            // Unknown rejection code: fail fast instead of polling until the
-            // deadline. A null errCode (no body / no error field, e.g. a bare
-            // 403) stays pending per the device-auth semantics.
-            _fail('Codex device auth rejected with code: $errCode');
+        if (resp != null) {
+          debugPrint('[CodexOAuth] poll status=${resp.statusCode}');
+          if (resp.statusCode >= 200 && resp.statusCode < 300) {
+            final json = _tryDecodeJson(resp);
+            final authCode = json?['authorization_code'];
+            final verifier = json?['code_verifier'];
+            if (authCode is String && verifier is String) {
+              authorizationCode = authCode;
+              codeVerifier = verifier;
+              break;
+            }
+            _fail('Invalid Codex device auth token response');
             return CodexFlowOutcome.failed;
           }
-        } else {
-          final errCode = _extractErrorCode(resp);
-          if (errCode == 'deviceauth_authorization_pending') {
-            // still pending
-          } else if (errCode == 'slow_down') {
-            intervalSeconds =
-                (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
-                    .clamp(kCodexMinInterval.inSeconds, 60)
-                    .toInt();
-            debugPrint(
-              '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
-            );
-          } else if (resp.statusCode == 429 || resp.statusCode >= 500) {
-            // Transient server errors (rate limit / 5xx) must not kill the
-            // login: keep polling until the next attempt or the deadline.
-            debugPrint(
-              '[CodexOAuth] poll transient status ${resp.statusCode}, '
-              'keeping polling',
-            );
+          if (resp.statusCode == 403 || resp.statusCode == 404) {
+            final errCode = _extractErrorCode(resp);
+            if (errCode == 'slow_down') {
+              // slow_down must be handled before the unknown-code fail-fast:
+              // it is a non-empty code that means "keep polling, slower".
+              intervalSeconds =
+                  (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
+                      .clamp(kCodexMinInterval.inSeconds, 60)
+                      .toInt();
+              debugPrint(
+                '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
+              );
+            } else if (errCode == 'deviceauth_authorization_pending') {
+              // Pending keeps polling even on a 403/404 envelope: the device
+              // flow can surface the pending code under either status.
+            } else if (errCode == 'access_denied' ||
+                errCode == 'expired_token' ||
+                errCode == 'deviceauth_authorization_denied') {
+              _fail('Codex device auth was denied or expired');
+              return CodexFlowOutcome.failed;
+            } else if (errCode != null && errCode.isNotEmpty) {
+              // Unknown rejection code: fail fast instead of polling until the
+              // deadline. A null errCode (no body / no error field, e.g. a
+              // bare 403) stays pending per the device-auth semantics.
+              _fail('Codex device auth rejected with code: $errCode');
+              return CodexFlowOutcome.failed;
+            }
           } else {
-            _fail('Codex device auth failed with status ${resp.statusCode}');
-            return CodexFlowOutcome.failed;
+            final errCode = _extractErrorCode(resp);
+            if (errCode == 'deviceauth_authorization_pending') {
+              // still pending
+            } else if (errCode == 'slow_down') {
+              intervalSeconds =
+                  (intervalSeconds + kCodexSlowDownIncrement.inSeconds)
+                      .clamp(kCodexMinInterval.inSeconds, 60)
+                      .toInt();
+              debugPrint(
+                '[CodexOAuth] poll slow_down, interval now ${intervalSeconds}s',
+              );
+            } else if (resp.statusCode == 429 || resp.statusCode >= 500) {
+              // Transient server errors (rate limit / 5xx) must not kill the
+              // login: keep polling until the next attempt or the deadline.
+              debugPrint(
+                '[CodexOAuth] poll transient status ${resp.statusCode}, '
+                'keeping polling',
+              );
+            } else {
+              _fail('Codex device auth failed with status ${resp.statusCode}');
+              return CodexFlowOutcome.failed;
+            }
           }
         }
         final remaining = deadline.difference(DateTime.now());
@@ -742,6 +763,9 @@ class CodexDeviceCodeController extends ChangeNotifier {
   Future<void> _doRefresh() async {
     final c = credential;
     if (c == null) return;
+    // Captured before the first await: any signOut() that starts after this
+    // point (or any refresh that outlives one) must not be able to commit.
+    final epochAtStart = _signOutEpoch;
     final client = _clientFactory(c.proxy ?? _signInProxy);
     try {
       final resp = await client
@@ -786,8 +810,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
         // TOCTOU guard: signOut() reads _refreshing once and parks on its
         // prefs removal, an async gap in which a fresh ensureFresh() can
         // start a new _doRefresh from a still-non-null credential. Committing
-        // here would resurrect the session the sign-out just cleared.
-        if (_cancelled || !identical(credential, c)) {
+        // here would resurrect the session the sign-out just cleared. The
+        // epoch check catches a sign-out that started while this refresh was
+        // in flight even when _flowEnded() has since reset _cancelled.
+        if (_cancelled ||
+            _signOutEpoch != epochAtStart ||
+            !identical(credential, c)) {
           debugPrint('[CodexOAuth] refresh commit aborted (signed out)');
           return;
         }
@@ -828,6 +856,11 @@ class CodexDeviceCodeController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    // Bump the epoch before anything else: any refresh that started before
+    // the sign-out (or that starts in the async gaps below) can never commit
+    // its result, regardless of whether a poll flow's _flowEnded() clears
+    // _cancelled in the meantime.
+    _signOutEpoch++;
     // Abort any in-flight device-code poll loop so it cannot keep running
     // after sign-out and resurrect the credential.
     cancel();

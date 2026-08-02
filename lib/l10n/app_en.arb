@@ -3184,6 +3184,7 @@
   "codexLoginOpenPageButton": "Open authorization page",
   "codexLoginCopyCodeButton": "Copy code",
   "codexLoginCopiedToast": "Code copied to clipboard",
+  "codexLoginCopyFailed": "Failed to copy the code.",
   "codexLoginCancelButton": "Cancel",
   "codexLoginAccountLabel": "ChatGPT account",
   "codexLoginExpiresLabel": "Token expires",

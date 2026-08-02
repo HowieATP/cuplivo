@@ -242,4 +242,100 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'built-in Codex provider shows the account entry on a non-codex host',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = await _createSettings(
+        tester,
+        keyName: 'Codex',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://api.openai.com/v1',
+      );
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        _harness(settings, controller, keyName: 'Codex', displayName: 'Codex'),
+      );
+      await tester.pumpAndSettle();
+
+      // The provider id itself grants the entry even when the baseUrl is not
+      // a codex host: the id branch of showEntryFor.
+      expect(
+        find.byType(CodexAccountEntry, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'custom openai provider on a trailing-slash codex host shows the entry',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = await _createSettings(
+        tester,
+        keyName: 'MyCodexSlash',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://chatgpt.com/backend-api/codex/',
+      );
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        _harness(
+          settings,
+          controller,
+          keyName: 'MyCodexSlash',
+          displayName: 'MyCodexSlash',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // isCodexHost tolerates a trailing slash on the codex path.
+      expect(
+        find.byType(CodexAccountEntry, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'custom openai provider on a near-codex path hides the account entry',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final settings = await _createSettings(
+        tester,
+        keyName: 'MyCodexNear',
+        kind: ProviderKind.openai,
+        baseUrl: 'https://chatgpt.com/backend-api/notcodex',
+      );
+      addTearDown(settings.dispose);
+
+      await tester.pumpWidget(
+        _harness(
+          settings,
+          controller,
+          keyName: 'MyCodexNear',
+          displayName: 'MyCodexNear',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The path match must be exact: a sibling path on the same host is not
+      // a codex endpoint and must not show the entry.
+      expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

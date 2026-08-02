@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SharedPreferencesAsync backup filter', () {
-    test('snapshot excludes local-only chat font scale', () async {
+    test('snapshot excludes local-only keys', () async {
       SharedPreferences.setMockInitialValues({
         'display_chat_font_scale_v1': 1.3,
         'display_auto_scroll_enabled_v1': false,

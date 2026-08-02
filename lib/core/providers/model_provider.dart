@@ -136,7 +136,17 @@ class _Http {
     // Same proxy semantics as ChatApiService: an unparseable or out-of-range
     // port degrades to a direct connection instead of a magic default port.
     final proxy = CodexDeviceCodeController.proxyFromConfig(cfg);
-    return proxy == null ? DioHttpClient() : DioHttpClient(proxy: proxy);
+    if (proxy == null) {
+      if (cfg.proxyEnabled == true) {
+        debugPrint(
+          '[ModelProvider] proxy enabled but host/port invalid '
+          '(${cfg.proxyHost}:${cfg.proxyPort}); falling back to direct '
+          'connection',
+        );
+      }
+      return DioHttpClient();
+    }
+    return DioHttpClient(proxy: proxy);
   }
 }
 

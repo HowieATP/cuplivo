@@ -644,6 +644,41 @@ void main() {
       expect(client.requests[2].url.toString(), kCodexPollEndpoint);
     });
 
+    test(
+      'poll SocketException keeps polling instead of failing the login',
+      () async {
+        client.handlers.add(
+          (_) async => _json(200, {
+            'device_auth_id': 'da-1',
+            'user_code': 'ABC-DEF',
+            'interval': '1',
+          }),
+        );
+        client.handlers.add(
+          (_) async => throw const SocketException('refused'),
+        );
+        client.handlers.add(
+          (_) async => _json(200, {
+            'authorization_code': 'ac-1',
+            'code_verifier': 'cv-1',
+          }),
+        );
+        client.handlers.add((_) async => _json(200, _tokenBody('acc-1')));
+
+        final outcome = await controller.startFlow(
+          cfg: codexProviderConfig(),
+          onAuthenticated: () async {},
+        );
+
+        // A transient network failure must not kill the login: the loop keeps
+        // polling until a success or the deadline instead of surfacing a
+        // failed login.
+        expect(outcome, CodexFlowOutcome.success);
+        expect(client.requests.length, 4);
+        expect(client.requests[2].url.toString(), kCodexPollEndpoint);
+      },
+    );
+
     test('502 poll with an error code keeps polling too', () async {
       client.handlers.add(
         (_) async => _json(200, {
@@ -2141,6 +2176,72 @@ void main() {
       // The refresh response lands only after sign-out committed: its
       // commit must be aborted instead of re-persisting / flipping back to
       // signedIn.
+      refreshGate.complete(_json(200, _tokenBody('acc-2')));
+      await refreshing.timeout(const Duration(seconds: 5));
+
+      expect(controller.credential, isNull);
+      expect(controller.status, CodexAuthStatus.signedOut);
+      final storedPrefs = await SharedPreferences.getInstance();
+      expect(storedPrefs.getString(kCodexPrefsKey), isNull);
+    });
+
+    test('a refresh born while signOut is parked cannot resurrect the session '
+        'when a poll flow is active', () async {
+      // The poll flow is what distinguishes this from the refresh-only
+      // variant: while signOut is parked on its prefs removal, the flow's
+      // _flowEnded() resets _cancelled, so the refresh's commit guard cannot
+      // rely on the cancel flag alone - the sign-out epoch must still reject
+      // the commit once the response arrives.
+      SharedPreferences.setMockInitialValues({});
+      final gated = _GatedPrefsStore();
+      SharedPreferencesStorePlatform.instance = gated;
+      final prefs = await SharedPreferences.getInstance();
+      controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.expired;
+      await prefs.setString(
+        kCodexPrefsKey,
+        jsonEncode(controller.credential!.toJson()),
+      );
+
+      final pollGate = Completer<http.Response>();
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '5',
+        }),
+      );
+      client.handlers.add((_) => pollGate.future);
+
+      gated.parkRemove();
+      final flow = controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+      // The flow is polling with its poll request hanging on pollGate.
+      await _waitForRequests(client, 2);
+      final signOutFuture = controller.signOut();
+      await gated.removeStarted.timeout(const Duration(seconds: 5));
+      // signOut is parked inside the removal while the flow is still alive.
+      // Releasing the poll makes the flow exit through _flowEnded(), which
+      // resets _cancelled - the window a stale refresh must not commit into.
+      pollGate.complete(http.Response('{}', 403));
+      expect(
+        await flow.timeout(const Duration(seconds: 5)),
+        CodexFlowOutcome.cancelled,
+      );
+      expect(controller.status, CodexAuthStatus.signedOut);
+
+      // The flow has ended and _cancelled is reset, but signOut is still
+      // parked: a refresh born now captures the post-signOut epoch.
+      final refreshGate = Completer<http.Response>();
+      client.handlers.add((_) => refreshGate.future);
+      final refreshing = controller.ensureFresh();
+      await _waitForRequests(client, 3);
+      gated.releaseRemove();
+      await signOutFuture.timeout(const Duration(seconds: 5));
+      // The response lands only after sign-out committed: the commit must be
+      // aborted instead of re-persisting / flipping back to signedIn.
       refreshGate.complete(_json(200, _tokenBody('acc-2')));
       await refreshing.timeout(const Duration(seconds: 5));
 

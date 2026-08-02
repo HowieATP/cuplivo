@@ -2606,6 +2606,7 @@
   "codexLoginOpenPageButton": "打开授权页面",
   "codexLoginCopyCodeButton": "复制验证码",
   "codexLoginCopiedToast": "验证码已复制到剪贴板",
+  "codexLoginCopyFailed": "复制代码失败。",
   "codexLoginCancelButton": "取消",
   "codexLoginAccountLabel": "ChatGPT 账号",
   "codexLoginExpiresLabel": "令牌过期时间",

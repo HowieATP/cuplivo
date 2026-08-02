@@ -2634,6 +2634,7 @@
   "codexLoginOpenPageButton": "開啟授權頁面",
   "codexLoginCopyCodeButton": "複製驗證碼",
   "codexLoginCopiedToast": "驗證碼已複製到剪貼簿",
+  "codexLoginCopyFailed": "複製代碼失敗。",
   "codexLoginCancelButton": "取消",
   "codexLoginAccountLabel": "ChatGPT 帳號",
   "codexLoginExpiresLabel": "令牌過期時間",

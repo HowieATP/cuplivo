@@ -104,6 +104,14 @@ class CodexAccountEntry extends StatelessWidget {
   /// starts with the current proxy / endpoint settings. The flow future is
   /// deliberately not awaited here; it guards its own errors.
   void _openFlow(BuildContext context) {
+    final controller = context.read<CodexDeviceCodeController>();
+    // Reentry guard: a double-tap must not open a second sheet. The second
+    // sheet's dispose() would cancel the first flow, killing a login the
+    // user is mid-way through.
+    if (controller.status == CodexAuthStatus.waitingForUser ||
+        controller.status == CodexAuthStatus.polling) {
+      return;
+    }
     final latest = context.read<SettingsProvider>().getProviderConfig(
       cfg.id,
       defaultName: cfg.name,

@@ -63,6 +63,11 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   bool _localFlowFailed = false;
   String _localFlowTitle = '';
   bool _providerWriteError = false;
+  // The flow future of the current startFlow invocation, so a retry can wait
+  // for the previous flow to fully exit (poll loop terminated, status
+  // terminal) before restarting; restarting while the old flow is still
+  // alive would be swallowed by the startFlow reentrancy guard.
+  Future<CodexFlowOutcome>? _flowFuture;
   late final SettingsProvider _settings;
   late final CodexDeviceCodeController _controller;
 
@@ -126,18 +131,18 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       });
       if (next == Duration.zero) _timer?.cancel();
     });
-    unawaited(_runFlow());
+    _flowFuture = _runFlow();
   }
 
   /// Runs the flow; `startFlow` already handles most failures internally, so
   /// this is a last-resort guard for pre-await exceptions (e.g. a client
   /// factory throwing) that would otherwise surface as an unhandled future.
-  Future<void> _runFlow() async {
+  Future<CodexFlowOutcome> _runFlow() async {
     // startFlow() notifies synchronously up to its first await; defer past the
     // build phase so initState-triggered flows never mark dependents dirty
     // while a route (bottom sheet / dialog) is still mounting.
     await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
+    if (!mounted) return CodexFlowOutcome.cancelled;
     if (_starting) {
       setState(() => _starting = false);
     }
@@ -146,7 +151,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
         cfg: widget.cfg,
         onAuthenticated: _onAuthenticated,
       );
-      if (!mounted) return;
+      if (!mounted) return outcome;
       if (outcome == CodexFlowOutcome.notEnabled) {
         // The controller is already back to signedOut; surface the
         // account-level rejection on a retryable local error view instead of
@@ -171,14 +176,33 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
           )!.codexLoginStatusFailed;
         });
       }
+      return outcome;
     } catch (e, st) {
       debugPrint('[CodexOAuth] startFlow threw: $e\n$st');
-      if (!mounted) return;
+      if (!mounted) return CodexFlowOutcome.failed;
       setState(() {
         _localFlowFailed = true;
         _localFlowTitle = AppLocalizations.of(context)!.codexLoginStatusFailed;
       });
+      return CodexFlowOutcome.failed;
     }
+  }
+
+  /// Restarts the flow after a failure: cancels the current flow and waits
+  /// for it to fully exit (poll loop terminated, status terminal) so the
+  /// startFlow reentrancy guard cannot swallow the restart, then starts a
+  /// fresh flow. A terminal flow future (failed / expired view) completes
+  /// immediately.
+  Future<void> _retryFlow() async {
+    _controller.cancel();
+    final flow = _flowFuture;
+    if (flow != null) {
+      try {
+        await flow;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    _start();
   }
 
   Future<void> _onAuthenticated() async {
@@ -225,11 +249,10 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     // Defensive hardening: only ever open the trusted OpenAI auth origin.
     // A corrupted controller value or a future call site forwarding an
     // arbitrary URL must not drive the external browser to an untrusted
-    // host.
-    final host = target.host.toLowerCase();
+    // host. The controller only ever publishes kCodexVerificationUri, so an
+    // exact host match is all that is trusted.
     final trusted =
-        target.scheme == 'https' &&
-        (host == 'auth.openai.com' || host.endsWith('.openai.com'));
+        target.scheme == 'https' && target.host == 'auth.openai.com';
     if (!trusted) {
       target = Uri.parse(kCodexVerificationUri);
     }
@@ -260,7 +283,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        message: AppLocalizations.of(context)!.codexLoginNetworkError,
+        message: AppLocalizations.of(context)!.codexLoginCopyFailed,
         type: NotificationType.error,
       );
       return;
@@ -531,13 +554,11 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            // Same cancel-first semantics as _buildFailed: while a stale poll
-            // loop is still running, a plain retry would be swallowed by the
-            // startFlow reentrancy guard and appear dead.
-            onTap: () {
-              _controller.cancel();
-              _start();
-            },
+            // Cancel the stale flow and wait for it to fully exit before
+            // restarting: while a stale poll loop is still running, a plain
+            // retry would be swallowed by the startFlow reentrancy guard and
+            // appear dead.
+            onTap: _retryFlow,
           ),
         ),
         const SizedBox(height: 4),
@@ -589,26 +610,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
             icon: Lucide.RefreshCw,
             label: l10n.codexLoginSignInButton,
             backgroundColor: cs.primary,
-            // While the controller is still polling (e.g. the local countdown
-            // hit zero before the controller deadline fired), a plain retry
-            // would be swallowed by the startFlow reentrancy guard; the
-            // cancel-first handler below stops the old loop so startFlow can
-            // re-enter. A guard rejection is covered by the local failed
-            // fallback instead of a dead waiting view.
-            enabled:
-                (controller.status != CodexAuthStatus.waitingForUser &&
-                    controller.status != CodexAuthStatus.polling) ||
-                _countdownExpired,
-            onTap: () {
-              if (_countdownExpired) {
-                // The local countdown expired while the controller-side flow
-                // may still be running: cancel it (the flow exits back to
-                // signedOut) before restarting, otherwise the restart is
-                // swallowed by the reentrancy guard.
-                _controller.cancel();
-              }
-              _start();
-            },
+            onTap: _retryFlow,
           ),
         ),
         const SizedBox(height: 4),

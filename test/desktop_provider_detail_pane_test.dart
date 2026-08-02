@@ -229,17 +229,20 @@ void main() {
       await tester.pump();
     }
 
-    ProviderConfig openAiConfig(String id, {bool multiKey = false}) =>
-        ProviderConfig(
-          id: id,
-          enabled: true,
-          name: id,
-          apiKey: 'test-key',
-          baseUrl: 'https://api.openai.com/v1',
-          providerType: ProviderKind.openai,
-          models: const ['gpt-4o'],
-          multiKeyEnabled: multiKey,
-        );
+    ProviderConfig openAiConfig(
+      String id, {
+      bool multiKey = false,
+      String? baseUrl,
+    }) => ProviderConfig(
+      id: id,
+      enabled: true,
+      name: id,
+      apiKey: 'test-key',
+      baseUrl: baseUrl ?? 'https://api.openai.com/v1',
+      providerType: ProviderKind.openai,
+      models: const ['gpt-4o'],
+      multiKeyEnabled: multiKey,
+    );
 
     testWidgets('built-in OpenAI shows the Codex account entry', (
       tester,
@@ -295,6 +298,43 @@ void main() {
       addTearDown(settings.dispose);
 
       await pumpProvider(tester, settings, 'Claude');
+
+      expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('custom openai provider on a codex host shows the entry', (
+      tester,
+    ) async {
+      final settings = await buildSettings(
+        tester,
+        key: 'MyCodex',
+        cfg: openAiConfig('MyCodex', baseUrl: kCodexBaseUrl),
+      );
+      addTearDown(settings.dispose);
+
+      await pumpProvider(tester, settings, 'MyCodex');
+
+      // A user-added openai provider pointed at the codex host is treated
+      // like the built-in codex provider.
+      expect(
+        find.byType(CodexAccountEntry, skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('custom openai provider on a non-codex host hides the entry', (
+      tester,
+    ) async {
+      final settings = await buildSettings(
+        tester,
+        key: 'MyProxy',
+        cfg: openAiConfig('MyProxy', baseUrl: 'https://myproxy.example.com/v1'),
+      );
+      addTearDown(settings.dispose);
+
+      await pumpProvider(tester, settings, 'MyProxy');
 
       expect(find.byType(CodexAccountEntry, skipOffstage: false), findsNothing);
       expect(tester.takeException(), isNull);

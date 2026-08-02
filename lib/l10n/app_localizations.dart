@@ -12410,6 +12410,12 @@ abstract class AppLocalizations {
   /// **'Code copied to clipboard'**
   String get codexLoginCopiedToast;
 
+  /// No description provided for @codexLoginCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to copy the code.'**
+  String get codexLoginCopyFailed;
+
   /// No description provided for @codexLoginCancelButton.
   ///
   /// In en, this message translates to:

@@ -6478,6 +6478,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexLoginSignOutButton => '退出登录';
 
   @override
+  String get codexLoginSignOutConfirm => '将移除本设备上保存的 ChatGPT 凭证。';
+
+  @override
+  String get codexLoginCloseButton => '关闭';
+
+  @override
   String get codexLoginStatusSignedIn => '已登录';
 
   @override
@@ -13004,6 +13010,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get codexLoginSignOutButton => '退出登录';
+
+  @override
+  String get codexLoginSignOutConfirm => '将移除本设备上保存的 ChatGPT 凭证。';
+
+  @override
+  String get codexLoginCloseButton => '关闭';
 
   @override
   String get codexLoginStatusSignedIn => '已登录';
@@ -19533,6 +19545,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codexLoginSignOutButton => '登出';
+
+  @override
+  String get codexLoginSignOutConfirm => '將移除本裝置上儲存的 ChatGPT 憑證。';
+
+  @override
+  String get codexLoginCloseButton => '關閉';
 
   @override
   String get codexLoginStatusSignedIn => '已登入';

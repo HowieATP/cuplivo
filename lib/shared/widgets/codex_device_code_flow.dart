@@ -53,17 +53,23 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   Timer? _timer;
   DateTime? _deadline;
   Duration _remaining = kCodexFlowDeadline;
+  late final SettingsProvider _settings;
 
   @override
   void initState() {
     super.initState();
+    _settings = context.read<SettingsProvider>();
     _start();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    CodexDeviceCodeController.instance.cancel();
+    final c = CodexDeviceCodeController.instance;
+    if (c.status == CodexAuthStatus.waitingForUser ||
+        c.status == CodexAuthStatus.polling) {
+      c.cancel();
+    }
     super.dispose();
   }
 
@@ -73,6 +79,14 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) {
+        _timer?.cancel();
+        return;
+      }
+      final status = CodexDeviceCodeController.instance.status;
+      if (status == CodexAuthStatus.signedIn ||
+          status == CodexAuthStatus.signedOut ||
+          status == CodexAuthStatus.failed ||
+          status == CodexAuthStatus.expired) {
         _timer?.cancel();
         return;
       }
@@ -91,11 +105,7 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
   }
 
   Future<void> _onAuthenticated() async {
-    if (!mounted) return;
-    await context.read<SettingsProvider>().setProviderConfig(
-      kCodexProviderKey,
-      codexProviderConfig(),
-    );
+    await _settings.setProviderConfig(kCodexProviderKey, codexProviderConfig());
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -161,11 +171,10 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
         style: TextStyle(fontSize: 14, color: cs.onSurface),
         textAlign: TextAlign.center,
       ),
-      CodexAuthStatus.signedOut => Text(
-        l10n.codexLoginStatusSignedOut,
-        style: TextStyle(fontSize: 14, color: cs.onSurface),
-        textAlign: TextAlign.center,
-      ),
+      CodexAuthStatus.signedOut =>
+        (controller.errorMessage != null && controller.errorMessage!.isNotEmpty)
+            ? _buildFailed(controller, l10n, l10n.codexLoginStatusFailed)
+            : _buildSignedOutEnd(l10n, cs),
     };
 
     return SafeArea(
@@ -287,6 +296,21 @@ class _CodexDeviceCodeFlowState extends State<CodexDeviceCodeFlow> {
           onPressed: _cancel,
           child: Text(l10n.codexLoginCancelButton),
         ),
+      ],
+    );
+  }
+
+  Widget _buildSignedOutEnd(AppLocalizations l10n, ColorScheme cs) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l10n.codexLoginStatusSignedOut,
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 18),
+        TextButton(onPressed: _cancel, child: Text(l10n.codexLoginCloseButton)),
       ],
     );
   }

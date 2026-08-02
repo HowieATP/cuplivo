@@ -234,7 +234,7 @@ class CodexAccountEntry extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.codexLoginSignOutButton),
-        content: Text(l10n.codexLoginSubtitle),
+        content: Text(l10n.codexLoginSignOutConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -249,7 +249,18 @@ class CodexAccountEntry extends StatelessWidget {
     );
     if (confirmed != true) return;
     if (!context.mounted) return;
-    await controller.signOut();
+    try {
+      await controller.signOut();
+    } catch (e, st) {
+      debugPrint('[CodexOAuth] signOut failed: $e\n$st');
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.codexLoginNetworkError,
+        type: NotificationType.error,
+      );
+      return;
+    }
     if (!context.mounted) return;
     showAppSnackBar(
       context,

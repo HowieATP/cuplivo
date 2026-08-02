@@ -12338,6 +12338,18 @@ abstract class AppLocalizations {
   /// **'Sign out'**
   String get codexLoginSignOutButton;
 
+  /// No description provided for @codexLoginSignOutConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the saved ChatGPT credentials from this device.'**
+  String get codexLoginSignOutConfirm;
+
+  /// No description provided for @codexLoginCloseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get codexLoginCloseButton;
+
   /// No description provided for @codexLoginStatusSignedIn.
   ///
   /// In en, this message translates to:

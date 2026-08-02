@@ -120,6 +120,10 @@ void main() {
     onAuthenticatedCalls = 0;
   });
 
+  tearDown(() {
+    controller.resetForTest();
+  });
+
   group('startFlow', () {
     test('happy path exchanges and persists credential', () async {
       DateTime? poll1At;
@@ -164,10 +168,10 @@ void main() {
 
       final pollReq = client.requests[1];
       expect(pollReq.url.toString(), kCodexPollEndpoint);
-      expect(
-        pollReq.body,
-        jsonEncode({'device_auth_id': 'da-1', 'user_code': 'ABC-DEF'}),
-      );
+      expect(jsonDecode(pollReq.body), {
+        'device_auth_id': 'da-1',
+        'user_code': 'ABC-DEF',
+      });
 
       final exchangeReq = client.requests[3];
       expect(exchangeReq.url.toString(), kCodexTokenEndpoint);
@@ -180,8 +184,11 @@ void main() {
       expect(exchangeReq.body, contains('code_verifier=cv-1'));
       expect(
         exchangeReq.body,
-        contains('redirect_uri=https://auth.openai.com/deviceauth/callback'),
+        contains(
+          'redirect_uri=${Uri.encodeQueryComponent('https://auth.openai.com/deviceauth/callback')}',
+        ),
       );
+      expect(exchangeReq.body, contains('client_id=$kCodexClientId'));
 
       // string interval '5' honored: ~5s wait between pending polls
       expect(
@@ -321,6 +328,50 @@ void main() {
       },
     );
 
+    test('403 with denied error code fails immediately', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add(
+        (_) async => _json(403, {
+          'error': {'code': 'access_denied'},
+        }),
+      );
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(client.requests.length, 2);
+    });
+
+    test('404 with expired_token error code fails immediately', () async {
+      client.handlers.add(
+        (_) async => _json(200, {
+          'device_auth_id': 'da-1',
+          'user_code': 'ABC-DEF',
+          'interval': '1',
+        }),
+      );
+      client.handlers.add((_) async => _json(404, {'error': 'expired_token'}));
+
+      final outcome = await controller.startFlow(
+        cfg: codexProviderConfig(),
+        onAuthenticated: () async {},
+      );
+
+      expect(outcome, CodexFlowOutcome.failed);
+      expect(controller.status, CodexAuthStatus.failed);
+      expect(client.requests.length, 2);
+    });
+
     test('slow_down grows the poll interval', () async {
       DateTime? poll1At;
       DateTime? poll2At;
@@ -353,7 +404,7 @@ void main() {
       // base interval 1s + 5s slow_down increment
       expect(
         poll2At!.difference(poll1At!),
-        greaterThanOrEqualTo(const Duration(seconds: 5)),
+        greaterThanOrEqualTo(const Duration(seconds: 6)),
       );
     });
 
@@ -538,25 +589,28 @@ void main() {
       expect(prefs.getString(kCodexPrefsKey), isNull);
     });
 
-    test('keeps credential on server error', () async {
+    test('keeps credential and status on server error', () async {
       controller.credential = _expiredCred('acc-1');
+      controller.status = CodexAuthStatus.signedIn;
       client.handlers.add((_) async => http.Response('oops', 500));
 
       await controller.ensureFresh();
 
       expect(controller.credential, isNotNull);
-      expect(controller.status, CodexAuthStatus.expired);
+      expect(controller.status, CodexAuthStatus.signedIn);
     });
 
-    test('keeps credential when refresh response is malformed', () async {
-      controller.credential = _expiredCred('acc-1');
-      client.handlers.add((_) async => _json(200, {'access_token': 'x'}));
+    test('keeps credential and status when refresh response is malformed',
+        () async {
+          controller.credential = _expiredCred('acc-1');
+          controller.status = CodexAuthStatus.signedIn;
+          client.handlers.add((_) async => _json(200, {'access_token': 'x'}));
 
-      await controller.ensureFresh();
+          await controller.ensureFresh();
 
-      expect(controller.credential, isNotNull);
-      expect(controller.status, CodexAuthStatus.expired);
-    });
+          expect(controller.credential, isNotNull);
+          expect(controller.status, CodexAuthStatus.signedIn);
+        });
 
     test('is single-flight under concurrency', () async {
       controller.credential = _expiredCred('acc-1');
@@ -584,6 +638,17 @@ void main() {
       );
 
       expect(h, isEmpty);
+    });
+
+    test('empty when id is Codex but baseUrl is not a chatgpt.com host', () {
+      controller.credential = _freshCred('acc-1');
+
+      final h = controller.maybeCodexHeaders(
+        _cfg(id: 'Codex', baseUrl: 'https://proxy.example.com/v1'),
+      );
+
+      expect(h, isEmpty);
+      expect(CodexDeviceCodeController.isCodexHost(_cfg(id: 'Codex')), isFalse);
     });
 
     test('empty without credential', () {
@@ -626,15 +691,28 @@ void main() {
         final h = controller.maybeCodexHeaders(codexProviderConfig());
 
         expect(h, isEmpty);
-        await _waitForRequests(client, 1);
-        expect(client.requests.length, 1);
+        // Poll until the background refresh completes and signs back in.
+        final deadline = DateTime.now().add(const Duration(seconds: 3));
+        while (controller.status != CodexAuthStatus.signedIn &&
+            DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(controller.status, CodexAuthStatus.signedIn);
+        expect(controller.credential, isNotNull);
+        expect(controller.credential!.accountId, 'acc-2');
       },
     );
   });
 
   group('routing helpers', () {
     test('isCodexHost branches', () {
-      expect(CodexDeviceCodeController.isCodexHost(_cfg(id: 'Codex')), isTrue);
+      expect(CodexDeviceCodeController.isCodexHost(_cfg(id: 'Codex')), isFalse);
+      expect(
+        CodexDeviceCodeController.isCodexHost(
+          _cfg(id: 'Codex', baseUrl: kCodexBaseUrl),
+        ),
+        isTrue,
+      );
       expect(
         CodexDeviceCodeController.isCodexHost(
           _cfg(id: 'X', baseUrl: 'https://chatgpt.com/backend-api/codex'),

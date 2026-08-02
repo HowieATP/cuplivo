@@ -2622,6 +2622,8 @@
   "codexLoginSubtitle": "使用 ChatGPT 帳號登入以使用 Codex 模型。",
   "codexLoginSignInButton": "登入你的 Codex 帳號",
   "codexLoginSignOutButton": "登出",
+  "codexLoginSignOutConfirm": "將移除本裝置上儲存的 ChatGPT 憑證。",
+  "codexLoginCloseButton": "關閉",
   "codexLoginStatusSignedIn": "已登入",
   "codexLoginStatusSignedOut": "未登入",
   "codexLoginStatusWaiting": "等待授權…",

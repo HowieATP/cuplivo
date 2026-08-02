@@ -26,6 +26,15 @@ const Duration kCodexSlowDownIncrement = Duration(seconds: 5);
 const Duration kCodexRefreshGrace = Duration(seconds: 60);
 const String kCodexProviderKey = 'Codex';
 const String kCodexBaseUrl = 'https://chatgpt.com/backend-api/codex';
+const List<String> kCodexModels = [
+  'gpt-5.3-codex-spark',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5.5',
+  'gpt-5.6-luna',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+];
 
 class CodexOAuthCredential {
   final String accessToken;
@@ -94,6 +103,21 @@ class CodexDeviceCodeController extends ChangeNotifier {
     _instance = c;
   }
 
+  /// Resets all mutable state so a controller instance can be reused between
+  /// tests without leaking credentials, in-flight refresh or cancel signals.
+  @visibleForTesting
+  void resetForTest() {
+    _refreshing = null;
+    _signInProxy = null;
+    _cancelled = false;
+    _cancelSignal = Completer<void>();
+    credential = null;
+    status = CodexAuthStatus.signedOut;
+    usercode = null;
+    verificationUri = null;
+    errorMessage = null;
+  }
+
   static http.Client _defaultClientFactory(NetworkProxyConfig? proxy) {
     if (proxy == null) return DioHttpClient();
     return DioHttpClient(proxy: proxy);
@@ -111,11 +135,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
   bool _cancelled = false;
   Completer<void> _cancelSignal = Completer<void>();
   Future<void>? _refreshing;
+  NetworkProxyConfig? _signInProxy;
 
   static const String _jwtAuthClaim = 'https://api.openai.com/auth';
 
   static bool isCodexHost(ProviderConfig cfg) {
-    if (cfg.id == kCodexProviderKey) return true;
+    // Host-only: a provider id of 'Codex' must not leak OAuth credentials
+    // when the user points its baseUrl at a non-chatgpt.com endpoint.
     final uri = Uri.tryParse(cfg.baseUrl);
     if (uri == null) return false;
     final host = uri.host.toLowerCase();
@@ -263,6 +289,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
     }
     _cancelled = false;
     _cancelSignal = Completer<void>();
+    _signInProxy = null;
     status = CodexAuthStatus.waitingForUser;
     errorMessage = null;
     notifyListeners();
@@ -309,6 +336,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
       }
       usercode = rawUserCode;
       verificationUri = Uri.parse(kCodexVerificationUri);
+      _signInProxy = proxyFromConfig(cfg);
       status = CodexAuthStatus.polling;
       notifyListeners();
       debugPrint(
@@ -350,6 +378,15 @@ class CodexDeviceCodeController extends ChangeNotifier {
           _fail('Invalid Codex device auth token response');
           return CodexFlowOutcome.failed;
         }
+        if (resp.statusCode == 403 || resp.statusCode == 404) {
+          final errCode = _extractErrorCode(resp);
+          if (errCode == 'access_denied' ||
+              errCode == 'expired_token' ||
+              errCode == 'deviceauth_authorization_denied') {
+            _fail('Codex device auth was denied or expired');
+            return CodexFlowOutcome.failed;
+          }
+        }
         if (resp.statusCode != 403 && resp.statusCode != 404) {
           final errCode = _extractErrorCode(resp);
           if (errCode == 'deviceauth_authorization_pending') {
@@ -375,16 +412,18 @@ class CodexDeviceCodeController extends ChangeNotifier {
       }
 
       debugPrint('[CodexOAuth] authorization code received, exchanging');
-      final exchangeResp = await client.post(
-        Uri.parse(kCodexTokenEndpoint),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'grant_type=authorization_code'
-            '&client_id=$kCodexClientId'
-            '&code=$authorizationCode'
-            '&code_verifier=$codeVerifier'
-            '&redirect_uri=$kCodexRedirectUri',
-      );
+      final exchangeResp = await client
+          .post(
+            Uri.parse(kCodexTokenEndpoint),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'grant_type=authorization_code'
+                '&client_id=${Uri.encodeQueryComponent(kCodexClientId)}'
+                '&code=${Uri.encodeQueryComponent(authorizationCode)}'
+                '&code_verifier=${Uri.encodeQueryComponent(codeVerifier)}'
+                '&redirect_uri=${Uri.encodeQueryComponent(kCodexRedirectUri)}',
+          )
+          .timeout(const Duration(seconds: 30));
       debugPrint('[CodexOAuth] exchange status=${exchangeResp.statusCode}');
       if (_cancelled) {
         _flowEnded();
@@ -425,8 +464,8 @@ class CodexDeviceCodeController extends ChangeNotifier {
         ),
         accountId: accountId,
       );
-      credential = cred;
       await _persistCredential(cred);
+      credential = cred;
       status = CodexAuthStatus.signedIn;
       usercode = null;
       verificationUri = null;
@@ -452,11 +491,13 @@ class CodexDeviceCodeController extends ChangeNotifier {
     String url,
     Map<String, dynamic> body,
   ) {
-    return client.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    return client
+        .post(
+          Uri.parse(url),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
   }
 
   void cancel() {
@@ -494,16 +535,18 @@ class CodexDeviceCodeController extends ChangeNotifier {
   Future<void> _doRefresh() async {
     final c = credential;
     if (c == null) return;
-    final client = _clientFactory(null);
+    final client = _clientFactory(_signInProxy);
     try {
-      final resp = await client.post(
-        Uri.parse(kCodexTokenEndpoint),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'grant_type=refresh_token'
-            '&refresh_token=${c.refreshToken}'
-            '&client_id=$kCodexClientId',
-      );
+      final resp = await client
+          .post(
+            Uri.parse(kCodexTokenEndpoint),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'grant_type=refresh_token'
+                '&refresh_token=${Uri.encodeQueryComponent(c.refreshToken)}'
+                '&client_id=${Uri.encodeQueryComponent(kCodexClientId)}',
+          )
+          .timeout(const Duration(seconds: 30));
       debugPrint('[CodexOAuth] refresh status=${resp.statusCode}');
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final json = _tryDecodeJson(resp);
@@ -516,8 +559,6 @@ class CodexDeviceCodeController extends ChangeNotifier {
             refresh.isEmpty ||
             expiresIn is! num) {
           debugPrint('[CodexOAuth] refresh response missing fields: $json');
-          status = CodexAuthStatus.expired;
-          notifyListeners();
           return;
         }
         final accountId = _accountIdFromAccessToken(access);
@@ -529,8 +570,8 @@ class CodexDeviceCodeController extends ChangeNotifier {
           ),
           accountId: accountId ?? c.accountId,
         );
-        credential = cred;
         await _persistCredential(cred);
+        credential = cred;
         status = CodexAuthStatus.signedIn;
         notifyListeners();
         return;
@@ -551,28 +592,29 @@ class CodexDeviceCodeController extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      // Transient failure (network / 5xx / 429 / other): keep the credential.
+      // Transient failure (network / 5xx / 429 / other): keep the credential
+      // and the current status so isFresh/ensureFresh drive the retry.
       debugPrint('[CodexOAuth] refresh transient failure, keeping credential');
-      status = CodexAuthStatus.expired;
-      notifyListeners();
     } on SocketException catch (e) {
       debugPrint('[CodexOAuth] refresh SocketException: $e');
-      status = CodexAuthStatus.expired;
-      notifyListeners();
     } on TimeoutException catch (e) {
       debugPrint('[CodexOAuth] refresh TimeoutException: $e');
-      status = CodexAuthStatus.expired;
-      notifyListeners();
     } catch (e, st) {
       debugPrint('[CodexOAuth] refresh failed: $e\n$st');
-      status = CodexAuthStatus.expired;
-      notifyListeners();
     } finally {
       client.close();
     }
   }
 
   Future<void> signOut() async {
+    final inFlight = _refreshing;
+    if (inFlight != null) {
+      // Wait for an in-flight refresh to finish so it cannot re-persist the
+      // credential or flip the status back to signedIn after we sign out.
+      try {
+        await inFlight;
+      } catch (_) {}
+    }
     try {
       await _removeStoredCredential();
     } catch (e, st) {
@@ -580,6 +622,7 @@ class CodexDeviceCodeController extends ChangeNotifier {
     }
     credential = null;
     status = CodexAuthStatus.signedOut;
+    _signInProxy = null;
     notifyListeners();
   }
 
@@ -600,6 +643,12 @@ class CodexDeviceCodeController extends ChangeNotifier {
       }
       // Stale credential: kick off a background refresh and send no auth
       // headers for this request.
+      // NOTE: deliberately NOT async/await. The three call entries
+      // (sendMessageStream / generateText / testConnection) already await
+      // ensureFresh() synchronously before reaching here, so this branch only
+      // guards non-entry call points (balance / images / listModels are
+      // excluded from codex routing). Keeping this synchronous avoids
+      // async-ifying the _customHeaders chain across 12 call sites.
       unawaited(ensureFresh());
       return const {};
     } catch (e, st) {
@@ -618,25 +667,9 @@ ProviderConfig codexProviderConfig() => ProviderConfig(
   providerType: ProviderKind.openai,
   chatPath: null,
   useResponseApi: true,
-  models: const [
-    'gpt-5.3-codex-spark',
-    'gpt-5.4',
-    'gpt-5.4-mini',
-    'gpt-5.5',
-    'gpt-5.6-luna',
-    'gpt-5.6-sol',
-    'gpt-5.6-terra',
-  ],
+  models: kCodexModels,
   modelOverrides: {
-    for (final m in const [
-      'gpt-5.3-codex-spark',
-      'gpt-5.4',
-      'gpt-5.4-mini',
-      'gpt-5.5',
-      'gpt-5.6-luna',
-      'gpt-5.6-sol',
-      'gpt-5.6-terra',
-    ])
+    for (final m in kCodexModels)
       m: {
         'type': 'chat',
         'input': ['text'],

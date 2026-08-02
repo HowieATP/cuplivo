@@ -6769,6 +6769,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexLoginSignOutButton => 'Sign out';
 
   @override
+  String get codexLoginSignOutConfirm =>
+      'This removes the saved ChatGPT credentials from this device.';
+
+  @override
+  String get codexLoginCloseButton => 'Close';
+
+  @override
   String get codexLoginStatusSignedIn => 'Signed in';
 
   @override

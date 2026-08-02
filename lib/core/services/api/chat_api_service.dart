@@ -787,6 +787,13 @@ class ChatApiService {
       if (kind == ProviderKind.openai) {
         if (CodexDeviceCodeController.isCodexHost(config)) {
           await CodexDeviceCodeController.instance.ensureFresh();
+          if (!CodexDeviceCodeController.instance.isFresh) {
+            // Avoid sending an unauthenticated request that would 401 for sure.
+            throw HttpException(
+              'Codex session expired, please sign in again',
+              uri: Uri.parse(config.baseUrl),
+            );
+          }
         }
         final url = _openAICompatibleUrl(config);
         Map<String, dynamic> body;

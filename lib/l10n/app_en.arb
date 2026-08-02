@@ -3172,6 +3172,8 @@
   "codexLoginSubtitle": "Sign in with your ChatGPT account to access Codex models.",
   "codexLoginSignInButton": "Sign in with Codex",
   "codexLoginSignOutButton": "Sign out",
+  "codexLoginSignOutConfirm": "This removes the saved ChatGPT credentials from this device.",
+  "codexLoginCloseButton": "Close",
   "codexLoginStatusSignedIn": "Signed in",
   "codexLoginStatusSignedOut": "Not signed in",
   "codexLoginStatusWaiting": "Waiting for authorization…",

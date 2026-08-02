@@ -385,6 +385,11 @@
 - **Header precedence**: When OAuth is enabled, the Bearer token overwrites any manual `Authorization` header from `McpServerConfig.headers` (natural library behavior: merged headers first, token written last). No save-time validation.
 - **Flow state**: PKCE verifier + `state` + loopback server live in `OAuthFlowService` (`lib/core/services/oauth/oauth_flow_service.dart`) in memory only, keyed by serverId. An app restart mid-flow invalidates them — the user restarts the flow. Normal restarts need no user action: the persisted token is injected via `setOAuthToken` at connect. The service is provider-agnostic: a future OAuth LLM provider (e.g. xAI) reuses the flow + loopback + DCR machinery.
 
+## Schema Self-Heal (schema 自愈)
+
+- **Schema Self-Heal**: A runtime repair on every database open: checks that every column/table added by migrations actually exists and adds whatever is missing. Exists because migration steps wrap `ADD COLUMN` in silent error-swallowing for idempotent replay — a genuinely failed step leaves `user_version` advanced while the column stays missing, and later upgrades never re-run the failed step. Real users hit this on schema v8 (`is_preset`) and v12 (`discoverable`/`handoff_*`); such DBs reach the current schema with a permanent gap that only the heal can close. See `docs/adr/0017-schema-self-heal.md`.
+- **Heal boundary**: Covers everything added by the v5–v13 migrations. `director_message_rows` is deliberately NOT healed — schema v14 dropped it (the Director session is ephemeral, rebuilt from the public transcript).
+
 ## Network Request Logging
 
 - **Request log (请求日志)**: The per-day request/response log file `logs/logs.txt` (daily rotation, size cap, auto-delete). All categories interleaved in one file; entries carry a category tag.

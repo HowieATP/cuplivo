@@ -57,23 +57,17 @@
 - Theme and dynamic color follow the repo as-is:
   - `lib/theme/**` is the single source of truth for theming and tokens
   - Android dynamic color is only enabled per-platform in `main.dart`. Do not extrapolate Android visual or interaction rules to desktop.
-- 桌面端导航通过 `DesktopHomePage` 的 nav rail / 侧边栏切换页面，不使用 Navigator 路由栈。
-- 移动端使用命令式 `Navigator.push` 在全屏页面间导航。
-- 桌面端有独立的窗口控制（`desktop_window_controller.dart`）、托盘（`desktop_tray_controller.dart`）、热键（`desktop/hotkeys/`）——这些不应被视为"移动端功能在宽屏上的延伸"。
+- Desktop navigation uses the nav rail / sidebar in `DesktopHomePage` to switch pages, not a Navigator route stack.
+- Mobile uses imperative `Navigator.push` for full-screen page navigation.
+- Desktop has its own window controls (`desktop_window_controller.dart`), tray (`desktop_tray_controller.dart`), and hotkeys (`desktop/hotkeys/`) — these should not be treated as "mobile features stretched to wide screens."
 
 ### 1.4 Fork & Upstream
 
 - This repository (Cuplivo) is a **community fork** of upstream [Kelivo](https://github.com/Chevey339/kelivo).
 
-- Branch conventions:
-  
-  - `legacy` → always corresponds to upstream Kelivo
-  - `cuplivo`, `cuplivo-next` → always correspond to this fork (Cuplivo)
-  - `master` → depends on local repository; cannot be assumed upstream or fork
-
 - README intentionally retains many upstream references (download links, Issues, sponsors, community groups, Star History). Do not "fix" or rewrite these links.
 
-- `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when updating the changelog, always update both files simultaneously.
+- `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when bumping version, always update both files simultaneously; in other cases, there is no need to update them.
 
 ## 2. Working Style
 

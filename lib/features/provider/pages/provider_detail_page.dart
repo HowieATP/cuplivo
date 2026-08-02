@@ -57,6 +57,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   late ProviderConfig _cfg;
   late ProviderKind _kind;
   final _nameCtrl = TextEditingController();
+
+  /// Sentinel for the tool-result-images bottom sheet: distinguishes the
+  /// "auto" choice (null value) from a dismissed sheet.
+  static const Object _toolResultImagesAutoSentinel = Object();
   final _keyCtrl = TextEditingController();
   final _baseCtrl = TextEditingController();
   final _pathCtrl = TextEditingController();
@@ -66,6 +70,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final _saJsonCtrl = TextEditingController();
   bool _enabled = true;
   bool _useResp = false; // openai
+  bool? _toolResultImages; // openai; null = auto (allowlist)
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
@@ -101,6 +106,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _baseCtrl.text = _cfg.baseUrl;
     _pathCtrl.text = _cfg.chatPath ?? '/chat/completions';
     _useResp = _cfg.useResponseApi ?? false;
+    _toolResultImages = _cfg.enableToolResultImages;
     _vertexAI = _cfg.vertexAI ?? false;
     _locationCtrl.text = _cfg.location ?? '';
     _projectCtrl.text = _cfg.projectId ?? '';
@@ -1077,6 +1083,36 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     setState(() => _useResp = v);
                     _save();
                   },
+                ),
+              ),
+            if (_kind == ProviderKind.openai)
+              _iosRow(
+                context,
+                label: l10n.providerDetailPageToolResultImagesTitle,
+                trailing: GestureDetector(
+                  onTap: _showToolResultImagesSheet,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _toolResultImagesLabel(l10n),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Lucide.ChevronRight,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             if (_kind == ProviderKind.openai) _buildBalanceEntry(context),
@@ -2117,6 +2153,125 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
   }
 
+  String _toolResultImagesLabel(AppLocalizations l10n) {
+    switch (_toolResultImages) {
+      case true:
+        return l10n.providerDetailPageToolResultImagesOn;
+      case false:
+        return l10n.providerDetailPageToolResultImagesOff;
+      default:
+        return l10n.providerDetailPageToolResultImagesAuto;
+    }
+  }
+
+  Future<void> _showToolResultImagesSheet() async {
+    final cs = Theme.of(context).colorScheme;
+    final Object? selected = await showModalBottomSheet<Object>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final sheetL10n = AppLocalizations.of(ctx)!;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _toolResultImagesTile(
+                  ctx,
+                  null,
+                  label: sheetL10n.providerDetailPageToolResultImagesAuto,
+                  selected: _toolResultImages == null,
+                ),
+                _toolResultImagesTile(
+                  ctx,
+                  true,
+                  label: sheetL10n.providerDetailPageToolResultImagesOn,
+                  selected: _toolResultImages == true,
+                ),
+                _toolResultImagesTile(
+                  ctx,
+                  false,
+                  label: sheetL10n.providerDetailPageToolResultImagesOff,
+                  selected: _toolResultImages == false,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    final bool? next;
+    if (identical(selected, _toolResultImagesAutoSentinel)) {
+      next = null;
+    } else {
+      next = selected as bool?;
+    }
+    if (!identical(next, _toolResultImages)) {
+      setState(() => _toolResultImages = next);
+      await _save();
+    }
+  }
+
+  Widget _toolResultImagesTile(
+    BuildContext ctx,
+    bool? value, {
+    required String label,
+    required bool selected,
+  }) {
+    final cs = Theme.of(ctx).colorScheme;
+    return _TactileRow(
+      pressedScale: 1.00,
+      haptics: false,
+      onTap: () =>
+          Navigator.of(ctx).pop(value ?? _toolResultImagesAutoSentinel),
+      builder: (pressed) {
+        final base = cs.onSurface;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
+        return TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: target),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          builder: (context, color, _) {
+            final c = color ?? base;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(fontSize: 15, color: c),
+                    ),
+                  ),
+                  if (selected) Icon(Icons.check, color: cs.primary),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _providerKindTile(
     BuildContext ctx,
     ProviderKind k, {
@@ -2189,6 +2344,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       useResponseApi: _kind == ProviderKind.openai
           ? _useResp
           : old.useResponseApi,
+      enableToolResultImages: _kind == ProviderKind.openai
+          ? _toolResultImages
+          : old.enableToolResultImages,
       vertexAI: _kind == ProviderKind.google ? _vertexAI : old.vertexAI,
       location: _kind == ProviderKind.google
           ? _locationCtrl.text.trim()

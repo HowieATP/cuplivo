@@ -274,6 +274,7 @@ class ChatApiService {
     bool allowDataImages = true,
     bool keepRemoteMarkdownText = true,
     bool keepDisallowedImageText = true,
+    bool keepRemoteUrlsAsText = false,
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
     // Match custom inline image markers like: [image:/absolute/path.png]
@@ -374,8 +375,13 @@ class ChatApiService {
         if (url.startsWith('http://') || url.startsWith('https://')) {
           if (!allowRemoteImages) {
             // Model does not accept image input (or we intentionally skip http images):
-            // keep original markdown so the model can see the template.
-            if (keepDisallowedImageText) buf.write(full);
+            // keep the bare URL so text-only models can still reference the link,
+            // or keep the original markdown when explicitly requested.
+            if (keepRemoteUrlsAsText) {
+              buf.write(url);
+            } else if (keepDisallowedImageText) {
+              buf.write(full);
+            }
             i = m1.$2;
             continue;
           }
@@ -439,7 +445,11 @@ class ChatApiService {
         }
         if (p.startsWith('http://') || p.startsWith('https://')) {
           if (!allowRemoteImages) {
-            if (keepDisallowedImageText) buf.write(full);
+            if (keepRemoteUrlsAsText) {
+              buf.write(p);
+            } else if (keepDisallowedImageText) {
+              buf.write(full);
+            }
             i = m2.end;
             continue;
           }
@@ -524,6 +534,7 @@ class ChatApiService {
       allowDataImages: false,
       keepRemoteMarkdownText: false,
       keepDisallowedImageText: false,
+      keepRemoteUrlsAsText: true,
     );
     return parsed.text;
   }

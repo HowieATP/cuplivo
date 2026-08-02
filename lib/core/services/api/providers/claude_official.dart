@@ -11,6 +11,63 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
+/// Converts a tool result string into a Claude `tool_result.content` value.
+///
+/// Returns the original string unchanged when there are no image references
+/// (byte-identical request bodies for marker-free tool results). When image
+/// refs are present, returns a content-block array: a `text` block plus
+/// `image` blocks (base64 source for local files / data URLs, `url` source
+/// for remote URLs).
+Future<dynamic> _claudeToolResultContent(String res) async {
+  if (!res.contains('[image:') && !(res.contains('![') && res.contains(']('))) {
+    return res;
+  }
+  final parsed = await _parseTextAndImages(
+    res,
+    allowRemoteImages: true,
+    allowLocalImages: true,
+    allowDataImages: true,
+    keepRemoteMarkdownText: false,
+    keepDisallowedImageText: true,
+  );
+  if (parsed.images.isEmpty) return res;
+  final blocks = <Map<String, dynamic>>[];
+  if (parsed.text.isNotEmpty) {
+    blocks.add({'type': 'text', 'text': parsed.text});
+  }
+  final seenSources = <String>{};
+  for (final ref in parsed.images) {
+    if (!seenSources.add(ref.src)) continue;
+    if (ref.kind == 'path') {
+      blocks.add({
+        'type': 'image',
+        'source': {
+          'type': 'base64',
+          'media_type': _mimeFromPath(ref.src),
+          'data': await _encodeBase64File(ref.src, withPrefix: false),
+        },
+      });
+    } else if (ref.kind == 'data') {
+      final idx = ref.src.indexOf('base64,');
+      if (idx <= 0) continue;
+      blocks.add({
+        'type': 'image',
+        'source': {
+          'type': 'base64',
+          'media_type': _mimeFromDataUrl(ref.src),
+          'data': ref.src.substring(idx + 7),
+        },
+      });
+    } else {
+      blocks.add({
+        'type': 'image',
+        'source': {'type': 'url', 'url': ref.src},
+      });
+    }
+  }
+  return blocks.isEmpty ? res : blocks;
+}
+
 int _readClaudeUsageInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
@@ -196,7 +253,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         pendingToolResults.add({
           'type': 'tool_result',
           'tool_use_id': id,
-          'content': (m['content'] ?? '').toString(),
+          'content': await _claudeToolResultContent(
+            (m['content'] ?? '').toString(),
+          ),
         });
       }
       continue;
@@ -490,7 +549,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
           results.add({
             'type': 'tool_result',
             'tool_use_id': e.key,
-            'content': res,
+            'content': await _claudeToolResultContent(res),
           });
           resultsInfo.add(
             ToolResultInfo(
@@ -1005,7 +1064,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       toolResultsBlocks.add({
         'type': 'tool_result',
         'tool_use_id': id,
-        if (res.isNotEmpty) 'content': res,
+        if (res.isNotEmpty) 'content': await _claudeToolResultContent(res),
       });
     }
 

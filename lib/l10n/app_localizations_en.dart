@@ -3572,6 +3572,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPageToolResultImagesTitle => 'Tool Result Images';
+
+  @override
+  String get providerDetailPageToolResultImagesAuto => 'Auto';
+
+  @override
+  String get providerDetailPageToolResultImagesOn => 'On';
+
+  @override
+  String get providerDetailPageToolResultImagesOff => 'Off';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => 'APP-Code (10% off)';
 
   @override

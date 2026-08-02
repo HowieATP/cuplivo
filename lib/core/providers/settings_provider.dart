@@ -4811,6 +4811,10 @@ class ProviderConfig {
   providerType; // Explicit provider type to avoid misclassification
   final String? chatPath; // openai only
   final bool? useResponseApi; // openai only
+  // Whether tool results containing [image:...] markers are converted into
+  // content parts for the LLM. null = allowlist-derived (see
+  // _shouldSendToolResultImages); explicit true/false overrides. openai only.
+  final bool? enableToolResultImages;
   final bool? vertexAI; // google only
   final String? location; // google vertex ai only
   final String? projectId; // google vertex ai only
@@ -4888,6 +4892,7 @@ class ProviderConfig {
     this.providerType,
     this.chatPath,
     this.useResponseApi,
+    this.enableToolResultImages,
     this.vertexAI,
     this.location,
     this.projectId,
@@ -4927,6 +4932,7 @@ class ProviderConfig {
     ProviderKind? providerType,
     String? chatPath,
     bool? useResponseApi,
+    Object? enableToolResultImages = _sentinel,
     bool? vertexAI,
     String? location,
     String? projectId,
@@ -4961,6 +4967,9 @@ class ProviderConfig {
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
     useResponseApi: useResponseApi ?? this.useResponseApi,
+    enableToolResultImages: identical(enableToolResultImages, _sentinel)
+        ? this.enableToolResultImages
+        : (enableToolResultImages as bool?),
     vertexAI: vertexAI ?? this.vertexAI,
     location: location ?? this.location,
     projectId: projectId ?? this.projectId,
@@ -5004,6 +5013,7 @@ class ProviderConfig {
     'providerType': providerType?.name,
     'chatPath': chatPath,
     'useResponseApi': useResponseApi,
+    'enableToolResultImages': enableToolResultImages,
     'vertexAI': vertexAI,
     'location': location,
     'projectId': projectId,
@@ -5047,6 +5057,7 @@ class ProviderConfig {
         : null,
     chatPath: json['chatPath'] as String?,
     useResponseApi: json['useResponseApi'] as bool?,
+    enableToolResultImages: json['enableToolResultImages'] as bool?,
     vertexAI: json['vertexAI'] as bool?,
     location: json['location'] as String?,
     projectId: json['projectId'] as String?,

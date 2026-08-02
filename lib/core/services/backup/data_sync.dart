@@ -2121,6 +2121,7 @@ class SharedPreferencesAsync {
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
     'codex_oauth_v1',
+    'grok_oauth_v1',
   };
 
   static Future<SharedPreferencesAsync> get instance async {

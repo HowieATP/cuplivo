@@ -6642,6 +6642,75 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get codexLoginNotEnabled => '该账号暂不支持 Codex 设备码登录。';
+
+  @override
+  String get grokLoginTitle => 'Grok 账号登录';
+
+  @override
+  String get grokLoginSubtitle => '使用 SuperGrok 或 X Premium 账号登录以使用 Grok 模型。';
+
+  @override
+  String get grokLoginSignInButton => '登录你的 xAI 账号';
+
+  @override
+  String get grokLoginSignOutButton => '退出登录';
+
+  @override
+  String get grokLoginSignOutConfirm => '将移除本设备上保存的 xAI 凭证。';
+
+  @override
+  String get grokLoginCloseButton => '关闭';
+
+  @override
+  String get grokLoginStatusSignedIn => '已登录';
+
+  @override
+  String get grokLoginStatusSignedOut => '未登录';
+
+  @override
+  String get grokLoginStatusWaiting => '等待授权…';
+
+  @override
+  String get grokLoginStatusPolling => '等待登录…';
+
+  @override
+  String get grokLoginStatusExpired => '授权已过期';
+
+  @override
+  String get grokLoginStatusFailed => '登录失败';
+
+  @override
+  String get grokLoginUsercodeLabel => '你的验证码';
+
+  @override
+  String get grokLoginOpenPageButton => '打开授权页面';
+
+  @override
+  String get grokLoginCopyCodeButton => '复制验证码';
+
+  @override
+  String get grokLoginCopiedToast => '验证码已复制到剪贴板';
+
+  @override
+  String get grokLoginCopyFailed => '复制代码失败。';
+
+  @override
+  String get grokLoginCancelButton => '取消';
+
+  @override
+  String get grokLoginAccountLabel => 'xAI 账号';
+
+  @override
+  String get grokLoginSessionHint => '保持登录；访问令牌会在后台自动续期，无需重新登录。';
+
+  @override
+  String get grokLoginSignedOutToast => '已退出登录';
+
+  @override
+  String get grokLoginHelpText => '打开 xAI 授权页面，输入验证码完成 Grok 授权。';
+
+  @override
+  String get grokLoginNetworkError => '网络错误，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13282,6 +13351,75 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get codexLoginNotEnabled => '该账号暂不支持 Codex 设备码登录。';
+
+  @override
+  String get grokLoginTitle => 'Grok 账号登录';
+
+  @override
+  String get grokLoginSubtitle => '使用 SuperGrok 或 X Premium 账号登录以使用 Grok 模型。';
+
+  @override
+  String get grokLoginSignInButton => '登录你的 xAI 账号';
+
+  @override
+  String get grokLoginSignOutButton => '退出登录';
+
+  @override
+  String get grokLoginSignOutConfirm => '将移除本设备上保存的 xAI 凭证。';
+
+  @override
+  String get grokLoginCloseButton => '关闭';
+
+  @override
+  String get grokLoginStatusSignedIn => '已登录';
+
+  @override
+  String get grokLoginStatusSignedOut => '未登录';
+
+  @override
+  String get grokLoginStatusWaiting => '等待授权…';
+
+  @override
+  String get grokLoginStatusPolling => '等待登录…';
+
+  @override
+  String get grokLoginStatusExpired => '授权已过期';
+
+  @override
+  String get grokLoginStatusFailed => '登录失败';
+
+  @override
+  String get grokLoginUsercodeLabel => '你的验证码';
+
+  @override
+  String get grokLoginOpenPageButton => '打开授权页面';
+
+  @override
+  String get grokLoginCopyCodeButton => '复制验证码';
+
+  @override
+  String get grokLoginCopiedToast => '验证码已复制到剪贴板';
+
+  @override
+  String get grokLoginCopyFailed => '复制代码失败。';
+
+  @override
+  String get grokLoginCancelButton => '取消';
+
+  @override
+  String get grokLoginAccountLabel => 'xAI 账号';
+
+  @override
+  String get grokLoginSessionHint => '保持登录；访问令牌会在后台自动续期，无需重新登录。';
+
+  @override
+  String get grokLoginSignedOutToast => '已退出登录';
+
+  @override
+  String get grokLoginHelpText => '打开 xAI 授权页面，输入验证码完成 Grok 授权。';
+
+  @override
+  String get grokLoginNetworkError => '网络错误，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -19923,4 +20061,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codexLoginNotEnabled => '該帳號暫不支援 Codex 裝置碼登入。';
+
+  @override
+  String get grokLoginTitle => 'Grok 帳號登入';
+
+  @override
+  String get grokLoginSubtitle => '使用 SuperGrok 或 X Premium 帳號登入以使用 Grok 模型。';
+
+  @override
+  String get grokLoginSignInButton => '登入你的 xAI 帳號';
+
+  @override
+  String get grokLoginSignOutButton => '登出';
+
+  @override
+  String get grokLoginSignOutConfirm => '將移除此裝置上儲存的 xAI 憑證。';
+
+  @override
+  String get grokLoginCloseButton => '關閉';
+
+  @override
+  String get grokLoginStatusSignedIn => '已登入';
+
+  @override
+  String get grokLoginStatusSignedOut => '未登入';
+
+  @override
+  String get grokLoginStatusWaiting => '等待授權…';
+
+  @override
+  String get grokLoginStatusPolling => '等待登入…';
+
+  @override
+  String get grokLoginStatusExpired => '授權已過期';
+
+  @override
+  String get grokLoginStatusFailed => '登入失敗';
+
+  @override
+  String get grokLoginUsercodeLabel => '你的驗證碼';
+
+  @override
+  String get grokLoginOpenPageButton => '開啟授權頁面';
+
+  @override
+  String get grokLoginCopyCodeButton => '複製驗證碼';
+
+  @override
+  String get grokLoginCopiedToast => '驗證碼已複製到剪貼簿';
+
+  @override
+  String get grokLoginCopyFailed => '複製代碼失敗。';
+
+  @override
+  String get grokLoginCancelButton => '取消';
+
+  @override
+  String get grokLoginAccountLabel => 'xAI 帳號';
+
+  @override
+  String get grokLoginSessionHint => '保持登入；存取權杖會在背景自動續期，無需重新登入。';
+
+  @override
+  String get grokLoginSignedOutToast => '已登出';
+
+  @override
+  String get grokLoginHelpText => '開啟 xAI 授權頁面，輸入驗證碼完成 Grok 授權。';
+
+  @override
+  String get grokLoginNetworkError => '網路錯誤，請重試';
 }

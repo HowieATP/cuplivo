@@ -1493,6 +1493,12 @@ class _DesktopProviderDetailPaneState
                   const SizedBox(height: 14),
                   CodexAccountEntry(cfg: cfg),
                 ],
+                if (kind == ProviderKind.openai &&
+                    !(cfg.multiKeyEnabled == true) &&
+                    GrokDeviceCodeController.showEntryFor(cfg)) ...[
+                  const SizedBox(height: 14),
+                  GrokAccountEntry(cfg: cfg),
+                ],
                 const SizedBox(height: 14),
               ],
 

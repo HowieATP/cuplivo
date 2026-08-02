@@ -6936,4 +6936,77 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get codexLoginNotEnabled =>
       'Codex device sign-in is not available for this account.';
+
+  @override
+  String get grokLoginTitle => 'Grok Account Login';
+
+  @override
+  String get grokLoginSubtitle =>
+      'Sign in with SuperGrok or X Premium to access Grok models.';
+
+  @override
+  String get grokLoginSignInButton => 'Sign in with your xAI account';
+
+  @override
+  String get grokLoginSignOutButton => 'Sign out';
+
+  @override
+  String get grokLoginSignOutConfirm =>
+      'This removes the saved xAI credentials from this device.';
+
+  @override
+  String get grokLoginCloseButton => 'Close';
+
+  @override
+  String get grokLoginStatusSignedIn => 'Signed in';
+
+  @override
+  String get grokLoginStatusSignedOut => 'Not signed in';
+
+  @override
+  String get grokLoginStatusWaiting => 'Waiting for authorization...';
+
+  @override
+  String get grokLoginStatusPolling => 'Waiting for sign-in...';
+
+  @override
+  String get grokLoginStatusExpired => 'Authorization expired';
+
+  @override
+  String get grokLoginStatusFailed => 'Sign-in failed';
+
+  @override
+  String get grokLoginUsercodeLabel => 'Your verification code';
+
+  @override
+  String get grokLoginOpenPageButton => 'Open authorization page';
+
+  @override
+  String get grokLoginCopyCodeButton => 'Copy code';
+
+  @override
+  String get grokLoginCopiedToast => 'Code copied to clipboard';
+
+  @override
+  String get grokLoginCopyFailed => 'Failed to copy the code.';
+
+  @override
+  String get grokLoginCancelButton => 'Cancel';
+
+  @override
+  String get grokLoginAccountLabel => 'xAI account';
+
+  @override
+  String get grokLoginSessionHint =>
+      'Stays signed in; access renews automatically in the background.';
+
+  @override
+  String get grokLoginSignedOutToast => 'Signed out';
+
+  @override
+  String get grokLoginHelpText =>
+      'Open the xAI authorization page and enter the verification code to authorize Grok access.';
+
+  @override
+  String get grokLoginNetworkError => 'Network error, please retry';
 }

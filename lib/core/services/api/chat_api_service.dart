@@ -8,6 +8,7 @@ import 'package:http_parser/http_parser.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/codex_device_code_controller.dart';
+import '../../providers/grok_device_code_controller.dart';
 import '../../models/token_usage.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
@@ -173,6 +174,11 @@ class ChatApiService {
       final h = CodexDeviceCodeController.instance.maybeCodexHeaders(cfg);
       if (h.isNotEmpty) out.addAll(h);
     }
+    // Grok OAuth is dual-mode and independent of Codex: always merge when a
+    // credential exists (overwrites base Authorization). Outside the Codex
+    // gate so image paths with includeCodexAuth:false still get Grok auth.
+    final grokH = GrokDeviceCodeController.instance.maybeGrokHeaders(cfg);
+    if (grokH.isNotEmpty) out.addAll(grokH);
     return out;
   }
 
@@ -804,6 +810,7 @@ class ChatApiService {
     try {
       if (kind == ProviderKind.openai) {
         await CodexDeviceCodeController.ensureFreshOrThrow(config);
+        await GrokDeviceCodeController.ensureFreshOrThrow(config);
         final url = _openAICompatibleUrl(config);
         Map<String, dynamic> body;
         final effectiveInfo = _effectiveModelInfo(config, modelId);

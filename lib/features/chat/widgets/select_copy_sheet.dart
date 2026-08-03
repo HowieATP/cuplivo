@@ -127,12 +127,12 @@ class _SelectCopySheet extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: Scrollbar(
-                controller: sc,
-                child: SingleChildScrollView(
+              child: SelectionArea(
+                child: Scrollbar(
                   controller: sc,
-                  primary: false,
-                  child: SelectionArea(
+                  child: SingleChildScrollView(
+                    controller: sc,
+                    primary: false,
                     child: Text(
                       message.content,
                       style: TextStyle(fontSize: 15, height: 1.5),

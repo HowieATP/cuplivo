@@ -11,6 +11,12 @@
 - Both are wrapped in `ListenableBuilder(controller)` so the dropdown label updates immediately on preset click or text edit, without auto-saving.
 - "重置全部" button: resets both prompt text (`resetTitlePrompt()`) and Thinking switch (`resetTitleGenerationThinkingEnabled()`). No separate [↺] on the Thinking row.
 
+## Text Selection & Boundary Auto-Scroll
+
+- **Boundary auto-scroll (边界自动滚动)**: While drag-selecting, holding the pointer past a scrollable's edge scrolls the content. Desktop mouse drags get a continuous smooth loop; mobile handle drags get jump-to-edge (framework built-in, Flutter 3.44+ `EdgeDraggingAutoScroller`). It only activates when the scrollable is INSIDE a `SelectionArea` (region wraps scrollable).
+- **选择复制 (Select & Copy)**: The per-message full-content copy shell (desktop Dialog / mobile bottom sheet) whose scroll view IS wrapped in the SelectionArea — the designated surface for boundary auto-scroll, and the recommended path for copying content longer than the viewport.
+- **Chat list drag selection**: Messages are each wrapped in their own `SelectionArea` with the ListView ABOVE the regions — the framework's built-in auto-scroll does not apply (inverted structure). Deliberately NOT implemented — wont-fix (issue #155): a list-level region risks mobile long-press gesture conflicts with the user message menu, per-message context-menu relocation (copy-as-markdown subsequence / quote / speak), and unintended selectability of list-level chrome. Long-content copying goes through Select & Copy.
+
 ## Prompt Preset Screen Layout
 
 ```

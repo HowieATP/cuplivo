@@ -104,10 +104,10 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                           width: 0.6,
                         ),
                       ),
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: SelectionArea(
+                      child: SelectionArea(
+                        child: Scrollbar(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(12),
                             child: Text(
                               message.content,
                               style: TextStyle(fontSize: 15, height: 1.5),

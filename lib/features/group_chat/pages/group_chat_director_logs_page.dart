@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation.dart';
+import '../../../core/models/group_chat.dart';
 import '../../../core/models/group_chat_director_log.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/group_chat_provider.dart';
@@ -13,17 +16,66 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import '../services/director_log_builder.dart';
 
-class GroupChatDirectorLogsPage extends StatelessWidget {
+class GroupChatDirectorLogsPage extends StatefulWidget {
   const GroupChatDirectorLogsPage({super.key, required this.groupChatId});
 
   final String groupChatId;
+
+  @override
+  State<GroupChatDirectorLogsPage> createState() =>
+      _GroupChatDirectorLogsPageState();
+}
+
+class _GroupChatDirectorLogsPageState extends State<GroupChatDirectorLogsPage> {
+  String _entriesSignature = '';
+  List<DirectorLogEntry> _entries = const [];
+
+  /// Rebuilds the reconstructed timeline only when its inputs actually
+  /// change. The page watches several providers that notify frequently during
+  /// active group rounds; without this guard every notification recomputed
+  /// the whole timeline from scratch.
+  List<DirectorLogEntry> _entriesFor({
+    required ChatService chatService,
+    required GroupChat group,
+    required List<ChatMessage> publicMessages,
+    required Conversation? conversation,
+    required List<Assistant> roster,
+    required String userName,
+    required Map<String, Assistant> assistantsById,
+    required String fallbackAssistantName,
+    required List<GroupChatDirectorRuntimeLog> runtimeLogs,
+  }) {
+    final signature = _signature(
+      group: group,
+      publicMessages: publicMessages,
+      conversation: conversation,
+      roster: roster,
+      userName: userName,
+      assistantsById: assistantsById,
+      fallbackAssistantName: fallbackAssistantName,
+      runtimeLogs: runtimeLogs,
+    );
+    if (signature == _entriesSignature) return _entries;
+    _entriesSignature = signature;
+    _entries = DirectorLogBuilder(chatService: chatService).build(
+      group: group,
+      publicMessages: publicMessages,
+      conversation: conversation,
+      rosterAssistants: roster,
+      userName: userName,
+      assistantsById: assistantsById,
+      fallbackAssistantName: fallbackAssistantName,
+      runtimeLogs: runtimeLogs,
+    );
+    return _entries;
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final groupProvider = context.watch<GroupChatProvider>();
-    final group = groupProvider.getById(groupChatId);
+    final group = groupProvider.getById(widget.groupChatId);
 
     if (group == null) {
       return Scaffold(
@@ -44,11 +96,12 @@ class GroupChatDirectorLogsPage extends StatelessWidget {
         ? l10n.groupChatUserLabel
         : user.name.trim();
     final publicMessages = chatService.getMessages(group.conversationId);
-    final entries = DirectorLogBuilder(chatService: chatService).build(
+    final entries = _entriesFor(
+      chatService: chatService,
       group: group,
       publicMessages: publicMessages,
       conversation: chatService.getConversation(group.conversationId),
-      rosterAssistants: roster,
+      roster: roster,
       userName: userName,
       assistantsById: assistantsById,
       fallbackAssistantName: l10n.groupChatDirectorLogsUnknownSpeaker,
@@ -96,6 +149,83 @@ class GroupChatDirectorLogsPage extends StatelessWidget {
               },
             ),
     );
+  }
+
+  /// Cheap, deterministic fingerprint of every input the timeline build reads.
+  /// Message content is included because the chat cache mutates messages in
+  /// place (streaming updates), so list identity alone is not a safe key.
+  static String _signature({
+    required GroupChat group,
+    required List<ChatMessage> publicMessages,
+    required Conversation? conversation,
+    required List<Assistant> roster,
+    required String userName,
+    required Map<String, Assistant> assistantsById,
+    required String fallbackAssistantName,
+    required List<GroupChatDirectorRuntimeLog> runtimeLogs,
+  }) {
+    final buf = StringBuffer();
+    buf.write(group.id);
+    buf.write('|cap=');
+    buf.write(group.maxAssistantMessagesPerRound);
+    buf.write('|inject=');
+    buf.write(group.assistantDetailInjectionMode.name);
+    buf.write(':');
+    buf.write(group.assistantDetailInjectionN);
+    buf.write('|pending=');
+    buf.write(group.pendingCapAssistantMessageId);
+    buf.write('|prompt=');
+    buf.write(group.directorSystemPrompt);
+    buf.write('|name=');
+    buf.write(group.name);
+    buf.write('|user=');
+    buf.write(userName);
+    buf.write('|fallback=');
+    buf.write(fallbackAssistantName);
+    buf.write('|truncate=');
+    buf.write(conversation?.truncateIndex);
+    final selections = conversation?.versionSelections ?? const <String, int>{};
+    final sortedKeys = selections.keys.toList()..sort();
+    for (final key in sortedKeys) {
+      buf.write('|sel=');
+      buf.write(key);
+      buf.write(':');
+      buf.write(selections[key]);
+    }
+    for (final message in publicMessages) {
+      buf.write('|');
+      buf.write(message.id);
+      buf.write('@');
+      buf.write(message.groupId);
+      buf.write(':');
+      buf.write(message.version);
+      buf.write(':');
+      buf.write(message.role);
+      buf.write(':');
+      buf.write(message.content);
+    }
+    for (final assistant in roster) {
+      buf.write('|a=');
+      buf.write(assistant.id);
+      buf.write(':');
+      buf.write(assistant.name);
+      buf.write(':');
+      buf.write(assistant.systemPrompt);
+    }
+    // Assistant names feed the reconstructed E2 context; sort for stability.
+    final names = assistantsById.values.map((a) => '${a.id}:${a.name}').toList()
+      ..sort();
+    for (final name in names) {
+      buf.write('|n=');
+      buf.write(name);
+    }
+    for (final log in runtimeLogs) {
+      buf.write('|r=');
+      buf.write(log.sourceMessageId);
+      buf.write(':');
+      buf.write(log.finishedAt.microsecondsSinceEpoch);
+    }
+    return buf.toString();
   }
 }
 

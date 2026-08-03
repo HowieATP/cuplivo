@@ -68,11 +68,10 @@ class DirectorLogBuilder {
     if (collapsed.isEmpty) return const [];
 
     final runtimeBySourceId = _latestRuntimeLogsBySource(runtimeLogs);
-    final rawIndexByGroup = <String, int>{};
-    for (var i = 0; i < publicMessages.length; i++) {
-      final message = publicMessages[i];
-      rawIndexByGroup.putIfAbsent(message.groupId ?? message.id, () => i);
-    }
+    // Reuse each message's reconstructed content across every entry so the
+    // per-message tool-event lookup runs once per build instead of once per
+    // entry (the history prefix is re-collapsed for every entry).
+    final contentCache = <String, String>{};
 
     final entries = <DirectorLogEntry>[];
     var assistantCountThisRound = 0;
@@ -81,9 +80,11 @@ class DirectorLogBuilder {
 
     for (var i = 0; i < collapsed.length; i++) {
       final message = collapsed[i];
-      final groupId = message.groupId ?? message.id;
-      final rawIndex = rawIndexByGroup[groupId] ?? publicMessages.length;
-      final historyRaw = publicMessages.take(rawIndex).toList(growable: false);
+      // Build the context from the already-collapsed prefix. Slicing the raw
+      // transcript at a group's first occurrence would drop a prior group's
+      // selected version when that version was appended later (edited versions
+      // are appended at the end of the raw list, interleaved with newer turns).
+      final historyRaw = collapsed.take(i).toList(growable: false);
 
       if (message.role == 'user') {
         final capReached =
@@ -119,6 +120,7 @@ class DirectorLogBuilder {
           assistantsById: assistantsById,
           skipPendingCapMessageId: capReached ? lastAssistant.id : null,
           fallbackAssistantName: fallbackAssistantName,
+          contentCache: contentCache,
         );
         final nextAssistant = _nextAssistant(collapsed, i);
         entries.add(
@@ -177,6 +179,7 @@ class DirectorLogBuilder {
         userName: userName,
         assistantsById: assistantsById,
         fallbackAssistantName: fallbackAssistantName,
+        contentCache: contentCache,
       );
       final nextAssistant = _nextAssistant(collapsed, i);
       entries.add(
@@ -209,6 +212,7 @@ class DirectorLogBuilder {
     required Map<String, Assistant> assistantsById,
     required String fallbackAssistantName,
     String? skipPendingCapMessageId,
+    Map<String, String>? contentCache,
   }) {
     final memberNames = [userName, ...rosterAssistants.map((a) => a.name)];
     final originalTruncateIndex = conversation?.truncateIndex ?? -1;
@@ -227,6 +231,7 @@ class DirectorLogBuilder {
       skipPendingCapMessageId: skipPendingCapMessageId,
       truncateIndexOverride: truncateIndex,
       fallbackAssistantName: fallbackAssistantName,
+      contentCache: contentCache,
     );
   }
 

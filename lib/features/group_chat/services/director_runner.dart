@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/assistant.dart';
@@ -92,25 +93,31 @@ class DirectorRunner {
     void emitRuntimeLog({String? failure}) {
       if (runtimeLogEmitted || onRuntimeLog == null) return;
       runtimeLogEmitted = true;
-      onRuntimeLog(
-        GroupChatDirectorRuntimeLog(
-          sourceMessageId: sourceMessageId,
-          trigger: trigger,
-          startedAt: startedAt,
-          finishedAt: DateTime.now(),
-          providerKey: providerKey,
-          modelId: modelId,
-          requestMessageCount: requestMessageCount,
-          attemptCount: attemptCount,
-          attemptErrors: attemptErrors,
-          decisionKind: decision?.kind.name,
-          assistantId: decision?.assistantId,
-          reason: _clipNullable(decision?.reason, 500),
-          fallback: decision?.fallback ?? false,
-          freeText: _clipNullable(lastFreeText, 500),
-          failure: _clipNullable(failure, 300),
-        ),
-      );
+      // Logging is best-effort: a throwing sink must never break the director
+      // flow (it would otherwise mask the real decision or a DirectorSoftError).
+      try {
+        onRuntimeLog(
+          GroupChatDirectorRuntimeLog(
+            sourceMessageId: sourceMessageId,
+            trigger: trigger,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
+            providerKey: providerKey,
+            modelId: modelId,
+            requestMessageCount: requestMessageCount,
+            attemptCount: attemptCount,
+            attemptErrors: attemptErrors,
+            decisionKind: decision?.kind.name,
+            assistantId: decision?.assistantId,
+            reason: _clipNullable(decision?.reason, 500),
+            fallback: decision?.fallback ?? false,
+            freeText: _clipNullable(lastFreeText, 500),
+            failure: _clipNullable(failure, 300),
+          ),
+        );
+      } catch (e) {
+        debugPrint('[Director] runtime log sink failed: $e');
+      }
     }
 
     try {
@@ -167,8 +174,8 @@ class DirectorRunner {
         decision = result.decision;
         lastFreeText = result.freeText;
       } catch (e) {
-        lastError = e.toString();
-        attemptErrors.add(_clip(lastError, 300));
+        lastError = _describeError(e);
+        attemptErrors.add(lastError);
         debugPrint('[Director] first call failed: $e');
       }
 
@@ -194,8 +201,8 @@ class DirectorRunner {
           decision = result.decision;
           lastFreeText = result.freeText ?? lastFreeText;
         } catch (e) {
-          lastError = e.toString();
-          attemptErrors.add(_clip(lastError, 300));
+          lastError = _describeError(e);
+          attemptErrors.add(lastError);
           debugPrint('[Director] retry failed: $e');
         }
       }
@@ -226,7 +233,7 @@ class DirectorRunner {
       return decision;
     } catch (e) {
       if (!runtimeLogEmitted) {
-        emitRuntimeLog(failure: e.toString());
+        emitRuntimeLog(failure: _describeError(e));
       }
       rethrow;
     }
@@ -365,6 +372,20 @@ class DirectorRunner {
       }
     }
     return null;
+  }
+
+  static String _describeError(Object error) {
+    // Dio errors can embed request URLs, headers, or response bodies that may
+    // include private conversation content or API keys. Only stable, non-
+    // sensitive fields are kept so runtime logs never leak request internals.
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      return status == null
+          ? error.type.name
+          : '${error.type.name} (HTTP $status)';
+    }
+    if (error is TimeoutException) return 'timeout';
+    return _clip(error.toString(), 300);
   }
 
   static String _clip(String s, int max) {

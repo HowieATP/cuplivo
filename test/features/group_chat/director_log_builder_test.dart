@@ -173,6 +173,35 @@ void main() {
     expect(context, isNot(contains('new answer')));
   });
 
+  test('a selected version appended after a later turn is still included', () {
+    final oldVersion = assistant(
+      'old',
+      'old answer',
+      groupId: 'answer',
+      version: 0,
+    );
+    final newVersion = assistant(
+      'new',
+      'new answer',
+      groupId: 'answer',
+      version: 1,
+    );
+    final entries = buildLogs(
+      [user('u1', 'Question'), oldVersion, user('u2', 'Follow up'), newVersion],
+      conversation: Conversation(
+        id: 'c1',
+        title: 'Room',
+        conversationKind: Conversation.kindGroup,
+        versionSelections: const {'answer': 1},
+      ),
+    );
+
+    final followUp = entries.last;
+    final context = followUp.contextMessages.map((m) => m.content).join('\n');
+    expect(context, contains('new answer'));
+    expect(context, isNot(contains('old answer')));
+  });
+
   test(
     'clear-context boundary is applied relative to the prefix being shown',
     () {

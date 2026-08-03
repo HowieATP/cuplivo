@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -16,9 +17,28 @@ import 'chat/prompt_transformer.dart';
 import 'instruction_injection_store.dart';
 import 'logging/flutter_logger.dart';
 import 'memory_store.dart';
+import 'proactive_care_decision_tools.dart';
 import 'proactive_care_service.dart';
 
 const String _logTag = 'ProactiveCareFlow';
+
+/// Stream source signature for the decision flow (injectable for tests).
+/// Subset of [ChatApiService.sendMessageStream], same idea as
+/// DirectorStreamSender.
+typedef ProactiveCareDecisionSender =
+    Stream<ChatStreamChunk> Function({
+      required ProviderConfig config,
+      required String modelId,
+      required List<Map<String, dynamic>> messages,
+      List<Map<String, dynamic>>? tools,
+      ToolCallHandler? onToolCall,
+      int? thinkingBudget,
+      double? temperature,
+      double? topP,
+      int? maxTokens,
+      bool stream,
+      String? requestId,
+    });
 
 /// Snapshot of localized strings needed by the proactive care background
 /// isolate, which has no BuildContext / AppLocalizations. The main isolate
@@ -99,6 +119,11 @@ class ProactiveCareModelConfig {
 /// killed). Only data loading and persistence differ between the two paths:
 /// the main isolate uses providers + ChatService, the background isolate uses
 /// SQLite via [ProactiveCareHeadlessChatStore].
+///
+/// The decision flow (Pipeline ①) uses the same transport as normal chat
+/// ([ChatApiService.sendMessageStream]) with provider-default
+/// `tool_choice: auto` (not `required`), so DeepSeek and other
+/// OpenAI-compatible hosts that reject forced tools still work.
 class ProactiveCareMessageFlow {
   const ProactiveCareMessageFlow._();
 
@@ -445,9 +470,11 @@ class ProactiveCareMessageFlow {
     return buf.toString().trim();
   }
 
+  static const Duration _decisionTimeout = Duration(seconds: 45);
+
   /// Silently asks the decision model for the next proactive care time
-  /// (Pipeline ①). Returns null when the model declines, fails, or returns
-  /// an invalid/past time.
+  /// (Pipeline ①) via tool calls. Returns null when the model keeps the
+  /// current time, declines, fails, or returns an invalid/past time.
   static Future<DateTime?> decideNextCareTime({
     required ProviderConfig config,
     required String modelId,
@@ -456,8 +483,10 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> history,
     required String decisionPrompt,
     int? fallbackThinkingBudget,
+    ProactiveCareDecisionSender? sendMessageStream,
   }) async {
     if (history.isEmpty) return null;
+    final send = sendMessageStream ?? ChatApiService.sendMessageStream;
     final now = DateTime.now();
 
     String personaPrompt = '';
@@ -492,29 +521,159 @@ class ProactiveCareMessageFlow {
       personaPrompt: personaPrompt,
       memoriesBlock: memoriesBlock,
     );
+    final tools = ProactiveCareDecisionTools.definitions();
+    final baseRequestId =
+        'proactive-care-decision-${assistant.id}-${DateTime.now().microsecondsSinceEpoch}';
+
+    final first = await _callDecisionOnce(
+      send: send,
+      config: config,
+      modelId: modelId,
+      messages: apiMessages,
+      tools: tools,
+      assistant: assistant,
+      fallbackThinkingBudget: fallbackThinkingBudget,
+      now: now,
+      requestId: baseRequestId,
+    );
+    if (first.decided) return first.time;
+
+    // One Director-style retry with an explicit tool-only directive.
+    final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
+      ..add({
+        'role': 'user',
+        'content':
+            '你必须只通过调用工具给出决策：修改时间调用 update_care_time'
+            '（参数 next_care_time 为 ISO 8601 格式的未来时间），'
+            '保持不变调用 keep_care_time。不要输出自由文本。',
+      });
+    final second = await _callDecisionOnce(
+      send: send,
+      config: config,
+      modelId: modelId,
+      messages: retryMessages,
+      tools: tools,
+      assistant: assistant,
+      fallbackThinkingBudget: fallbackThinkingBudget,
+      now: now,
+      requestId: '$baseRequestId-retry',
+    );
+    if (second.decided) return second.time;
+
+    FlutterLogger.log(
+      'Decision finished without a tool call; keeping current time',
+      tag: _logTag,
+    );
+    return null;
+  }
+
+  /// One decision attempt. `decided == true` means a recognized tool call
+  /// settled the outcome (`time` may still be null = keep current time);
+  /// `decided == false` means the attempt produced no decision (free text,
+  /// error, timeout) and the caller may retry.
+  static Future<({bool decided, DateTime? time})> _callDecisionOnce({
+    required ProactiveCareDecisionSender send,
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    required List<Map<String, dynamic>> tools,
+    required Assistant assistant,
+    required int? fallbackThinkingBudget,
+    required DateTime now,
+    required String requestId,
+  }) async {
+    var decided = false;
+    DateTime? decisionTime;
+    final completer = Completer<DateTime?>();
+    StreamSubscription<ChatStreamChunk>? sub;
+
+    void finish(DateTime? time) {
+      if (decided) return;
+      decided = true;
+      decisionTime = time;
+      if (!completer.isCompleted) completer.complete(time);
+      // The first recognized tool call IS the decision. Cancel the stream so
+      // the provider cannot start follow-up tool rounds (Director pattern).
+      unawaited(sub?.cancel());
+      ChatApiService.cancelRequest(requestId);
+    }
+
+    void maybeDecide(String name, Map<String, dynamic> args) {
+      if (decided) return;
+      if (ProactiveCareDecisionTools.isKeepTime(name)) {
+        finish(null);
+      } else if (ProactiveCareDecisionTools.isUpdateTime(name)) {
+        final time = ProactiveCareDecisionTools.parseUpdateTimeArgs(
+          args,
+          now: now,
+        );
+        if (time == null) {
+          FlutterLogger.log(
+            'Decision update_care_time args invalid/past: $args',
+            tag: _logTag,
+          );
+        }
+        finish(time); // invalid/past → null → keep current time (final)
+      }
+      // Unknown tool names: stay undecided; neutral result keeps stream going.
+    }
+
+    Future<String> onToolCall(
+      String name,
+      Map<String, dynamic> args, {
+      String? toolCallId,
+    }) async {
+      maybeDecide(name, args);
+      // Keep the result neutral — never 'ignored' (models retry-loop on it).
+      return jsonEncode({'ok': true});
+    }
 
     try {
-      final buf = StringBuffer();
-      await for (final chunk in ChatApiService.sendMessageStream(
+      final stream = send(
         config: config,
         modelId: modelId,
-        messages: apiMessages,
+        messages: messages,
+        tools: tools,
+        onToolCall: onToolCall,
         thinkingBudget: assistant.thinkingBudget ?? fallbackThinkingBudget,
         temperature: assistant.temperature,
         topP: assistant.topP,
         maxTokens: assistant.maxTokens,
         stream: false,
-      )) {
-        buf.write(chunk.content);
-      }
-      return ProactiveCareService.parseDecision(
-        buf.toString(),
-        now: DateTime.now(),
+        requestId: requestId,
+      );
+
+      sub = stream.listen(
+        (chunk) {
+          if (decided) return;
+          final calls = chunk.toolCalls;
+          if (calls == null || calls.isEmpty) return;
+          for (final c in calls) {
+            maybeDecide(c.name, Map<String, dynamic>.from(c.arguments));
+            if (decided) break;
+          }
+        },
+        onError: (Object e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        },
+        onDone: () {
+          if (!completer.isCompleted) completer.complete(null);
+        },
+        cancelOnError: true,
+      );
+
+      await completer.future.timeout(
+        _decisionTimeout,
+        onTimeout: () {
+          unawaited(sub?.cancel());
+          ChatApiService.cancelRequest(requestId);
+          throw TimeoutException('proactive care decision timeout');
+        },
       );
     } catch (e) {
-      FlutterLogger.log('Decision request failed: $e', tag: _logTag);
-      return null;
+      FlutterLogger.log('Decision call failed: $e', tag: _logTag);
     }
+    return (decided: decided, time: decisionTime);
   }
 }
 

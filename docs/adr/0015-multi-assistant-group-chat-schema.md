@@ -4,6 +4,13 @@ Group chat persistence uses 2 new tables (`GroupChatRows`, `GroupChatMemberRows`
 
 Schema v13 originally added a third table, `DirectorMessageRows` (the Director's persisted private session). In v14 it was dropped: the Director session is ephemeral — each director call is rebuilt from the public transcript (`buildApiMessagesFromPublic`), so the table had no live writer. See the "Director session" entry in CONTEXT.md.
 
+The Director Logs page is a read-only projection of that same design. It rebuilds
+the public decision trace from the current transcript and may overlay bounded
+runtime metadata held only in `GroupChatProvider` for the current app process.
+Runtime metadata is not a Director session: it is not written to Drift,
+SharedPreferences, backups, or the recycle bin, and is discarded when the group
+is deleted or the application process ends.
+
 ## Considered Options
 
 1. **Columns-only (extend ConversationRows/MessageRows).** Rejected: membership is a real M:N relationship (repo pattern = join table, cf. `ConversationMcpServerRows`); 10+ group-only config/runtime columns would pollute the conversation table; a JSON member list is off-pattern for entity relationships in this repo.

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/group_chat.dart';
+import '../../../core/models/group_chat_director_log.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -32,6 +33,8 @@ typedef DirectorStreamSender =
       bool allowImagesApiRouting,
       bool ocrActive,
     });
+
+typedef DirectorRuntimeLogSink = void Function(GroupChatDirectorRuntimeLog log);
 
 /// Runs one director decision via tool-calling.
 ///
@@ -71,113 +74,162 @@ class DirectorRunner {
     required Map<String, Assistant> assistantsById,
     String? skipPendingCapMessageId,
     String? excludeTrailingUserMessageId,
+    String? sourceMessageId,
+    GroupChatDirectorLogTrigger trigger = GroupChatDirectorLogTrigger.user,
+    DirectorRuntimeLogSink? onRuntimeLog,
   }) async {
-    final providerKey =
-        (group.directorModelProvider ?? settings.currentModelProvider)?.trim();
-    final modelId = (group.directorModelId ?? settings.currentModelId)?.trim();
-
-    if (providerKey == null ||
-        providerKey.isEmpty ||
-        modelId == null ||
-        modelId.isEmpty) {
-      debugPrint('[Director] no model configured');
-      throw DirectorSoftError(DirectorSoftErrorKind.noModel);
-    }
-
-    if (!modelSupportsTools(providerKey, modelId)) {
-      debugPrint('[Director] model lacks tools: $providerKey/$modelId');
-      throw DirectorSoftError(DirectorSoftErrorKind.noTools);
-    }
-
-    final config = settings.getProviderConfig(providerKey);
-    final assistantIds = rosterAssistants.map((a) => a.id).toList();
-    final tools = DirectorTools.definitions(assistantIds);
-
-    final apiMessages = contextBuilder.buildApiMessagesFromPublic(
-      group: group,
-      publicMessages: publicMessages,
-      versionSelections: versionSelections,
-      newUserContent: newUserContent,
-      rosterAssistants: rosterAssistants,
-      userName: userName,
-      memberNames: memberNames,
-      assistantsById: assistantsById,
-      skipPendingCapMessageId: skipPendingCapMessageId,
-      excludeTrailingUserMessageId: excludeTrailingUserMessageId,
-    );
-
-    final requestStamp = DateTime.now().microsecondsSinceEpoch;
-
+    final startedAt = DateTime.now();
+    String? providerKey;
+    String? modelId;
+    var requestMessageCount = 0;
+    var attemptCount = 0;
+    final attemptErrors = <String>[];
     String? lastError;
     String? lastFreeText;
     DirectorDecision? decision;
+    var runtimeLogEmitted = false;
 
-    try {
-      final result = await _callOnce(
-        config: config,
-        modelId: modelId,
-        messages: apiMessages,
-        tools: tools,
-        assistantIds: assistantIds,
-        requestId: 'director-${group.id}-$requestStamp',
+    void emitRuntimeLog({String? failure}) {
+      if (runtimeLogEmitted || onRuntimeLog == null) return;
+      runtimeLogEmitted = true;
+      onRuntimeLog(
+        GroupChatDirectorRuntimeLog(
+          sourceMessageId: sourceMessageId,
+          trigger: trigger,
+          startedAt: startedAt,
+          finishedAt: DateTime.now(),
+          providerKey: providerKey,
+          modelId: modelId,
+          requestMessageCount: requestMessageCount,
+          attemptCount: attemptCount,
+          attemptErrors: attemptErrors,
+          decisionKind: decision?.kind.name,
+          assistantId: decision?.assistantId,
+          reason: _clipNullable(decision?.reason, 500),
+          fallback: decision?.fallback ?? false,
+          freeText: _clipNullable(lastFreeText, 500),
+          failure: _clipNullable(failure, 300),
+        ),
       );
-      decision = result.decision;
-      lastFreeText = result.freeText;
-    } catch (e) {
-      lastError = e.toString();
-      debugPrint('[Director] first call failed: $e');
     }
 
-    if (decision == null) {
-      final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
-        ..add({
-          'role': 'user',
-          'content':
-              'You must respond ONLY by calling the tools select_speaker or '
-              'end_turn. Do not write free-text answers. '
-              'Valid assistant_id values: ${assistantIds.join(', ')}',
-        });
+    try {
+      providerKey =
+          (group.directorModelProvider ?? settings.currentModelProvider)
+              ?.trim();
+      modelId = (group.directorModelId ?? settings.currentModelId)?.trim();
+
+      if (providerKey == null ||
+          providerKey.isEmpty ||
+          modelId == null ||
+          modelId.isEmpty) {
+        debugPrint('[Director] no model configured');
+        emitRuntimeLog(failure: 'no_model');
+        throw DirectorSoftError(DirectorSoftErrorKind.noModel);
+      }
+
+      if (!modelSupportsTools(providerKey, modelId)) {
+        debugPrint('[Director] model lacks tools: $providerKey/$modelId');
+        emitRuntimeLog(failure: 'no_tools');
+        throw DirectorSoftError(DirectorSoftErrorKind.noTools);
+      }
+
+      final config = settings.getProviderConfig(providerKey);
+      final assistantIds = rosterAssistants.map((a) => a.id).toList();
+      final tools = DirectorTools.definitions(assistantIds);
+
+      final apiMessages = contextBuilder.buildApiMessagesFromPublic(
+        group: group,
+        publicMessages: publicMessages,
+        versionSelections: versionSelections,
+        newUserContent: newUserContent,
+        rosterAssistants: rosterAssistants,
+        userName: userName,
+        memberNames: memberNames,
+        assistantsById: assistantsById,
+        skipPendingCapMessageId: skipPendingCapMessageId,
+        excludeTrailingUserMessageId: excludeTrailingUserMessageId,
+      );
+      requestMessageCount = apiMessages.length;
+
+      final requestStamp = DateTime.now().microsecondsSinceEpoch;
+
       try {
+        attemptCount++;
         final result = await _callOnce(
           config: config,
           modelId: modelId,
-          messages: retryMessages,
+          messages: apiMessages,
           tools: tools,
           assistantIds: assistantIds,
-          requestId: 'director-${group.id}-$requestStamp-retry',
+          requestId: 'director-${group.id}-$requestStamp',
         );
         decision = result.decision;
-        lastFreeText = result.freeText ?? lastFreeText;
+        lastFreeText = result.freeText;
       } catch (e) {
         lastError = e.toString();
-        debugPrint('[Director] retry failed: $e');
+        attemptErrors.add(_clip(lastError, 300));
+        debugPrint('[Director] first call failed: $e');
       }
-    }
 
-    if (decision == null && lastFreeText != null && lastFreeText.isNotEmpty) {
-      decision = _tryParseFreeTextDecision(lastFreeText, assistantIds);
-      if (decision != null) {
-        debugPrint(
-          '[Director] free-text fallback decision=${decision.kind} '
-          'assistant=${decision.assistantId}',
-        );
+      if (decision == null) {
+        final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
+          ..add({
+            'role': 'user',
+            'content':
+                'You must respond ONLY by calling the tools select_speaker or '
+                'end_turn. Do not write free-text answers. '
+                'Valid assistant_id values: ${assistantIds.join(', ')}',
+          });
+        try {
+          attemptCount++;
+          final result = await _callOnce(
+            config: config,
+            modelId: modelId,
+            messages: retryMessages,
+            tools: tools,
+            assistantIds: assistantIds,
+            requestId: 'director-${group.id}-$requestStamp-retry',
+          );
+          decision = result.decision;
+          lastFreeText = result.freeText ?? lastFreeText;
+        } catch (e) {
+          lastError = e.toString();
+          attemptErrors.add(_clip(lastError, 300));
+          debugPrint('[Director] retry failed: $e');
+        }
       }
+
+      if (decision == null && lastFreeText != null && lastFreeText.isNotEmpty) {
+        decision = _tryParseFreeTextDecision(lastFreeText, assistantIds);
+        if (decision != null) {
+          debugPrint(
+            '[Director] free-text fallback decision=${decision.kind} '
+            'assistant=${decision.assistantId}',
+          );
+        }
+      }
+
+      decision ??= DirectorDecision.end(
+        reason: lastError != null
+            ? 'fallback_no_tool: $lastError'
+            : (lastFreeText != null && lastFreeText.isNotEmpty
+                  ? 'fallback_no_tool: free_text=${_clip(lastFreeText, 200)}'
+                  : 'fallback_no_tool'),
+        fallback: true,
+      );
+      debugPrint(
+        '[Director] decision=${decision.kind} '
+        'assistant=${decision.assistantId} fallback=${decision.fallback}',
+      );
+      emitRuntimeLog(failure: decision.fallback ? lastError : null);
+      return decision;
+    } catch (e) {
+      if (!runtimeLogEmitted) {
+        emitRuntimeLog(failure: e.toString());
+      }
+      rethrow;
     }
-
-    decision ??= DirectorDecision.end(
-      reason: lastError != null
-          ? 'fallback_no_tool: $lastError'
-          : (lastFreeText != null && lastFreeText.isNotEmpty
-                ? 'fallback_no_tool: free_text=${_clip(lastFreeText, 200)}'
-                : 'fallback_no_tool'),
-      fallback: true,
-    );
-    debugPrint(
-      '[Director] decision=${decision.kind} '
-      'assistant=${decision.assistantId} fallback=${decision.fallback}',
-    );
-
-    return decision;
   }
 
   Future<({DirectorDecision? decision, String? freeText})> _callOnce({
@@ -319,6 +371,11 @@ class DirectorRunner {
     final t = s.trim();
     if (t.length <= max) return t;
     return '${t.substring(0, max)}…';
+  }
+
+  static String? _clipNullable(String? value, int max) {
+    if (value == null || value.trim().isEmpty) return null;
+    return _clip(value, max);
   }
 }
 

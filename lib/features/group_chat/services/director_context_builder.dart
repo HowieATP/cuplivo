@@ -191,6 +191,8 @@ class DirectorContextBuilder {
     required Map<String, Assistant> assistantsById,
     String? skipPendingCapMessageId,
     String? excludeTrailingUserMessageId,
+    int? truncateIndexOverride,
+    String fallbackAssistantName = 'Assistant',
   }) {
     final roster = buildRosterBlock(rosterAssistants);
     final prompt = substituteVariables(
@@ -213,7 +215,9 @@ class DirectorContextBuilder {
 
     final collapsed = collapsePublicVersions(publicMessages, versionSelections);
     final truncateIndex =
-        chatService.getConversation(group.conversationId)?.truncateIndex ?? -1;
+        truncateIndexOverride ??
+        chatService.getConversation(group.conversationId)?.truncateIndex ??
+        -1;
     final skip = ChatService.rawToCollapsedSkip(
       rawMessages: publicMessages,
       collapsedMessages: collapsed,
@@ -241,7 +245,7 @@ class DirectorContextBuilder {
         final name =
             assistantsById[m.speakerAssistantId]?.name ??
             m.speakerAssistantId ??
-            'Assistant';
+            fallbackAssistantName;
         api.add({
           'role': 'user',
           'content': buildAssistantTurnE2(

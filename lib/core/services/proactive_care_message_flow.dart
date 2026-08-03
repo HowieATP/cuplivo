@@ -475,6 +475,9 @@ class ProactiveCareMessageFlow {
   /// Silently asks the decision model for the next proactive care time
   /// (Pipeline ①) via tool calls. Returns null when the model keeps the
   /// current time, declines, fails, or returns an invalid/past time.
+  ///
+  /// [decisionTimeout] bounds each attempt's stream (tests inject a tiny
+  /// value); defaults to [_decisionTimeout].
   static Future<DateTime?> decideNextCareTime({
     required ProviderConfig config,
     required String modelId,
@@ -484,6 +487,7 @@ class ProactiveCareMessageFlow {
     required String decisionPrompt,
     int? fallbackThinkingBudget,
     ProactiveCareDecisionSender? sendMessageStream,
+    Duration decisionTimeout = _decisionTimeout,
   }) async {
     if (history.isEmpty) return null;
     final send = sendMessageStream ?? ChatApiService.sendMessageStream;
@@ -533,19 +537,23 @@ class ProactiveCareMessageFlow {
       tools: tools,
       assistant: assistant,
       fallbackThinkingBudget: fallbackThinkingBudget,
-      now: now,
+      timeout: decisionTimeout,
       requestId: baseRequestId,
     );
-    if (first.decided) return first.time;
+    if (first.decided) {
+      FlutterLogger.log(
+        'Decision settled: '
+        '${first.time?.toIso8601String() ?? 'keep current time'}',
+        tag: _logTag,
+      );
+      return first.time;
+    }
 
     // One Director-style retry with an explicit tool-only directive.
     final retryMessages = List<Map<String, dynamic>>.from(apiMessages)
       ..add({
         'role': 'user',
-        'content':
-            '你必须只通过调用工具给出决策：修改时间调用 update_care_time'
-            '（参数 next_care_time 为 ISO 8601 格式的未来时间），'
-            '保持不变调用 keep_care_time。不要输出自由文本。',
+        'content': ProactiveCareService.builtinDecisionToolOnlyDirective,
       });
     final second = await _callDecisionOnce(
       send: send,
@@ -555,13 +563,21 @@ class ProactiveCareMessageFlow {
       tools: tools,
       assistant: assistant,
       fallbackThinkingBudget: fallbackThinkingBudget,
-      now: now,
+      timeout: decisionTimeout,
       requestId: '$baseRequestId-retry',
     );
-    if (second.decided) return second.time;
+    if (second.decided) {
+      FlutterLogger.log(
+        'Decision settled: '
+        '${second.time?.toIso8601String() ?? 'keep current time'}',
+        tag: _logTag,
+      );
+      return second.time;
+    }
 
     FlutterLogger.log(
-      'Decision finished without a tool call; keeping current time',
+      'Decision finished without a tool call (model: $modelId); '
+      'keeping current time',
       tag: _logTag,
     );
     return null;
@@ -579,7 +595,7 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> tools,
     required Assistant assistant,
     required int? fallbackThinkingBudget,
-    required DateTime now,
+    required Duration timeout,
     required String requestId,
   }) async {
     var decided = false;
@@ -603,13 +619,16 @@ class ProactiveCareMessageFlow {
       if (ProactiveCareDecisionTools.isKeepTime(name)) {
         finish(null);
       } else if (ProactiveCareDecisionTools.isUpdateTime(name)) {
+        // Validate against a fresh clock: the request-level `now` (time
+        // footer) can be stale by the time a tool call arrives.
         final time = ProactiveCareDecisionTools.parseUpdateTimeArgs(
           args,
-          now: now,
+          now: DateTime.now(),
         );
         if (time == null) {
           FlutterLogger.log(
-            'Decision update_care_time args invalid/past: $args',
+            'Decision ${ProactiveCareDecisionTools.updateTime} args '
+            'invalid/past: $args',
             tag: _logTag,
           );
         }
@@ -663,7 +682,7 @@ class ProactiveCareMessageFlow {
       );
 
       await completer.future.timeout(
-        _decisionTimeout,
+        timeout,
         onTimeout: () {
           unawaited(sub?.cancel());
           ChatApiService.cancelRequest(requestId);

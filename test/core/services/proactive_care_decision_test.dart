@@ -98,7 +98,10 @@ void main() {
     await transport.closeAll();
   });
 
-  Future<DateTime?> decide({List<Map<String, dynamic>>? history}) {
+  Future<DateTime?> decide({
+    List<Map<String, dynamic>>? history,
+    Duration decisionTimeout = const Duration(seconds: 45),
+  }) {
     return ProactiveCareMessageFlow.decideNextCareTime(
       config: ProviderConfig.defaultsFor('TestProvider'),
       modelId: 'test-model',
@@ -112,6 +115,7 @@ void main() {
           ],
       decisionPrompt: 'test',
       sendMessageStream: transport.send,
+      decisionTimeout: decisionTimeout,
     );
   }
 
@@ -308,8 +312,14 @@ void main() {
 
       final retryLast = transport.capturedMessages[1].last;
       expect(retryLast['role'], 'user');
-      expect(retryLast['content'] as String, contains('update_care_time'));
-      expect(retryLast['content'] as String, contains('keep_care_time'));
+      expect(
+        retryLast['content'] as String,
+        contains(ProactiveCareDecisionTools.updateTime),
+      );
+      expect(
+        retryLast['content'] as String,
+        contains(ProactiveCareDecisionTools.keepTime),
+      );
       expect(
         transport.capturedRequestIds[1],
         '${transport.capturedRequestIds[0]}-retry',
@@ -442,6 +452,70 @@ void main() {
         expect(transport.sendCount, 1);
       },
     );
+
+    test(
+      '18: first attempt timeout retries and second attempt decides',
+      () async {
+        transport.enqueue();
+        final second = transport.enqueue();
+        final time = futureTime();
+
+        final future = decide(
+          decisionTimeout: const Duration(milliseconds: 20),
+        );
+        // First stream never emits; the chunk is buffered for attempt 2.
+        second.add(updateChunk(time));
+
+        final result = await future.timeout(const Duration(seconds: 5));
+        expect(result, time);
+        expect(transport.sendCount, 2);
+      },
+    );
+
+    test('19: both attempts timing out returns null after two sends', () async {
+      transport.enqueue();
+      transport.enqueue();
+
+      final result = await decide(
+        decisionTimeout: const Duration(milliseconds: 20),
+      ).timeout(const Duration(seconds: 5));
+
+      expect(result, isNull);
+      expect(transport.sendCount, 2);
+    });
+
+    test('20: timeout cancels the hung attempt subscription', () async {
+      transport.enqueue();
+      transport.enqueue();
+
+      final result = await decide(
+        decisionTimeout: const Duration(milliseconds: 20),
+      ).timeout(const Duration(seconds: 5));
+      expect(result, isNull);
+
+      await pumpEventQueue();
+      expect(transport.subscriptionCancelled[0], isTrue);
+    });
+  });
+
+  group('ProactiveCareService', () {
+    test('21: empty decision prompt omits the system message', () {
+      final messages = ProactiveCareService.buildDecisionApiMessages(
+        decisionPrompt: '',
+        currentNextCareTime: null,
+        now: DateTime(2026, 8, 3, 12),
+        history: const <Map<String, dynamic>>[
+          {'role': 'user', 'content': 'hi'},
+        ],
+      );
+
+      expect(messages.where((m) => m['role'] == 'system'), isEmpty);
+      expect(messages.first['role'], 'user');
+      expect(
+        messages.first['content'] as String,
+        startsWith(ProactiveCareService.chatHistoryPrefix),
+      );
+    });
   });
 
   group('ProactiveCareDecisionTools', () {

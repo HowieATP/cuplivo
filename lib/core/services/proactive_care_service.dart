@@ -1,4 +1,5 @@
 import '../models/assistant_memory.dart';
+import 'proactive_care_decision_tools.dart';
 
 /// Pure logic for the proactive care ("Ta的来信") decision flow.
 ///
@@ -12,8 +13,17 @@ class ProactiveCareService {
   /// decision request (LLM only). Mirrors DirectorContextBuilder's
   /// tool-only reminder.
   static const String builtinDecisionToolReminder =
-      '请只通过调用工具给出决策：需要修改时间时调用 update_care_time，'
-      '保持不变时调用 keep_care_time。不要输出其他内容。';
+      '请只通过调用工具给出决策：需要修改时间时调用 '
+      '${ProactiveCareDecisionTools.updateTime}，'
+      '保持不变时调用 ${ProactiveCareDecisionTools.keepTime}。不要输出其他内容。';
+
+  /// Built-in tool-only retry directive appended as an extra user message
+  /// when the first decision attempt produced no tool call (LLM only).
+  static const String builtinDecisionToolOnlyDirective =
+      '你必须只通过调用工具给出决策：修改时间调用 '
+      '${ProactiveCareDecisionTools.updateTime}'
+      '（参数 next_care_time 为 ISO 8601 格式的未来时间），'
+      '保持不变调用 ${ProactiveCareDecisionTools.keepTime}。不要输出自由文本。';
 
   /// Prefix before the assistant persona in the decision request (LLM only).
   static const String personaReferencePrefix = '以下是供你参考的助手人设';

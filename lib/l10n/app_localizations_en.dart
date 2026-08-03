@@ -6353,18 +6353,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get documentProcessingTitle => 'Image & Document Processing';
 
   @override
-  String get documentProcessingImageWithoutVision =>
-      'Images without vision model';
+  String get documentProcessingImageOcr => 'Image OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR';
+  String get documentProcessingModeAuto => 'Auto';
+
+  @override
+  String get documentProcessingModeAlways => 'Always';
+
+  @override
+  String get documentProcessingModeNever => 'Never';
 
   @override
   String get documentProcessingModeDiscard => 'Discard';
 
   @override
   String get documentProcessingOcrNotConfigured =>
-      'No OCR model configured. OCR option unavailable.';
+      'No OCR model configured. Always-OCR unavailable.';
 
   @override
   String get documentProcessingDocx => 'DOCX';

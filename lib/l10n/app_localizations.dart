@@ -11636,17 +11636,29 @@ abstract class AppLocalizations {
   /// **'Image & Document Processing'**
   String get documentProcessingTitle;
 
-  /// Section label for image handling when the chat model lacks vision capability
+  /// Section label for the per-assistant image OCR mode
   ///
   /// In en, this message translates to:
-  /// **'Images without vision model'**
-  String get documentProcessingImageWithoutVision;
+  /// **'Image OCR'**
+  String get documentProcessingImageOcr;
 
-  /// Option to OCR-extract text from images
+  /// Option to OCR images only when the model lacks vision capability
   ///
   /// In en, this message translates to:
-  /// **'OCR'**
-  String get documentProcessingModeOcr;
+  /// **'Auto'**
+  String get documentProcessingModeAuto;
+
+  /// Option to always OCR images regardless of model capability
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get documentProcessingModeAlways;
+
+  /// Option to never OCR images
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get documentProcessingModeNever;
 
   /// Option to discard the attachment silently
   ///
@@ -11654,10 +11666,10 @@ abstract class AppLocalizations {
   /// **'Discard'**
   String get documentProcessingModeDiscard;
 
-  /// Hint shown when OCR model is not configured
+  /// Hint shown when the OCR model is not configured
   ///
   /// In en, this message translates to:
-  /// **'No OCR model configured. OCR option unavailable.'**
+  /// **'No OCR model configured. Always-OCR unavailable.'**
   String get documentProcessingOcrNotConfigured;
 
   /// Section label for DOCX document handling

@@ -23,6 +23,7 @@ import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -268,17 +269,23 @@ class _ChatInputBarState extends State<ChatInputBar>
       return;
     }
     final settings = context.watch<SettingsProvider>();
-    // If OCR is enabled, images will be OCR-processed instead of being
-    // sent to the vision model — no "images will be ignored" warning needed.
-    if (settings.ocrEnabled) {
-      _imageWarningModelKey = null;
-      return;
-    }
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
     final modelId = a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || modelId == null) {
+      _imageWarningModelKey = null;
+      return;
+    }
+    // OCR-active sends never need the warning: images are OCR-processed
+    // instead of being sent to the vision model.
+    final ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: a,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    if (ocrActive) {
       _imageWarningModelKey = null;
       return;
     }

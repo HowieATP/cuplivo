@@ -146,6 +146,8 @@ class AssistantRows extends Table {
   TextColumn get pdfMode => text().withDefault(const Constant('extract'))();
   TextColumn get otherOfficeMode =>
       text().withDefault(const Constant('direct'))();
+  // OCR processing mode: 'auto' | 'always' | 'never'
+  TextColumn get ocrMode => text().withDefault(const Constant('auto'))();
 
   // --- Time Injection ---
   BoolColumn get enableTimeInjection =>
@@ -363,7 +365,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0017-schema-self-heal.md.
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -446,6 +448,12 @@ class AppDatabase extends _$AppDatabase {
       'assistant_rows',
       'other_office_mode',
       "ALTER TABLE assistant_rows ADD COLUMN other_office_mode TEXT NOT NULL DEFAULT 'direct'",
+    );
+    // OCR mode (schema v15)
+    await _ensureColumn(
+      'assistant_rows',
+      'ocr_mode',
+      "ALTER TABLE assistant_rows ADD COLUMN ocr_mode TEXT NOT NULL DEFAULT 'auto'",
     );
     await _ensureColumn(
       'assistant_rows',
@@ -699,6 +707,13 @@ class AppDatabase extends _$AppDatabase {
         // The Director session is ephemeral (rebuilt from the public
         // transcript); the v13 table is unused by the live flow.
         await customStatement('DROP TABLE IF EXISTS director_message_rows');
+      }
+      if (from < 15) {
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.ocrMode);
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

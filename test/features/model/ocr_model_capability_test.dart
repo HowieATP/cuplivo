@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/model/utils/ocr_model_capability.dart';
 
@@ -110,6 +111,132 @@ void main() {
         ),
         isFalse,
       );
+    });
+  });
+
+  group('resolveOcrActive', () {
+    Future<SettingsProvider> newSettings({required bool withOcrModel}) async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+      await _waitForSettingsLoad();
+      await settings.setProviderConfig(
+        'OcrProvider',
+        _configWithOcrCandidates(),
+      );
+      if (withOcrModel) {
+        await settings.setOcrModel('OcrProvider', 'vision-model');
+      }
+      return settings;
+    }
+
+    Future<bool> resolve({
+      required bool withOcrModel,
+      String? ocrMode,
+      required String modelId,
+    }) async {
+      final settings = await newSettings(withOcrModel: withOcrModel);
+      final assistant = ocrMode == null
+          ? null
+          : Assistant(id: 'a1', name: 'A', ocrMode: ocrMode);
+      return resolveOcrActive(
+        settings: settings,
+        assistant: assistant,
+        providerKey: 'OcrProvider',
+        modelId: modelId,
+      );
+    }
+
+    test('never is false even with an OCR model for any model', () async {
+      expect(
+        await resolve(
+          withOcrModel: true,
+          ocrMode: 'never',
+          modelId: 'text-model',
+        ),
+        isFalse,
+      );
+      expect(
+        await resolve(
+          withOcrModel: true,
+          ocrMode: 'never',
+          modelId: 'vision-model',
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'always is true for vision and text models when OCR model set',
+      () async {
+        expect(
+          await resolve(
+            withOcrModel: true,
+            ocrMode: 'always',
+            modelId: 'vision-model',
+          ),
+          isTrue,
+        );
+        expect(
+          await resolve(
+            withOcrModel: true,
+            ocrMode: 'always',
+            modelId: 'text-model',
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test('always without an OCR model is false', () async {
+      expect(
+        await resolve(
+          withOcrModel: false,
+          ocrMode: 'always',
+          modelId: 'text-model',
+        ),
+        isFalse,
+      );
+    });
+
+    test('auto OCRs only when the model lacks vision input', () async {
+      expect(
+        await resolve(
+          withOcrModel: true,
+          ocrMode: 'auto',
+          modelId: 'vision-model',
+        ),
+        isFalse,
+      );
+      expect(
+        await resolve(
+          withOcrModel: true,
+          ocrMode: 'auto',
+          modelId: 'text-model',
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'auto without an OCR model is false even for text-only models',
+      () async {
+        expect(
+          await resolve(
+            withOcrModel: false,
+            ocrMode: 'auto',
+            modelId: 'text-model',
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('missing assistant falls back to auto mode', () async {
+      expect(
+        await resolve(withOcrModel: true, modelId: 'vision-model'),
+        isFalse,
+      );
+      expect(await resolve(withOcrModel: true, modelId: 'text-model'), isTrue);
     });
   });
 }

@@ -698,6 +698,7 @@
   "lanSyncServerDialogTitle": "作为服务器",
   "lanSyncClientDialogTitle": "作为客户端",
   "lanSyncSecurityNote": "同一局域网的设备均可连接（最低版本：v2.2.2）。",
+  "lanSyncFirewallHint": "若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。",
   "lanSyncPlanToSend": "{count} 个对话待发送",
   "lanSyncPlanToReceive": "{count} 个对话待接收",
   "lanSyncPlanForks": "{count} 处分叉已检测（v1 暂跳过）",

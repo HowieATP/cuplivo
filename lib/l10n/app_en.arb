@@ -839,6 +839,7 @@
   "lanSyncServerDialogTitle": "Server Mode",
   "lanSyncClientDialogTitle": "Client Mode",
   "lanSyncSecurityNote": "Devices on the same network can connect (minimum version: v2.2.2).",
+  "lanSyncFirewallHint": "If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).",
   "lanSyncPlanToSend": "{count} conversations to send",
   "lanSyncPlanToReceive": "{count} conversations to receive",
   "lanSyncPlanForks": "{count} forks detected (skipped in v1)",

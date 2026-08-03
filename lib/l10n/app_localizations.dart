@@ -3815,6 +3815,12 @@ abstract class AppLocalizations {
   /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
   String get lanSyncSecurityNote;
 
+  /// No description provided for @lanSyncFirewallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).'**
+  String get lanSyncFirewallHint;
+
   /// No description provided for @lanSyncPlanToSend.
   ///
   /// In en, this message translates to:

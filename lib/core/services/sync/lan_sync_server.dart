@@ -98,6 +98,10 @@ class LanSyncServer extends ChangeNotifier {
   Future<void> _handleRequests(HttpServer server) async {
     await for (final request in server) {
       try {
+        final peer = request.connectionInfo?.remoteAddress.address;
+        debugPrint(
+          'LanSyncServer ${request.method} ${request.uri.path} from $peer',
+        );
         final path = request.uri.path;
         // PIN validation on every request.
         if (!validatePin(request.headers.value('X-Sync-Pin'))) {

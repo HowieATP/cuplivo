@@ -1997,6 +1997,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Devices on the same network can connect (minimum version: v2.2.2).';
 
   @override
+  String get lanSyncFirewallHint =>
+      'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).';
+
+  @override
   String lanSyncPlanToSend(Object count) {
     return '$count conversations to send';
   }

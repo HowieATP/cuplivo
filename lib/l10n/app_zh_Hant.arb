@@ -674,6 +674,7 @@
   "lanSyncServerDialogTitle": "作為伺服器",
   "lanSyncClientDialogTitle": "作為客戶端",
   "lanSyncSecurityNote": "同一區域網路的裝置均可連接（最低版本：v2.2.2）。",
+  "lanSyncFirewallHint": "若其他裝置連線逾時，請在 Windows 防火牆中允許 Cuplivo 入站（TCP 9527 連接埠）。",
   "lanSyncPlanToSend": "{count} 個對話待發送",
   "lanSyncPlanToReceive": "{count} 個對話待接收",
   "lanSyncPlanForks": "{count} 處分叉已偵測（v1 暫跳過）",

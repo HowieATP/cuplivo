@@ -487,6 +487,16 @@ class _ServerDialogState extends State<_ServerDialog> {
               cs: cs,
               emphasize: true,
             ),
+            if (!kIsWeb && Platform.isWindows) ...[
+              const SizedBox(height: 10),
+              Text(
+                l10n.lanSyncFirewallHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
             if (server.status.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
@@ -637,7 +647,6 @@ class _ClientDialogState extends State<_ClientDialog> {
             Row(
               children: [
                 Expanded(
-                  flex: 2,
                   child: TextField(
                     controller: widget.portController,
                     keyboardType: TextInputType.number,
@@ -650,7 +659,6 @@ class _ClientDialogState extends State<_ClientDialog> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  flex: 1,
                   child: TextField(
                     controller: widget.pinController,
                     keyboardType: TextInputType.number,
@@ -808,7 +816,6 @@ class _ClientSheetState extends State<_ClientSheet> {
             Row(
               children: [
                 Expanded(
-                  flex: 2,
                   child: IosFormTextField(
                     label: l10n.lanSyncClientPort,
                     controller: widget.portController,
@@ -817,11 +824,11 @@ class _ClientSheetState extends State<_ClientSheet> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  flex: 1,
                   child: IosFormTextField(
                     label: l10n.lanSyncClientPin,
                     controller: widget.pinController,
                     keyboardType: TextInputType.number,
+                    maxLength: 4,
                   ),
                 ),
               ],

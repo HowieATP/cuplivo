@@ -1937,6 +1937,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
+  String get lanSyncFirewallHint =>
+      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
+
+  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -8646,6 +8650,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
+  String get lanSyncFirewallHint =>
+      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
+
+  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -15353,6 +15361,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get lanSyncSecurityNote => '同一區域網路的裝置均可連接（最低版本：v2.2.2）。';
+
+  @override
+  String get lanSyncFirewallHint =>
+      '若其他裝置連線逾時，請在 Windows 防火牆中允許 Cuplivo 入站（TCP 9527 連接埠）。';
 
   @override
   String lanSyncPlanToSend(Object count) {

@@ -285,7 +285,6 @@ class SettingsProvider extends ChangeNotifier {
   static const String _translateModelKey = 'translate_model_v1';
   static const String _translatePromptKey = 'translate_prompt_v1';
   static const String _translateTargetLangKey = 'translate_target_lang_v1';
-  static const String _ocrEnabledKey = 'ocr_enabled_v1';
   static const String _learningModeEnabledKey = 'learning_mode_enabled_v1';
   static const String _learningModePromptKey = 'learning_mode_prompt_v1';
   static const String _searchServicesKey = 'search_services_v1';
@@ -898,11 +897,6 @@ class SettingsProvider extends ChangeNotifier {
     _ocrPrompt = (ocrp == null || ocrp.trim().isEmpty)
         ? defaultOcrPrompt
         : ocrp;
-    // load OCR enabled (only effective when model is configured)
-    _ocrEnabled = prefs.getBool(_ocrEnabledKey) ?? false;
-    if (_ocrModelProvider == null || _ocrModelId == null) {
-      _ocrEnabled = false;
-    }
     // load summary model
     final summarySel = prefs.getString(_summaryModelKey);
     if (summarySel != null && summarySel.contains('::')) {
@@ -2752,9 +2746,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_ocrModelProvider == providerKey) {
       _ocrModelProvider = null;
       _ocrModelId = null;
-      _ocrEnabled = false;
       await prefs.remove(_ocrModelKey);
-      await prefs.setBool(_ocrEnabledKey, false);
       changed = true;
     }
     if (_summaryModelProvider == providerKey) {
@@ -2814,9 +2806,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_ocrModelProvider == providerKey && _ocrModelId == modelId) {
       _ocrModelProvider = null;
       _ocrModelId = null;
-      _ocrEnabled = false;
       await prefs.remove(_ocrModelKey);
-      await prefs.setBool(_ocrEnabledKey, false);
       changed = true;
     }
     if (_summaryModelProvider == providerKey && _summaryModelId == modelId) {
@@ -2884,9 +2874,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_ocrModelProvider == key) {
       _ocrModelProvider = null;
       _ocrModelId = null;
-      _ocrEnabled = false;
       await prefs.remove(_ocrModelKey);
-      await prefs.setBool(_ocrEnabledKey, false);
     }
     if (_summaryModelProvider == key) {
       _summaryModelProvider = null;
@@ -3108,9 +3096,6 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   String _ocrPrompt = defaultOcrPrompt;
   String get ocrPrompt => _ocrPrompt;
 
-  bool _ocrEnabled = false;
-  bool get ocrEnabled => _ocrEnabled;
-
   Future<void> setOcrModel(String providerKey, String modelId) async {
     _ocrModelProvider = providerKey;
     _ocrModelId = modelId;
@@ -3122,11 +3107,9 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   Future<void> resetOcrModel() async {
     _ocrModelProvider = null;
     _ocrModelId = null;
-    _ocrEnabled = false;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_ocrModelKey);
-    await prefs.setBool(_ocrEnabledKey, false);
   }
 
   Future<void> setOcrPrompt(String prompt) async {
@@ -3137,18 +3120,6 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   }
 
   Future<void> resetOcrPrompt() async => setOcrPrompt(defaultOcrPrompt);
-
-  Future<void> setOcrEnabled(bool value) async {
-    // If there is no OCR model configured, force disable.
-    if (_ocrModelProvider == null || _ocrModelId == null) {
-      value = false;
-    }
-    if (_ocrEnabled == value) return;
-    _ocrEnabled = value;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_ocrEnabledKey, _ocrEnabled);
-  }
 
   // Summary model and prompt
   String? _summaryModelProvider;
@@ -4575,7 +4546,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._ocrModelProvider = _ocrModelProvider;
     copy._ocrModelId = _ocrModelId;
     copy._ocrPrompt = _ocrPrompt;
-    copy._ocrEnabled = _ocrEnabled;
     copy._thinkingBudget = _thinkingBudget;
     copy._titleGenerationThinkingEnabled = _titleGenerationThinkingEnabled;
     copy._summaryThinkingEnabled = _summaryThinkingEnabled;

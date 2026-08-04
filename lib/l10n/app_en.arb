@@ -2882,24 +2882,32 @@
     "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
   },
   "documentProcessingTitle": "Image & Document Processing",
-  "@documentProcessingTitle": {
+    "@documentProcessingTitle": {
     "description": "Title for the document processing configuration panel"
   },
-  "documentProcessingImageWithoutVision": "Images without vision model",
-  "@documentProcessingImageWithoutVision": {
-    "description": "Section label for image handling when the chat model lacks vision capability"
+  "documentProcessingImageOcr": "Image OCR",
+  "@documentProcessingImageOcr": {
+    "description": "Section label for the per-assistant image OCR mode"
   },
-  "documentProcessingModeOcr": "OCR",
-  "@documentProcessingModeOcr": {
-    "description": "Option to OCR-extract text from images"
+  "documentProcessingModeAuto": "Auto",
+  "@documentProcessingModeAuto": {
+    "description": "Option to OCR images only when the model lacks vision capability"
+  },
+  "documentProcessingModeAlways": "Always",
+  "@documentProcessingModeAlways": {
+    "description": "Option to always OCR images regardless of model capability"
+  },
+  "documentProcessingModeNever": "Never",
+  "@documentProcessingModeNever": {
+    "description": "Option to never OCR images"
   },
   "documentProcessingModeDiscard": "Discard",
   "@documentProcessingModeDiscard": {
     "description": "Option to discard the attachment silently"
   },
-  "documentProcessingOcrNotConfigured": "No OCR model configured. OCR option unavailable.",
+  "documentProcessingOcrNotConfigured": "No OCR model configured. Always-OCR unavailable.",
   "@documentProcessingOcrNotConfigured": {
-    "description": "Hint shown when OCR model is not configured"
+    "description": "Hint shown when the OCR model is not configured"
   },
   "documentProcessingDocx": "DOCX",
   "@documentProcessingDocx": {

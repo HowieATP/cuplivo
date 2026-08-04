@@ -6,6 +6,7 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/message_builder_service.dart';
@@ -221,10 +222,12 @@ class GenerationController {
     required bool streamOutput,
     bool generateTitleOnFinish = true,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,

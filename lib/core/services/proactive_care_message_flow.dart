@@ -624,6 +624,7 @@ class ProactiveCareHeadlessChatStore {
       'docxMode': row['docx_mode'] as String,
       'pdfMode': row['pdf_mode'] as String,
       'otherOfficeMode': row['other_office_mode'] as String,
+      'ocrMode': row['ocr_mode'] as String? ?? 'auto',
       'presetMessages': jsonDecode(row['preset_messages_json'] as String),
       'regexRules': jsonDecode(row['regex_rules_json'] as String),
       'enableProactiveCare': (row['enable_proactive_care'] as int) != 0,

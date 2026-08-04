@@ -2332,24 +2332,32 @@
     "description": "在多 AI 对比中移除某个模型回复的按钮提示"
   },
   "documentProcessingTitle": "图片与文档解析",
-  "@documentProcessingTitle": {
+    "@documentProcessingTitle": {
     "description": "文档处理配置面板标题"
   },
-  "documentProcessingImageWithoutVision": "无视觉模型时的图片处理",
-  "@documentProcessingImageWithoutVision": {
-    "description": "当聊天模型不具备视觉能力时图片的处理方式"
+  "documentProcessingImageOcr": "图片 OCR",
+  "@documentProcessingImageOcr": {
+    "description": "Section label for the per-assistant image OCR mode"
   },
-  "documentProcessingModeOcr": "OCR 文字识别",
-  "@documentProcessingModeOcr": {
-    "description": "对图片执行 OCR 提取文字"
+  "documentProcessingModeAuto": "智能识别",
+  "@documentProcessingModeAuto": {
+    "description": "Option to OCR images only when the model lacks vision capability"
+  },
+  "documentProcessingModeAlways": "全部",
+  "@documentProcessingModeAlways": {
+    "description": "Option to always OCR images regardless of model capability"
+  },
+  "documentProcessingModeNever": "永不",
+  "@documentProcessingModeNever": {
+    "description": "Option to never OCR images"
   },
   "documentProcessingModeDiscard": "丢弃",
   "@documentProcessingModeDiscard": {
     "description": "静默丢弃附件"
   },
-  "documentProcessingOcrNotConfigured": "尚未配置 OCR 模型，OCR 选项不可用",
+  "documentProcessingOcrNotConfigured": "尚未配置 OCR 模型，「全部」选项不可用",
   "@documentProcessingOcrNotConfigured": {
-    "description": "未配置 OCR 模型时显示的提示"
+    "description": "Hint shown when the OCR model is not configured"
   },
   "documentProcessingDocx": "DOCX 处理",
   "@documentProcessingDocx": {

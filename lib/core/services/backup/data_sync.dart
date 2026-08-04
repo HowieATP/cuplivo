@@ -1010,12 +1010,19 @@ class DataSync {
 
       // Restore settings
       Object? backupAssistantsRaw;
+      Object? backupLegacyOcrEnabled;
       final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       if (await settingsFile.exists()) {
         try {
           final txt = await settingsFile.readAsString();
           final map = jsonDecode(txt) as Map<String, dynamic>;
           backupAssistantsRaw = map.remove('assistants_v1');
+          // Legacy global OCR toggle: capture it so assistants restored from a
+          // pre-v15 backup get the same ocrMode mapping as an in-place upgrade
+          // (true -> auto, false -> never). Never write it back into prefs, or
+          // the one-time per-assistant ocrMode migration would re-run and
+          // overwrite user per-assistant choices.
+          backupLegacyOcrEnabled = map.remove('ocr_enabled_v1');
           final prefs = await SharedPreferencesAsync.instance;
           if (mode == RestoreMode.overwrite) {
             // For overwrite mode, restore all settings
@@ -1673,7 +1680,14 @@ class DataSync {
           if (mode == RestoreMode.overwrite) {
             final assistants = decoded
                 .whereType<Map>()
-                .map((e) => Assistant.fromJson(Map<String, dynamic>.from(e)))
+                .map(
+                  (e) => Assistant.fromJson(
+                    _applyLegacyOcrModeToAssistantMap(
+                      Map<String, dynamic>.from(e),
+                      backupLegacyOcrEnabled,
+                    ),
+                  ),
+                )
                 .toList();
             await chatService.putAssistants(assistants);
           } else {
@@ -1684,7 +1698,18 @@ class DataSync {
             final existing = await chatService.getAllAssistants();
             final existingMaps = existing.map((a) => a.toJson()).toList();
             final merged = _mergeAssistantMaps(existingMaps, incoming);
-            final assistants = merged.map(Assistant.fromJson).toList();
+            // Local assistants always carry an explicit ocrMode; only
+            // brand-new incoming assistants can still lack it.
+            final assistants = merged
+                .map(
+                  (m) => Assistant.fromJson(
+                    _applyLegacyOcrModeToAssistantMap(
+                      m,
+                      backupLegacyOcrEnabled,
+                    ),
+                  ),
+                )
+                .toList();
             await chatService.putAssistants(assistants);
           }
         } catch (e, st) {
@@ -1729,6 +1754,19 @@ class DataSync {
     }
 
     return jsonEncode([for (final id in order) byId[id]]);
+  }
+
+  /// Applies the legacy `ocr_enabled_v1` mapping to an assistant map that
+  /// predates per-assistant `ocrMode` (true -> 'auto', false -> 'never').
+  /// Assistants that already carry an `ocrMode` field are left untouched.
+  static Map<String, dynamic> _applyLegacyOcrModeToAssistantMap(
+    Map<String, dynamic> map,
+    Object? legacyOcrEnabled,
+  ) {
+    if (legacyOcrEnabled is bool && !map.containsKey('ocrMode')) {
+      return {...map, 'ocrMode': legacyOcrEnabled ? 'auto' : 'never'};
+    }
+    return map;
   }
 
   static List<Map<String, dynamic>> _mergeAssistantMaps(

@@ -86,6 +86,9 @@ Do **not** store sensitive information, including:
   final String docxMode;
   final String pdfMode;
   final String otherOfficeMode;
+  // OCR processing mode (per assistant)
+  // Values: 'auto' (OCR only when the model lacks vision), 'always', 'never'
+  final String ocrMode;
   // Time injection
   final bool enableTimeInjection;
   // Handoff / delegation
@@ -133,6 +136,7 @@ Do **not** store sensitive information, including:
     this.docxMode = 'extract',
     this.pdfMode = 'extract',
     this.otherOfficeMode = 'direct',
+    this.ocrMode = 'auto',
     this.enableTimeInjection = false,
     this.discoverable = false,
     this.handoffId,
@@ -181,6 +185,7 @@ Do **not** store sensitive information, including:
     String? docxMode,
     String? pdfMode,
     String? otherOfficeMode,
+    String? ocrMode,
     bool? enableTimeInjection,
     bool? discoverable,
     String? handoffId,
@@ -244,6 +249,7 @@ Do **not** store sensitive information, including:
       docxMode: docxMode ?? this.docxMode,
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+      ocrMode: ocrMode ?? this.ocrMode,
       enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
       discoverable: discoverable ?? this.discoverable,
       handoffId: clearHandoffId ? null : (handoffId ?? this.handoffId),
@@ -293,6 +299,7 @@ Do **not** store sensitive information, including:
     'docxMode': docxMode,
     'pdfMode': pdfMode,
     'otherOfficeMode': otherOfficeMode,
+    'ocrMode': ocrMode,
     'enableTimeInjection': enableTimeInjection,
     'discoverable': discoverable,
     'handoffId': handoffId,
@@ -397,6 +404,7 @@ Do **not** store sensitive information, including:
     docxMode: (json['docxMode'] as String?) ?? 'extract',
     pdfMode: (json['pdfMode'] as String?) ?? 'extract',
     otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',
+    ocrMode: (json['ocrMode'] as String?) ?? 'auto',
     enableTimeInjection: json['enableTimeInjection'] as bool? ?? false,
     discoverable: json['discoverable'] as bool? ?? false,
     handoffId: json['handoffId'] as String?,

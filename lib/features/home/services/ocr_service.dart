@@ -177,9 +177,9 @@ class OcrService {
     if (imagePaths.isEmpty) return null;
 
     final settings = context.read<SettingsProvider>();
-    if (!(settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null)) {
+    // The caller gates on the resolved per-assistant OCR mode; here we only
+    // require an OCR model to be configured.
+    if (settings.ocrModelProvider == null || settings.ocrModelId == null) {
       return null;
     }
 

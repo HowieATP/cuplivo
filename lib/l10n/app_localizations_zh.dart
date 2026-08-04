@@ -6107,16 +6107,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -12913,16 +12919,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -19719,16 +19731,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get documentProcessingTitle => '圖片與文檔解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '無視覺模型時的圖片處理';
+  String get documentProcessingImageOcr => '圖片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字識別';
+  String get documentProcessingModeAuto => '智能識別';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '捨棄';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 選項不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」選項不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 處理';

@@ -274,6 +274,125 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSortByTime => 'By date';
 
   @override
+  String get storageWorkspaceEntryTitle => 'Workspace';
+
+  @override
+  String get storageMountsTitle => 'Filesystem Mounts';
+
+  @override
+  String get storageMountsAddButton => 'Add mount';
+
+  @override
+  String get storageMountsAliasLabel => 'Alias';
+
+  @override
+  String get storageMountsPathLabel => 'Path';
+
+  @override
+  String get storageMountsReadOnlyLabel => 'Read-only';
+
+  @override
+  String get storageMountsPickButton => 'Browse';
+
+  @override
+  String get storageMountsAddDialogTitle => 'Add External Mount';
+
+  @override
+  String get storageMountsEditDialogTitle => 'Edit Mount';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => 'Remove Mount';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return 'Remove mount $alias? The directory itself will not be deleted.';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote =>
+      'Built-in read-write sandbox. Workspace files sync with backups.';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      'Invalid alias (lowercase letters, digits, underscores, hyphens; max 32 chars)';
+
+  @override
+  String get storageMountsErrorAliasReserved =>
+      '\"workspaces\" is a reserved alias';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => 'This alias already exists';
+
+  @override
+  String get storageMountsErrorPathInvalid =>
+      'Invalid path (must be an absolute directory path)';
+
+  @override
+  String get storageMountsErrorPathNotFound =>
+      'Path does not exist or is not a directory';
+
+  @override
+  String get workspaceFilesPageTitle => 'Workspace Files';
+
+  @override
+  String get workspaceFilesEmpty => 'No workspace files yet';
+
+  @override
+  String get workspaceFilesSortName => 'By name';
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => 'Delete File';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return 'Delete $path? This cannot be undone.';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => 'Delete';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return 'Deleted $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return 'Delete failed: $error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return 'Failed to load workspace files: $error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => 'File Marks';
+
+  @override
+  String get trashWorkspaceMarksEmpty => 'No workspace file deletion marks';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable =>
+      'Workspace files cannot be restored. Marks are deletion records only.';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => 'Delete on this device';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => 'Clear record';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return 'Delete directory $path on this device? $count files inside will also be deleted.';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return 'Mount saved: $alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count refs';
   }

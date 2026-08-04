@@ -58,6 +58,12 @@ class AppDirectories {
     return Directory('${root.path}/skills');
   }
 
+  /// Gets the directory for the built-in `@workspaces` filesystem sandbox.
+  static Future<Directory> getWorkspacesDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/workspaces');
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

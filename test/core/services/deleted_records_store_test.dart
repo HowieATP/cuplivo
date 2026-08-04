@@ -78,6 +78,56 @@ void main() {
       expect(records, isEmpty);
     });
 
+    test(
+      'recordFileDeletion writes marker-only workspaceFile row (no payload)',
+      () async {
+        await store.recordFileDeletion(
+          id: '@workspaces/notes/a.md',
+          deletedAt: DateTime(2026, 8, 3),
+        );
+
+        final records = await store.listDeletedRecords();
+        expect(records, isEmpty, reason: 'files are not recoverable');
+
+        final markers = await store.listFileDeletionMarkers();
+        expect(markers.length, 1);
+        expect(markers.first.id, '@workspaces/notes/a.md');
+        expect(markers.first.type, DeletionEntityType.workspaceFile);
+        expect(markers.first.origin, DeletionOrigin.local);
+
+        // Remote + local rows for the same path can coexist (PK is
+        // id+type+origin) and are both listed.
+        await store.recordRemoteDeletion(
+          id: '@workspaces/notes/a.md',
+          type: DeletionEntityType.workspaceFile,
+          remoteDeletedAt: DateTime(2026, 8, 3),
+        );
+        final both = await store.listFileDeletionMarkers();
+        expect(both.length, 2);
+      },
+    );
+
+    test(
+      'recordFileDeletion supersedes an existing remote row for the path',
+      () async {
+        await store.recordRemoteDeletion(
+          id: '@workspaces/notes/a.md',
+          type: DeletionEntityType.workspaceFile,
+          remoteDeletedAt: DateTime(2026, 8, 2),
+        );
+        expect((await store.listFileDeletionMarkers()).length, 1);
+
+        await store.recordFileDeletion(
+          id: '@workspaces/notes/a.md',
+          deletedAt: DateTime(2026, 8, 3),
+        );
+
+        final markers = await store.listFileDeletionMarkers();
+        expect(markers.length, 1, reason: 'remote row superseded by local');
+        expect(markers.first.origin, DeletionOrigin.local);
+      },
+    );
+
     test('evictToCap evicts oldest, never current batch', () async {
       // Write 3 rows with different batchIds and increasing timestamps.
       for (var i = 0; i < 3; i++) {

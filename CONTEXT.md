@@ -188,6 +188,32 @@
 - **Skill vs WorldBook**: **WorldBook** entries are triggered by keyword/regex matching against conversation context and injected at specific positions (after system prompt, top of chat, bottom of chat, at depth). **Skill** has no keyword triggering — the model decides based on the `<available_skills>` descriptions.
 - **Skill vs LocalTool/MCP**: **LocalTool** and **MCP** are executable tools: model calls them → something happens (read clipboard, execute code). **Skill**'s `load_skill` is a "knowledge tool": model calls it → receives instruction text → nothing executes. Same tool dispatch pathway, different semantics.
 
+## Filesystem MCP (@kelivo/filesystem)
+
+- **Mount (挂载)**: A named root directory bound into the `@kelivo/filesystem` in-memory MCP server — `{alias, path, ro/rw}`, default `ro`. External mounts are desktop-only and never sync. Mount config lives in the storage space management page (desktop); mobile has zero mount-config entry (sandbox-only).
+- **Mount alias**: `@[a-z0-9][a-z0-9_-]*`, ≤32 chars, lowercase; `workspaces` reserved; validated at save time.
+- **@workspaces**: The built-in rw sandbox at `<appData>/workspaces/` — the only mount on mobile. Participates in backup + LAN sync (`includeFiles`-gated, mtime filter); `clearAllData` physically wipes it (peer-blind, no markers); restore: merge = per-ZIP-entry mtime, overwrite = wipe first.
+- **Wire path (wire format)**: The only addressing form — mount-relative `@alias/rel/path`. Absolute paths, `..`, backslashes, empty segments, trailing slashes, unknown aliases → error. Segment rule is Win32-aware via the shared `isSafeWireSegment`: segments ending in dot/space, whitespace-only segments, and all-dot names (`...`) are rejected on ALL platforms — Win32 strips trailing dots/spaces and treats all-dot names as `..`, which would resolve outside the mount on Windows. The same helper guards the `deleted.json` import filter, the trash-page resolver, and unzip's zip-slip pre-scan. Wire paths double as identity (workspaceFile marker ids, recorded tool calls). See `docs/adr/0019-filesystem-mount-relative-wire-format.md`.
+- **Approval default**: Only the `delete` tool carries `needsApproval=true` by default (per-tool, overridable in the MCP edit sheet); move/unzip/write/patch auto-approve. `delete(path, recursive: false)` — non-empty dirs require explicit `recursive: true`. Mount roots are never deletable/movable.
+- **Fetch cache**: `@workspaces/.fetch_cache/` — the fetch truncation cache. Dot-prefixed entries are excluded from backup/sync AND from glob/grep (one rg-dotfile rule, two surfaces). Eviction: 512 MB total + 7-day TTL (no settings).
+- **Workspace files UI**: Storage page shows a summary tile → standalone `WorkspaceFilesPage` (path + size + mtime listing), independent of the images/files category pages. No refCount/orphan detection — workspace files are never referenced via `[image:]`/`[file:]` markers. Trash page hosts a marks section for workspaceFile markers (record-only, explicitly not recoverable).
+
+### Relationships
+
+- A **Mount** is addressed by its **Mount alias** in **Wire paths**.
+- **@workspaces** is the built-in **Mount**; **workspaceFile markers** are `deletion_markers` rows keyed by **Wire path**.
+- **Marks ≠ Trash**: recoverable entities have **trash** (`deleted_records`, restorable); workspace files have **marks** (advisory, no restore). Both surfaces live on the trash page but are distinct.
+
+### Example Dialogue
+
+> **Dev:** "A sync peer's backup declares a workspaceFile deletion for `@workspaces/reports/q3.md`, and the file still exists here. Does anything get deleted automatically?"
+> **Domain expert:** "No — the marker is advisory. The trash page shows 远端已删除 and offers a one-click local delete; the user decides. That delete runs the normal path: physical delete, an `origin='local'` marker so further peers learn about it, and removal of the remote row. `clearAllData` is the only path that deletes without markers."
+
+### Flagged Ambiguities
+
+- "workspace" was used to mean both the model's working context and the sandbox directory — resolved: **@workspaces** (with the `@` prefix, as written in wire paths) is the sandbox mount; bare "workspace" is not a domain term.
+- "mount root" was used loosely to mean both a mount alias and a directory inside one — resolved: only the mount alias root (e.g. `@workspaces` itself) is protected; its children are normal paths.
+
 ## Time Injection (Cache-Aware)
 
 - **Time Injection**: A per-assistant feature (`Assistant.enableTimeInjection`, default off) that appends a timestamp to every user message in the API payload at build time. Ephemeral — never persisted to DB, never shown in chat UI. The timestamp is derived from the message's immutable `ChatMessage.timestamp`, so historical messages produce byte-identical output across requests on a device with a stable timezone, preserving the LLM provider's prompt cache prefix. Note: the timestamp uses device-local time without a UTC offset; if the device timezone changes, historical timestamps resolve to different local components and the cache prefix will invalidate.
@@ -279,11 +305,12 @@
 - **Echo avoidance**: `deleted.json` is generated from `origin='local'` rows only. A remote marker is never echoed back — A deletes X → syncs to B → B stores `origin='remote'` row → B's `deleted.json` excludes it → A never receives its own deletion as a foreign declaration.
 
 - **deleted.json**: Optional payload in LAN sync round-2 zip AND backup zip. Contains `{type: [{id, deletedAt}, ...]}` grouped by entity type, capped at 5000 entries/type. Sourced only from `origin='local'` rows. Absent in old-format payloads → receiver treats as "no deletions declared" (backward compatible, no protocol bump).
+- **workspaceFile markers**: Filesystem deletions ride the same tombstone protocol — `type='workspaceFile'`, `id` = mount-relative wire path (see Filesystem section). Marker-only: NO `deleted_records` payload (files are not recoverable, Skill precedent). Local marks are dismissible (acknowledge); writing a local mark also supersedes any remote row for the same path. Remote marks are advisory — file/dir still exists locally → 远端已删除 + optional one-click local delete, which writes an `origin='local'` marker; remote row removal is implicit. Never auto-deletes. **Directory deletions propagate as a single directory mark**; applying it on a peer is a user-confirmed recursive local delete (the local directory may contain files unique to the peer — the UI shows the local file count in the confirm dialog). Dot-prefixed paths (`.fetch_cache/`) never get markers. See `docs/adr/0018-filesystem-deletion-marks-ride-tombstone-protocol.md`.
 
 ### Recovery Granularity
 
 - **Bundled per top-level entity**: 1 `deleted_records` row = 1 top-level entity. Conversation bundle nests all messages + toolEvents + geminiSigs + MCP server links. No 二级展开 in UI.
-- **7 recoverable types**: conversation, message, assistant, worldBook, quickPhrase, mcpServer, memory. Skill is NOT recoverable (filesystem entity, physical delete).
+- **7 recoverable types**: conversation, message, assistant, worldBook, quickPhrase, mcpServer, memory. Skill and workspaceFile are NOT recoverable (filesystem entities, physical delete) — workspaceFile still writes a tombstone marker, Skill writes none.
 
 ### Deletion Path Policies
 
@@ -424,3 +451,4 @@
 - **Typography**: 18px base / 1.75 line-height, centered content column capped at 720px. Font −/+ (14–24, step 2) scales the WHOLE content area — code blocks and tables included — via `TextScaler.linear(systemScale × readerSize/18)`, the same mechanism as the chat list's font scale. Heading sizes (h1–h6) scale proportionally with the base font (`MarkdownWithCodeHighlight._headingTextStyle`, anchored at 15.5 so chat/export output is unchanged) — otherwise fixed heading sizes would collapse against the reader's larger body. The reader size is an absolute int, independent of `chatFontScale` (a relative multiplier), persisted as `reader_font_size_v1` (default 18), adjustable only in the reader toolbar (no settings-page row).
 - **Toolbar**: Back + assistant name + copy-all + font −/current size/＋. The name is the caller-supplied `assistantName`, with a localized fallback when none resolves (e.g. deleted assistant).
 - **Presentation**: `Navigator.push` on ALL platforms, including desktop — a deliberate deviation from the sidebar-switching convention. See `docs/adr/0017-reading-mode-desktop-route-push.md`.
+

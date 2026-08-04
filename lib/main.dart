@@ -22,6 +22,7 @@ import 'core/providers/settings_provider.dart';
 import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
+import 'core/providers/filesystem_mounts_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/group_chat_provider.dart';
@@ -180,6 +181,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => McpToolService()),
+        ChangeNotifierProvider(create: (_) => FilesystemMountsProvider()),
         ChangeNotifierProvider(
           create: (ctx) =>
               AssistantProvider(chatService: ctx.read<ChatService>()),
@@ -201,6 +203,7 @@ class MyApp extends StatelessWidget {
               chatService: ctx.read<ChatService>(),
               assistantProvider: ctx.read<AssistantProvider>(),
               headlessGen: ctx.read<HeadlessGenerationService>(),
+              filesystemMounts: ctx.read<FilesystemMountsProvider>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),
             );

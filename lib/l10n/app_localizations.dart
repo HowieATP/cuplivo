@@ -574,6 +574,204 @@ abstract class AppLocalizations {
   /// **'By date'**
   String get storageSpaceSortByTime;
 
+  /// No description provided for @storageWorkspaceEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get storageWorkspaceEntryTitle;
+
+  /// No description provided for @storageMountsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filesystem Mounts'**
+  String get storageMountsTitle;
+
+  /// No description provided for @storageMountsAddButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mount'**
+  String get storageMountsAddButton;
+
+  /// No description provided for @storageMountsAliasLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias'**
+  String get storageMountsAliasLabel;
+
+  /// No description provided for @storageMountsPathLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get storageMountsPathLabel;
+
+  /// No description provided for @storageMountsReadOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get storageMountsReadOnlyLabel;
+
+  /// No description provided for @storageMountsPickButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get storageMountsPickButton;
+
+  /// No description provided for @storageMountsAddDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add External Mount'**
+  String get storageMountsAddDialogTitle;
+
+  /// No description provided for @storageMountsEditDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Mount'**
+  String get storageMountsEditDialogTitle;
+
+  /// No description provided for @storageMountsRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Mount'**
+  String get storageMountsRemoveConfirmTitle;
+
+  /// No description provided for @storageMountsRemoveConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove mount {alias}? The directory itself will not be deleted.'**
+  String storageMountsRemoveConfirmMessage(Object alias);
+
+  /// No description provided for @storageMountsWorkspacesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in read-write sandbox. Workspace files sync with backups.'**
+  String get storageMountsWorkspacesNote;
+
+  /// No description provided for @storageMountsErrorAliasInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid alias (lowercase letters, digits, underscores, hyphens; max 32 chars)'**
+  String get storageMountsErrorAliasInvalid;
+
+  /// No description provided for @storageMountsErrorAliasReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'\"workspaces\" is a reserved alias'**
+  String get storageMountsErrorAliasReserved;
+
+  /// No description provided for @storageMountsErrorAliasDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This alias already exists'**
+  String get storageMountsErrorAliasDuplicate;
+
+  /// No description provided for @storageMountsErrorPathInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid path (must be an absolute directory path)'**
+  String get storageMountsErrorPathInvalid;
+
+  /// No description provided for @storageMountsErrorPathNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Path does not exist or is not a directory'**
+  String get storageMountsErrorPathNotFound;
+
+  /// No description provided for @workspaceFilesPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace Files'**
+  String get workspaceFilesPageTitle;
+
+  /// No description provided for @workspaceFilesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace files yet'**
+  String get workspaceFilesEmpty;
+
+  /// No description provided for @workspaceFilesSortName.
+  ///
+  /// In en, this message translates to:
+  /// **'By name'**
+  String get workspaceFilesSortName;
+
+  /// No description provided for @workspaceFilesDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete File'**
+  String get workspaceFilesDeleteConfirmTitle;
+
+  /// No description provided for @workspaceFilesDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {path}? This cannot be undone.'**
+  String workspaceFilesDeleteConfirmMessage(Object path);
+
+  /// No description provided for @workspaceFilesDeleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get workspaceFilesDeleteButton;
+
+  /// No description provided for @workspaceFilesDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {path}'**
+  String workspaceFilesDeleted(Object path);
+
+  /// No description provided for @workspaceFilesDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String workspaceFilesDeleteFailed(Object error);
+
+  /// No description provided for @workspaceFilesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load workspace files: {error}'**
+  String workspaceFilesLoadFailed(Object error);
+
+  /// No description provided for @trashWorkspaceMarksTab.
+  ///
+  /// In en, this message translates to:
+  /// **'File Marks'**
+  String get trashWorkspaceMarksTab;
+
+  /// No description provided for @trashWorkspaceMarksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace file deletion marks'**
+  String get trashWorkspaceMarksEmpty;
+
+  /// No description provided for @trashWorkspaceMarksNotRecoverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace files cannot be restored. Marks are deletion records only.'**
+  String get trashWorkspaceMarksNotRecoverable;
+
+  /// No description provided for @trashWorkspaceMarksDeleteLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete on this device'**
+  String get trashWorkspaceMarksDeleteLocal;
+
+  /// No description provided for @trashWorkspaceMarksClearRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear record'**
+  String get trashWorkspaceMarksClearRecord;
+
+  /// No description provided for @trashWorkspaceMarksDeleteDirConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete directory {path} on this device? {count} files inside will also be deleted.'**
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path);
+
+  /// No description provided for @storageMountsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount saved: {alias}'**
+  String storageMountsSaved(Object alias);
+
   /// No description provided for @storageSpaceRefCount.
   ///
   /// In en, this message translates to:

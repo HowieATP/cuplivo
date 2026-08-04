@@ -1,18 +1,23 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/deleted_records_store.dart';
+import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
+    show isSafeWireSegment;
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/expansion_setting_tile.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/app_directories.dart';
 
 class TrashDetailPage extends StatefulWidget {
   const TrashDetailPage({
@@ -33,6 +38,7 @@ class _TrashDetailPageState extends State<TrashDetailPage>
   late TabController _tabController;
   List<DeletedRecordRow> _localTrash = [];
   List<DeletionMarkerRow> _conflicts = [];
+  List<DeletionMarkerRow> _fileMarks = [];
   int _localCount = 0;
   int _pendingCount = 0;
   bool _loading = true;
@@ -43,9 +49,9 @@ class _TrashDetailPageState extends State<TrashDetailPage>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 2,
+      length: 3,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 1),
+      initialIndex: widget.initialTab.clamp(0, 2),
     );
     _loadData();
   }
@@ -64,10 +70,12 @@ class _TrashDetailPageState extends State<TrashDetailPage>
     await store.setCapMb(settings.trashCapMb);
     final local = await store.listDeletedRecords();
     final conflicts = await store.listConflicts(coordinator.getLocalIds);
+    final fileMarks = await store.listFileDeletionMarkers();
     if (!mounted) return;
     setState(() {
       _localTrash = local;
       _conflicts = conflicts;
+      _fileMarks = fileMarks;
       _localCount = local.length;
       _pendingCount = conflicts.length;
       _loading = false;
@@ -233,6 +241,7 @@ class _TrashDetailPageState extends State<TrashDetailPage>
     final tabs = [
       Tab(text: '${l10n.trashSectionLocalTab} ($_localCount)'),
       Tab(text: '${l10n.trashSectionPendingTab} ($_pendingCount)'),
+      Tab(text: l10n.trashWorkspaceMarksTab),
     ];
 
     final tabBarView = Expanded(
@@ -241,6 +250,7 @@ class _TrashDetailPageState extends State<TrashDetailPage>
         children: [
           _buildLocalTab(cs, l10n, settings),
           _buildPendingTab(cs, l10n),
+          _buildFileMarksTab(cs, l10n),
         ],
       ),
     );
@@ -269,6 +279,186 @@ class _TrashDetailPageState extends State<TrashDetailPage>
       ),
       body: Column(children: [tabBarView]),
     );
+  }
+
+  Widget _buildFileMarksTab(ColorScheme cs, AppLocalizations l10n) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+          child: Row(
+            children: [
+              Icon(
+                Lucide.info,
+                size: 14,
+                color: cs.onSurface.withValues(alpha: 0.45),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.trashWorkspaceMarksNotRecoverable,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _fileMarks.isEmpty
+              ? Center(
+                  child: Text(
+                    l10n.trashWorkspaceMarksEmpty,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _fileMarks.length,
+                  itemBuilder: (ctx, i) {
+                    final m = _fileMarks[i];
+                    return ListTile(
+                      leading: Icon(
+                        Lucide.FileText,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                      title: Text(
+                        m.id,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontFamily: 'monospace'),
+                      ),
+                      subtitle: Text(
+                        '${m.origin == DeletionOrigin.local ? l10n.trashConflictOriginLocal : l10n.trashConflictOriginRemote} \u00b7 ${m.deletedAt.toLocal().toString().substring(0, 19)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      trailing: _FileMarkActions(
+                        marker: m,
+                        resolveHost: (id) => _resolveWorkspaceHostPath(id),
+                        onDeleteLocally: () => _deleteWorkspaceFileLocally(m),
+                        onClearRecord: () => _clearFileMark(m),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// Resolves a workspaceFile wire path to a host path, or null when the
+  /// path is outside the local @workspaces tree (unknown mount alias, or
+  /// unsafe segments — `..`, Win32 trailing-dot/space forms and dot-prefixed
+  /// segments rejected per segment, same rule as the wire resolver and the
+  /// marker plane).
+  Future<String?> _resolveWorkspaceHostPath(String wirePath) async {
+    if (!wirePath.startsWith('@workspaces/')) return null;
+    final rel = wirePath.substring('@workspaces/'.length);
+    if (rel.isEmpty) return null;
+    final segments = rel.split(RegExp(r'[\\/]'));
+    if (segments.any((s) => s.startsWith('.') || !isSafeWireSegment(s))) {
+      return null;
+    }
+    final ws = await AppDirectories.getWorkspacesDirectory();
+    return p.join(ws.path, segments.join(p.separator));
+  }
+
+  Future<int> _countFiles(String dirPath) async {
+    var count = 0;
+    try {
+      // followLinks: false — symlinks are never followed in scans.
+      await for (final ent in Directory(
+        dirPath,
+      ).list(recursive: true, followLinks: false)) {
+        if (ent is File) count++;
+      }
+    } catch (_) {}
+    return count;
+  }
+
+  /// One-click local delete for a remote workspaceFile mark: physical
+  /// delete + origin='local' marker (so further peers learn) + remote row
+  /// removal (done inside [DeletedRecordsStore.recordFileDeletion]).
+  /// Advisory — never auto-deletes (ADR-0018).
+  ///
+  /// Directory marks (a recursive delete elsewhere) apply as a
+  /// user-confirmed recursive local delete; the confirm dialog shows the
+  /// local file count because the directory may contain files that never
+  /// existed on the source device.
+  Future<void> _deleteWorkspaceFileLocally(DeletionMarkerRow m) async {
+    final l10n = AppLocalizations.of(context)!;
+    final store = context.read<ChatService>().deletedRecordsStore;
+    if (store == null) return;
+    final host = await _resolveWorkspaceHostPath(m.id);
+    if (host == null) {
+      await _clearFileMark(m);
+      return;
+    }
+    final isDir = await Directory(host).exists();
+    if (isDir) {
+      final count = await _countFiles(host);
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.trashWorkspaceMarksDeleteLocal),
+          content: Text(l10n.trashWorkspaceMarksDeleteDirConfirm(count, m.id)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.homePageCancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.workspaceFilesDeleteButton),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    try {
+      if (isDir) {
+        await Directory(host).delete(recursive: true);
+      } else {
+        final f = File(host);
+        if (await f.exists()) await f.delete();
+      }
+      await store.recordFileDeletion(id: m.id, deletedAt: DateTime.now());
+      await _loadData();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.trashWorkspaceMarksDeleteLocal,
+        type: NotificationType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<void> _clearFileMark(DeletionMarkerRow m) async {
+    final store = context.read<ChatService>().deletedRecordsStore;
+    if (store == null) return;
+    if (m.origin == DeletionOrigin.local) {
+      await store.purgeLocalMarker(m.id, DeletionEntityType.workspaceFile);
+    } else {
+      await store.purgeRemoteMarker(m.id, DeletionEntityType.workspaceFile);
+    }
+    await _loadData();
   }
 
   Widget _buildLocalTab(
@@ -436,6 +626,67 @@ class _TrashDetailPageState extends State<TrashDetailPage>
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _FileMarkActions extends StatefulWidget {
+  const _FileMarkActions({
+    required this.marker,
+    required this.resolveHost,
+    required this.onDeleteLocally,
+    required this.onClearRecord,
+  });
+
+  final DeletionMarkerRow marker;
+  final Future<String?> Function(String wirePath) resolveHost;
+  final Future<void> Function() onDeleteLocally;
+  final Future<void> Function() onClearRecord;
+
+  @override
+  State<_FileMarkActions> createState() => _FileMarkActionsState();
+}
+
+class _FileMarkActionsState extends State<_FileMarkActions> {
+  bool? _exists;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExists();
+  }
+
+  Future<void> _checkExists() async {
+    final host = await widget.resolveHost(widget.marker.id);
+    if (!mounted) return;
+    final exists =
+        host != null &&
+        (await File(host).exists() || await Directory(host).exists());
+    setState(() => _exists = exists);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final isRemote = widget.marker.origin == DeletionOrigin.remote;
+    final canDeleteLocally = isRemote && _exists == true;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (canDeleteLocally) ...[
+          TextButton(
+            onPressed: widget.onDeleteLocally,
+            style: TextButton.styleFrom(foregroundColor: cs.error),
+            child: Text(l10n.trashWorkspaceMarksDeleteLocal),
+          ),
+          const SizedBox(width: 4),
+        ],
+        TextButton(
+          onPressed: widget.onClearRecord,
+          child: Text(l10n.trashWorkspaceMarksClearRecord),
+        ),
       ],
     );
   }

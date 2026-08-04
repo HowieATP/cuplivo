@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
+import '../services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import '../services/network/mcp_log_bridge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,7 @@ import '../services/deleted_records_store.dart';
 import '../services/headless_generation_service.dart';
 import '../services/oauth/oauth_flow_service.dart';
 import 'assistant_provider.dart';
+import 'filesystem_mounts_provider.dart';
 import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
@@ -419,6 +421,7 @@ class McpProvider extends ChangeNotifier {
     this.chatService,
     this.assistantProvider,
     this.headlessGen,
+    this.filesystemMounts,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
     OAuthFlowService? oauthFlowService,
@@ -431,6 +434,7 @@ class McpProvider extends ChangeNotifier {
   final ChatService? chatService;
   final AssistantProvider? assistantProvider;
   final HeadlessGenerationService? headlessGen;
+  final FilesystemMountsProvider? filesystemMounts;
   final BuildContext Function() contextProvider;
 
   /// Provider-agnostic OAuth flow orchestration (see ADR-0016).
@@ -481,6 +485,7 @@ class McpProvider extends ChangeNotifier {
     // Ensure built-in MCP servers are present by default
     _ensureBuiltinFetchServerPresent();
     _ensureBuiltinSubagentServerPresent();
+    _ensureBuiltinFilesystemServerPresent();
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -537,6 +542,23 @@ class McpProvider extends ChangeNotifier {
       id: 'kelivo_fetch',
       enabled: true,
       name: '@kelivo/fetch',
+      transport: McpTransportType.inmemory,
+      tools: const <McpToolConfig>[], // will refresh on connect
+    );
+    _servers = [..._servers, cfg];
+  }
+
+  /// @kelivo/filesystem — present but DISABLED by default (unbound by
+  /// default; a sandboxed filesystem must be an explicit user choice).
+  void _ensureBuiltinFilesystemServerPresent() {
+    final exists = _servers.any(
+      (s) => s.name == '@kelivo/filesystem' || s.id == 'kelivo_filesystem',
+    );
+    if (exists) return;
+    final cfg = McpServerConfig(
+      id: 'kelivo_filesystem',
+      enabled: false,
+      name: '@kelivo/filesystem',
       transport: McpTransportType.inmemory,
       tools: const <McpToolConfig>[], // will refresh on connect
     );
@@ -1164,6 +1186,9 @@ class McpProvider extends ChangeNotifier {
 
       // In-memory builtin server path
       if (server.transport == McpTransportType.inmemory) {
+        // Ensure the @workspaces sandbox + external mounts are resolved
+        // before building any in-memory engine (idempotent).
+        await filesystemMounts?.init();
         final engine = switch (server.id) {
           'kelivo_subagent' => KelivoSubagentMcpServerEngine(
             assistants: assistantProvider!,
@@ -1171,11 +1196,27 @@ class McpProvider extends ChangeNotifier {
             headlessGen: headlessGen!,
             contextProvider: contextProvider,
           ),
+          'kelivo_filesystem' => KelivoFilesystemMcpServerEngine(
+            mountsProvider: () =>
+                filesystemMounts?.allMounts ?? const <FilesystemMount>[],
+            onWorkspaceFileDeleted: (wirePath) {
+              final store = chatService?.deletedRecordsStore;
+              if (store == null) {
+                return Future<void>.value();
+              }
+              return store.recordFileDeletion(
+                id: wirePath,
+                deletedAt: DateTime.now(),
+              );
+            },
+          ),
           _ => KelivoFetchMcpServerEngine(),
         };
         final transport = switch (engine) {
           KelivoSubagentMcpServerEngine e =>
             KelivoSubagentInMemoryClientTransport(e),
+          KelivoFilesystemMcpServerEngine e =>
+            KelivoFilesystemInMemoryClientTransport(e),
           _ => KelivoInMemoryClientTransport(
             engine as KelivoFetchMcpServerEngine,
           ),
@@ -1733,7 +1774,8 @@ class McpProvider extends ChangeNotifier {
             description: t.description,
             params: params,
             schema: schemaJson,
-            needsApproval: prior?.needsApproval ?? false,
+            needsApproval:
+                prior?.needsApproval ?? _defaultToolNeedsApproval(id, t.name),
           ),
         );
       }
@@ -1745,6 +1787,17 @@ class McpProvider extends ChangeNotifier {
       // debugPrint('[MCP/Tools] listTools() failed for id=$id');
       // ignore tool refresh errors; status stays connected
     }
+  }
+
+  /// Default approval flag for a tool when its config is first created.
+  /// Only the filesystem `delete` tool requires approval by default (see
+  /// CONTEXT.md "Filesystem MCP"); users can override per-tool in the MCP
+  /// server edit sheet.
+  static bool _defaultToolNeedsApproval(String serverId, String toolName) {
+    if (serverId == 'kelivo_filesystem' && toolName == 'kelivo_delete') {
+      return true;
+    }
+    return false;
   }
 
   Future<void> ensureConnected(String id) async {

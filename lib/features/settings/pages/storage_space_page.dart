@@ -1,18 +1,23 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../core/models/file_reference.dart';
+import '../../../core/providers/filesystem_mounts_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -23,6 +28,7 @@ import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
 import 'trash_detail_page.dart';
+import 'workspace_files_page.dart';
 import '../../../theme/app_font_weights.dart';
 
 class StorageSpacePage extends StatefulWidget {
@@ -333,6 +339,13 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _openWorkspaceFiles() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const WorkspaceFilesPage()));
+    await _refreshReport();
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -500,13 +513,24 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   children: [
                     SizedBox(
                       width: 280,
-                      child: _CategoryMenu(
-                        categories: report.categories,
-                        selected: _selected,
-                        iconFor: _iconFor,
-                        titleFor: (k) => _titleFor(k, l10n),
-                        fmtBytes: formatBytes,
-                        onSelect: (k) => setState(() => _selected = k),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _MountsPanel(
+                            onOpenWorkspace: () => _openWorkspaceFiles(),
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: _CategoryMenu(
+                              categories: report.categories,
+                              selected: _selected,
+                              iconFor: _iconFor,
+                              titleFor: (k) => _titleFor(k, l10n),
+                              fmtBytes: formatBytes,
+                              onSelect: (k) => setState(() => _selected = k),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     VerticalDivider(
@@ -614,6 +638,15 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                 ],
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _iosSectionCard(
+          child: _iosNavRow(
+            context,
+            icon: Lucide.FolderOpen,
+            label: l10n.storageWorkspaceEntryTitle,
+            onTap: () => _openWorkspaceFiles(),
           ),
         ),
         const SizedBox(height: 12),
@@ -2440,4 +2473,398 @@ Widget _iosNavRow(
       ],
     ),
   );
+}
+
+/// Desktop-only panel: `@workspaces` entry + external mount config.
+/// External mounts are never synced and never appear on mobile.
+class _MountsPanel extends StatelessWidget {
+  const _MountsPanel({required this.onOpenWorkspace});
+
+  final VoidCallback onOpenWorkspace;
+
+  Future<void> _confirmRemove(
+    BuildContext context,
+    FilesystemMountsProvider provider,
+    FilesystemMount mount,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.storageMountsRemoveConfirmTitle),
+        content: Text(
+          l10n.storageMountsRemoveConfirmMessage('@${mount.alias}'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.workspaceFilesDeleteButton),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await provider.removeExternalMount(mount.alias);
+    }
+  }
+
+  Future<void> _openEdit(
+    BuildContext context,
+    FilesystemMountsProvider provider, {
+    FilesystemMount? existing,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) =>
+          _MountEditDialog(provider: provider, existing: existing),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.watch<FilesystemMountsProvider>();
+
+    return _iosSectionCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Lucide.HardDrive,
+                  size: 16,
+                  color: cs.onSurface.withValues(alpha: 0.8),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.storageMountsTitle,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
+                const Spacer(),
+                IosIconButton(
+                  icon: Lucide.Plus,
+                  size: 16,
+                  minSize: 28,
+                  semanticLabel: l10n.storageMountsAddButton,
+                  onTap: () => _openEdit(context, provider),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _MountRow(
+              alias: '@workspaces',
+              path: provider.workspaces?.path ?? '',
+              readOnly: false,
+              builtin: true,
+              onTap: onOpenWorkspace,
+            ),
+            for (final m in provider.externalMounts) ...[
+              const SizedBox(height: 6),
+              _MountRow(
+                alias: '@${m.alias}',
+                path: m.path,
+                readOnly: m.readOnly,
+                builtin: false,
+                onTap: () => _openEdit(context, provider, existing: m),
+                onDelete: () => _confirmRemove(context, provider, m),
+              ),
+            ],
+            if (provider.workspaces != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.storageMountsWorkspacesNote,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MountRow extends StatelessWidget {
+  const _MountRow({
+    required this.alias,
+    required this.path,
+    required this.readOnly,
+    required this.builtin,
+    required this.onTap,
+    this.onDelete,
+  });
+
+  final String alias;
+  final String path;
+  final bool readOnly;
+  final bool builtin;
+  final VoidCallback onTap;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      alias,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: readOnly
+                            ? cs.onSurface.withValues(alpha: 0.06)
+                            : cs.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        readOnly ? l10n.storageMountsReadOnlyLabel : 'rw',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: readOnly
+                              ? cs.onSurface.withValues(alpha: 0.6)
+                              : cs.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  path,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (!builtin && onDelete != null)
+            _TactileIconButton(
+              icon: Lucide.Trash2,
+              color: cs.error.withValues(alpha: 0.8),
+              size: 16,
+              onTap: onDelete!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MountEditDialog extends StatefulWidget {
+  const _MountEditDialog({required this.provider, this.existing});
+
+  final FilesystemMountsProvider provider;
+  final FilesystemMount? existing;
+
+  @override
+  State<_MountEditDialog> createState() => _MountEditDialogState();
+}
+
+class _MountEditDialogState extends State<_MountEditDialog> {
+  late final TextEditingController _alias = TextEditingController(
+    text: widget.existing?.alias ?? '',
+  );
+  late final TextEditingController _path = TextEditingController(
+    text: widget.existing?.path ?? '',
+  );
+  late bool _readOnly = widget.existing?.readOnly ?? true;
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _alias.dispose();
+    _path.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDirectory() async {
+    final result = await FilePicker.platform.getDirectoryPath();
+    if (result == null || result.isEmpty) return;
+    if (!mounted) return;
+    setState(() {
+      _path.text = result;
+      _error = null;
+    });
+  }
+
+  String? _localizedError(String code) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (code) {
+      case FilesystemMountsProvider.errorAliasInvalid:
+        return l10n.storageMountsErrorAliasInvalid;
+      case FilesystemMountsProvider.errorAliasReserved:
+        return l10n.storageMountsErrorAliasReserved;
+      case FilesystemMountsProvider.errorAliasDuplicate:
+        return l10n.storageMountsErrorAliasDuplicate;
+      case FilesystemMountsProvider.errorPathInvalid:
+        return l10n.storageMountsErrorPathInvalid;
+      case FilesystemMountsProvider.errorPathNotFound:
+        return l10n.storageMountsErrorPathNotFound;
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final existing = widget.existing;
+    final String? err;
+    if (existing == null) {
+      err = await widget.provider.addExternalMount(
+        alias: _alias.text.trim(),
+        path: _path.text.trim(),
+        readOnly: _readOnly,
+      );
+    } else {
+      err = await widget.provider.updateExternalMount(
+        alias: existing.alias,
+        path: _path.text.trim(),
+        readOnly: _readOnly,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (err != null) {
+      final errorMessage = _localizedError(err);
+      setState(() => _error = errorMessage);
+      return;
+    }
+    if (context.mounted) {
+      showAppSnackBar(
+        context,
+        message: l10n.storageMountsSaved('@${_alias.text.trim()}'),
+        type: NotificationType.success,
+      );
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(
+        widget.existing == null
+            ? l10n.storageMountsAddDialogTitle
+            : l10n.storageMountsEditDialogTitle,
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IosFormTextField(
+              label: l10n.storageMountsAliasLabel,
+              controller: _alias,
+              enabled: widget.existing == null,
+              hintText: 'docs',
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: IosFormTextField(
+                    label: l10n.storageMountsPathLabel,
+                    controller: _path,
+                    hintText: '/path/to/dir',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IosTileButton(
+                  label: l10n.storageMountsPickButton,
+                  icon: Lucide.FolderOpen,
+                  onTap: _pickDirectory,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  l10n.storageMountsReadOnlyLabel,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                IosSwitch(
+                  value: _readOnly,
+                  onChanged: (v) => setState(() => _readOnly = v),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: Text(l10n.homePageCancel),
+        ),
+        TextButton(
+          onPressed: _saving ? null : _save,
+          child: Text(
+            widget.existing == null
+                ? l10n.assistantTagsCreateDialogOk
+                : l10n.homePageDone,
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -270,6 +270,120 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSortByTime => '按时间';
 
   @override
+  String get storageWorkspaceEntryTitle => '工作区';
+
+  @override
+  String get storageMountsTitle => '文件系统挂载';
+
+  @override
+  String get storageMountsAddButton => '添加挂载';
+
+  @override
+  String get storageMountsAliasLabel => '别名';
+
+  @override
+  String get storageMountsPathLabel => '路径';
+
+  @override
+  String get storageMountsReadOnlyLabel => '只读';
+
+  @override
+  String get storageMountsPickButton => '浏览';
+
+  @override
+  String get storageMountsAddDialogTitle => '添加外部挂载';
+
+  @override
+  String get storageMountsEditDialogTitle => '编辑挂载';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除挂载';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '确定移除挂载 $alias？目录本身不会被删除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '内置读写沙箱。工作区文件随备份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      '别名无效（小写字母、数字、下划线、连字符，不超过 32 字符）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '该别名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路径无效（必须是绝对目录路径）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
+
+  @override
+  String get workspaceFilesPageTitle => '工作区文件';
+
+  @override
+  String get workspaceFilesEmpty => '暂无工作区文件';
+
+  @override
+  String get workspaceFilesSortName => '按名称';
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '删除文件';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '确定删除 $path？此操作不可恢复。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '删除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已删除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '加载工作区文件失败：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '文件标记';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暂无工作区文件删除标记';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作区文件不可恢复，标记仅为删除记录。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本机删除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除记录';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '确定在本机删除目录 $path？其中的 $count 个文件将一并删除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已保存挂载：$alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count 处引用';
   }
@@ -7082,6 +7196,120 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSortByTime => '按时间';
 
   @override
+  String get storageWorkspaceEntryTitle => '工作区';
+
+  @override
+  String get storageMountsTitle => '文件系统挂载';
+
+  @override
+  String get storageMountsAddButton => '添加挂载';
+
+  @override
+  String get storageMountsAliasLabel => '别名';
+
+  @override
+  String get storageMountsPathLabel => '路径';
+
+  @override
+  String get storageMountsReadOnlyLabel => '只读';
+
+  @override
+  String get storageMountsPickButton => '浏览';
+
+  @override
+  String get storageMountsAddDialogTitle => '添加外部挂载';
+
+  @override
+  String get storageMountsEditDialogTitle => '编辑挂载';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除挂载';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '确定移除挂载 $alias？目录本身不会被删除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '内置读写沙箱。工作区文件随备份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      '别名无效（小写字母、数字、下划线、连字符，不超过 32 字符）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '该别名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路径无效（必须是绝对目录路径）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
+
+  @override
+  String get workspaceFilesPageTitle => '工作区文件';
+
+  @override
+  String get workspaceFilesEmpty => '暂无工作区文件';
+
+  @override
+  String get workspaceFilesSortName => '按名称';
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '删除文件';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '确定删除 $path？此操作不可恢复。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '删除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已删除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '加载工作区文件失败：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '文件标记';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暂无工作区文件删除标记';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作区文件不可恢复，标记仅为删除记录。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本机删除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除记录';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '确定在本机删除目录 $path？其中的 $count 个文件将一并删除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已保存挂载：$alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count 处引用';
   }
@@ -13892,6 +14120,119 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSortByTime => '按時間';
+
+  @override
+  String get storageWorkspaceEntryTitle => '工作區';
+
+  @override
+  String get storageMountsTitle => '檔案系統掛載';
+
+  @override
+  String get storageMountsAddButton => '新增掛載';
+
+  @override
+  String get storageMountsAliasLabel => '別名';
+
+  @override
+  String get storageMountsPathLabel => '路徑';
+
+  @override
+  String get storageMountsReadOnlyLabel => '唯讀';
+
+  @override
+  String get storageMountsPickButton => '瀏覽';
+
+  @override
+  String get storageMountsAddDialogTitle => '新增外部掛載';
+
+  @override
+  String get storageMountsEditDialogTitle => '編輯掛載';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除掛載';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '確定移除掛載 $alias？目錄本身不會被刪除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '內建讀寫沙箱。工作區檔案隨備份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid => '別名無效（小寫字母、數字、底線、連字號，不超過 32 字元）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '「workspaces」為保留別名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '該別名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路徑無效（必須是絕對目錄路徑）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路徑不存在或不是目錄';
+
+  @override
+  String get workspaceFilesPageTitle => '工作區檔案';
+
+  @override
+  String get workspaceFilesEmpty => '暫無工作區檔案';
+
+  @override
+  String get workspaceFilesSortName => '按名稱';
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '刪除檔案';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '確定刪除 $path？此操作不可復原。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '刪除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已刪除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '刪除失敗：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '載入工作區檔案失敗：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '檔案標記';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暫無工作區檔案刪除標記';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作區檔案不可復原，標記僅為刪除記錄。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本機刪除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除記錄';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '確定在本機刪除目錄 $path？其中的 $count 個檔案將一併刪除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已儲存掛載：$alias';
+  }
 
   @override
   String storageSpaceRefCount(int count) {

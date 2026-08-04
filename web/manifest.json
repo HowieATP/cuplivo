@@ -3,7 +3,7 @@
     "short_name": "cuplivo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#FFFFFF",
+    "background_color": "#C1BDB4",
     "theme_color": "#0175C2",
     "description": "An LLM chat client.",
     "orientation": "portrait-primary",

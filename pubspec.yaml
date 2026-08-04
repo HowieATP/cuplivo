@@ -193,10 +193,24 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/app_icon_foreground.png
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/app_icon_foreground.png
+  image_path: assets/app_icon_2.png
+  image_path_ios: assets/app_icon_2.png
+  image_path_ios_dark_transparent: assets/app_icon_dark.png
+  adaptive_icon_background: "#C1BDB4"
+  adaptive_icon_foreground: assets/app_icon_2.png
   remove_alpha_ios: true
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: assets/app_icon.png
+    background_color: "#C1BDB4"
+  windows:
+    generate: true
+    image_path: assets/app_icon.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/app_icon_macos2.png
 
 flutter_native_splash:
   # Apply to both platforms

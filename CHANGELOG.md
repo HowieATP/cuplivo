@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.6.0] - 2026-08-04
+
+### Added
+
+- New app icon: switched to Cuplivo's custom artwork (commissioned by @Pheobe-Southwood)
+- Built-in filesystem MCP server: read, write, and regex search, with local directory mounting — no command line, security-first (#173)
+- OCR mode extension: new "Smart" OCR mode that keeps OCR off for vision-capable models and turns it on for those without vision (#171)
+- Ta's letter (proactive care) decision mechanism: migrated from JSON output to more systematic tool calls
+
+### Fixed
+
+- Multi-assistant group chat: director logs are now displayed
+- LAN sync: fixed a mobile-side UI issue and added a firewall hint
+
 ## [2.5.0] - 2026-08-03
 
 ### Added

@@ -43,11 +43,13 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 2. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context (#150).
 
-3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
+3. **Built-in filesystem MCP server** — Read, write, and regex-search local files through an in-memory MCP server; mount local directories without a command line, security-first (#173).
+
+4. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
    - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
-4. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
+5. **Memory mode switcher + Time injection** — Per-assistant toggles that keep the system prompt stable for better API cache hits: switch memories between **Auto Injection** (injected into system prompt on every turn) and **On Demand (Tool)** (accessed via `read_memory` tool only when needed); optionally append a cache-friendly timestamp after each user message instead of baking time into the system prompt. A smart warning dialog scans the system prompt and memory record prompt for volatile variables when time injection is enabled (#121).
    - *Tip*: For best cache performance, disable Recent Chats Reference, switch to On Demand mode, and enable time injection.
 
 ### Agent Capabilities
@@ -66,11 +68,13 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 4. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
 
-5. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
+5. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
 
-6. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+6. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-7. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+7. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+
+8. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
 
 ### Practical Utilities
 
@@ -110,7 +114,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ## ⚠️ Note
 
-Cuplivo is a community fork and has not been fully separated from the upstream project. Donation QR codes and community groups (Discord, QQ) still point to the original author. Some references may retain the original name during the transition.
+Cuplivo is a community fork and has not been fully separated from the upstream project. Donation QR codes and community groups (Discord, QQ) still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
 
 ---
 
@@ -176,6 +180,8 @@ Pull Requests and Issues are welcome!
 ## ❤️ Acknowledgements
 
 Special thanks to the [RikkaHub](https://github.com/re-ovo/rikkahub) project for the UI design inspiration. Kelivo's interface design is heavily inspired by RikkaHub's beautiful and practical design.
+
+Special thanks to [OpenCode](https://opencode.ai) — the design of our file system tools is heavily inspired by OpenCode.
 
 ## ⭐ Star History
 

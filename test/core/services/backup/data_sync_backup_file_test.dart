@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path/path.dart' as p;
@@ -9,6 +10,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Cuplivo/core/database/app_database.dart';
+import 'package:Cuplivo/core/database/chat_database_repository.dart';
+import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/backup.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
@@ -32,6 +36,38 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
+}
+
+/// An initialized [ChatService] backed by an in-memory database, for restore
+/// paths that require `chatService.initialized`.
+class _InMemoryChatService extends ChatService {
+  late final AppDatabase db;
+  late final ChatDatabaseRepository _testRepo;
+
+  _InMemoryChatService() {
+    db = AppDatabase(NativeDatabase.memory());
+    _testRepo = ChatDatabaseRepository(db);
+  }
+
+  @override
+  bool get initialized => true;
+
+  @override
+  ChatDatabaseRepository get repo => _testRepo;
+
+  @override
+  Future<List<Assistant>> getAllAssistants() => _testRepo.getAllAssistants();
+
+  @override
+  Future<void> putAssistants(List<Assistant> list) =>
+      _testRepo.putAssistants(list);
+
+  @override
+  Future<void> reloadCachesFromDb() async {}
+
+  Future<void> closeDb() async {
+    await _testRepo.close();
+  }
 }
 
 void main() {
@@ -690,6 +726,143 @@ void main() {
         expect(scope.newFileCount, 0);
 
         await chatService.close();
+      },
+    );
+  });
+
+  group('DataSync legacy OCR restore', () {
+    late Directory root;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('kelivo_ocr_restore_');
+      PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    tearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    Future<File> makeSettingsZip(Map<String, dynamic> settings) async {
+      final settingsFile = File('${root.path}/settings.json');
+      await settingsFile.writeAsString(jsonEncode(settings));
+      final zipFile = File('${root.path}/backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.closeSync();
+      return zipFile;
+    }
+
+    test(
+      'pre-v15 backup with ocr_enabled_v1=false restores assistants to never '
+      'and never resurrects the key',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Legacy A'},
+            {'id': 'a2', 'name': 'Legacy B'},
+          ]),
+          'ocr_enabled_v1': false,
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants, hasLength(2));
+        expect(assistants.every((a) => a.ocrMode == 'never'), isTrue);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
+      },
+    );
+
+    test(
+      'pre-v15 backup with ocr_enabled_v1=true restores assistants to auto',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Legacy A'},
+          ]),
+          'ocr_enabled_v1': true,
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants.single.ocrMode, 'auto');
+      },
+    );
+
+    test('merge restore keeps existing per-assistant ocrMode and maps only new '
+        'incoming assistants', () async {
+      final chatService = _InMemoryChatService();
+      addTearDown(chatService.closeDb);
+      await chatService.putAssistants([
+        Assistant(id: 'a1', name: 'Local Alpha', ocrMode: 'always'),
+      ]);
+      final zipFile = await makeSettingsZip({
+        'assistants_v1': jsonEncode([
+          {'id': 'a1', 'name': 'Incoming Alpha'},
+          {'id': 'a2', 'name': 'New Beta'},
+        ]),
+        'ocr_enabled_v1': false,
+      });
+
+      final sync = DataSync(chatService: chatService);
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
+        mode: RestoreMode.merge,
+      );
+
+      final byId = {
+        for (final a in await chatService.getAllAssistants()) a.id: a,
+      };
+      expect(byId['a1']!.ocrMode, 'always');
+      expect(byId['a2']!.ocrMode, 'never');
+    });
+
+    test(
+      'v15-format backup preserves per-assistant ocrMode untouched',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Modern A', 'ocrMode': 'always'},
+            {'id': 'a2', 'name': 'Modern B', 'ocrMode': 'never'},
+          ]),
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final byId = {
+          for (final a in await chatService.getAllAssistants()) a.id: a,
+        };
+        expect(byId['a1']!.ocrMode, 'always');
+        expect(byId['a2']!.ocrMode, 'never');
       },
     );
   });

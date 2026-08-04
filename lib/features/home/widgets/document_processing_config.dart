@@ -27,10 +27,16 @@ class DocumentProcessingConfigContent extends StatelessWidget {
     final hasOcrModel =
         settings.ocrModelProvider != null && settings.ocrModelId != null;
 
-    final ocrEnabled = settings.ocrEnabled;
+    final ocrMode = assistant?.ocrMode ?? 'auto';
     final docxMode = assistant?.docxMode ?? 'extract';
     final pdfMode = assistant?.pdfMode ?? 'extract';
     final otherMode = assistant?.otherOfficeMode ?? 'direct';
+
+    Future<void> updateOcr(String v) async {
+      final a = assistantProvider.currentAssistant;
+      if (a == null) return;
+      await assistantProvider.updateAssistant(a.copyWith(ocrMode: v));
+    }
 
     Future<void> updateDocx(String v) async {
       final a = assistantProvider.currentAssistant;
@@ -57,6 +63,7 @@ class DocumentProcessingConfigContent extends StatelessWidget {
         docxMode: 'extract',
         pdfMode: 'extract',
         otherOfficeMode: 'direct',
+        ocrMode: 'auto',
       );
       await assistantProvider.updateAssistant(updated);
     }
@@ -67,22 +74,29 @@ class DocumentProcessingConfigContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Image without vision model (OCR toggle)
-          _SectionHeader(label: l10n.documentProcessingImageWithoutVision),
+          // Image OCR (per assistant)
+          _SectionHeader(label: l10n.documentProcessingImageOcr),
           const SizedBox(height: 4),
           _ModeSegmentedControl(
             options: [
-              _ModeOption(value: 'ocr', label: l10n.documentProcessingModeOcr),
               _ModeOption(
-                value: 'discard',
-                label: l10n.documentProcessingModeDiscard,
+                value: 'auto',
+                label: l10n.documentProcessingModeAuto,
+              ),
+              _ModeOption(
+                value: 'always',
+                label: l10n.documentProcessingModeAlways,
+              ),
+              _ModeOption(
+                value: 'never',
+                label: l10n.documentProcessingModeNever,
               ),
             ],
-            selected: ocrEnabled ? 'ocr' : 'discard',
-            disabledValue: hasOcrModel ? null : 'ocr',
+            selected: ocrMode,
+            disabledValue: hasOcrModel ? null : 'always',
             onChanged: (v) async {
               Haptics.light();
-              await settings.setOcrEnabled(v == 'ocr');
+              await updateOcr(v);
             },
           ),
           if (!hasOcrModel)

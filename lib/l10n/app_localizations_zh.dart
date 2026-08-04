@@ -2051,6 +2051,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
+  String get lanSyncFirewallHint =>
+      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
+
+  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -6217,16 +6221,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -6659,7 +6669,100 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
+  String get groupChatDirectorLogsEphemeral =>
+      '导演上下文从公共会话现场重建；运行时详情仅在本次应用运行期间保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次导演调用';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由用户消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合并触发';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '观察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共会话中未观察到后续发言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已达到回合上限，导演未再次调用。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的导演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此标记没有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '运行时详情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此调用的运行时详情不可用（例如应用重启后）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '尝试次数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '请求消息数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '尝试错误';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失败';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文本';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '没有捕获到额外的运行时详情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '选择助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '结束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系统';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '用户';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
@@ -8872,6 +8975,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
+
+  @override
+  String get lanSyncFirewallHint =>
+      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
 
   @override
   String lanSyncPlanToSend(Object count) {
@@ -13040,16 +13147,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -13482,7 +13595,100 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
+  String get groupChatDirectorLogsEphemeral =>
+      '导演上下文从公共会话现场重建；运行时详情仅在本次应用运行期间保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次导演调用';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由用户消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合并触发';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '观察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共会话中未观察到后续发言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已达到回合上限，导演未再次调用。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的导演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此标记没有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '运行时详情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此调用的运行时详情不可用（例如应用重启后）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '尝试次数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '请求消息数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '尝试错误';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失败';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文本';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '没有捕获到额外的运行时详情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '选择助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '结束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系统';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '用户';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
@@ -15694,6 +15900,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get lanSyncSecurityNote => '同一區域網路的裝置均可連接（最低版本：v2.2.2）。';
+
+  @override
+  String get lanSyncFirewallHint =>
+      '若其他裝置連線逾時，請在 Windows 防火牆中允許 Cuplivo 入站（TCP 9527 連接埠）。';
 
   @override
   String lanSyncPlanToSend(Object count) {
@@ -19862,16 +20072,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get documentProcessingTitle => '圖片與文檔解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '無視覺模型時的圖片處理';
+  String get documentProcessingImageOcr => '圖片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字識別';
+  String get documentProcessingModeAuto => '智能識別';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '捨棄';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 選項不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」選項不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 處理';
@@ -20305,7 +20521,100 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get groupChatDirectorLogsEmpty => '暫無導演日誌。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '導演上下文從公共會話現場拼裝，不再單獨落庫。';
+  String get groupChatDirectorLogsEphemeral =>
+      '導演上下文從公共會話現場重建；執行時詳情僅在本次應用程式執行期間保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次導演呼叫';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由使用者訊息觸發';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手訊息觸發';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合併觸發';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '觀察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共會話中未觀察到後續發言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已達到回合上限，導演未再次呼叫。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的導演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此標記沒有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '執行時詳情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此呼叫的執行時詳情不可用（例如應用程式重啟後）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '嘗試次數';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '請求訊息數';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '決策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退決策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '嘗試錯誤';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失敗';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文字';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '沒有捕獲到額外的執行時詳情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '選擇助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '結束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系統';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '使用者';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '沒有可邀請的助手。';

@@ -2666,6 +2666,18 @@ class $AssistantRowsTable extends AssistantRows
     requiredDuringInsert: false,
     defaultValue: const Constant('direct'),
   );
+  static const VerificationMeta _ocrModeMeta = const VerificationMeta(
+    'ocrMode',
+  );
+  @override
+  late final GeneratedColumn<String> ocrMode = GeneratedColumn<String>(
+    'ocr_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('auto'),
+  );
   static const VerificationMeta _enableTimeInjectionMeta =
       const VerificationMeta('enableTimeInjection');
   @override
@@ -2789,6 +2801,7 @@ class $AssistantRowsTable extends AssistantRows
     docxMode,
     pdfMode,
     otherOfficeMode,
+    ocrMode,
     enableTimeInjection,
     discoverable,
     handoffId,
@@ -3116,6 +3129,12 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('ocr_mode')) {
+      context.handle(
+        _ocrModeMeta,
+        ocrMode.isAcceptableOrUnknown(data['ocr_mode']!, _ocrModeMeta),
+      );
+    }
     if (data.containsKey('enable_time_injection')) {
       context.handle(
         _enableTimeInjectionMeta,
@@ -3330,6 +3349,10 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}other_office_mode'],
       )!,
+      ocrMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ocr_mode'],
+      )!,
       enableTimeInjection: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}enable_time_injection'],
@@ -3405,6 +3428,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String docxMode;
   final String pdfMode;
   final String otherOfficeMode;
+  final String ocrMode;
   final bool enableTimeInjection;
   final bool discoverable;
   final String? handoffId;
@@ -3450,6 +3474,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.docxMode,
     required this.pdfMode,
     required this.otherOfficeMode,
+    required this.ocrMode,
     required this.enableTimeInjection,
     required this.discoverable,
     this.handoffId,
@@ -3524,6 +3549,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['docx_mode'] = Variable<String>(docxMode);
     map['pdf_mode'] = Variable<String>(pdfMode);
     map['other_office_mode'] = Variable<String>(otherOfficeMode);
+    map['ocr_mode'] = Variable<String>(ocrMode);
     map['enable_time_injection'] = Variable<bool>(enableTimeInjection);
     map['discoverable'] = Variable<bool>(discoverable);
     if (!nullToAbsent || handoffId != null) {
@@ -3594,6 +3620,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       docxMode: Value(docxMode),
       pdfMode: Value(pdfMode),
       otherOfficeMode: Value(otherOfficeMode),
+      ocrMode: Value(ocrMode),
       enableTimeInjection: Value(enableTimeInjection),
       discoverable: Value(discoverable),
       handoffId: handoffId == null && nullToAbsent
@@ -3671,6 +3698,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       docxMode: serializer.fromJson<String>(json['docxMode']),
       pdfMode: serializer.fromJson<String>(json['pdfMode']),
       otherOfficeMode: serializer.fromJson<String>(json['otherOfficeMode']),
+      ocrMode: serializer.fromJson<String>(json['ocrMode']),
       enableTimeInjection: serializer.fromJson<bool>(
         json['enableTimeInjection'],
       ),
@@ -3733,6 +3761,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'docxMode': serializer.toJson<String>(docxMode),
       'pdfMode': serializer.toJson<String>(pdfMode),
       'otherOfficeMode': serializer.toJson<String>(otherOfficeMode),
+      'ocrMode': serializer.toJson<String>(ocrMode),
       'enableTimeInjection': serializer.toJson<bool>(enableTimeInjection),
       'discoverable': serializer.toJson<bool>(discoverable),
       'handoffId': serializer.toJson<String?>(handoffId),
@@ -3781,6 +3810,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? docxMode,
     String? pdfMode,
     String? otherOfficeMode,
+    String? ocrMode,
     bool? enableTimeInjection,
     bool? discoverable,
     Value<String?> handoffId = const Value.absent(),
@@ -3835,6 +3865,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     docxMode: docxMode ?? this.docxMode,
     pdfMode: pdfMode ?? this.pdfMode,
     otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+    ocrMode: ocrMode ?? this.ocrMode,
     enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
     discoverable: discoverable ?? this.discoverable,
     handoffId: handoffId.present ? handoffId.value : this.handoffId,
@@ -3945,6 +3976,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       otherOfficeMode: data.otherOfficeMode.present
           ? data.otherOfficeMode.value
           : this.otherOfficeMode,
+      ocrMode: data.ocrMode.present ? data.ocrMode.value : this.ocrMode,
       enableTimeInjection: data.enableTimeInjection.present
           ? data.enableTimeInjection.value
           : this.enableTimeInjection,
@@ -4003,6 +4035,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('docxMode: $docxMode, ')
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
+          ..write('ocrMode: $ocrMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
           ..write('discoverable: $discoverable, ')
           ..write('handoffId: $handoffId, ')
@@ -4053,6 +4086,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     docxMode,
     pdfMode,
     otherOfficeMode,
+    ocrMode,
     enableTimeInjection,
     discoverable,
     handoffId,
@@ -4104,6 +4138,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.docxMode == this.docxMode &&
           other.pdfMode == this.pdfMode &&
           other.otherOfficeMode == this.otherOfficeMode &&
+          other.ocrMode == this.ocrMode &&
           other.enableTimeInjection == this.enableTimeInjection &&
           other.discoverable == this.discoverable &&
           other.handoffId == this.handoffId &&
@@ -4151,6 +4186,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> docxMode;
   final Value<String> pdfMode;
   final Value<String> otherOfficeMode;
+  final Value<String> ocrMode;
   final Value<bool> enableTimeInjection;
   final Value<bool> discoverable;
   final Value<String?> handoffId;
@@ -4197,6 +4233,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.docxMode = const Value.absent(),
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
+    this.ocrMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
     this.discoverable = const Value.absent(),
     this.handoffId = const Value.absent(),
@@ -4244,6 +4281,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.docxMode = const Value.absent(),
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
+    this.ocrMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
     this.discoverable = const Value.absent(),
     this.handoffId = const Value.absent(),
@@ -4295,6 +4333,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? docxMode,
     Expression<String>? pdfMode,
     Expression<String>? otherOfficeMode,
+    Expression<String>? ocrMode,
     Expression<bool>? enableTimeInjection,
     Expression<bool>? discoverable,
     Expression<String>? handoffId,
@@ -4353,6 +4392,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (docxMode != null) 'docx_mode': docxMode,
       if (pdfMode != null) 'pdf_mode': pdfMode,
       if (otherOfficeMode != null) 'other_office_mode': otherOfficeMode,
+      if (ocrMode != null) 'ocr_mode': ocrMode,
       if (enableTimeInjection != null)
         'enable_time_injection': enableTimeInjection,
       if (discoverable != null) 'discoverable': discoverable,
@@ -4403,6 +4443,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? docxMode,
     Value<String>? pdfMode,
     Value<String>? otherOfficeMode,
+    Value<String>? ocrMode,
     Value<bool>? enableTimeInjection,
     Value<bool>? discoverable,
     Value<String?>? handoffId,
@@ -4454,6 +4495,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       docxMode: docxMode ?? this.docxMode,
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+      ocrMode: ocrMode ?? this.ocrMode,
       enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
       discoverable: discoverable ?? this.discoverable,
       handoffId: handoffId ?? this.handoffId,
@@ -4591,6 +4633,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (otherOfficeMode.present) {
       map['other_office_mode'] = Variable<String>(otherOfficeMode.value);
     }
+    if (ocrMode.present) {
+      map['ocr_mode'] = Variable<String>(ocrMode.value);
+    }
     if (enableTimeInjection.present) {
       map['enable_time_injection'] = Variable<bool>(enableTimeInjection.value);
     }
@@ -4660,6 +4705,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('docxMode: $docxMode, ')
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
+          ..write('ocrMode: $ocrMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
           ..write('discoverable: $discoverable, ')
           ..write('handoffId: $handoffId, ')
@@ -9684,6 +9730,7 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> docxMode,
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
+      Value<String> ocrMode,
       Value<bool> enableTimeInjection,
       Value<bool> discoverable,
       Value<String?> handoffId,
@@ -9732,6 +9779,7 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> docxMode,
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
+      Value<String> ocrMode,
       Value<bool> enableTimeInjection,
       Value<bool> discoverable,
       Value<String?> handoffId,
@@ -9933,6 +9981,11 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get otherOfficeMode => $composableBuilder(
     column: $table.otherOfficeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ocrMode => $composableBuilder(
+    column: $table.ocrMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10167,6 +10220,11 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ocrMode => $composableBuilder(
+    column: $table.ocrMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get enableTimeInjection => $composableBuilder(
     column: $table.enableTimeInjection,
     builder: (column) => ColumnOrderings(column),
@@ -10384,6 +10442,9 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get ocrMode =>
+      $composableBuilder(column: $table.ocrMode, builder: (column) => column);
+
   GeneratedColumn<bool> get enableTimeInjection => $composableBuilder(
     column: $table.enableTimeInjection,
     builder: (column) => column,
@@ -10483,6 +10544,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> docxMode = const Value.absent(),
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
+                Value<String> ocrMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
                 Value<bool> discoverable = const Value.absent(),
                 Value<String?> handoffId = const Value.absent(),
@@ -10529,6 +10591,7 @@ class $$AssistantRowsTableTableManager
                 docxMode: docxMode,
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
+                ocrMode: ocrMode,
                 enableTimeInjection: enableTimeInjection,
                 discoverable: discoverable,
                 handoffId: handoffId,
@@ -10580,6 +10643,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> docxMode = const Value.absent(),
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
+                Value<String> ocrMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
                 Value<bool> discoverable = const Value.absent(),
                 Value<String?> handoffId = const Value.absent(),
@@ -10626,6 +10690,7 @@ class $$AssistantRowsTableTableManager
                 docxMode: docxMode,
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
+                ocrMode: ocrMode,
                 enableTimeInjection: enableTimeInjection,
                 discoverable: discoverable,
                 handoffId: handoffId,

@@ -731,6 +731,7 @@
   "lanSyncServerDialogTitle": "作为服务器",
   "lanSyncClientDialogTitle": "作为客户端",
   "lanSyncSecurityNote": "同一局域网的设备均可连接（最低版本：v2.2.2）。",
+  "lanSyncFirewallHint": "若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。",
   "lanSyncPlanToSend": "{count} 个对话待发送",
   "lanSyncPlanToReceive": "{count} 个对话待接收",
   "lanSyncPlanForks": "{count} 处分叉已检测（v1 暂跳过）",
@@ -2336,24 +2337,32 @@
     "description": "在多 AI 对比中移除某个模型回复的按钮提示"
   },
   "documentProcessingTitle": "图片与文档解析",
-  "@documentProcessingTitle": {
+    "@documentProcessingTitle": {
     "description": "文档处理配置面板标题"
   },
-  "documentProcessingImageWithoutVision": "无视觉模型时的图片处理",
-  "@documentProcessingImageWithoutVision": {
-    "description": "当聊天模型不具备视觉能力时图片的处理方式"
+  "documentProcessingImageOcr": "图片 OCR",
+  "@documentProcessingImageOcr": {
+    "description": "Section label for the per-assistant image OCR mode"
   },
-  "documentProcessingModeOcr": "OCR 文字识别",
-  "@documentProcessingModeOcr": {
-    "description": "对图片执行 OCR 提取文字"
+  "documentProcessingModeAuto": "智能识别",
+  "@documentProcessingModeAuto": {
+    "description": "Option to OCR images only when the model lacks vision capability"
+  },
+  "documentProcessingModeAlways": "全部",
+  "@documentProcessingModeAlways": {
+    "description": "Option to always OCR images regardless of model capability"
+  },
+  "documentProcessingModeNever": "永不",
+  "@documentProcessingModeNever": {
+    "description": "Option to never OCR images"
   },
   "documentProcessingModeDiscard": "丢弃",
   "@documentProcessingModeDiscard": {
     "description": "静默丢弃附件"
   },
-  "documentProcessingOcrNotConfigured": "尚未配置 OCR 模型，OCR 选项不可用",
+  "documentProcessingOcrNotConfigured": "尚未配置 OCR 模型，「全部」选项不可用",
   "@documentProcessingOcrNotConfigured": {
-    "description": "未配置 OCR 模型时显示的提示"
+    "description": "Hint shown when the OCR model is not configured"
   },
   "documentProcessingDocx": "DOCX 处理",
   "@documentProcessingDocx": {
@@ -2668,7 +2677,52 @@
   "groupChatInjectionEveryNUser": "每 N 轮用户消息注入用户消息的结尾",
   "groupChatInjectionEveryNUserAndAssistant": "每 N 条用户与助手消息，注入消息的结尾",
   "groupChatDirectorLogsEmpty": "暂无导演日志。",
-  "groupChatDirectorLogsEphemeral": "导演上下文从公共会话现场拼装，不再单独落库。",
+  "groupChatDirectorLogsEphemeral": "导演上下文从公共会话现场重建；运行时详情仅在本次应用运行期间保留。",
+  "groupChatDirectorLogsEntryTitle": "第 {index} 次导演调用",
+  "@groupChatDirectorLogsEntryTitle": {
+    "description": "一条重建导演调用的标题。",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "groupChatDirectorLogsTriggerUser": "由用户消息触发",
+  "groupChatDirectorLogsTriggerAssistant": "由助手消息触发",
+  "groupChatDirectorLogsTriggerCapMerge": "由回合上限合并触发",
+  "groupChatDirectorLogsObservedSpeaker": "观察到下一位助手：{name}",
+  "@groupChatDirectorLogsObservedSpeaker": {
+    "description": "导演上下文条目之后实际出现的助手。",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupChatDirectorLogsNoObservedFollowUp": "公共会话中未观察到后续发言。",
+  "groupChatDirectorLogsRoundCapReached": "已达到回合上限，导演未再次调用。",
+  "groupChatDirectorLogsUnknownSpeaker": "未知助手",
+  "groupChatDirectorLogsReconstructedContext": "重建的导演上下文",
+  "groupChatDirectorLogsNoContext": "此标记没有可展示的重建上下文。",
+  "groupChatDirectorLogsRuntimeDetails": "运行时详情",
+  "groupChatDirectorLogsRuntimeUnavailable": "此调用的运行时详情不可用（例如应用重启后）。",
+  "groupChatDirectorLogsRuntimeModel": "模型",
+  "groupChatDirectorLogsRuntimeAttempts": "尝试次数",
+  "groupChatDirectorLogsRuntimeRequestMessages": "请求消息数",
+  "groupChatDirectorLogsRuntimeDecision": "决策",
+  "groupChatDirectorLogsRuntimeReason": "原因",
+  "groupChatDirectorLogsRuntimeFallback": "回退",
+  "groupChatDirectorLogsRuntimeFallbackValue": "使用了回退决策",
+  "groupChatDirectorLogsRuntimeError": "尝试错误",
+  "groupChatDirectorLogsRuntimeFailure": "失败",
+  "groupChatDirectorLogsRuntimeFreeText": "模型文本",
+  "groupChatDirectorLogsRuntimeEmpty": "没有捕获到额外的运行时详情。",
+  "groupChatDirectorLogsDecisionSelectSpeaker": "选择助手",
+  "groupChatDirectorLogsDecisionEndTurn": "结束回合",
+  "groupChatDirectorLogsRoleSystem": "系统",
+  "groupChatDirectorLogsRoleUser": "用户",
+  "groupChatDirectorLogsRoleAssistant": "助手",
+  "groupChatDirectorLogsRoleTool": "工具",
   "groupChatNoAssistantsToInvite": "没有可邀请的助手。",
   "groupChatEmptyConversation": "发送消息开始群聊。",
   "groupChatNoAssistants": "请先在群设置中添加助手。",

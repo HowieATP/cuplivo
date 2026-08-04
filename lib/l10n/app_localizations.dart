@@ -4013,6 +4013,12 @@ abstract class AppLocalizations {
   /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
   String get lanSyncSecurityNote;
 
+  /// No description provided for @lanSyncFirewallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).'**
+  String get lanSyncFirewallHint;
+
   /// No description provided for @lanSyncPlanToSend.
   ///
   /// In en, this message translates to:
@@ -11834,17 +11840,29 @@ abstract class AppLocalizations {
   /// **'Image & Document Processing'**
   String get documentProcessingTitle;
 
-  /// Section label for image handling when the chat model lacks vision capability
+  /// Section label for the per-assistant image OCR mode
   ///
   /// In en, this message translates to:
-  /// **'Images without vision model'**
-  String get documentProcessingImageWithoutVision;
+  /// **'Image OCR'**
+  String get documentProcessingImageOcr;
 
-  /// Option to OCR-extract text from images
+  /// Option to OCR images only when the model lacks vision capability
   ///
   /// In en, this message translates to:
-  /// **'OCR'**
-  String get documentProcessingModeOcr;
+  /// **'Auto'**
+  String get documentProcessingModeAuto;
+
+  /// Option to always OCR images regardless of model capability
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get documentProcessingModeAlways;
+
+  /// Option to never OCR images
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get documentProcessingModeNever;
 
   /// Option to discard the attachment silently
   ///
@@ -11852,10 +11870,10 @@ abstract class AppLocalizations {
   /// **'Discard'**
   String get documentProcessingModeDiscard;
 
-  /// Hint shown when OCR model is not configured
+  /// Hint shown when the OCR model is not configured
   ///
   /// In en, this message translates to:
-  /// **'No OCR model configured. OCR option unavailable.'**
+  /// **'No OCR model configured. Always-OCR unavailable.'**
   String get documentProcessingOcrNotConfigured;
 
   /// Section label for DOCX document handling
@@ -12665,8 +12683,182 @@ abstract class AppLocalizations {
   /// No description provided for @groupChatDirectorLogsEphemeral.
   ///
   /// In en, this message translates to:
-  /// **'Director context is assembled live from the public conversation and is not stored separately.'**
+  /// **'Director context is rebuilt from the public conversation. Runtime details are kept only while this app is running.'**
   String get groupChatDirectorLogsEphemeral;
+
+  /// Title for one reconstructed director call.
+  ///
+  /// In en, this message translates to:
+  /// **'Director call {index}'**
+  String groupChatDirectorLogsEntryTitle(int index);
+
+  /// No description provided for @groupChatDirectorLogsTriggerUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by a user message'**
+  String get groupChatDirectorLogsTriggerUser;
+
+  /// No description provided for @groupChatDirectorLogsTriggerAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by an assistant message'**
+  String get groupChatDirectorLogsTriggerAssistant;
+
+  /// No description provided for @groupChatDirectorLogsTriggerCapMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by a round-cap merge'**
+  String get groupChatDirectorLogsTriggerCapMerge;
+
+  /// Observed assistant selected after a director context entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Observed next speaker: {name}'**
+  String groupChatDirectorLogsObservedSpeaker(String name);
+
+  /// No description provided for @groupChatDirectorLogsNoObservedFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'No subsequent public speaker observed.'**
+  String get groupChatDirectorLogsNoObservedFollowUp;
+
+  /// No description provided for @groupChatDirectorLogsRoundCapReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Round cap reached; the director was not called again.'**
+  String get groupChatDirectorLogsRoundCapReached;
+
+  /// No description provided for @groupChatDirectorLogsUnknownSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown assistant'**
+  String get groupChatDirectorLogsUnknownSpeaker;
+
+  /// No description provided for @groupChatDirectorLogsReconstructedContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconstructed director context'**
+  String get groupChatDirectorLogsReconstructedContext;
+
+  /// No description provided for @groupChatDirectorLogsNoContext.
+  ///
+  /// In en, this message translates to:
+  /// **'No reconstructed context is available for this marker.'**
+  String get groupChatDirectorLogsNoContext;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime details'**
+  String get groupChatDirectorLogsRuntimeDetails;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime details are unavailable for this call (for example, after an app restart).'**
+  String get groupChatDirectorLogsRuntimeUnavailable;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get groupChatDirectorLogsRuntimeModel;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempts'**
+  String get groupChatDirectorLogsRuntimeAttempts;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeRequestMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Request messages'**
+  String get groupChatDirectorLogsRuntimeRequestMessages;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision'**
+  String get groupChatDirectorLogsRuntimeDecision;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get groupChatDirectorLogsRuntimeReason;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback'**
+  String get groupChatDirectorLogsRuntimeFallback;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFallbackValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback decision was used'**
+  String get groupChatDirectorLogsRuntimeFallbackValue;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt error'**
+  String get groupChatDirectorLogsRuntimeError;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Failure'**
+  String get groupChatDirectorLogsRuntimeFailure;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFreeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Model text'**
+  String get groupChatDirectorLogsRuntimeFreeText;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No additional runtime details were captured.'**
+  String get groupChatDirectorLogsRuntimeEmpty;
+
+  /// No description provided for @groupChatDirectorLogsDecisionSelectSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Select speaker'**
+  String get groupChatDirectorLogsDecisionSelectSpeaker;
+
+  /// No description provided for @groupChatDirectorLogsDecisionEndTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'End turn'**
+  String get groupChatDirectorLogsDecisionEndTurn;
+
+  /// No description provided for @groupChatDirectorLogsRoleSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get groupChatDirectorLogsRoleSystem;
+
+  /// No description provided for @groupChatDirectorLogsRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get groupChatDirectorLogsRoleUser;
+
+  /// No description provided for @groupChatDirectorLogsRoleAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get groupChatDirectorLogsRoleAssistant;
+
+  /// No description provided for @groupChatDirectorLogsRoleTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool'**
+  String get groupChatDirectorLogsRoleTool;
 
   /// No description provided for @groupChatNoAssistantsToInvite.
   ///

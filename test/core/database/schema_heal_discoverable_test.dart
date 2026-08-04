@@ -103,7 +103,6 @@ void main() {
         missingIsPreset: false,
         missingHandoffColumns: false,
       );
-
       final repo = ChatDatabaseRepository.open(file: dbFile);
       await repo.ensureReady();
 
@@ -131,6 +130,34 @@ void main() {
       await repo.close();
     },
   );
+
+  test(
+    'heal adds ocr_mode before assistant insert (v15 column shape)',
+    () async {
+      _createLegacyDb(
+        dbFile,
+        userVersion: 15,
+        missingIsPreset: false,
+        missingHandoffColumns: false,
+        missingOcrMode: true,
+      );
+
+      final repo = ChatDatabaseRepository.open(file: dbFile);
+      await repo.ensureReady();
+
+      // Must succeed: heal adds ocr_mode before Drift INSERT.
+      await repo.putAssistant(
+        Assistant(id: 'a1', name: 'Alpha', systemPrompt: 'hi'),
+        sortOrder: 0,
+      );
+      final loaded = await repo.getAllAssistants();
+      expect(loaded, hasLength(1));
+      expect(loaded.first.name, 'Alpha');
+      expect(loaded.first.ocrMode, 'auto');
+
+      await repo.close();
+    },
+  );
 }
 
 /// Builds a v13-era DB shape (assistant/conversation/message tables only —
@@ -142,6 +169,7 @@ void _createLegacyDb(
   required int userVersion,
   required bool missingIsPreset,
   required bool missingHandoffColumns,
+  bool missingOcrMode = false,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -151,6 +179,11 @@ void _createLegacyDb(
   discoverable INTEGER NOT NULL DEFAULT 0,
   handoff_id TEXT NULL,
   handoff_description TEXT NULL,
+''';
+  final ocrModeColumn = missingOcrMode
+      ? ''
+      : '''
+  ocr_mode TEXT NOT NULL DEFAULT 'auto',
 ''';
   raw.execute('''
 CREATE TABLE assistant_rows (
@@ -191,6 +224,7 @@ CREATE TABLE assistant_rows (
   docx_mode TEXT NOT NULL DEFAULT 'extract',
   pdf_mode TEXT NOT NULL DEFAULT 'extract',
   other_office_mode TEXT NOT NULL DEFAULT 'direct',
+  $ocrModeColumn
   enable_time_injection INTEGER NOT NULL DEFAULT 0,
   $handoffColumns
   sort_order INTEGER NOT NULL,

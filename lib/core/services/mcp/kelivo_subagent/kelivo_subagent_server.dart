@@ -197,6 +197,8 @@ class KelivoSubagentMcpServerEngine {
         apiMessages,
         settings,
         target,
+        providerKey: providerKey,
+        modelId: modelId,
       );
       messageBuilder.injectSystemPrompt(apiMessages, target, modelId);
       await messageBuilder.injectMemoryAndRecentChats(

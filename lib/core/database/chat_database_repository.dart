@@ -1023,6 +1023,7 @@ class ChatDatabaseRepository {
       'docxMode': row.docxMode,
       'pdfMode': row.pdfMode,
       'otherOfficeMode': row.otherOfficeMode,
+      'ocrMode': row.ocrMode,
       'enableTimeInjection': row.enableTimeInjection,
       'presetMessages': jsonDecode(row.presetMessagesJson),
       'regexRules': jsonDecode(row.regexRulesJson),
@@ -1072,6 +1073,7 @@ class ChatDatabaseRepository {
       docxMode: Value(a.docxMode),
       pdfMode: Value(a.pdfMode),
       otherOfficeMode: Value(a.otherOfficeMode),
+      ocrMode: Value(a.ocrMode),
       presetMessagesJson: Value(
         jsonEncode(PresetMessage.encodeList(a.presetMessages)),
       ),

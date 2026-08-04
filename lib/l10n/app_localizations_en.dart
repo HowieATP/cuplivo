@@ -6833,7 +6833,107 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupChatDirectorLogsEphemeral =>
-      'Director context is assembled live from the public conversation and is not stored separately.';
+      'Director context is rebuilt from the public conversation. Runtime details are kept only while this app is running.';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return 'Director call $index';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => 'Triggered by a user message';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant =>
+      'Triggered by an assistant message';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge =>
+      'Triggered by a round-cap merge';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return 'Observed next speaker: $name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp =>
+      'No subsequent public speaker observed.';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached =>
+      'Round cap reached; the director was not called again.';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => 'Unknown assistant';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext =>
+      'Reconstructed director context';
+
+  @override
+  String get groupChatDirectorLogsNoContext =>
+      'No reconstructed context is available for this marker.';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => 'Runtime details';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      'Runtime details are unavailable for this call (for example, after an app restart).';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => 'Model';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => 'Attempts';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => 'Request messages';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => 'Decision';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => 'Reason';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => 'Fallback';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue =>
+      'Fallback decision was used';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => 'Attempt error';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => 'Failure';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => 'Model text';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty =>
+      'No additional runtime details were captured.';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => 'Select speaker';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => 'End turn';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => 'System';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => 'User';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => 'Assistant';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => 'Tool';
 
   @override
   String get groupChatNoAssistantsToInvite => 'No more assistants to invite.';

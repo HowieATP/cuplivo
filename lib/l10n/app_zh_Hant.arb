@@ -2664,7 +2664,52 @@
   "groupChatInjectionEveryNUser": "每 N 輪使用者訊息注入使用者訊息的結尾",
   "groupChatInjectionEveryNUserAndAssistant": "每 N 條使用者與助手訊息，注入訊息的結尾",
   "groupChatDirectorLogsEmpty": "暫無導演日誌。",
-  "groupChatDirectorLogsEphemeral": "導演上下文從公共會話現場拼裝，不再單獨落庫。",
+  "groupChatDirectorLogsEphemeral": "導演上下文從公共會話現場重建；執行時詳情僅在本次應用程式執行期間保留。",
+  "groupChatDirectorLogsEntryTitle": "第 {index} 次導演呼叫",
+  "@groupChatDirectorLogsEntryTitle": {
+    "description": "一條重建導演呼叫的標題。",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "groupChatDirectorLogsTriggerUser": "由使用者訊息觸發",
+  "groupChatDirectorLogsTriggerAssistant": "由助手訊息觸發",
+  "groupChatDirectorLogsTriggerCapMerge": "由回合上限合併觸發",
+  "groupChatDirectorLogsObservedSpeaker": "觀察到下一位助手：{name}",
+  "@groupChatDirectorLogsObservedSpeaker": {
+    "description": "導演上下文條目之後實際出現的助手。",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupChatDirectorLogsNoObservedFollowUp": "公共會話中未觀察到後續發言。",
+  "groupChatDirectorLogsRoundCapReached": "已達到回合上限，導演未再次呼叫。",
+  "groupChatDirectorLogsUnknownSpeaker": "未知助手",
+  "groupChatDirectorLogsReconstructedContext": "重建的導演上下文",
+  "groupChatDirectorLogsNoContext": "此標記沒有可展示的重建上下文。",
+  "groupChatDirectorLogsRuntimeDetails": "執行時詳情",
+  "groupChatDirectorLogsRuntimeUnavailable": "此呼叫的執行時詳情不可用（例如應用程式重啟後）。",
+  "groupChatDirectorLogsRuntimeModel": "模型",
+  "groupChatDirectorLogsRuntimeAttempts": "嘗試次數",
+  "groupChatDirectorLogsRuntimeRequestMessages": "請求訊息數",
+  "groupChatDirectorLogsRuntimeDecision": "決策",
+  "groupChatDirectorLogsRuntimeReason": "原因",
+  "groupChatDirectorLogsRuntimeFallback": "回退",
+  "groupChatDirectorLogsRuntimeFallbackValue": "使用了回退決策",
+  "groupChatDirectorLogsRuntimeError": "嘗試錯誤",
+  "groupChatDirectorLogsRuntimeFailure": "失敗",
+  "groupChatDirectorLogsRuntimeFreeText": "模型文字",
+  "groupChatDirectorLogsRuntimeEmpty": "沒有捕獲到額外的執行時詳情。",
+  "groupChatDirectorLogsDecisionSelectSpeaker": "選擇助手",
+  "groupChatDirectorLogsDecisionEndTurn": "結束回合",
+  "groupChatDirectorLogsRoleSystem": "系統",
+  "groupChatDirectorLogsRoleUser": "使用者",
+  "groupChatDirectorLogsRoleAssistant": "助手",
+  "groupChatDirectorLogsRoleTool": "工具",
   "groupChatNoAssistantsToInvite": "沒有可邀請的助手。",
   "groupChatEmptyConversation": "傳送訊息開始群聊。",
   "groupChatNoAssistants": "請先在群設定中新增助手。",

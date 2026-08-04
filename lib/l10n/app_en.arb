@@ -3214,7 +3214,52 @@
   "groupChatInjectionEveryNUser": "Every N user messages",
   "groupChatInjectionEveryNUserAndAssistant": "Every N user and assistant messages",
   "groupChatDirectorLogsEmpty": "No director logs yet.",
-  "groupChatDirectorLogsEphemeral": "Director context is assembled live from the public conversation and is not stored separately.",
+  "groupChatDirectorLogsEphemeral": "Director context is rebuilt from the public conversation. Runtime details are kept only while this app is running.",
+  "groupChatDirectorLogsEntryTitle": "Director call {index}",
+  "@groupChatDirectorLogsEntryTitle": {
+    "description": "Title for one reconstructed director call.",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "groupChatDirectorLogsTriggerUser": "Triggered by a user message",
+  "groupChatDirectorLogsTriggerAssistant": "Triggered by an assistant message",
+  "groupChatDirectorLogsTriggerCapMerge": "Triggered by a round-cap merge",
+  "groupChatDirectorLogsObservedSpeaker": "Observed next speaker: {name}",
+  "@groupChatDirectorLogsObservedSpeaker": {
+    "description": "Observed assistant selected after a director context entry.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupChatDirectorLogsNoObservedFollowUp": "No subsequent public speaker observed.",
+  "groupChatDirectorLogsRoundCapReached": "Round cap reached; the director was not called again.",
+  "groupChatDirectorLogsUnknownSpeaker": "Unknown assistant",
+  "groupChatDirectorLogsReconstructedContext": "Reconstructed director context",
+  "groupChatDirectorLogsNoContext": "No reconstructed context is available for this marker.",
+  "groupChatDirectorLogsRuntimeDetails": "Runtime details",
+  "groupChatDirectorLogsRuntimeUnavailable": "Runtime details are unavailable for this call (for example, after an app restart).",
+  "groupChatDirectorLogsRuntimeModel": "Model",
+  "groupChatDirectorLogsRuntimeAttempts": "Attempts",
+  "groupChatDirectorLogsRuntimeRequestMessages": "Request messages",
+  "groupChatDirectorLogsRuntimeDecision": "Decision",
+  "groupChatDirectorLogsRuntimeReason": "Reason",
+  "groupChatDirectorLogsRuntimeFallback": "Fallback",
+  "groupChatDirectorLogsRuntimeFallbackValue": "Fallback decision was used",
+  "groupChatDirectorLogsRuntimeError": "Attempt error",
+  "groupChatDirectorLogsRuntimeFailure": "Failure",
+  "groupChatDirectorLogsRuntimeFreeText": "Model text",
+  "groupChatDirectorLogsRuntimeEmpty": "No additional runtime details were captured.",
+  "groupChatDirectorLogsDecisionSelectSpeaker": "Select speaker",
+  "groupChatDirectorLogsDecisionEndTurn": "End turn",
+  "groupChatDirectorLogsRoleSystem": "System",
+  "groupChatDirectorLogsRoleUser": "User",
+  "groupChatDirectorLogsRoleAssistant": "Assistant",
+  "groupChatDirectorLogsRoleTool": "Tool",
   "groupChatNoAssistantsToInvite": "No more assistants to invite.",
   "groupChatEmptyConversation": "Send a message to start the group chat.",
   "groupChatNoAssistants": "Add assistants in group settings before chatting.",

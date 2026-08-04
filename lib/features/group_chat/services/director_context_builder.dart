@@ -191,6 +191,9 @@ class DirectorContextBuilder {
     required Map<String, Assistant> assistantsById,
     String? skipPendingCapMessageId,
     String? excludeTrailingUserMessageId,
+    int? truncateIndexOverride,
+    String fallbackAssistantName = 'Assistant',
+    Map<String, String>? contentCache,
   }) {
     final roster = buildRosterBlock(rosterAssistants);
     final prompt = substituteVariables(
@@ -201,6 +204,14 @@ class DirectorContextBuilder {
     );
     final mode = group.assistantDetailInjectionMode;
     final api = <Map<String, dynamic>>[];
+
+    String contentFor(ChatMessage message) {
+      if (contentCache == null) return contentForDirector(message);
+      return contentCache.putIfAbsent(
+        message.id,
+        () => contentForDirector(message),
+      );
+    }
 
     if (mode == AssistantDetailInjectionMode.beforeSystemPrompt) {
       api.add({'role': 'system', 'content': roster});
@@ -213,7 +224,9 @@ class DirectorContextBuilder {
 
     final collapsed = collapsePublicVersions(publicMessages, versionSelections);
     final truncateIndex =
-        chatService.getConversation(group.conversationId)?.truncateIndex ?? -1;
+        truncateIndexOverride ??
+        chatService.getConversation(group.conversationId)?.truncateIndex ??
+        -1;
     final skip = ChatService.rawToCollapsedSkip(
       rawMessages: publicMessages,
       collapsedMessages: collapsed,
@@ -234,19 +247,19 @@ class DirectorContextBuilder {
           'role': 'user',
           'content': buildUserTurnE1(
             userName: userName,
-            userMessageText: contentForDirector(m),
+            userMessageText: contentFor(m),
           ),
         });
       } else if (m.role == 'assistant') {
         final name =
             assistantsById[m.speakerAssistantId]?.name ??
             m.speakerAssistantId ??
-            'Assistant';
+            fallbackAssistantName;
         api.add({
           'role': 'user',
           'content': buildAssistantTurnE2(
             assistantName: name,
-            assistantContent: contentForDirector(m),
+            assistantContent: contentFor(m),
           ),
         });
       }

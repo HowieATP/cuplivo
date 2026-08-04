@@ -529,6 +529,14 @@ class ProactiveCareMessageFlow {
     final baseRequestId =
         'proactive-care-decision-${assistant.id}-${DateTime.now().microsecondsSinceEpoch}';
 
+    void logSettled(String attempt, DateTime? time) {
+      FlutterLogger.log(
+        'Decision settled ($attempt, model: $modelId): '
+        '${time?.toIso8601String() ?? 'keep current time'}',
+        tag: _logTag,
+      );
+    }
+
     final first = await _callDecisionOnce(
       send: send,
       config: config,
@@ -541,11 +549,7 @@ class ProactiveCareMessageFlow {
       requestId: baseRequestId,
     );
     if (first.decided) {
-      FlutterLogger.log(
-        'Decision settled: '
-        '${first.time?.toIso8601String() ?? 'keep current time'}',
-        tag: _logTag,
-      );
+      logSettled('attempt 1', first.time);
       return first.time;
     }
 
@@ -567,11 +571,7 @@ class ProactiveCareMessageFlow {
       requestId: '$baseRequestId-retry',
     );
     if (second.decided) {
-      FlutterLogger.log(
-        'Decision settled: '
-        '${second.time?.toIso8601String() ?? 'keep current time'}',
-        tag: _logTag,
-      );
+      logSettled('retry', second.time);
       return second.time;
     }
 

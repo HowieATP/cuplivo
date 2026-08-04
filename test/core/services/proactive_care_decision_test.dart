@@ -496,6 +496,31 @@ void main() {
       await pumpEventQueue();
       expect(transport.subscriptionCancelled[0], isTrue);
     });
+
+    test(
+      '22: validation uses a fresh clock, not the request-level now',
+      () async {
+        final controller = transport.enqueue();
+
+        // Timing margin: the proposed time is t0+150ms, future relative to
+        // the request-level clock captured inside decide() (~t0), but the
+        // chunk is only delivered after a real 300ms delay, so the fresh
+        // validation clock is already >= t0+300ms and the time is past.
+        // Direction is deterministic on any machine speed: the delay must
+        // elapse before the chunk arrives, and 300ms > 150ms. Reverting to
+        // the stale request-level clock would accept the time and fail here.
+        final t0 = DateTime.now();
+        final future = decide();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        controller.add(updateChunk(t0.add(const Duration(milliseconds: 150))));
+
+        final result = await future.timeout(const Duration(seconds: 5));
+
+        expect(result, isNull);
+        // Invalid/past args are final: no retry.
+        expect(transport.sendCount, 1);
+      },
+    );
   });
 
   group('ProactiveCareService', () {

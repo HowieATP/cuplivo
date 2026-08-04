@@ -1,25 +1,29 @@
-import 'dart:convert';
-
 import '../models/assistant_memory.dart';
+import 'proactive_care_decision_tools.dart';
 
 /// Pure logic for the proactive care ("Ta的来信") decision flow.
 ///
 /// After each completed assistant reply, the full conversation context plus
 /// the decision prompt built here is sent silently to the decision model.
-/// The model answers with a JSON decision that may update the assistant's
-/// next proactive message time.
+/// The model answers by calling one of the decision tools
+/// (`update_care_time` / `keep_care_time`); see
+/// `ProactiveCareDecisionTools`.
 class ProactiveCareService {
-  /// Built-in JSON output rules for the decision request (LLM only).
-  ///
-  /// Time fields are appended separately via [buildDecisionTimeFooter] after
-  /// the chat history.
-  static const String builtinDecisionJsonRules = '''
-【输出要求】
-你必须严格以 JSON 格式输出，不要包含任何额外文字：
-{
-  "should_update": true或false,
-  "next_care_time": "ISO 8601格式的时间字符串，如2026-06-12T10:00:00"
-}''';
+  /// Built-in tool-only reminder appended to the final user message of the
+  /// decision request (LLM only). Mirrors DirectorContextBuilder's
+  /// tool-only reminder.
+  static const String builtinDecisionToolReminder =
+      '请只通过调用工具给出决策：需要修改时间时调用 '
+      '${ProactiveCareDecisionTools.updateTime}，'
+      '保持不变时调用 ${ProactiveCareDecisionTools.keepTime}。不要输出其他内容。';
+
+  /// Built-in tool-only retry directive appended as an extra user message
+  /// when the first decision attempt produced no tool call (LLM only).
+  static const String builtinDecisionToolOnlyDirective =
+      '你必须只通过调用工具给出决策：修改时间调用 '
+      '${ProactiveCareDecisionTools.updateTime}'
+      '（参数 next_care_time 为 ISO 8601 格式的未来时间），'
+      '保持不变调用 ${ProactiveCareDecisionTools.keepTime}。不要输出自由文本。';
 
   /// Prefix before the assistant persona in the decision request (LLM only).
   static const String personaReferencePrefix = '以下是供你参考的助手人设';
@@ -47,12 +51,13 @@ class ProactiveCareService {
 
   /// Assembles the full silent decision API message list (Pipeline ①):
   ///
-  /// 1. `system`: user decision prompt + JSON output rules (no times)
+  /// 1. `system`: user decision prompt (when non-empty)
   /// 2. `user` (optional): persona reference prefix + assistant system prompt
   /// 3. `user` (optional): memories reference prefix + memory block
   /// 4. `user`: chat history header (when [history] is non-empty)
   /// 5. ...[history] (user/assistant turns, unchanged)
-  /// 6. `user`: next care time + current system time (always last)
+  /// 6. `user`: next care time + current system time + tool reminder
+  ///    (always last)
   static List<Map<String, dynamic>> buildDecisionApiMessages({
     required String decisionPrompt,
     required DateTime? currentNextCareTime,
@@ -63,11 +68,10 @@ class ProactiveCareService {
   }) {
     final messages = <Map<String, dynamic>>[];
 
-    final systemParts = <String>[
-      if (decisionPrompt.trim().isNotEmpty) decisionPrompt.trim(),
-      builtinDecisionJsonRules.trim(),
-    ];
-    messages.add({'role': 'system', 'content': systemParts.join('\n\n')});
+    final prompt = decisionPrompt.trim();
+    if (prompt.isNotEmpty) {
+      messages.add({'role': 'system', 'content': prompt});
+    }
 
     final persona = personaPrompt.trim();
     if (persona.isNotEmpty) {
@@ -92,10 +96,9 @@ class ProactiveCareService {
 
     messages.add({
       'role': 'user',
-      'content': buildDecisionTimeFooter(
-        now: now,
-        currentNextCareTime: currentNextCareTime,
-      ),
+      'content':
+          '${buildDecisionTimeFooter(now: now, currentNextCareTime: currentNextCareTime)}'
+          '\n\n$builtinDecisionToolReminder',
     });
 
     return messages;
@@ -136,43 +139,5 @@ class ProactiveCareService {
     final head = carePrompt.trim();
     if (head.isEmpty) return time;
     return '$head\n\n$time';
-  }
-
-  /// Parses the LLM decision reply.
-  ///
-  /// Returns the new next-care time only when `should_update` is true and
-  /// `next_care_time` parses to a time later than [now] (mirroring the date
-  /// picker constraint that past times are not allowed). Returns null in all
-  /// other cases (invalid JSON, should_update=false, past/invalid time).
-  static DateTime? parseDecision(String raw, {required DateTime now}) {
-    final jsonText = _extractJsonObject(raw);
-    if (jsonText == null) return null;
-
-    Object? decoded;
-    try {
-      decoded = jsonDecode(jsonText);
-    } catch (_) {
-      return null;
-    }
-    if (decoded is! Map) return null;
-
-    if (decoded['should_update'] != true) return null;
-    final rawTime = decoded['next_care_time'];
-    if (rawTime is! String || rawTime.trim().isEmpty) return null;
-    final parsed = DateTime.tryParse(rawTime.trim());
-    if (parsed == null) return null;
-
-    final local = parsed.isUtc ? parsed.toLocal() : parsed;
-    if (!local.isAfter(now)) return null;
-    return local;
-  }
-
-  /// Extracts the first balanced top-level `{...}` block, tolerating
-  /// markdown code fences and surrounding prose.
-  static String? _extractJsonObject(String raw) {
-    final start = raw.indexOf('{');
-    final end = raw.lastIndexOf('}');
-    if (start < 0 || end <= start) return null;
-    return raw.substring(start, end + 1);
   }
 }

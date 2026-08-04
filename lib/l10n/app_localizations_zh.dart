@@ -6928,6 +6928,141 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get grokLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get settingsPageLinuxSandbox => '沙箱';
+
+  @override
+  String get linuxSandboxListTitle => '沙箱';
+
+  @override
+  String get linuxSandboxListEmpty => '暂无沙箱。创建一个后，即可为助手提供本地工作区。';
+
+  @override
+  String get linuxSandboxCreateTitle => '创建沙箱';
+
+  @override
+  String get linuxSandboxCreateNameLabel => '名称';
+
+  @override
+  String get linuxSandboxCreateNameHint => '我的沙箱';
+
+  @override
+  String get linuxSandboxCreateNameRequired => '请输入沙箱名称。';
+
+  @override
+  String get linuxSandboxCreateAction => '创建';
+
+  @override
+  String get linuxSandboxCreateFailed => '创建沙箱失败。';
+
+  @override
+  String get linuxSandboxDeleteFailed => '删除沙箱失败。';
+
+  @override
+  String get linuxSandboxCreateInstallSection => '安装选项';
+
+  @override
+  String get linuxSandboxCreateBaseEnvTitle => '基础环境';
+
+  @override
+  String get linuxSandboxCreateBaseEnvSubtitle => '空白工作区，提供文件与 Shell 工具。';
+
+  @override
+  String get linuxSandboxCreatePythonTitle => 'Python';
+
+  @override
+  String get linuxSandboxCreateJavaTitle => 'Java';
+
+  @override
+  String get linuxSandboxCreateComingLater => '稍后提供';
+
+  @override
+  String get linuxSandboxDetailToolsSection => '工具';
+
+  @override
+  String get linuxSandboxToolReadName => '读取';
+
+  @override
+  String get linuxSandboxToolReadDescription => '在沙箱内读取文件或列出目录。';
+
+  @override
+  String get linuxSandboxToolWriteName => '写入';
+
+  @override
+  String get linuxSandboxToolWriteDescription => '在沙箱内创建或覆盖文本文件。';
+
+  @override
+  String get linuxSandboxToolEditName => '编辑';
+
+  @override
+  String get linuxSandboxToolEditDescription => '在沙箱内替换文件中的文本。';
+
+  @override
+  String get linuxSandboxToolShellName => 'Shell';
+
+  @override
+  String get linuxSandboxToolShellDescription => '以沙箱为工作目录运行 Shell 命令。';
+
+  @override
+  String linuxSandboxToolsCount(int enabled, int total) {
+    return '$enabled/$total 个工具';
+  }
+
+  @override
+  String get linuxSandboxBackupNote => '沙箱文件仅保存在本机，不会包含在备份中。';
+
+  @override
+  String get linuxSandboxDeleteConfirmTitle => '删除沙箱？';
+
+  @override
+  String linuxSandboxDeleteConfirmMessage(String name) {
+    return '确定删除“$name”？已绑定的助手将解除绑定，本地文件也会被删除。';
+  }
+
+  @override
+  String get linuxSandboxDeleteAction => '删除';
+
+  @override
+  String get linuxSandboxBrowseTitle => '文件';
+
+  @override
+  String get linuxSandboxBrowseEmpty => '此文件夹为空。';
+
+  @override
+  String get linuxSandboxBrowseUp => '上级';
+
+  @override
+  String get linuxSandboxAndroidUnsupported =>
+      '当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxPlatformUnsupported =>
+      '沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxMissingMessage => '该沙箱已不存在。';
+
+  @override
+  String get assistantEditPageLinuxSandboxTab => '沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnable => '启用沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnableSubtitle => '允许此助手使用本地沙箱工作区。';
+
+  @override
+  String get assistantEditLinuxSandboxPick => '选择沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxNone => '暂无沙箱。请先在设置中创建。';
+
+  @override
+  String get assistantEditLinuxSandboxMissing => '所选沙箱已丢失。请另选一个，或关闭沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxManageCta => '管理沙箱';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13854,6 +13989,141 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get grokLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get settingsPageLinuxSandbox => '沙箱';
+
+  @override
+  String get linuxSandboxListTitle => '沙箱';
+
+  @override
+  String get linuxSandboxListEmpty => '暂无沙箱。创建一个后，即可为助手提供本地工作区。';
+
+  @override
+  String get linuxSandboxCreateTitle => '创建沙箱';
+
+  @override
+  String get linuxSandboxCreateNameLabel => '名称';
+
+  @override
+  String get linuxSandboxCreateNameHint => '我的沙箱';
+
+  @override
+  String get linuxSandboxCreateNameRequired => '请输入沙箱名称。';
+
+  @override
+  String get linuxSandboxCreateAction => '创建';
+
+  @override
+  String get linuxSandboxCreateFailed => '创建沙箱失败。';
+
+  @override
+  String get linuxSandboxDeleteFailed => '删除沙箱失败。';
+
+  @override
+  String get linuxSandboxCreateInstallSection => '安装选项';
+
+  @override
+  String get linuxSandboxCreateBaseEnvTitle => '基础环境';
+
+  @override
+  String get linuxSandboxCreateBaseEnvSubtitle => '空白工作区，提供文件与 Shell 工具。';
+
+  @override
+  String get linuxSandboxCreatePythonTitle => 'Python';
+
+  @override
+  String get linuxSandboxCreateJavaTitle => 'Java';
+
+  @override
+  String get linuxSandboxCreateComingLater => '稍后提供';
+
+  @override
+  String get linuxSandboxDetailToolsSection => '工具';
+
+  @override
+  String get linuxSandboxToolReadName => '读取';
+
+  @override
+  String get linuxSandboxToolReadDescription => '在沙箱内读取文件或列出目录。';
+
+  @override
+  String get linuxSandboxToolWriteName => '写入';
+
+  @override
+  String get linuxSandboxToolWriteDescription => '在沙箱内创建或覆盖文本文件。';
+
+  @override
+  String get linuxSandboxToolEditName => '编辑';
+
+  @override
+  String get linuxSandboxToolEditDescription => '在沙箱内替换文件中的文本。';
+
+  @override
+  String get linuxSandboxToolShellName => 'Shell';
+
+  @override
+  String get linuxSandboxToolShellDescription => '以沙箱为工作目录运行 Shell 命令。';
+
+  @override
+  String linuxSandboxToolsCount(int enabled, int total) {
+    return '$enabled/$total 个工具';
+  }
+
+  @override
+  String get linuxSandboxBackupNote => '沙箱文件仅保存在本机，不会包含在备份中。';
+
+  @override
+  String get linuxSandboxDeleteConfirmTitle => '删除沙箱？';
+
+  @override
+  String linuxSandboxDeleteConfirmMessage(String name) {
+    return '确定删除“$name”？已绑定的助手将解除绑定，本地文件也会被删除。';
+  }
+
+  @override
+  String get linuxSandboxDeleteAction => '删除';
+
+  @override
+  String get linuxSandboxBrowseTitle => '文件';
+
+  @override
+  String get linuxSandboxBrowseEmpty => '此文件夹为空。';
+
+  @override
+  String get linuxSandboxBrowseUp => '上级';
+
+  @override
+  String get linuxSandboxAndroidUnsupported =>
+      '当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxPlatformUnsupported =>
+      '沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxMissingMessage => '该沙箱已不存在。';
+
+  @override
+  String get assistantEditPageLinuxSandboxTab => '沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnable => '启用沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnableSubtitle => '允许此助手使用本地沙箱工作区。';
+
+  @override
+  String get assistantEditLinuxSandboxPick => '选择沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxNone => '暂无沙箱。请先在设置中创建。';
+
+  @override
+  String get assistantEditLinuxSandboxMissing => '所选沙箱已丢失。请另选一个，或关闭沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxManageCta => '管理沙箱';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -20780,4 +21050,139 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get grokLoginNetworkError => '網路錯誤，請重試';
+
+  @override
+  String get settingsPageLinuxSandbox => '沙箱';
+
+  @override
+  String get linuxSandboxListTitle => '沙箱';
+
+  @override
+  String get linuxSandboxListEmpty => '尚無沙箱。建立一個後，即可為助手提供本機工作區。';
+
+  @override
+  String get linuxSandboxCreateTitle => '建立沙箱';
+
+  @override
+  String get linuxSandboxCreateNameLabel => '名稱';
+
+  @override
+  String get linuxSandboxCreateNameHint => '我的沙箱';
+
+  @override
+  String get linuxSandboxCreateNameRequired => '請輸入沙箱名稱。';
+
+  @override
+  String get linuxSandboxCreateAction => '建立';
+
+  @override
+  String get linuxSandboxCreateFailed => '建立沙箱失敗。';
+
+  @override
+  String get linuxSandboxDeleteFailed => '刪除沙箱失敗。';
+
+  @override
+  String get linuxSandboxCreateInstallSection => '安裝選項';
+
+  @override
+  String get linuxSandboxCreateBaseEnvTitle => '基礎環境';
+
+  @override
+  String get linuxSandboxCreateBaseEnvSubtitle => '空白工作區，提供檔案與 Shell 工具。';
+
+  @override
+  String get linuxSandboxCreatePythonTitle => 'Python';
+
+  @override
+  String get linuxSandboxCreateJavaTitle => 'Java';
+
+  @override
+  String get linuxSandboxCreateComingLater => '稍後提供';
+
+  @override
+  String get linuxSandboxDetailToolsSection => '工具';
+
+  @override
+  String get linuxSandboxToolReadName => '讀取';
+
+  @override
+  String get linuxSandboxToolReadDescription => '在沙箱內讀取檔案或列出目錄。';
+
+  @override
+  String get linuxSandboxToolWriteName => '寫入';
+
+  @override
+  String get linuxSandboxToolWriteDescription => '在沙箱內建立或覆寫文字檔案。';
+
+  @override
+  String get linuxSandboxToolEditName => '編輯';
+
+  @override
+  String get linuxSandboxToolEditDescription => '在沙箱內替換檔案中的文字。';
+
+  @override
+  String get linuxSandboxToolShellName => 'Shell';
+
+  @override
+  String get linuxSandboxToolShellDescription => '以沙箱為工作目錄執行 Shell 命令。';
+
+  @override
+  String linuxSandboxToolsCount(int enabled, int total) {
+    return '$enabled/$total 個工具';
+  }
+
+  @override
+  String get linuxSandboxBackupNote => '沙箱檔案僅保存在本機，不會包含在備份中。';
+
+  @override
+  String get linuxSandboxDeleteConfirmTitle => '刪除沙箱？';
+
+  @override
+  String linuxSandboxDeleteConfirmMessage(String name) {
+    return '確定刪除「$name」？已綁定的助手將解除綁定，本機檔案也會被刪除。';
+  }
+
+  @override
+  String get linuxSandboxDeleteAction => '刪除';
+
+  @override
+  String get linuxSandboxBrowseTitle => '檔案';
+
+  @override
+  String get linuxSandboxBrowseEmpty => '此資料夾為空。';
+
+  @override
+  String get linuxSandboxBrowseUp => '上一層';
+
+  @override
+  String get linuxSandboxAndroidUnsupported =>
+      '目前版本 Android 尚不支援沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxPlatformUnsupported =>
+      '沙箱工具目前僅在 Windows 上執行。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxMissingMessage => '此沙箱已不存在。';
+
+  @override
+  String get assistantEditPageLinuxSandboxTab => '沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnable => '啟用沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxEnableSubtitle => '允許此助手使用本機沙箱工作區。';
+
+  @override
+  String get assistantEditLinuxSandboxPick => '選擇沙箱';
+
+  @override
+  String get assistantEditLinuxSandboxNone => '尚無沙箱。請先在設定中建立。';
+
+  @override
+  String get assistantEditLinuxSandboxMissing => '所選沙箱已遺失。請另選一個，或關閉沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxManageCta => '管理沙箱';
 }

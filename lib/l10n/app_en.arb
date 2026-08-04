@@ -3355,5 +3355,65 @@
   "grokLoginSessionHint": "Stays signed in; access renews automatically in the background.",
   "grokLoginSignedOutToast": "Signed out",
   "grokLoginHelpText": "Open the xAI authorization page and enter the verification code to authorize Grok access.",
-  "grokLoginNetworkError": "Network error, please retry"
+  "grokLoginNetworkError": "Network error, please retry",
+  "settingsPageLinuxSandbox": "Sandbox",
+  "linuxSandboxListTitle": "Sandbox",
+  "linuxSandboxListEmpty": "No sandboxes yet. Create one to give assistants a local workspace.",
+  "linuxSandboxCreateTitle": "Create sandbox",
+  "linuxSandboxCreateNameLabel": "Name",
+  "linuxSandboxCreateNameHint": "My sandbox",
+  "linuxSandboxCreateNameRequired": "Please enter a sandbox name.",
+  "linuxSandboxCreateAction": "Create",
+  "linuxSandboxCreateFailed": "Failed to create sandbox.",
+  "linuxSandboxDeleteFailed": "Failed to delete sandbox.",
+  "linuxSandboxCreateInstallSection": "Install options",
+  "linuxSandboxCreateBaseEnvTitle": "Base environment",
+  "linuxSandboxCreateBaseEnvSubtitle": "Empty workspace with file and shell tools.",
+  "linuxSandboxCreatePythonTitle": "Python",
+  "linuxSandboxCreateJavaTitle": "Java",
+  "linuxSandboxCreateComingLater": "Coming later",
+  "linuxSandboxDetailToolsSection": "Tools",
+  "linuxSandboxToolReadName": "Read",
+  "linuxSandboxToolReadDescription": "Read a file or list a directory inside the sandbox.",
+  "linuxSandboxToolWriteName": "Write",
+  "linuxSandboxToolWriteDescription": "Create or overwrite a text file inside the sandbox.",
+  "linuxSandboxToolEditName": "Edit",
+  "linuxSandboxToolEditDescription": "Replace text in a file inside the sandbox.",
+  "linuxSandboxToolShellName": "Shell",
+  "linuxSandboxToolShellDescription": "Run a shell command with the sandbox as working directory.",
+  "linuxSandboxToolsCount": "{enabled}/{total} tools",
+  "@linuxSandboxToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linuxSandboxBackupNote": "Sandbox files are stored on this device and are not included in backup.",
+  "linuxSandboxDeleteConfirmTitle": "Delete sandbox?",
+  "linuxSandboxDeleteConfirmMessage": "Delete “{name}”? Bound assistants will be unbound and local files removed.",
+  "@linuxSandboxDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linuxSandboxDeleteAction": "Delete",
+  "linuxSandboxBrowseTitle": "Files",
+  "linuxSandboxBrowseEmpty": "This folder is empty.",
+  "linuxSandboxBrowseUp": "Up",
+  "linuxSandboxAndroidUnsupported": "Sandbox tools are not available on Android in this version. You can still manage sandboxes here.",
+  "linuxSandboxPlatformUnsupported": "Sandbox tools currently run only on Windows. You can still manage sandboxes here.",
+  "linuxSandboxMissingMessage": "This sandbox no longer exists.",
+  "assistantEditPageLinuxSandboxTab": "Sandbox",
+  "assistantEditLinuxSandboxEnable": "Enable sandbox",
+  "assistantEditLinuxSandboxEnableSubtitle": "Allow this assistant to use a local sandbox workspace.",
+  "assistantEditLinuxSandboxPick": "Choose sandbox",
+  "assistantEditLinuxSandboxNone": "No sandboxes yet. Create one in Settings first.",
+  "assistantEditLinuxSandboxMissing": "The selected sandbox is missing. Choose another or turn sandbox off.",
+  "assistantEditLinuxSandboxManageCta": "Manage sandboxes"
 }

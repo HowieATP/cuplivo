@@ -13189,6 +13189,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Network error, please retry'**
   String get grokLoginNetworkError;
+
+  /// No description provided for @settingsPageLinuxSandbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox'**
+  String get settingsPageLinuxSandbox;
+
+  /// No description provided for @linuxSandboxListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox'**
+  String get linuxSandboxListTitle;
+
+  /// No description provided for @linuxSandboxListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sandboxes yet. Create one to give assistants a local workspace.'**
+  String get linuxSandboxListEmpty;
+
+  /// No description provided for @linuxSandboxCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create sandbox'**
+  String get linuxSandboxCreateTitle;
+
+  /// No description provided for @linuxSandboxCreateNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get linuxSandboxCreateNameLabel;
+
+  /// No description provided for @linuxSandboxCreateNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'My sandbox'**
+  String get linuxSandboxCreateNameHint;
+
+  /// No description provided for @linuxSandboxCreateNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a sandbox name.'**
+  String get linuxSandboxCreateNameRequired;
+
+  /// No description provided for @linuxSandboxCreateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get linuxSandboxCreateAction;
+
+  /// No description provided for @linuxSandboxCreateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create sandbox.'**
+  String get linuxSandboxCreateFailed;
+
+  /// No description provided for @linuxSandboxDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete sandbox.'**
+  String get linuxSandboxDeleteFailed;
+
+  /// No description provided for @linuxSandboxCreateInstallSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Install options'**
+  String get linuxSandboxCreateInstallSection;
+
+  /// No description provided for @linuxSandboxCreateBaseEnvTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Base environment'**
+  String get linuxSandboxCreateBaseEnvTitle;
+
+  /// No description provided for @linuxSandboxCreateBaseEnvSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty workspace with file and shell tools.'**
+  String get linuxSandboxCreateBaseEnvSubtitle;
+
+  /// No description provided for @linuxSandboxCreatePythonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Python'**
+  String get linuxSandboxCreatePythonTitle;
+
+  /// No description provided for @linuxSandboxCreateJavaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Java'**
+  String get linuxSandboxCreateJavaTitle;
+
+  /// No description provided for @linuxSandboxCreateComingLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming later'**
+  String get linuxSandboxCreateComingLater;
+
+  /// No description provided for @linuxSandboxDetailToolsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get linuxSandboxDetailToolsSection;
+
+  /// No description provided for @linuxSandboxToolReadName.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get linuxSandboxToolReadName;
+
+  /// No description provided for @linuxSandboxToolReadDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Read a file or list a directory inside the sandbox.'**
+  String get linuxSandboxToolReadDescription;
+
+  /// No description provided for @linuxSandboxToolWriteName.
+  ///
+  /// In en, this message translates to:
+  /// **'Write'**
+  String get linuxSandboxToolWriteName;
+
+  /// No description provided for @linuxSandboxToolWriteDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or overwrite a text file inside the sandbox.'**
+  String get linuxSandboxToolWriteDescription;
+
+  /// No description provided for @linuxSandboxToolEditName.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get linuxSandboxToolEditName;
+
+  /// No description provided for @linuxSandboxToolEditDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace text in a file inside the sandbox.'**
+  String get linuxSandboxToolEditDescription;
+
+  /// No description provided for @linuxSandboxToolShellName.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell'**
+  String get linuxSandboxToolShellName;
+
+  /// No description provided for @linuxSandboxToolShellDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a shell command with the sandbox as working directory.'**
+  String get linuxSandboxToolShellDescription;
+
+  /// No description provided for @linuxSandboxToolsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled}/{total} tools'**
+  String linuxSandboxToolsCount(int enabled, int total);
+
+  /// No description provided for @linuxSandboxBackupNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox files are stored on this device and are not included in backup.'**
+  String get linuxSandboxBackupNote;
+
+  /// No description provided for @linuxSandboxDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete sandbox?'**
+  String get linuxSandboxDeleteConfirmTitle;
+
+  /// No description provided for @linuxSandboxDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”? Bound assistants will be unbound and local files removed.'**
+  String linuxSandboxDeleteConfirmMessage(String name);
+
+  /// No description provided for @linuxSandboxDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get linuxSandboxDeleteAction;
+
+  /// No description provided for @linuxSandboxBrowseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get linuxSandboxBrowseTitle;
+
+  /// No description provided for @linuxSandboxBrowseEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get linuxSandboxBrowseEmpty;
+
+  /// No description provided for @linuxSandboxBrowseUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get linuxSandboxBrowseUp;
+
+  /// No description provided for @linuxSandboxAndroidUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox tools are not available on Android in this version. You can still manage sandboxes here.'**
+  String get linuxSandboxAndroidUnsupported;
+
+  /// No description provided for @linuxSandboxPlatformUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox tools currently run only on Windows. You can still manage sandboxes here.'**
+  String get linuxSandboxPlatformUnsupported;
+
+  /// No description provided for @linuxSandboxMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This sandbox no longer exists.'**
+  String get linuxSandboxMissingMessage;
+
+  /// No description provided for @assistantEditPageLinuxSandboxTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox'**
+  String get assistantEditPageLinuxSandboxTab;
+
+  /// No description provided for @assistantEditLinuxSandboxEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable sandbox'**
+  String get assistantEditLinuxSandboxEnable;
+
+  /// No description provided for @assistantEditLinuxSandboxEnableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this assistant to use a local sandbox workspace.'**
+  String get assistantEditLinuxSandboxEnableSubtitle;
+
+  /// No description provided for @assistantEditLinuxSandboxPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose sandbox'**
+  String get assistantEditLinuxSandboxPick;
+
+  /// No description provided for @assistantEditLinuxSandboxNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No sandboxes yet. Create one in Settings first.'**
+  String get assistantEditLinuxSandboxNone;
+
+  /// No description provided for @assistantEditLinuxSandboxMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected sandbox is missing. Choose another or turn sandbox off.'**
+  String get assistantEditLinuxSandboxMissing;
+
+  /// No description provided for @assistantEditLinuxSandboxManageCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage sandboxes'**
+  String get assistantEditLinuxSandboxManageCta;
 }
 
 class _AppLocalizationsDelegate

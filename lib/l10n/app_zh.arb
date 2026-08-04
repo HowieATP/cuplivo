@@ -2805,5 +2805,65 @@
   "grokLoginSessionHint": "保持登录；访问令牌会在后台自动续期，无需重新登录。",
   "grokLoginSignedOutToast": "已退出登录",
   "grokLoginHelpText": "打开 xAI 授权页面，输入验证码完成 Grok 授权。",
-  "grokLoginNetworkError": "网络错误，请重试"
+  "grokLoginNetworkError": "网络错误，请重试",
+  "settingsPageLinuxSandbox": "沙箱",
+  "linuxSandboxListTitle": "沙箱",
+  "linuxSandboxListEmpty": "暂无沙箱。创建一个后，即可为助手提供本地工作区。",
+  "linuxSandboxCreateTitle": "创建沙箱",
+  "linuxSandboxCreateNameLabel": "名称",
+  "linuxSandboxCreateNameHint": "我的沙箱",
+  "linuxSandboxCreateNameRequired": "请输入沙箱名称。",
+  "linuxSandboxCreateAction": "创建",
+  "linuxSandboxCreateFailed": "创建沙箱失败。",
+  "linuxSandboxDeleteFailed": "删除沙箱失败。",
+  "linuxSandboxCreateInstallSection": "安装选项",
+  "linuxSandboxCreateBaseEnvTitle": "基础环境",
+  "linuxSandboxCreateBaseEnvSubtitle": "空白工作区，提供文件与 Shell 工具。",
+  "linuxSandboxCreatePythonTitle": "Python",
+  "linuxSandboxCreateJavaTitle": "Java",
+  "linuxSandboxCreateComingLater": "稍后提供",
+  "linuxSandboxDetailToolsSection": "工具",
+  "linuxSandboxToolReadName": "读取",
+  "linuxSandboxToolReadDescription": "在沙箱内读取文件或列出目录。",
+  "linuxSandboxToolWriteName": "写入",
+  "linuxSandboxToolWriteDescription": "在沙箱内创建或覆盖文本文件。",
+  "linuxSandboxToolEditName": "编辑",
+  "linuxSandboxToolEditDescription": "在沙箱内替换文件中的文本。",
+  "linuxSandboxToolShellName": "Shell",
+  "linuxSandboxToolShellDescription": "以沙箱为工作目录运行 Shell 命令。",
+  "linuxSandboxToolsCount": "{enabled}/{total} 个工具",
+  "@linuxSandboxToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "linuxSandboxBackupNote": "沙箱文件仅保存在本机，不会包含在备份中。",
+  "linuxSandboxDeleteConfirmTitle": "删除沙箱？",
+  "linuxSandboxDeleteConfirmMessage": "确定删除“{name}”？已绑定的助手将解除绑定，本地文件也会被删除。",
+  "@linuxSandboxDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "linuxSandboxDeleteAction": "删除",
+  "linuxSandboxBrowseTitle": "文件",
+  "linuxSandboxBrowseEmpty": "此文件夹为空。",
+  "linuxSandboxBrowseUp": "上级",
+  "linuxSandboxAndroidUnsupported": "当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。",
+  "linuxSandboxPlatformUnsupported": "沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。",
+  "linuxSandboxMissingMessage": "该沙箱已不存在。",
+  "assistantEditPageLinuxSandboxTab": "沙箱",
+  "assistantEditLinuxSandboxEnable": "启用沙箱",
+  "assistantEditLinuxSandboxEnableSubtitle": "允许此助手使用本地沙箱工作区。",
+  "assistantEditLinuxSandboxPick": "选择沙箱",
+  "assistantEditLinuxSandboxNone": "暂无沙箱。请先在设置中创建。",
+  "assistantEditLinuxSandboxMissing": "所选沙箱已丢失。请另选一个，或关闭沙箱。",
+  "assistantEditLinuxSandboxManageCta": "管理沙箱"
 }

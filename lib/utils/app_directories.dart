@@ -64,6 +64,12 @@ class AppDirectories {
     return Directory('${root.path}/workspaces');
   }
 
+  /// Gets the directory for Linux Sandbox local jail roots.
+  static Future<Directory> getLinuxSandboxesDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/linux_sandboxes');
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

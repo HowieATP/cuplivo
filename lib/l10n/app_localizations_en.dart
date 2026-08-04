@@ -7237,4 +7237,149 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get grokLoginNetworkError => 'Network error, please retry';
+
+  @override
+  String get settingsPageLinuxSandbox => 'Sandbox';
+
+  @override
+  String get linuxSandboxListTitle => 'Sandbox';
+
+  @override
+  String get linuxSandboxListEmpty =>
+      'No sandboxes yet. Create one to give assistants a local workspace.';
+
+  @override
+  String get linuxSandboxCreateTitle => 'Create sandbox';
+
+  @override
+  String get linuxSandboxCreateNameLabel => 'Name';
+
+  @override
+  String get linuxSandboxCreateNameHint => 'My sandbox';
+
+  @override
+  String get linuxSandboxCreateNameRequired => 'Please enter a sandbox name.';
+
+  @override
+  String get linuxSandboxCreateAction => 'Create';
+
+  @override
+  String get linuxSandboxCreateFailed => 'Failed to create sandbox.';
+
+  @override
+  String get linuxSandboxDeleteFailed => 'Failed to delete sandbox.';
+
+  @override
+  String get linuxSandboxCreateInstallSection => 'Install options';
+
+  @override
+  String get linuxSandboxCreateBaseEnvTitle => 'Base environment';
+
+  @override
+  String get linuxSandboxCreateBaseEnvSubtitle =>
+      'Empty workspace with file and shell tools.';
+
+  @override
+  String get linuxSandboxCreatePythonTitle => 'Python';
+
+  @override
+  String get linuxSandboxCreateJavaTitle => 'Java';
+
+  @override
+  String get linuxSandboxCreateComingLater => 'Coming later';
+
+  @override
+  String get linuxSandboxDetailToolsSection => 'Tools';
+
+  @override
+  String get linuxSandboxToolReadName => 'Read';
+
+  @override
+  String get linuxSandboxToolReadDescription =>
+      'Read a file or list a directory inside the sandbox.';
+
+  @override
+  String get linuxSandboxToolWriteName => 'Write';
+
+  @override
+  String get linuxSandboxToolWriteDescription =>
+      'Create or overwrite a text file inside the sandbox.';
+
+  @override
+  String get linuxSandboxToolEditName => 'Edit';
+
+  @override
+  String get linuxSandboxToolEditDescription =>
+      'Replace text in a file inside the sandbox.';
+
+  @override
+  String get linuxSandboxToolShellName => 'Shell';
+
+  @override
+  String get linuxSandboxToolShellDescription =>
+      'Run a shell command with the sandbox as working directory.';
+
+  @override
+  String linuxSandboxToolsCount(int enabled, int total) {
+    return '$enabled/$total tools';
+  }
+
+  @override
+  String get linuxSandboxBackupNote =>
+      'Sandbox files are stored on this device and are not included in backup.';
+
+  @override
+  String get linuxSandboxDeleteConfirmTitle => 'Delete sandbox?';
+
+  @override
+  String linuxSandboxDeleteConfirmMessage(String name) {
+    return 'Delete “$name”? Bound assistants will be unbound and local files removed.';
+  }
+
+  @override
+  String get linuxSandboxDeleteAction => 'Delete';
+
+  @override
+  String get linuxSandboxBrowseTitle => 'Files';
+
+  @override
+  String get linuxSandboxBrowseEmpty => 'This folder is empty.';
+
+  @override
+  String get linuxSandboxBrowseUp => 'Up';
+
+  @override
+  String get linuxSandboxAndroidUnsupported =>
+      'Sandbox tools are not available on Android in this version. You can still manage sandboxes here.';
+
+  @override
+  String get linuxSandboxPlatformUnsupported =>
+      'Sandbox tools currently run only on Windows. You can still manage sandboxes here.';
+
+  @override
+  String get linuxSandboxMissingMessage => 'This sandbox no longer exists.';
+
+  @override
+  String get assistantEditPageLinuxSandboxTab => 'Sandbox';
+
+  @override
+  String get assistantEditLinuxSandboxEnable => 'Enable sandbox';
+
+  @override
+  String get assistantEditLinuxSandboxEnableSubtitle =>
+      'Allow this assistant to use a local sandbox workspace.';
+
+  @override
+  String get assistantEditLinuxSandboxPick => 'Choose sandbox';
+
+  @override
+  String get assistantEditLinuxSandboxNone =>
+      'No sandboxes yet. Create one in Settings first.';
+
+  @override
+  String get assistantEditLinuxSandboxMissing =>
+      'The selected sandbox is missing. Choose another or turn sandbox off.';
+
+  @override
+  String get assistantEditLinuxSandboxManageCta => 'Manage sandboxes';
 }

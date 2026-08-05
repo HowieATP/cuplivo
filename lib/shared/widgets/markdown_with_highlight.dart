@@ -15,6 +15,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:ui' as ui;
+import 'package:image/image.dart' as image_lib;
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -3179,8 +3180,22 @@ class _MarkdownTableBlock extends StatelessWidget {
             as RenderRepaintBoundary?;
     if (boundary == null) return null;
     final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
+    final data = await image.toByteData(
+      format: ui.ImageByteFormat.rawStraightRgba,
+    );
+    if (data == null) return null;
+    // 8-bit straight-alpha readback: ImageByteFormat.png on wide-gamut
+    // backends (iOS Impeller) embeds 10/16-bit wide-gamut bytes that
+    // downstream consumers misinterpret as sRGB. Encode to a plain
+    // 8-bit PNG here instead.
+    return image_lib.encodePng(
+      image_lib.Image.fromBytes(
+        width: image.width,
+        height: image.height,
+        bytes: data.buffer,
+        numChannels: 4,
+      ),
+    );
   }
 
   Future<File> _writeTableImageTempFile(Uint8List bytes) async {

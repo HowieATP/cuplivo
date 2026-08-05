@@ -247,19 +247,50 @@ class SseCompressedClientTransport implements ClientTransport {
         _logger.debug(
           'Compressed message delivery confirmation: $responseBody',
         );
+      } else if (response.statusCode == 404) {
+        // 404 means the server no longer knows this session. Mirror
+        // SseClientTransport: surface it as a JSON-RPC "Session terminated"
+        // error on the message stream instead of throwing — `send` is
+        // `void async`, so a throw would escape as an unhandled exception.
+        final responseBody = await _decompressResponse(response);
+        _logger.debug('Session terminated (404): $responseBody');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {'code': 32600, 'message': 'Session terminated'},
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       } else {
         final responseBody = await _decompressResponse(response);
         _logger.debug('Error response: $responseBody');
-        throw McpError(
-          'Error sending compressed message: ${response.statusCode}',
-        );
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {
+              'code': -32603,
+              'message':
+                  'Error sending compressed message: ${response.statusCode}',
+            },
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       }
 
       client.close();
       _logger.debug('Compressed message sent successfully');
     } catch (e) {
       _logger.debug('Error sending compressed message: $e');
-      rethrow;
+      if (!_messageController.isClosed) {
+        _messageController.add({
+          'jsonrpc': '2.0',
+          'error': {
+            'code': -32603,
+            'message': 'Error sending compressed message: $e',
+          },
+          if (message is Map && message['id'] != null) 'id': message['id'],
+        });
+      }
     }
   }
 

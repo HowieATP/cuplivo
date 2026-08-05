@@ -462,12 +462,34 @@ class SseHeartbeatClientTransport implements ClientTransport {
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Heartbeat message delivery confirmation: $responseBody');
+      } else if (response.statusCode == 404) {
+        // 404 means the server no longer knows this session. Mirror
+        // SseClientTransport: surface it as a JSON-RPC "Session terminated"
+        // error on the message stream instead of throwing — `send` is
+        // `void async`, so a throw would escape as an unhandled exception.
+        final responseBody = await response.transform(utf8.decoder).join();
+        _logger.debug('Session terminated (404): $responseBody');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {'code': 32600, 'message': 'Session terminated'},
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       } else {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        throw McpError(
-          'Error sending heartbeat message: ${response.statusCode}',
-        );
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {
+              'code': -32603,
+              'message':
+                  'Error sending heartbeat message: ${response.statusCode}',
+            },
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       }
 
       client.close();
@@ -481,7 +503,16 @@ class SseHeartbeatClientTransport implements ClientTransport {
         _updateHealth(ConnectionHealth.degraded);
       }
 
-      rethrow;
+      if (!_messageController.isClosed) {
+        _messageController.add({
+          'jsonrpc': '2.0',
+          'error': {
+            'code': -32603,
+            'message': 'Error sending heartbeat message: $e',
+          },
+          if (message is Map && message['id'] != null) 'id': message['id'],
+        });
+      }
     }
   }
 

@@ -407,18 +407,58 @@ class SseClientTransport implements ClientTransport {
           'Message delivery confirmation (${response.statusCode}): $responseBody',
         );
         // Don't forward this to message controller, actual response comes via SSE
+      } else if (response.statusCode == 404) {
+        // 404 means the server no longer knows this session. Mirror the
+        // StreamableHttpClientTransport behavior: surface it as a JSON-RPC
+        // "Session terminated" error on the message stream instead of
+        // throwing, so fire-and-forget notifications don't end up as
+        // unhandled exceptions. Requests are failed by the client through
+        // the error response's `id`.
+        final responseBody = await response.transform(utf8.decoder).join();
+        _logger.debug('Session terminated (404): $responseBody');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {'code': 32600, 'message': 'Session terminated'},
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       } else {
+        // Any non-200/202 response is routed back as a JSON-RPC error
+        // message instead of throwing: `send` is declared `void async`, so a
+        // thrown error would escape as an unhandled exception (the client
+        // cannot await or catch it). Requests are failed by the client
+        // through the error response's `id`; notifications without an `id`
+        // are dropped after a debug log.
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        throw McpError('Error sending message: ${response.statusCode}');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {
+              'code': -32603,
+              'message': 'Error sending message: ${response.statusCode}',
+            },
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
+        }
       }
 
       // Close the HTTP client
       client.close();
       _logger.debug('Message sent successfully');
     } catch (e) {
+      // Same rationale as the non-200/202 branch above: this `void async`
+      // method must never throw, or the error escapes as an unhandled
+      // exception (e.g. a connection dropped mid-response).
       _logger.debug('Error sending message: $e');
-      rethrow;
+      if (!_messageController.isClosed) {
+        _messageController.add({
+          'jsonrpc': '2.0',
+          'error': {'code': -32603, 'message': 'Error sending message: $e'},
+          if (message is Map && message['id'] != null) 'id': message['id'],
+        });
+      }
     }
   }
 

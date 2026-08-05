@@ -2272,7 +2272,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   if (useTabs) {
                     return _DesktopTabViews(
                       controller: _tabController!,
-                      listController: _listController,
                       buildAssistants: () => _buildAssistantsList(context),
                       buildConversations: () => _buildConversationsList(
                         context,
@@ -4285,17 +4284,36 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
 }
 
 // Desktop: TabBarView area hosting assistants and topics lists
-class _DesktopTabViews extends StatelessWidget {
+//
+// Each tab owns its own ScrollController: a TabBarView keeps adjacent pages
+// alive during the tab animation, so sharing one controller between both
+// lists attaches it to two ScrollPositions at once. On desktop the framework
+// wraps each scrollable in a Scrollbar bound to that controller, which then
+// fails the "attached to more than one ScrollPosition" assertion.
+class _DesktopTabViews extends StatefulWidget {
   const _DesktopTabViews({
     required this.controller,
-    required this.listController,
     required this.buildAssistants,
     required this.buildConversations,
   });
   final TabController controller;
-  final ScrollController listController;
   final Widget Function() buildAssistants;
   final Widget Function() buildConversations;
+
+  @override
+  State<_DesktopTabViews> createState() => _DesktopTabViewsState();
+}
+
+class _DesktopTabViewsState extends State<_DesktopTabViews> {
+  final ScrollController _assistantsController = ScrollController();
+  final ScrollController _conversationsController = ScrollController();
+
+  @override
+  void dispose() {
+    _assistantsController.dispose();
+    _conversationsController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4307,20 +4325,20 @@ class _DesktopTabViews extends StatelessWidget {
         ? (isDesktop ? 2.0 : 4.0)
         : 10.0;
     return TabBarView(
-      controller: controller,
+      controller: widget.controller,
       physics: const BouncingScrollPhysics(),
       children: [
         // Assistants
         ListView(
-          controller: listController,
+          controller: _assistantsController,
           padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-          children: [buildAssistants()],
+          children: [widget.buildAssistants()],
         ),
         // Topics (conversations)
         ListView(
-          controller: listController,
+          controller: _conversationsController,
           padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
-          children: [buildConversations()],
+          children: [widget.buildConversations()],
         ),
       ],
     );

@@ -335,10 +335,7 @@ class SseAuthClientTransport implements ClientTransport {
       // Add current OAuth token if available
       final token = _oauthToken;
       if (token != null) {
-        request.headers.set(
-          'Authorization',
-          'Bearer ${token.accessToken}',
-        );
+        request.headers.set('Authorization', 'Bearer ${token.accessToken}');
       }
 
       // Send the request
@@ -356,6 +353,7 @@ class SseAuthClientTransport implements ClientTransport {
         _logger.debug(
           'Authentication error during send: ${response.statusCode} - $responseBody',
         );
+        client.close();
 
         // Try to refresh token if possible
         if (_oauthClient != null &&
@@ -365,15 +363,31 @@ class SseAuthClientTransport implements ClientTransport {
           // Retry the send operation
           return send(message);
         } else {
-          throw McpError(
+          _emitError(
             'Authentication failed during send: ${response.statusCode}',
+            message: message,
           );
+        }
+      } else if (response.statusCode == 404) {
+        // 404 means the server no longer knows this session. Mirror
+        // SseClientTransport: surface it as a JSON-RPC "Session terminated"
+        // error on the message stream instead of throwing — `send` is
+        // `void async`, so a throw would escape as an unhandled exception.
+        final responseBody = await response.transform(utf8.decoder).join();
+        _logger.debug('Session terminated (404): $responseBody');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {'code': 32600, 'message': 'Session terminated'},
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
         }
       } else {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        throw McpError(
+        _emitError(
           'Error sending authenticated message: ${response.statusCode}',
+          message: message,
         );
       }
 
@@ -381,8 +395,21 @@ class SseAuthClientTransport implements ClientTransport {
       _logger.debug('Authenticated message sent successfully');
     } catch (e) {
       _logger.debug('Error sending authenticated message: $e');
-      rethrow;
+      _emitError('Error sending authenticated message: $e', message: message);
     }
+  }
+
+  /// Route a send failure to the message stream as a JSON-RPC error, so a
+  /// `void async` send never throws (see [send]). Requests are failed by
+  /// the client through the error response's `id`; notifications without an
+  /// `id` are logged by the client and dropped.
+  void _emitError(String description, {required dynamic message}) {
+    if (_messageController.isClosed) return;
+    _messageController.add({
+      'jsonrpc': '2.0',
+      'error': {'code': -32603, 'message': description},
+      if (message is Map && message['id'] != null) 'id': message['id'],
+    });
   }
 
   @override

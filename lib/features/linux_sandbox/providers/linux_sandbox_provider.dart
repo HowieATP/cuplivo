@@ -204,6 +204,10 @@ class LinuxSandboxProvider extends ChangeNotifier {
 
   /// Re-probe sandboxes marked ready; downgrade if disk/runtime disagrees.
   Future<void> _probeReadySandboxes() async {
+    // Runtime probes touch platform channels (path_provider / wsl.exe) that
+    // never complete under `flutter test`; skip there. Production behavior is
+    // unchanged.
+    if (Platform.environment.containsKey('FLUTTER_TEST')) return;
     var changed = false;
     for (var i = 0; i < _sandboxes.length; i++) {
       final sandbox = _sandboxes[i];

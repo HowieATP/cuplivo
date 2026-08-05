@@ -24,13 +24,12 @@ class _LinuxSandboxTab extends StatelessWidget {
     final sandboxes = sandboxProvider.sandboxes;
     final enabled = assistant.sandboxEnabled;
     final selectedId = assistant.sandboxId;
-    final selectedExists =
-        selectedId != null && sandboxProvider.getById(selectedId) != null;
+    final selectedSandbox = selectedId == null
+        ? null
+        : sandboxProvider.getById(selectedId);
+    final selectedExists = selectedSandbox != null;
     final missingSelected =
         selectedId != null && selectedId.isNotEmpty && !selectedExists;
-    final selectedSandbox = selectedExists
-        ? sandboxProvider.getById(selectedId!)
-        : null;
     final selectedNotReady =
         enabled &&
         selectedSandbox != null &&

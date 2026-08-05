@@ -37,6 +37,7 @@ import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../skills/skill_manager.dart';
+import '../../linux_sandbox/models/linux_sandbox.dart';
 import '../../linux_sandbox/pages/linux_sandbox_list_page.dart';
 import '../../linux_sandbox/providers/linux_sandbox_provider.dart';
 import '../../../icons/lucide_adapter.dart';

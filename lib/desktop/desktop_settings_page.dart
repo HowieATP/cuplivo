@@ -51,6 +51,7 @@ import 'package:path/path.dart' as p;
 import 'desktop_context_menu.dart';
 import 'desktop_settings_navigation_bus.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/settings/widgets/ios_settings_widgets.dart';
 import 'setting/default_model_pane.dart';
 import 'setting/search_services_pane.dart';
 import 'setting/mcp_pane.dart';
@@ -83,10 +84,18 @@ part 'setting/display_pane.dart';
 /// Desktop settings layout: left menu + vertical divider + right content.
 /// For now, only the left menu and the Display Settings content are implemented.
 class DesktopSettingsPage extends StatefulWidget {
-  const DesktopSettingsPage({super.key, this.initialProviderKey});
+  const DesktopSettingsPage({
+    super.key,
+    this.initialProviderKey,
+    this.showLegacyBackButton = false,
+  });
 
   // Optional: when provided, jump to Providers tab and preselect this provider
   final String? initialProviderKey;
+
+  // When true (opened as a route from the new settings hub), show a back
+  // button that pops the route.
+  final bool showLegacyBackButton;
 
   @override
   State<DesktopSettingsPage> createState() => _DesktopSettingsPageState();
@@ -146,21 +155,39 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
     final l10n = AppLocalizations.of(context)!;
 
     const double menuWidth = 250;
+    final titleWidget = Text(
+      l10n.settingsPageTitle, // 固定显示“设置”
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: AppFontWeights.semibold,
+        color: cs.onSurface,
+        decoration: TextDecoration.none,
+      ),
+    );
     final topBar = SizedBox(
       height: 36,
       child: Align(
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(left: 16, top: 8),
-          child: Text(
-            l10n.settingsPageTitle, // 固定显示“设置”
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: AppFontWeights.semibold,
-              color: cs.onSurface,
-              decoration: TextDecoration.none,
-            ),
-          ),
+          child: widget.showLegacyBackButton
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Tooltip(
+                      message: l10n.settingsPageBackButton,
+                      child: IosTactileIconButton(
+                        icon: lucide.Lucide.ArrowLeft,
+                        color: cs.onSurface,
+                        size: 16,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    titleWidget,
+                  ],
+                )
+              : titleWidget,
         ),
       ),
     );

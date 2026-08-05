@@ -1,20 +1,24 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+
+import '../../../utils/app_directories.dart';
 import '../models/linux_sandbox.dart';
 import 'local_jail_fs.dart';
 import 'sandbox_disk_layout.dart';
 import 'sandbox_runtime.dart';
-import 'windows_local_jail_runtime.dart';
 import 'windows_wsl.dart';
+import 'wsl_rootfs_installer.dart';
 
-/// Windows facade: prefers WSL when a distro is ready, otherwise local jail.
+/// Windows sandbox runtime: real Linux via shared WSL distro only.
+///
+/// File tools use [LocalJailFs] on the host `files/` tree. Shell always goes
+/// through `wsl.exe -d Cuplivo-Sandbox`. There is no localJail shell fallback.
 class WindowsSandboxRuntime implements SandboxRuntime {
-  WindowsSandboxRuntime(this.sandboxId)
-    : _localJail = WindowsLocalJailRuntime(sandboxId);
+  WindowsSandboxRuntime(this.sandboxId);
 
-  final WindowsLocalJailRuntime _localJail;
-
-  LinuxSandboxRuntimeMode _mode = LinuxSandboxRuntimeMode.localJail;
+  LinuxSandboxRuntimeMode _mode = LinuxSandboxRuntimeMode.wsl;
 
   @override
   final String sandboxId;
@@ -42,6 +46,11 @@ class WindowsSandboxRuntime implements SandboxRuntime {
     }
   }
 
+  Future<Directory> _sharedDistroInstallDir() async {
+    final base = await AppDirectories.getWslDistrosDirectory();
+    return Directory(p.join(base.path, kCuplivoWslDistroName));
+  }
+
   @override
   Future<Directory> rootDirectory() => SandboxDiskLayout.filesDir(sandboxId);
 
@@ -53,40 +62,155 @@ class WindowsSandboxRuntime implements SandboxRuntime {
     void Function(double? progress, String stage)? onProgress,
   }) async {
     try {
-      onProgress?.call(0.1, 'layout');
+      onProgress?.call(0.02, 'layout');
       await ensureReady();
-      onProgress?.call(0.4, 'probe_wsl');
-      final probe = await probeWsl();
-      if (probe.distroReady) {
-        onProgress?.call(0.8, 'marker');
-        await SandboxDiskLayout.writeRuntimeMode(
-          sandboxId,
-          LinuxSandboxRuntimeMode.wsl.name,
+
+      onProgress?.call(0.08, 'probe_wsl');
+      var probe = await probeWsl();
+      if (probe.cuplivoDistroReady) {
+        final verified = await verifyCuplivoDistro();
+        if (verified) {
+          return _markWslReady(onProgress: onProgress);
+        }
+        debugPrint(
+          'WindowsSandboxRuntime: Cuplivo distro registered but verify failed; '
+          'will re-import if possible',
         );
-        await SandboxDiskLayout.writeBaseEnvMarker(sandboxId);
-        _mode = LinuxSandboxRuntimeMode.wsl;
-        onProgress?.call(1.0, 'done');
-        return SandboxInstallResult.success(LinuxSandboxRuntimeMode.wsl);
       }
 
-      onProgress?.call(0.8, 'marker');
-      await SandboxDiskLayout.writeRuntimeMode(
-        sandboxId,
-        LinuxSandboxRuntimeMode.localJail.name,
+      if (!probe.platformReady) {
+        onProgress?.call(0.15, 'enable_wsl');
+        final enable = await tryEnableWslPlatform();
+        if (enable.rebootRecommended) {
+          return SandboxInstallResult.failure(
+            LinuxSandboxRuntimeMode.wsl,
+            enable.detail ??
+                'Restart Windows, then tap Install base environment again.',
+            errorCode: 'wsl_reboot_required',
+          );
+        }
+        if (!enable.ok) {
+          return SandboxInstallResult.failure(
+            LinuxSandboxRuntimeMode.wsl,
+            enable.detail ??
+                'Could not enable the WSL platform. Grant admin permission '
+                    'or install WSL, then retry.',
+            errorCode: 'wsl_enable_failed',
+          );
+        }
+
+        onProgress?.call(0.25, 'probe_wsl');
+        probe = await probeWsl();
+        if (probe.rebootRecommended) {
+          return SandboxInstallResult.failure(
+            LinuxSandboxRuntimeMode.wsl,
+            probe.detail ??
+                'Restart Windows, then tap Install base environment again.',
+            errorCode: 'wsl_reboot_required',
+          );
+        }
+        if (!probe.platformReady) {
+          return SandboxInstallResult.failure(
+            LinuxSandboxRuntimeMode.wsl,
+            probe.detail ??
+                'WSL platform is still not ready after enable attempt.',
+            errorCode: 'wsl_enable_failed',
+          );
+        }
+      }
+
+      if (probe.cuplivoDistroReady) {
+        final verified = await verifyCuplivoDistro();
+        if (verified) {
+          return _markWslReady(onProgress: onProgress);
+        }
+      }
+
+      // Download rootfs + import shared distro (process-wide lock inside
+      // ensureCuplivoDistroImported). Broken registrations are unregistered
+      // there before re-import.
+      final tmp = await SandboxDiskLayout.tmpDir(sandboxId);
+      final installDir = await _sharedDistroInstallDir();
+      if (probe.cuplivoDistroReady) {
+        // verify failed above — force clean re-import path
+        onProgress?.call(0.28, 'wsl_unregister');
+        await unregisterCuplivoDistro();
+      }
+      if (await installDir.exists()) {
+        try {
+          await installDir.delete(recursive: true);
+        } catch (e, st) {
+          debugPrint(
+            'WindowsSandboxRuntime: clear stale WSL install dir failed: $e\n$st',
+          );
+        }
+      }
+      await installDir.create(recursive: true);
+
+      final installer = WslRootfsInstaller();
+      late final String tarPath;
+      try {
+        onProgress?.call(0.30, 'download');
+        tarPath = await installer.downloadAndGunzipTar(
+          tmpDir: tmp.path,
+          onProgress: (progress, stage) {
+            // Map download/gunzip into 0.30..0.75
+            final mapped = 0.30 + ((progress ?? 0).clamp(0.0, 1.0) * 0.45);
+            onProgress?.call(mapped, stage);
+          },
+        );
+
+        onProgress?.call(0.78, 'import');
+        await ensureCuplivoDistroImported(
+          installDir: installDir.path,
+          rootfsTarPath: tarPath,
+          onProgress: (progress, stage) {
+            final mapped = 0.78 + ((progress ?? 0).clamp(0.0, 1.0) * 0.18);
+            onProgress?.call(mapped, stage);
+          },
+        );
+      } finally {
+        installer.close();
+        try {
+          final tar = File(p.join(tmp.path, 'rootfs.tar'));
+          if (await tar.exists()) await tar.delete();
+        } catch (e, st) {
+          debugPrint(
+            'WindowsSandboxRuntime: cleanup rootfs.tar failed: $e\n$st',
+          );
+        }
+        try {
+          final gz = File(p.join(tmp.path, 'rootfs.tar.gz'));
+          if (await gz.exists()) await gz.delete();
+        } catch (e, st) {
+          debugPrint(
+            'WindowsSandboxRuntime: cleanup rootfs.tar.gz failed: $e\n$st',
+          );
+        }
+      }
+
+      return _markWslReady(onProgress: onProgress);
+    } catch (e, st) {
+      debugPrint('WindowsSandboxRuntime.installBaseEnv failed: $e\n$st');
+      return SandboxInstallResult.failure(
+        LinuxSandboxRuntimeMode.wsl,
+        e.toString(),
       );
-      await SandboxDiskLayout.writeBaseEnvMarker(sandboxId);
-      _mode = LinuxSandboxRuntimeMode.localJail;
-      onProgress?.call(1.0, 'done');
-      final detail =
-          probe.detail ??
-          'WSL not available; using Windows folder jail (not Linux)';
-      return SandboxInstallResult.success(
-        LinuxSandboxRuntimeMode.localJail,
-        statusMessage: detail,
-      );
-    } catch (e) {
-      return SandboxInstallResult.failure(_mode, e.toString());
     }
+  }
+
+  Future<SandboxInstallResult> _markWslReady({
+    void Function(double? progress, String stage)? onProgress,
+  }) async {
+    onProgress?.call(0.95, 'marker');
+    await SandboxDiskLayout.writeRuntimeMode(
+      sandboxId,
+      LinuxSandboxRuntimeMode.wsl.name,
+    );
+    await SandboxDiskLayout.writeBaseEnvMarker(sandboxId);
+    _mode = LinuxSandboxRuntimeMode.wsl;
+    onProgress?.call(1.0, 'done');
+    return SandboxInstallResult.success(LinuxSandboxRuntimeMode.wsl);
   }
 
   @override
@@ -97,11 +221,30 @@ class WindowsSandboxRuntime implements SandboxRuntime {
       if (!await root.exists()) return LinuxSandboxStatus.notReady;
       final files = await SandboxDiskLayout.filesDir(sandboxId);
       if (!await files.exists()) return LinuxSandboxStatus.notReady;
-      if (await SandboxDiskLayout.hasBaseEnvMarker(sandboxId)) {
-        return LinuxSandboxStatus.ready;
+
+      final hasMarker = await SandboxDiskLayout.hasBaseEnvMarker(sandboxId);
+      if (!hasMarker) return LinuxSandboxStatus.notReady;
+
+      final probe = await probeWsl();
+      if (probe.cuplivoDistroReady) {
+        final verified = await verifyCuplivoDistro();
+        if (verified) {
+          _mode = LinuxSandboxRuntimeMode.wsl;
+          return LinuxSandboxStatus.ready;
+        }
+        debugPrint(
+          'WindowsSandboxRuntime.probeStatus: marker present but '
+          'Cuplivo-Sandbox verify failed',
+        );
+        return LinuxSandboxStatus.broken;
       }
-      return LinuxSandboxStatus.notReady;
-    } catch (_) {
+      debugPrint(
+        'WindowsSandboxRuntime.probeStatus: marker present but '
+        'Cuplivo-Sandbox missing (${probe.detail})',
+      );
+      return LinuxSandboxStatus.broken;
+    } catch (e, st) {
+      debugPrint('WindowsSandboxRuntime.probeStatus failed: $e\n$st');
       return LinuxSandboxStatus.broken;
     }
   }
@@ -133,22 +276,31 @@ class WindowsSandboxRuntime implements SandboxRuntime {
     await ensureReady();
     await _refreshModeFromDisk();
 
-    if (_mode == LinuxSandboxRuntimeMode.wsl) {
-      final probe = await probeWsl();
-      if (probe.distroReady) {
-        final files = await rootDirectory();
-        return execWslShell(
-          hostFilesDir: files.path,
-          command: command,
-          timeout: timeout,
-          distro: probe.defaultDistro,
-        );
-      }
-      // Marker says wsl but probe failed — fall back for this call only.
-      return _localJail.shell(command, timeout: timeout);
+    final hasMarker = await SandboxDiskLayout.hasBaseEnvMarker(sandboxId);
+    if (!hasMarker || _mode != LinuxSandboxRuntimeMode.wsl) {
+      return SandboxToolResult.failure(
+        'sandbox_not_ready',
+        'Sandbox base environment is not ready. Install WSL base env first.',
+      );
     }
 
-    return _localJail.shell(command, timeout: timeout);
+    final probe = await probeWsl();
+    if (!probe.cuplivoDistroReady) {
+      return SandboxToolResult.failure(
+        'wsl_unavailable',
+        probe.detail ??
+            'WSL distro $kCuplivoWslDistroName is not available. '
+                'Reinstall the base environment.',
+      );
+    }
+
+    final files = await rootDirectory();
+    return execWslShell(
+      hostFilesDir: files.path,
+      command: command,
+      timeout: timeout,
+      distro: kCuplivoWslDistroName,
+    );
   }
 
   @override
@@ -157,6 +309,8 @@ class WindowsSandboxRuntime implements SandboxRuntime {
     return fs.listDir(path);
   }
 
+  /// Destroys only this sandbox tree. Does **not** unregister the shared
+  /// [kCuplivoWslDistroName] distro (shared across sandboxes).
   @override
   Future<void> destroyDisk() => SandboxDiskLayout.destroySandboxTree(sandboxId);
 }

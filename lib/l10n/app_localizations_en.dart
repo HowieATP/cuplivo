@@ -7374,7 +7374,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linuxSandboxWindowsLocalJailBanner =>
-      'Running as a Windows folder jail — not a Linux environment. Install or enable WSL for a real Linux shell.';
+      'Windows sandbox tools require WSL. Install or reinstall the base environment.';
+
+  @override
+  String get linuxSandboxWindowsWslBrokenHint =>
+      'WSL base environment is not ready. Tap Install / Reinstall base environment. You may need to approve UAC or restart Windows.';
+
+  @override
+  String get linuxSandboxWindowsWslInstallNote =>
+      'On Windows, base environment uses real Linux via WSL (shared Cuplivo-Sandbox distro). Setup may show a UAC prompt and can require a restart before finishing.';
+
+  @override
+  String get linuxSandboxWslRebootRequired =>
+      'WSL was enabled but Windows must restart. After restart, open this sandbox and tap Install base environment to finish.';
+
+  @override
+  String get linuxSandboxWslEnableFailed =>
+      'Could not enable WSL. Install WSL from Windows features or run wsl --install, then retry Install base environment.';
+
+  @override
+  String get linuxSandboxWslResumeAfterReboot =>
+      'Restart complete — tap Install base environment to finish WSL setup.';
+
+  @override
+  String get linuxSandboxWslDownloadingRootfs => 'Downloading Linux rootfs';
+
+  @override
+  String get linuxSandboxWslImportingDistro => 'Importing WSL distro';
 
   @override
   String get linuxSandboxStatusDisabled => 'Disabled';
@@ -7413,7 +7439,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get linuxSandboxReinstallBaseEnvAction => 'Reinstall base environment';
 
   @override
-  String get linuxSandboxRetryWslAction => 'Retry WSL';
+  String get linuxSandboxRetryWslAction => 'Install WSL / Reinstall base env';
 
   @override
   String get linuxSandboxInstallFailed => 'Failed to install base environment.';

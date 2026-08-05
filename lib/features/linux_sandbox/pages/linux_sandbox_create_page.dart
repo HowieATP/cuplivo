@@ -200,13 +200,26 @@ class _LinuxSandboxCreatePageState extends State<LinuxSandboxCreatePage> {
               ),
             ),
           ],
+          if (Platform.isWindows) ...[
+            const SizedBox(height: 12),
+            Text(
+              l10n.linuxSandboxWindowsWslInstallNote,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
           if (_creating) ...[
             const SizedBox(height: 16),
             LinearProgressIndicator(value: _installProgress),
             if (_installStage != null) ...[
               const SizedBox(height: 8),
               Text(
-                l10n.linuxSandboxInstallProgress(_installStage!),
+                l10n.linuxSandboxInstallProgress(
+                  _localizeCreateInstallStage(l10n, _installStage!),
+                ),
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurface.withValues(alpha: 0.6),
@@ -244,6 +257,18 @@ class _LinuxSandboxCreatePageState extends State<LinuxSandboxCreatePage> {
       clipBehavior: Clip.antiAlias,
       child: child,
     );
+  }
+}
+
+String _localizeCreateInstallStage(AppLocalizations l10n, String stage) {
+  switch (stage) {
+    case 'download':
+      return l10n.linuxSandboxWslDownloadingRootfs;
+    case 'import':
+    case 'wsl_import':
+      return l10n.linuxSandboxWslImportingDistro;
+    default:
+      return stage;
   }
 }
 

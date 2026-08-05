@@ -7058,7 +7058,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get linuxSandboxWindowsLocalJailBanner =>
-      '当前以 Windows 文件夹隔离方式运行——并非 Linux 环境。安装或启用 WSL 后可使用真正的 Linux Shell。';
+      'Windows 沙箱工具需要 WSL。请安装或重新安装基础环境。';
+
+  @override
+  String get linuxSandboxWindowsWslBrokenHint =>
+      'WSL 基础环境尚未就绪。请点击安装/重新安装基础环境。可能需要批准 UAC 或重启 Windows。';
+
+  @override
+  String get linuxSandboxWindowsWslInstallNote =>
+      '在 Windows 上，基础环境通过 WSL 提供真正的 Linux（共享 Cuplivo-Sandbox 发行版）。安装时可能弹出 UAC，并可能需要重启后才能完成。';
+
+  @override
+  String get linuxSandboxWslRebootRequired =>
+      'WSL 已启用，但需要重启 Windows。重启后打开此沙箱并点击「安装基础环境」以完成设置。';
+
+  @override
+  String get linuxSandboxWslEnableFailed =>
+      '无法启用 WSL。请从 Windows 功能安装 WSL，或运行 wsl --install，然后重试安装基础环境。';
+
+  @override
+  String get linuxSandboxWslResumeAfterReboot =>
+      '重启完成 — 请点击「安装基础环境」以完成 WSL 设置。';
+
+  @override
+  String get linuxSandboxWslDownloadingRootfs => '正在下载 Linux 根文件系统';
+
+  @override
+  String get linuxSandboxWslImportingDistro => '正在导入 WSL 发行版';
 
   @override
   String get linuxSandboxStatusDisabled => '已禁用';
@@ -7097,7 +7123,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get linuxSandboxReinstallBaseEnvAction => '重新安装基础环境';
 
   @override
-  String get linuxSandboxRetryWslAction => '重试 WSL';
+  String get linuxSandboxRetryWslAction => '安装 WSL / 重新安装基础环境';
 
   @override
   String get linuxSandboxInstallFailed => '安装基础环境失败。';
@@ -14184,7 +14210,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get linuxSandboxWindowsLocalJailBanner =>
-      '当前以 Windows 文件夹隔离方式运行——并非 Linux 环境。安装或启用 WSL 后可使用真正的 Linux Shell。';
+      'Windows 沙箱工具需要 WSL。请安装或重新安装基础环境。';
+
+  @override
+  String get linuxSandboxWindowsWslBrokenHint =>
+      'WSL 基础环境尚未就绪。请点击安装/重新安装基础环境。可能需要批准 UAC 或重启 Windows。';
+
+  @override
+  String get linuxSandboxWindowsWslInstallNote =>
+      '在 Windows 上，基础环境通过 WSL 提供真正的 Linux（共享 Cuplivo-Sandbox 发行版）。安装时可能弹出 UAC，并可能需要重启后才能完成。';
+
+  @override
+  String get linuxSandboxWslRebootRequired =>
+      'WSL 已启用，但需要重启 Windows。重启后打开此沙箱并点击「安装基础环境」以完成设置。';
+
+  @override
+  String get linuxSandboxWslEnableFailed =>
+      '无法启用 WSL。请从 Windows 功能安装 WSL，或运行 wsl --install，然后重试安装基础环境。';
+
+  @override
+  String get linuxSandboxWslResumeAfterReboot =>
+      '重启完成 — 请点击「安装基础环境」以完成 WSL 设置。';
+
+  @override
+  String get linuxSandboxWslDownloadingRootfs => '正在下载 Linux 根文件系统';
+
+  @override
+  String get linuxSandboxWslImportingDistro => '正在导入 WSL 发行版';
 
   @override
   String get linuxSandboxStatusDisabled => '已禁用';
@@ -14223,7 +14275,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get linuxSandboxReinstallBaseEnvAction => '重新安装基础环境';
 
   @override
-  String get linuxSandboxRetryWslAction => '重试 WSL';
+  String get linuxSandboxRetryWslAction => '安装 WSL / 重新安装基础环境';
 
   @override
   String get linuxSandboxInstallFailed => '安装基础环境失败。';
@@ -21310,7 +21362,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get linuxSandboxWindowsLocalJailBanner =>
-      '目前以 Windows 資料夾隔離方式執行——並非 Linux 環境。安裝或啟用 WSL 後可使用真正的 Linux Shell。';
+      'Windows 沙箱工具需要 WSL。請安裝或重新安裝基礎環境。';
+
+  @override
+  String get linuxSandboxWindowsWslBrokenHint =>
+      'WSL 基礎環境尚未就緒。請點選安裝/重新安裝基礎環境。可能需要批准 UAC 或重新啟動 Windows。';
+
+  @override
+  String get linuxSandboxWindowsWslInstallNote =>
+      '在 Windows 上，基礎環境透過 WSL 提供真正的 Linux（共用 Cuplivo-Sandbox 發行版）。安裝時可能跳出 UAC，並可能需要重新啟動後才能完成。';
+
+  @override
+  String get linuxSandboxWslRebootRequired =>
+      'WSL 已啟用，但需要重新啟動 Windows。重新啟動後開啟此沙箱並點選「安裝基礎環境」以完成設定。';
+
+  @override
+  String get linuxSandboxWslEnableFailed =>
+      '無法啟用 WSL。請從 Windows 功能安裝 WSL，或執行 wsl --install，然後重試安裝基礎環境。';
+
+  @override
+  String get linuxSandboxWslResumeAfterReboot =>
+      '重新啟動完成 — 請點選「安裝基礎環境」以完成 WSL 設定。';
+
+  @override
+  String get linuxSandboxWslDownloadingRootfs => '正在下載 Linux 根檔案系統';
+
+  @override
+  String get linuxSandboxWslImportingDistro => '正在匯入 WSL 發行版';
 
   @override
   String get linuxSandboxStatusDisabled => '已停用';
@@ -21349,7 +21427,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get linuxSandboxReinstallBaseEnvAction => '重新安裝基礎環境';
 
   @override
-  String get linuxSandboxRetryWslAction => '重試 WSL';
+  String get linuxSandboxRetryWslAction => '安裝 WSL / 重新安裝基礎環境';
 
   @override
   String get linuxSandboxInstallFailed => '安裝基礎環境失敗。';

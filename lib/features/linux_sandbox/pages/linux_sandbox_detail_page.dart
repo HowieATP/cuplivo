@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -151,8 +153,12 @@ class LinuxSandboxDetailPage extends StatelessWidget {
     final metas = _toolMetas(l10n);
     final installing = sandbox.status == LinuxSandboxStatus.installing;
     final isReady = sandbox.status == LinuxSandboxStatus.ready;
-    final showLocalJailBanner =
-        sandbox.runtimeMode == LinuxSandboxRuntimeMode.localJail;
+    final resumeAfterReboot = provider.wslResumeSandboxId == sandbox.id;
+    final showWslHint =
+        Platform.isWindows &&
+        (resumeAfterReboot ||
+            sandbox.status == LinuxSandboxStatus.broken ||
+            sandbox.status == LinuxSandboxStatus.notReady);
     final showProotBanner =
         sandbox.runtimeMode == LinuxSandboxRuntimeMode.proot;
 
@@ -224,10 +230,12 @@ class LinuxSandboxDetailPage extends StatelessWidget {
               ),
             ],
           ),
-          if (showLocalJailBanner) ...[
+          if (showWslHint) ...[
             const SizedBox(height: 12),
             _InfoBanner(
-              message: l10n.linuxSandboxWindowsLocalJailBanner,
+              message: resumeAfterReboot
+                  ? l10n.linuxSandboxWslResumeAfterReboot
+                  : l10n.linuxSandboxWindowsWslBrokenHint,
               color: cs.tertiary,
               onColor: cs.onTertiaryContainer,
               background: cs.tertiaryContainer.withValues(alpha: 0.55),
@@ -246,7 +254,7 @@ class LinuxSandboxDetailPage extends StatelessWidget {
               sandbox.lastInstallError!.isNotEmpty) ...[
             const SizedBox(height: 12),
             _InfoBanner(
-              message: sandbox.lastInstallError!,
+              message: _friendlyInstallError(l10n, sandbox.lastInstallError!),
               color: cs.error,
               onColor: cs.onErrorContainer,
               background: cs.errorContainer.withValues(alpha: 0.55),
@@ -262,15 +270,6 @@ class LinuxSandboxDetailPage extends StatelessWidget {
             enabled: !installing,
             onTap: () => _installBaseEnv(context, sandbox.id),
           ),
-          if (showLocalJailBanner) ...[
-            const SizedBox(height: 10),
-            IosTileButton(
-              icon: Lucide.RefreshCw,
-              label: l10n.linuxSandboxRetryWslAction,
-              enabled: !installing,
-              onTap: () => _installBaseEnv(context, sandbox.id),
-            ),
-          ],
           if (installing) ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(
@@ -280,7 +279,7 @@ class LinuxSandboxDetailPage extends StatelessWidget {
             Text(
               l10n.linuxSandboxInstallProgress(
                 sandbox.statusMessage?.trim().isNotEmpty == true
-                    ? sandbox.statusMessage!.trim()
+                    ? _localizeInstallStage(l10n, sandbox.statusMessage!.trim())
                     : l10n.linuxSandboxStatusInstalling,
               ),
               style: TextStyle(
@@ -376,6 +375,47 @@ String _modeLabel(AppLocalizations l10n, LinuxSandboxRuntimeMode mode) {
     case LinuxSandboxRuntimeMode.unsupported:
     case LinuxSandboxRuntimeMode.unknown:
       return l10n.linuxSandboxRuntimeModeUnknown;
+  }
+}
+
+String _friendlyInstallError(AppLocalizations l10n, String raw) {
+  final lower = raw.toLowerCase();
+  if (lower.contains('wsl_reboot_required') ||
+      lower.contains('restart windows') ||
+      lower.contains('reboot')) {
+    return l10n.linuxSandboxWslRebootRequired;
+  }
+  if (lower.contains('wsl_enable_failed') ||
+      lower.contains('could not enable the wsl') ||
+      lower.contains('wsl platform')) {
+    return l10n.linuxSandboxWslEnableFailed;
+  }
+  return raw;
+}
+
+String _localizeInstallStage(AppLocalizations l10n, String stageMessage) {
+  final stage = stageMessage.split(RegExp(r'\s+\d{1,3}%\s*$')).first.trim();
+  final pctMatch = RegExp(r'(\d{1,3})\s*%\s*$').firstMatch(stageMessage);
+  final pct = pctMatch != null ? ' ${pctMatch.group(1)}%' : '';
+  switch (stage) {
+    case 'download':
+      return '${l10n.linuxSandboxWslDownloadingRootfs}$pct';
+    case 'import':
+    case 'wsl_import':
+      return '${l10n.linuxSandboxWslImportingDistro}$pct';
+    case 'gunzip':
+    case 'enable_wsl':
+    case 'probe_wsl':
+    case 'layout':
+    case 'marker':
+    case 'done':
+    case 'wsl_verify':
+    case 'wsl_ready':
+    case 'wsl_set_default_version':
+    case 'download_done':
+      return '$stage$pct';
+    default:
+      return stageMessage;
   }
 }
 

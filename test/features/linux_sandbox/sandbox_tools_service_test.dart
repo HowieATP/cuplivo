@@ -16,7 +16,7 @@ class _RecordingRuntime implements SandboxRuntime {
   bool get isSupported => true;
 
   @override
-  LinuxSandboxRuntimeMode get runtimeMode => LinuxSandboxRuntimeMode.localJail;
+  LinuxSandboxRuntimeMode get runtimeMode => LinuxSandboxRuntimeMode.wsl;
 
   @override
   Future<void> ensureReady() async {
@@ -77,7 +77,7 @@ class _RecordingRuntime implements SandboxRuntime {
 
 LinuxSandbox _readySandbox({
   Map<String, LinuxSandboxToolConfig>? tools,
-  LinuxSandboxRuntimeMode mode = LinuxSandboxRuntimeMode.localJail,
+  LinuxSandboxRuntimeMode mode = LinuxSandboxRuntimeMode.wsl,
 }) {
   return LinuxSandbox(
     id: '1',
@@ -175,7 +175,20 @@ void main() {
       expect(names, isNot(contains(LinuxSandboxToolNames.shell)));
     });
 
-    test('buildToolDefinitions localJail shell copy is honest', () {
+    test('buildToolDefinitions wsl shell copy mentions WSL Linux', () {
+      final defs = SandboxToolsService.buildToolDefinitions(
+        sandbox: _readySandbox(mode: LinuxSandboxRuntimeMode.wsl),
+        supportsTools: true,
+      );
+      final shell = defs.firstWhere(
+        (d) => (d['function'] as Map)['name'] == LinuxSandboxToolNames.shell,
+      );
+      final desc = (shell['function'] as Map)['description'] as String;
+      expect(desc.toLowerCase(), contains('wsl'));
+      expect(desc.toLowerCase(), contains('linux'));
+    });
+
+    test('buildToolDefinitions localJail shell copy stays honest if used', () {
       final defs = SandboxToolsService.buildToolDefinitions(
         sandbox: _readySandbox(mode: LinuxSandboxRuntimeMode.localJail),
         supportsTools: true,

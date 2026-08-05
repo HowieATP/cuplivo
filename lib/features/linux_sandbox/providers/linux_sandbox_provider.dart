@@ -14,11 +14,16 @@ import '../services/sandbox_runtime.dart';
 class LinuxSandboxProvider extends ChangeNotifier {
   static const String prefsKey = 'linux_sandboxes_v1';
 
+  /// Sandbox id waiting for user to finish WSL install after a Windows reboot.
+  static const String wslResumeInstallPrefsKey =
+      'linux_sandbox_wsl_resume_install_v1';
+
   final List<LinuxSandbox> _sandboxes = <LinuxSandbox>[];
   bool _loaded = false;
   Future<void>? _loadFuture;
   Future<void> _persistChain = Future<void>.value();
   final Set<String> _installingIds = <String>{};
+  String? _wslResumeSandboxId;
 
   LinuxSandboxProvider() {
     unawaited(
@@ -32,16 +37,35 @@ class LinuxSandboxProvider extends ChangeNotifier {
 
   List<LinuxSandbox> get sandboxes => List.unmodifiable(_sandboxes);
 
+  /// Non-null when a prior WSL install asked for reboot; user must tap Install.
+  String? get wslResumeSandboxId => _wslResumeSandboxId;
+
   /// Reject empty ids and path-escape segments so destroyDisk cannot leave
   /// the sandboxes base directory. Create still uses Uuid().v4().
   static bool isValidSandboxId(String id) =>
       SandboxDiskLayout.isValidSandboxId(id);
 
   static LinuxSandboxRuntimeMode defaultRuntimeModeForPlatform() {
-    if (Platform.isWindows) return LinuxSandboxRuntimeMode.localJail;
+    if (Platform.isWindows) return LinuxSandboxRuntimeMode.wsl;
     if (Platform.isLinux) return LinuxSandboxRuntimeMode.nativeLinux;
     if (Platform.isAndroid) return LinuxSandboxRuntimeMode.proot;
     return LinuxSandboxRuntimeMode.unsupported;
+  }
+
+  Future<void> _setWslResumeSandboxId(String? id) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (id == null || id.isEmpty) {
+      await prefs.remove(wslResumeInstallPrefsKey);
+      _wslResumeSandboxId = null;
+    } else {
+      await prefs.setString(wslResumeInstallPrefsKey, id);
+      _wslResumeSandboxId = id;
+    }
+  }
+
+  Future<void> clearWslResumeFlag() async {
+    await _setWslResumeSandboxId(null);
+    notifyListeners();
   }
 
   LinuxSandbox? getById(String id) {
@@ -132,12 +156,50 @@ class LinuxSandboxProvider extends ChangeNotifier {
         }
       }
       await _probeReadySandboxes();
+      await _loadWslResumeFlag(prefs);
       _loaded = true;
       notifyListeners();
     } catch (e, st) {
       debugPrint('LinuxSandboxProvider: load failed: $e\n$st');
       rethrow;
     }
+  }
+
+  /// After reboot: surface resume hint on the sandbox; do not auto-install.
+  Future<void> _loadWslResumeFlag(SharedPreferences prefs) async {
+    final resumeId = prefs.getString(wslResumeInstallPrefsKey);
+    if (resumeId == null || resumeId.isEmpty) {
+      _wslResumeSandboxId = null;
+      return;
+    }
+    if (!isValidSandboxId(resumeId)) {
+      debugPrint(
+        'LinuxSandboxProvider: clearing invalid wsl resume id: $resumeId',
+      );
+      await prefs.remove(wslResumeInstallPrefsKey);
+      _wslResumeSandboxId = null;
+      return;
+    }
+    final idx = _sandboxes.indexWhere((s) => s.id == resumeId);
+    if (idx < 0) {
+      debugPrint(
+        'LinuxSandboxProvider: wsl resume sandbox missing, clearing flag',
+      );
+      await prefs.remove(wslResumeInstallPrefsKey);
+      _wslResumeSandboxId = null;
+      return;
+    }
+    final status = _sandboxes[idx].status;
+    if (status == LinuxSandboxStatus.ready) {
+      debugPrint(
+        'LinuxSandboxProvider: wsl resume sandbox already ready, clearing flag',
+      );
+      await prefs.remove(wslResumeInstallPrefsKey);
+      _wslResumeSandboxId = null;
+      return;
+    }
+    _wslResumeSandboxId = resumeId;
+    // Keep broken/notReady; UI shows localized resume banner via flag.
   }
 
   /// Re-probe sandboxes marked ready; downgrade if disk/runtime disagrees.
@@ -311,6 +373,14 @@ class LinuxSandboxProvider extends ChangeNotifier {
       if (afterIdx < 0) return result;
 
       if (result.ok) {
+        // Shared WSL distro is ready for every sandbox — drop resume flag.
+        try {
+          await _setWslResumeSandboxId(null);
+        } catch (e, st) {
+          debugPrint(
+            'LinuxSandboxProvider: clear wsl resume on success failed: $e\n$st',
+          );
+        }
         final msg = result.statusMessage;
         _sandboxes[afterIdx] = _sandboxes[afterIdx].copyWith(
           status: LinuxSandboxStatus.ready,
@@ -321,6 +391,18 @@ class LinuxSandboxProvider extends ChangeNotifier {
           updatedAt: DateTime.now(),
         );
       } else {
+        final err = result.errorMessage ?? '';
+        if (result.errorCode == 'wsl_reboot_required' ||
+            err.contains('WSL_REBOOT_REQUIRED') ||
+            err.contains('wsl_reboot_required')) {
+          try {
+            await _setWslResumeSandboxId(id);
+          } catch (e, st) {
+            debugPrint(
+              'LinuxSandboxProvider: set wsl resume flag failed: $e\n$st',
+            );
+          }
+        }
         _sandboxes[afterIdx] = _sandboxes[afterIdx].copyWith(
           status: LinuxSandboxStatus.broken,
           runtimeMode: result.mode,
@@ -430,6 +512,15 @@ class LinuxSandboxProvider extends ChangeNotifier {
     final removeIdx = _sandboxes.indexWhere((s) => s.id == id);
     if (removeIdx >= 0) {
       _sandboxes.removeAt(removeIdx);
+    }
+    if (_wslResumeSandboxId == id) {
+      try {
+        await _setWslResumeSandboxId(null);
+      } catch (e, st) {
+        debugPrint(
+          'LinuxSandboxProvider.delete: clear wsl resume failed: $e\n$st',
+        );
+      }
     }
     await _persist();
     notifyListeners();

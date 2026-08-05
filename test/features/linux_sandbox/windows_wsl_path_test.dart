@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:Cuplivo/features/linux_sandbox/services/windows_wsl.dart';
+import 'package:Cuplivo/features/linux_sandbox/services/wsl_rootfs_installer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -59,6 +63,60 @@ void main() {
 
     test('decodes plain UTF-8', () {
       expect(decodeWslOutput('Ubuntu\n'.codeUnits).trim(), 'Ubuntu');
+    });
+  });
+
+  group('parseWslDistroList', () {
+    test('parses quiet list lines', () {
+      expect(parseWslDistroList('Ubuntu\r\nDebian\n'), ['Ubuntu', 'Debian']);
+    });
+
+    test('strips default asterisk and parentheses', () {
+      expect(parseWslDistroList('* Cuplivo-Sandbox (Running)\nUbuntu\n'), [
+        'Cuplivo-Sandbox',
+        'Ubuntu',
+      ]);
+    });
+
+    test('skips noise lines', () {
+      expect(
+        parseWslDistroList(
+          'Windows Subsystem for Linux Distributions:\n'
+          'Cuplivo-Sandbox\n',
+        ),
+        ['Cuplivo-Sandbox'],
+      );
+    });
+
+    test('detects Cuplivo distro case-insensitively', () {
+      expect(listContainsCuplivoDistro(['Ubuntu']), isFalse);
+      expect(listContainsCuplivoDistro(['Cuplivo-Sandbox']), isTrue);
+      expect(listContainsCuplivoDistro(['cuplivo-sandbox']), isTrue);
+    });
+  });
+
+  group('kCuplivoWslDistroName', () {
+    test('is stable shared name', () {
+      expect(kCuplivoWslDistroName, 'Cuplivo-Sandbox');
+    });
+  });
+
+  group('WslRootfsInstaller.gunzipFileToTar', () {
+    test('decompresses gzip payload to tar bytes', () async {
+      final dir = await Directory.systemTemp.createTemp('wsl_gz_');
+      try {
+        final gz = File('${dir.path}/sample.tar.gz');
+        final tar = File('${dir.path}/sample.tar');
+        const payload = 'hello-wsl-rootfs-tar';
+        // Minimal gzip via dart:io GZipCodec (same wire format).
+        await gz.writeAsBytes(gzip.encode(utf8.encode(payload)));
+
+        await WslRootfsInstaller.gunzipFileToTar(gzipFile: gz, tarFile: tar);
+        expect(await tar.exists(), isTrue);
+        expect(utf8.decode(await tar.readAsBytes()), payload);
+      } finally {
+        await dir.delete(recursive: true);
+      }
     });
   });
 }

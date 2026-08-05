@@ -70,6 +70,12 @@ class AppDirectories {
     return Directory('${root.path}/linux_sandboxes');
   }
 
+  /// Shared WSL distro install roots (`{appData}/wsl/<distroName>/`).
+  static Future<Directory> getWslDistrosDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/wsl');
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

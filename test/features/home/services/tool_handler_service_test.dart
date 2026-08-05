@@ -148,7 +148,7 @@ void main() {
         id: 'sb-defs',
         name: 'Defs',
         status: LinuxSandboxStatus.ready,
-        runtimeMode: LinuxSandboxRuntimeMode.localJail,
+        runtimeMode: LinuxSandboxRuntimeMode.wsl,
         tools: {
           LinuxSandboxToolNames.read: const LinuxSandboxToolConfig(
             enabled: true,

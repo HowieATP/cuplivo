@@ -5,7 +5,7 @@ class _LinuxSandboxTab extends StatelessWidget {
   final String assistantId;
 
   String? _platformBanner(AppLocalizations l10n) {
-    // Real runtimes: Windows (WSL/localJail), Android (PRoot), Linux desktop.
+    // Real runtimes: Windows (WSL), Android (PRoot), Linux desktop.
     if (Platform.isWindows || Platform.isAndroid || Platform.isLinux) {
       return null;
     }

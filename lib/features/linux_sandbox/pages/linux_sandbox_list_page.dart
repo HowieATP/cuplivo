@@ -226,16 +226,19 @@ class _LinuxSandboxListPageState extends State<LinuxSandboxListPage> {
                                     .where((t) => t.enabled)
                                     .length;
                                 final total = sandbox.tools.length;
-                                final localJail =
-                                    sandbox.runtimeMode ==
-                                    LinuxSandboxRuntimeMode.localJail;
+                                final showWslHint =
+                                    Platform.isWindows &&
+                                    (sandbox.status ==
+                                            LinuxSandboxStatus.broken ||
+                                        provider.wslResumeSandboxId ==
+                                            sandbox.id);
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      if (localJail)
+                                      if (showWslHint)
                                         Padding(
                                           padding: const EdgeInsets.only(
                                             bottom: 8,
@@ -255,7 +258,10 @@ class _LinuxSandboxListPageState extends State<LinuxSandboxListPage> {
                                                     8,
                                                   ),
                                               child: Text(
-                                                l10n.linuxSandboxWindowsLocalJailBanner,
+                                                provider.wslResumeSandboxId ==
+                                                        sandbox.id
+                                                    ? l10n.linuxSandboxWslResumeAfterReboot
+                                                    : l10n.linuxSandboxWindowsWslBrokenHint,
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   height: 1.35,

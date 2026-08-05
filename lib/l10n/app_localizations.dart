@@ -13427,8 +13427,50 @@ abstract class AppLocalizations {
   /// No description provided for @linuxSandboxWindowsLocalJailBanner.
   ///
   /// In en, this message translates to:
-  /// **'Running as a Windows folder jail — not a Linux environment. Install or enable WSL for a real Linux shell.'**
+  /// **'Windows sandbox tools require WSL. Install or reinstall the base environment.'**
   String get linuxSandboxWindowsLocalJailBanner;
+
+  /// No description provided for @linuxSandboxWindowsWslBrokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'WSL base environment is not ready. Tap Install / Reinstall base environment. You may need to approve UAC or restart Windows.'**
+  String get linuxSandboxWindowsWslBrokenHint;
+
+  /// No description provided for @linuxSandboxWindowsWslInstallNote.
+  ///
+  /// In en, this message translates to:
+  /// **'On Windows, base environment uses real Linux via WSL (shared Cuplivo-Sandbox distro). Setup may show a UAC prompt and can require a restart before finishing.'**
+  String get linuxSandboxWindowsWslInstallNote;
+
+  /// No description provided for @linuxSandboxWslRebootRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'WSL was enabled but Windows must restart. After restart, open this sandbox and tap Install base environment to finish.'**
+  String get linuxSandboxWslRebootRequired;
+
+  /// No description provided for @linuxSandboxWslEnableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not enable WSL. Install WSL from Windows features or run wsl --install, then retry Install base environment.'**
+  String get linuxSandboxWslEnableFailed;
+
+  /// No description provided for @linuxSandboxWslResumeAfterReboot.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart complete — tap Install base environment to finish WSL setup.'**
+  String get linuxSandboxWslResumeAfterReboot;
+
+  /// No description provided for @linuxSandboxWslDownloadingRootfs.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading Linux rootfs'**
+  String get linuxSandboxWslDownloadingRootfs;
+
+  /// No description provided for @linuxSandboxWslImportingDistro.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing WSL distro'**
+  String get linuxSandboxWslImportingDistro;
 
   /// No description provided for @linuxSandboxStatusDisabled.
   ///
@@ -13505,7 +13547,7 @@ abstract class AppLocalizations {
   /// No description provided for @linuxSandboxRetryWslAction.
   ///
   /// In en, this message translates to:
-  /// **'Retry WSL'**
+  /// **'Install WSL / Reinstall base env'**
   String get linuxSandboxRetryWslAction;
 
   /// No description provided for @linuxSandboxInstallFailed.

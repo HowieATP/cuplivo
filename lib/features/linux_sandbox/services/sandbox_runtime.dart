@@ -92,11 +92,15 @@ class SandboxInstallResult {
   final String? errorMessage;
   final String? statusMessage;
 
+  /// Stable machine code e.g. `wsl_reboot_required`, `wsl_enable_failed`.
+  final String? errorCode;
+
   const SandboxInstallResult({
     required this.ok,
     required this.mode,
     this.errorMessage,
     this.statusMessage,
+    this.errorCode,
   });
 
   factory SandboxInstallResult.success(
@@ -112,12 +116,14 @@ class SandboxInstallResult {
 
   factory SandboxInstallResult.failure(
     LinuxSandboxRuntimeMode mode,
-    String errorMessage,
-  ) {
+    String errorMessage, {
+    String? errorCode,
+  }) {
     return SandboxInstallResult(
       ok: false,
       mode: mode,
       errorMessage: errorMessage,
+      errorCode: errorCode,
     );
   }
 }
@@ -135,7 +141,7 @@ abstract class SandboxRuntime {
   /// Layout only: create `{files,linux,tmp}/` and migrate v1 flat trees.
   Future<void> ensureReady();
 
-  /// Explicit base-env install. Local modes layout + mark ready.
+  /// Explicit base-env install (WSL import, PRoot rootfs, or local layout).
   Future<SandboxInstallResult> installBaseEnv({
     void Function(double? progress, String stage)? onProgress,
   });

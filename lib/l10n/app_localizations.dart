@@ -1156,6 +1156,24 @@ abstract class AppLocalizations {
   /// **'Desktop Only'**
   String get newSettingsDesktopOnlySection;
 
+  /// No description provided for @newSettingsSystemFontOption.
+  ///
+  /// In en, this message translates to:
+  /// **'System Fonts'**
+  String get newSettingsSystemFontOption;
+
+  /// No description provided for @newSettingsLogSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Settings'**
+  String get newSettingsLogSettingsTitle;
+
+  /// No description provided for @newSettingsLogSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request and app logging switches'**
+  String get newSettingsLogSettingsSubtitle;
+
   /// No description provided for @statsPageTitle.
   ///
   /// In en, this message translates to:

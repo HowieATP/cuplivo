@@ -605,6 +605,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newSettingsDesktopOnlySection => 'Desktop Only';
 
   @override
+  String get newSettingsSystemFontOption => 'System Fonts';
+
+  @override
+  String get newSettingsLogSettingsTitle => 'Log Settings';
+
+  @override
+  String get newSettingsLogSettingsSubtitle =>
+      'Request and app logging switches';
+
+  @override
   String get statsPageTitle => 'Statistics';
 
   @override

@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../utils/platform_utils.dart';
 import '../../../../desktop/setting/hotkeys_pane.dart';
 import '../../widgets/display_setting_rows.dart';
 import '../../widgets/ios_settings_widgets.dart';
@@ -17,11 +17,7 @@ class BehaviorSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isDesktop =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux);
+    final isDesktop = PlatformUtils.isDesktopTargetSafe;
     final isBackgroundChatSupported = BackgroundChatRow.supportedOn(
       defaultTargetPlatform,
     );
@@ -30,6 +26,12 @@ class BehaviorSettingsPage extends StatelessWidget {
     );
     final minimizeOnClose = context.select<SettingsProvider, bool>(
       (s) => s.desktopMinimizeToTrayOnClose,
+    );
+    final sendShortcut = context.select<SettingsProvider, DesktopSendShortcut>(
+      (s) => s.desktopSendShortcut,
+    );
+    final autoSwitchTopics = context.select<SettingsProvider, bool>(
+      (s) => s.desktopAutoSwitchTopics,
     );
 
     return IosSettingsPage(
@@ -77,6 +79,24 @@ class BehaviorSettingsPage extends StatelessWidget {
                 onTap: () => Navigator.of(
                   context,
                 ).push(MaterialPageRoute(builder: (_) => const _HotkeysPage())),
+              ),
+              IosSettingsDivider(context),
+              IosSettingsNavRow(
+                context,
+                icon: Lucide.Keyboard,
+                label: l10n.displaySettingsPageSendShortcutTitle,
+                detailText: sendShortcut == DesktopSendShortcut.ctrlEnter
+                    ? l10n.displaySettingsPageSendShortcutCtrlEnter
+                    : l10n.displaySettingsPageSendShortcutEnter,
+                onTap: () => _showSendShortcutSheet(context),
+              ),
+              IosSettingsDivider(context),
+              IosSettingsSwitchRow(
+                label: l10n.displaySettingsPageAutoSwitchTopicsTitle,
+                value: autoSwitchTopics,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setDesktopAutoSwitchTopics(v),
               ),
               IosSettingsDivider(context),
               IosSettingsSwitchRow(
@@ -129,4 +149,40 @@ class _HotkeysPage extends StatelessWidget {
       body: const DesktopHotkeysPane(),
     );
   }
+}
+
+Future<void> _showSendShortcutSheet(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  final selected = await showModalBottomSheet<DesktopSendShortcut>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IosSettingsSheetOption(
+              ctx,
+              label: l10n.displaySettingsPageSendShortcutEnter,
+              onTap: () => Navigator.of(ctx).pop(DesktopSendShortcut.enter),
+            ),
+            IosSettingsSheetDivider(ctx),
+            IosSettingsSheetOption(
+              ctx,
+              label: l10n.displaySettingsPageSendShortcutCtrlEnter,
+              onTap: () => Navigator.of(ctx).pop(DesktopSendShortcut.ctrlEnter),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (selected == null) return;
+  if (!context.mounted) return;
+  await context.read<SettingsProvider>().setDesktopSendShortcut(selected);
 }

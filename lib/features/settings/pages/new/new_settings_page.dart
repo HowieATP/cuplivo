@@ -1,11 +1,10 @@
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../utils/platform_utils.dart';
 import '../../../../desktop/desktop_settings_page.dart';
 import '../../widgets/ios_settings_widgets.dart';
 import '../../../assistant/pages/assistant_settings_page.dart';
@@ -255,11 +254,7 @@ class _LegacySettingsAction extends StatelessWidget {
 }
 
 void _openLegacySettings(BuildContext context) {
-  final platform = defaultTargetPlatform;
-  if (!kIsWeb &&
-      (platform == TargetPlatform.macOS ||
-          platform == TargetPlatform.windows ||
-          platform == TargetPlatform.linux)) {
+  if (PlatformUtils.isDesktopTargetSafe) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const DesktopSettingsPage(showLegacyBackButton: true),

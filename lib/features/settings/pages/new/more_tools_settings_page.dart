@@ -1,9 +1,8 @@
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../utils/platform_utils.dart';
 import '../../widgets/ios_settings_widgets.dart';
 import '../../../mcp/pages/mcp_page.dart';
 import '../../../search/pages/search_services_page.dart';
@@ -18,11 +17,7 @@ class MoreToolsSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isDesktop =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux);
+    final isDesktop = PlatformUtils.isDesktopTargetSafe;
     return IosSettingsPage(
       title: l10n.newSettingsMoreToolsTitle,
       subtitle: l10n.newSettingsMoreToolsSubtitle,

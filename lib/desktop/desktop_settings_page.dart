@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
@@ -47,7 +44,6 @@ import 'dart:async';
 import '../shared/widgets/model_tag_wrap.dart';
 import '../core/models/api_keys.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
 import 'desktop_context_menu.dart';
 import 'desktop_settings_navigation_bus.dart';
 import '../shared/widgets/snackbar.dart';
@@ -65,16 +61,12 @@ import 'setting/network_proxy_pane.dart';
 import 'setting/skills_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
-import 'package:system_fonts/system_fonts.dart';
+import 'widgets/system_font_chooser.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:pretty_qr_code/pretty_qr_code.dart';
-import 'package:super_clipboard/super_clipboard.dart';
+import '../features/provider/widgets/provider_share_dialog.dart';
 import '../features/provider/widgets/provider_avatar.dart';
 import '../features/provider/widgets/provider_balance_badge.dart';
-import '../features/provider/widgets/share_provider_sheet.dart'
-    show encodeProviderConfig;
-import '../utils/clipboard_images.dart';
 import '../utils/provider_grouping_logic.dart';
 
 part 'setting/assistants_pane.dart';

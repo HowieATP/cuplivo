@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../pages/ios_background_settings_page.dart';
 import '../pages/google_fonts_picker_page.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/desktop/widgets/system_font_chooser.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
@@ -50,6 +51,17 @@ Future<void> showMobileFontSourceSheet(
               label: l10n.fontPickerGetFromGoogleFonts,
               onTap: () => Navigator.of(ctx).pop('google'),
             ),
+            if (!kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.macOS ||
+                    defaultTargetPlatform == TargetPlatform.windows ||
+                    defaultTargetPlatform == TargetPlatform.linux)) ...[
+              IosSettingsSheetDivider(ctx),
+              IosSettingsSheetOption(
+                ctx,
+                label: l10n.newSettingsSystemFontOption,
+                onTap: () => Navigator.of(ctx).pop('system'),
+              ),
+            ],
             IosSettingsSheetDivider(ctx),
             IosSettingsSheetOption(
               ctx,
@@ -94,6 +106,14 @@ Future<void> showMobileFontSourceSheet(
     } else {
       await settings.setCodeFontFromGoogle(selected);
     }
+    return;
+  }
+  if (choice == 'system') {
+    if (!context.mounted) return;
+    await showSystemFontChooserDialog(
+      context,
+      codeFont: target == FontTarget.code,
+    );
     return;
   }
   if (choice == 'reset') {

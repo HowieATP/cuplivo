@@ -5,10 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../icons/lucide_adapter.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../utils/platform_utils.dart';
 import '../../widgets/ios_settings_widgets.dart';
 import '../about_page.dart';
 import '../log_viewer_page.dart';
 import '../sponsor_page.dart';
+import 'log_settings_page.dart';
 
 class CuplivoSettingsPage extends StatelessWidget {
   const CuplivoSettingsPage({super.key});
@@ -16,6 +18,7 @@ class CuplivoSettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isDesktop = PlatformUtils.isDesktopTargetSafe;
     final showLogs = context.select<SettingsProvider, bool>(
       (s) => s.requestLogEnabled || s.flutterLogEnabled,
     );
@@ -54,6 +57,17 @@ class CuplivoSettingsPage extends StatelessWidget {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SponsorPage())),
             ),
+            if (isDesktop) ...[
+              IosSettingsDivider(context),
+              IosSettingsNavRow(
+                context,
+                icon: Lucide.Settings2,
+                label: l10n.newSettingsLogSettingsTitle,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LogSettingsPage()),
+                ),
+              ),
+            ],
             if (showLogs) ...[
               IosSettingsDivider(context),
               IosSettingsNavRow(

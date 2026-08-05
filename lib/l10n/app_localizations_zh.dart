@@ -581,6 +581,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get newSettingsDesktopOnlySection => '桌面端专属';
 
   @override
+  String get newSettingsSystemFontOption => '选择系统字体';
+
+  @override
+  String get newSettingsLogSettingsTitle => '日志设置';
+
+  @override
+  String get newSettingsLogSettingsSubtitle => '请求与应用日志打印开关';
+
+  @override
   String get statsPageTitle => '统计';
 
   @override
@@ -7654,6 +7663,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get newSettingsDesktopOnlySection => '桌面端专属';
 
   @override
+  String get newSettingsSystemFontOption => '选择系统字体';
+
+  @override
+  String get newSettingsLogSettingsTitle => '日志设置';
+
+  @override
+  String get newSettingsLogSettingsSubtitle => '请求与应用日志打印开关';
+
+  @override
   String get statsPageTitle => '统计';
 
   @override
@@ -14724,6 +14742,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get newSettingsDesktopOnlySection => '桌面端專屬';
+
+  @override
+  String get newSettingsSystemFontOption => '選擇系統字型';
+
+  @override
+  String get newSettingsLogSettingsTitle => '日誌設定';
+
+  @override
+  String get newSettingsLogSettingsSubtitle => '請求與應用程式日誌列印開關';
 
   @override
   String get statsPageTitle => '統計';

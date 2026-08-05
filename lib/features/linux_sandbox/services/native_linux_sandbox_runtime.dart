@@ -8,9 +8,9 @@ import 'local_jail_fs.dart';
 import 'sandbox_disk_layout.dart';
 import 'sandbox_runtime.dart';
 
-/// Windows host folder jail under `files/`. Not a Linux environment.
-class WindowsLocalJailRuntime implements SandboxRuntime {
-  WindowsLocalJailRuntime(this.sandboxId);
+/// Native Linux desktop runtime: file jail under `files/`, shell via `/bin/sh -c`.
+class NativeLinuxSandboxRuntime implements SandboxRuntime {
+  NativeLinuxSandboxRuntime(this.sandboxId);
 
   static const Duration defaultShellTimeout = Duration(seconds: 30);
   static const Duration maxShellTimeout = Duration(seconds: 120);
@@ -23,7 +23,8 @@ class WindowsLocalJailRuntime implements SandboxRuntime {
   bool get isSupported => true;
 
   @override
-  LinuxSandboxRuntimeMode get runtimeMode => LinuxSandboxRuntimeMode.localJail;
+  LinuxSandboxRuntimeMode get runtimeMode =>
+      LinuxSandboxRuntimeMode.nativeLinux;
 
   Future<LocalJailFs> _fs() async {
     await ensureReady();
@@ -110,8 +111,8 @@ class WindowsLocalJailRuntime implements SandboxRuntime {
       await ensureReady();
       final files = await rootDirectory();
       final process = await Process.start(
-        'cmd',
-        ['/c', trimmed],
+        '/bin/sh',
+        ['-c', trimmed],
         workingDirectory: files.path,
         runInShell: false,
       );

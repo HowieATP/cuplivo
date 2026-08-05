@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/providers/assistant_provider.dart';
 import '../models/linux_sandbox.dart';
+import '../services/sandbox_disk_layout.dart';
 import '../services/sandbox_runtime.dart';
 
 class LinuxSandboxProvider extends ChangeNotifier {
@@ -16,6 +18,7 @@ class LinuxSandboxProvider extends ChangeNotifier {
   bool _loaded = false;
   Future<void>? _loadFuture;
   Future<void> _persistChain = Future<void>.value();
+  final Set<String> _installingIds = <String>{};
 
   LinuxSandboxProvider() {
     unawaited(
@@ -31,17 +34,14 @@ class LinuxSandboxProvider extends ChangeNotifier {
 
   /// Reject empty ids and path-escape segments so destroyDisk cannot leave
   /// the sandboxes base directory. Create still uses Uuid().v4().
-  static bool isValidSandboxId(String id) {
-    final trimmed = id.trim();
-    if (trimmed.isEmpty || trimmed != id) return false;
-    if (trimmed == '.' || trimmed == '..') return false;
-    if (trimmed.contains('/') ||
-        trimmed.contains('\\') ||
-        trimmed.contains('\u0000')) {
-      return false;
-    }
-    if (trimmed.contains('..')) return false;
-    return true;
+  static bool isValidSandboxId(String id) =>
+      SandboxDiskLayout.isValidSandboxId(id);
+
+  static LinuxSandboxRuntimeMode defaultRuntimeModeForPlatform() {
+    if (Platform.isWindows) return LinuxSandboxRuntimeMode.localJail;
+    if (Platform.isLinux) return LinuxSandboxRuntimeMode.nativeLinux;
+    if (Platform.isAndroid) return LinuxSandboxRuntimeMode.proot;
+    return LinuxSandboxRuntimeMode.unsupported;
   }
 
   LinuxSandbox? getById(String id) {
@@ -75,6 +75,7 @@ class LinuxSandboxProvider extends ChangeNotifier {
             );
           } else {
             final parsed = <LinuxSandbox>[];
+            var needsPersist = false;
             for (var i = 0; i < decoded.length; i++) {
               final item = decoded[i];
               if (item is! Map) {
@@ -84,7 +85,7 @@ class LinuxSandboxProvider extends ChangeNotifier {
                 continue;
               }
               try {
-                final sandbox = LinuxSandbox.fromJson(
+                var sandbox = LinuxSandbox.fromJson(
                   item.cast<String, dynamic>(),
                 );
                 if (!isValidSandboxId(sandbox.id)) {
@@ -92,6 +93,17 @@ class LinuxSandboxProvider extends ChangeNotifier {
                     'LinuxSandboxProvider: skip corrupt entry at $i: invalid id',
                   );
                   continue;
+                }
+                // Integrity: crashed mid-install must not stay installing.
+                if (sandbox.status == LinuxSandboxStatus.installing) {
+                  sandbox = sandbox.copyWith(
+                    status: LinuxSandboxStatus.broken,
+                    lastInstallError:
+                        sandbox.lastInstallError ??
+                        'Install interrupted; sandbox marked broken',
+                    updatedAt: DateTime.now(),
+                  );
+                  needsPersist = true;
                 }
                 parsed.add(sandbox);
               } catch (e) {
@@ -103,16 +115,71 @@ class LinuxSandboxProvider extends ChangeNotifier {
             _sandboxes
               ..clear()
               ..addAll(parsed);
+            if (needsPersist) {
+              try {
+                await _writeSnapshot(
+                  _sandboxes.map((e) => e.toJson()).toList(growable: false),
+                );
+              } catch (e, st) {
+                debugPrint(
+                  'LinuxSandboxProvider: crash-recovery persist failed: $e\n$st',
+                );
+              }
+            }
           }
         } catch (e) {
           debugPrint('LinuxSandboxProvider: failed to decode prefs: $e');
         }
       }
+      await _probeReadySandboxes();
       _loaded = true;
       notifyListeners();
     } catch (e, st) {
       debugPrint('LinuxSandboxProvider: load failed: $e\n$st');
       rethrow;
+    }
+  }
+
+  /// Re-probe sandboxes marked ready; downgrade if disk/runtime disagrees.
+  Future<void> _probeReadySandboxes() async {
+    var changed = false;
+    for (var i = 0; i < _sandboxes.length; i++) {
+      final sandbox = _sandboxes[i];
+      if (sandbox.status != LinuxSandboxStatus.ready) continue;
+      try {
+        final runtime = createSandboxRuntime(sandbox.id);
+        final probed = await runtime.probeStatus();
+        if (probed == LinuxSandboxStatus.ready) continue;
+        // Unsupported platform probe returns disabled — do not corrupt
+        // status when prefs were restored on another OS.
+        if (probed == LinuxSandboxStatus.disabled) continue;
+        _sandboxes[i] = sandbox.copyWith(
+          status: probed == LinuxSandboxStatus.notReady
+              ? LinuxSandboxStatus.notReady
+              : LinuxSandboxStatus.broken,
+          updatedAt: DateTime.now(),
+        );
+        changed = true;
+      } catch (e, st) {
+        debugPrint(
+          'LinuxSandboxProvider: probeStatus failed for ${sandbox.id}: $e\n$st',
+        );
+        _sandboxes[i] = sandbox.copyWith(
+          status: LinuxSandboxStatus.broken,
+          updatedAt: DateTime.now(),
+        );
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    try {
+      await _writeSnapshot(
+        _sandboxes.map((e) => e.toJson()).toList(growable: false),
+      );
+    } catch (e, st) {
+      debugPrint(
+        'LinuxSandboxProvider: probe downgrade persist failed: $e\n$st',
+      );
     }
   }
 
@@ -149,11 +216,14 @@ class LinuxSandboxProvider extends ChangeNotifier {
       createdAt: now,
       updatedAt: now,
       enabledEnvPacks: enabledEnvPacks,
+      status: LinuxSandboxStatus.notReady,
+      runtimeMode: defaultRuntimeModeForPlatform(),
     );
     _sandboxes.add(sandbox);
     try {
       await _persist();
       notifyListeners();
+      // Layout only — installBaseEnv is explicit.
       final runtime = createSandboxRuntime(sandbox.id);
       await runtime.ensureReady();
       return sandbox;
@@ -170,6 +240,126 @@ class LinuxSandboxProvider extends ChangeNotifier {
       }
       notifyListeners();
       rethrow;
+    }
+  }
+
+  /// Explicit base-env install. Updates status through installing → ready/broken.
+  Future<SandboxInstallResult> installBaseEnv(
+    String id, {
+    void Function(double? progress, String stage)? onProgress,
+  }) async {
+    await ensureLoaded();
+    if (!isValidSandboxId(id)) {
+      return SandboxInstallResult.failure(
+        LinuxSandboxRuntimeMode.unknown,
+        'Invalid sandbox id',
+      );
+    }
+    if (_installingIds.contains(id)) {
+      return SandboxInstallResult.failure(
+        LinuxSandboxRuntimeMode.unknown,
+        'Install already in progress for this sandbox',
+      );
+    }
+    final idx = _sandboxes.indexWhere((s) => s.id == id);
+    if (idx < 0) {
+      return SandboxInstallResult.failure(
+        LinuxSandboxRuntimeMode.unknown,
+        'Sandbox not found',
+      );
+    }
+
+    _installingIds.add(id);
+    try {
+      final current = _sandboxes[idx];
+      _sandboxes[idx] = current.copyWith(
+        status: LinuxSandboxStatus.installing,
+        clearLastInstallError: true,
+        clearStatusMessage: true,
+        updatedAt: DateTime.now(),
+      );
+      await _persist();
+      notifyListeners();
+
+      final runtime = createSandboxRuntime(id);
+      late final SandboxInstallResult result;
+      try {
+        result = await runtime.installBaseEnv(
+          onProgress: (progress, stage) {
+            onProgress?.call(progress, stage);
+            final progressIdx = _sandboxes.indexWhere((s) => s.id == id);
+            if (progressIdx < 0) return;
+            final pct = progress == null
+                ? ''
+                : ' ${(progress.clamp(0.0, 1.0) * 100).toStringAsFixed(0)}%';
+            _sandboxes[progressIdx] = _sandboxes[progressIdx].copyWith(
+              statusMessage: '$stage$pct',
+              updatedAt: DateTime.now(),
+            );
+            notifyListeners();
+          },
+        );
+      } catch (e, st) {
+        debugPrint('LinuxSandboxProvider.installBaseEnv: threw: $e\n$st');
+        result = SandboxInstallResult.failure(
+          runtime.runtimeMode,
+          e.toString(),
+        );
+      }
+
+      final afterIdx = _sandboxes.indexWhere((s) => s.id == id);
+      if (afterIdx < 0) return result;
+
+      if (result.ok) {
+        final msg = result.statusMessage;
+        _sandboxes[afterIdx] = _sandboxes[afterIdx].copyWith(
+          status: LinuxSandboxStatus.ready,
+          runtimeMode: result.mode,
+          clearLastInstallError: true,
+          statusMessage: msg,
+          clearStatusMessage: msg == null || msg.isEmpty,
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        _sandboxes[afterIdx] = _sandboxes[afterIdx].copyWith(
+          status: LinuxSandboxStatus.broken,
+          runtimeMode: result.mode,
+          lastInstallError: result.errorMessage,
+          clearStatusMessage: true,
+          updatedAt: DateTime.now(),
+        );
+      }
+      await _persist();
+      notifyListeners();
+      return result;
+    } catch (e, st) {
+      debugPrint(
+        'LinuxSandboxProvider.installBaseEnv: pipeline failed: $e\n$st',
+      );
+      final failIdx = _sandboxes.indexWhere((s) => s.id == id);
+      if (failIdx >= 0) {
+        _sandboxes[failIdx] = _sandboxes[failIdx].copyWith(
+          status: LinuxSandboxStatus.broken,
+          lastInstallError: e.toString(),
+          clearStatusMessage: true,
+          updatedAt: DateTime.now(),
+        );
+        try {
+          await _persist();
+        } catch (persistError, persistSt) {
+          debugPrint(
+            'LinuxSandboxProvider.installBaseEnv: broken persist failed: '
+            '$persistError\n$persistSt',
+          );
+        }
+        notifyListeners();
+      }
+      return SandboxInstallResult.failure(
+        LinuxSandboxRuntimeMode.unknown,
+        e.toString(),
+      );
+    } finally {
+      _installingIds.remove(id);
     }
   }
 

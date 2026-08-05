@@ -16,9 +16,23 @@ class _RecordingRuntime implements SandboxRuntime {
   bool get isSupported => true;
 
   @override
+  LinuxSandboxRuntimeMode get runtimeMode => LinuxSandboxRuntimeMode.localJail;
+
+  @override
   Future<void> ensureReady() async {
     calls.add('ensureReady');
   }
+
+  @override
+  Future<SandboxInstallResult> installBaseEnv({
+    void Function(double? progress, String stage)? onProgress,
+  }) async {
+    calls.add('installBaseEnv');
+    return SandboxInstallResult.success(runtimeMode);
+  }
+
+  @override
+  Future<LinuxSandboxStatus> probeStatus() async => LinuxSandboxStatus.ready;
 
   @override
   Future<Directory> rootDirectory() async {
@@ -61,6 +75,19 @@ class _RecordingRuntime implements SandboxRuntime {
   Future<void> destroyDisk() async {}
 }
 
+LinuxSandbox _readySandbox({
+  Map<String, LinuxSandboxToolConfig>? tools,
+  LinuxSandboxRuntimeMode mode = LinuxSandboxRuntimeMode.localJail,
+}) {
+  return LinuxSandbox(
+    id: '1',
+    name: 's',
+    status: LinuxSandboxStatus.ready,
+    runtimeMode: mode,
+    tools: tools,
+  );
+}
+
 void main() {
   group('SandboxToolsService', () {
     test('isSandboxTool recognizes only sandbox tools', () {
@@ -76,7 +103,7 @@ void main() {
     });
 
     test('toolNeedsApproval respects config', () {
-      final sandbox = LinuxSandbox(id: '1', name: 's');
+      final sandbox = _readySandbox();
       expect(
         SandboxToolsService.toolNeedsApproval(
           sandbox,
@@ -103,17 +130,30 @@ void main() {
       );
       expect(
         SandboxToolsService.buildToolDefinitions(
-          sandbox: LinuxSandbox(id: '1', name: 's'),
+          sandbox: _readySandbox(),
           supportsTools: false,
         ),
         isEmpty,
       );
     });
 
-    test('buildToolDefinitions includes enabled tools only', () {
-      final sandbox = LinuxSandbox(
-        id: '1',
-        name: 's',
+    test('buildToolDefinitions empty when status is not ready', () {
+      for (final status in [
+        LinuxSandboxStatus.notReady,
+        LinuxSandboxStatus.installing,
+        LinuxSandboxStatus.broken,
+        LinuxSandboxStatus.disabled,
+      ]) {
+        final defs = SandboxToolsService.buildToolDefinitions(
+          sandbox: LinuxSandbox(id: '1', name: 's', status: status),
+          supportsTools: true,
+        );
+        expect(defs, isEmpty, reason: 'status=$status');
+      }
+    });
+
+    test('buildToolDefinitions includes enabled tools only when ready', () {
+      final sandbox = _readySandbox(
         tools: {
           ...LinuxSandbox.defaultTools(),
           LinuxSandboxToolNames.shell: const LinuxSandboxToolConfig(
@@ -135,63 +175,100 @@ void main() {
       expect(names, isNot(contains(LinuxSandboxToolNames.shell)));
     });
 
+    test('buildToolDefinitions localJail shell copy is honest', () {
+      final defs = SandboxToolsService.buildToolDefinitions(
+        sandbox: _readySandbox(mode: LinuxSandboxRuntimeMode.localJail),
+        supportsTools: true,
+      );
+      final shell = defs.firstWhere(
+        (d) => (d['function'] as Map)['name'] == LinuxSandboxToolNames.shell,
+      );
+      final desc = (shell['function'] as Map)['description'] as String;
+      expect(desc.toLowerCase(), contains('not a linux'));
+      expect(desc.toLowerCase(), contains('folder jail'));
+    });
+
     test('tryHandleToolCall returns null for non-sandbox tools', () async {
       final result = await SandboxToolsService.tryHandleToolCall(
         name: 'clipboard_tool',
         args: const {},
-        sandbox: LinuxSandbox(id: '1', name: 's'),
+        sandbox: _readySandbox(),
         runtime: _RecordingRuntime(),
       );
       expect(result, isNull);
     });
 
-    test('tryHandleToolCall dispatches read/write/edit/shell', () async {
+    test(
+      'tryHandleToolCall dispatches read/write/edit/shell when ready',
+      () async {
+        final runtime = _RecordingRuntime();
+        final sandbox = _readySandbox();
+
+        final read = await SandboxToolsService.tryHandleToolCall(
+          name: LinuxSandboxToolNames.read,
+          args: {'path': 'a.txt'},
+          sandbox: sandbox,
+          runtime: runtime,
+        );
+        expect(jsonDecode(read!)['content'], 'content:a.txt');
+
+        final write = await SandboxToolsService.tryHandleToolCall(
+          name: LinuxSandboxToolNames.write,
+          args: {'path': 'a.txt', 'content': 'hi'},
+          sandbox: sandbox,
+          runtime: runtime,
+        );
+        expect(jsonDecode(write!)['ok'], isTrue);
+
+        final edit = await SandboxToolsService.tryHandleToolCall(
+          name: LinuxSandboxToolNames.edit,
+          args: {'path': 'a.txt', 'old_string': 'a', 'new_string': 'b'},
+          sandbox: sandbox,
+          runtime: runtime,
+        );
+        expect(jsonDecode(edit!)['ok'], isTrue);
+
+        final shell = await SandboxToolsService.tryHandleToolCall(
+          name: LinuxSandboxToolNames.shell,
+          args: {'command': 'echo hi', 'timeout_seconds': 10},
+          sandbox: sandbox,
+          runtime: runtime,
+        );
+        expect(jsonDecode(shell!)['exit_code'], 0);
+
+        expect(runtime.calls, contains('ensureReady'));
+        expect(runtime.calls, contains('read:a.txt'));
+        expect(runtime.calls, contains('write:a.txt:hi'));
+        expect(runtime.calls, contains('edit:a.txt:a->b'));
+        expect(runtime.calls, contains('shell:echo hi:10'));
+      },
+    );
+
+    test('tryHandleToolCall gates on status', () async {
       final runtime = _RecordingRuntime();
-      final sandbox = LinuxSandbox(id: '1', name: 's');
 
-      final read = await SandboxToolsService.tryHandleToolCall(
-        name: LinuxSandboxToolNames.read,
-        args: {'path': 'a.txt'},
-        sandbox: sandbox,
-        runtime: runtime,
+      Future<String> errorFor(LinuxSandboxStatus status) async {
+        final raw = await SandboxToolsService.tryHandleToolCall(
+          name: LinuxSandboxToolNames.read,
+          args: {'path': 'x'},
+          sandbox: LinuxSandbox(id: '1', name: 's', status: status),
+          runtime: runtime,
+        );
+        return (jsonDecode(raw!) as Map)['error'] as String;
+      }
+
+      expect(await errorFor(LinuxSandboxStatus.notReady), 'sandbox_not_ready');
+      expect(await errorFor(LinuxSandboxStatus.disabled), 'sandbox_not_ready');
+      expect(
+        await errorFor(LinuxSandboxStatus.installing),
+        'sandbox_installing',
       );
-      expect(jsonDecode(read!)['content'], 'content:a.txt');
-
-      final write = await SandboxToolsService.tryHandleToolCall(
-        name: LinuxSandboxToolNames.write,
-        args: {'path': 'a.txt', 'content': 'hi'},
-        sandbox: sandbox,
-        runtime: runtime,
-      );
-      expect(jsonDecode(write!)['ok'], isTrue);
-
-      final edit = await SandboxToolsService.tryHandleToolCall(
-        name: LinuxSandboxToolNames.edit,
-        args: {'path': 'a.txt', 'old_string': 'a', 'new_string': 'b'},
-        sandbox: sandbox,
-        runtime: runtime,
-      );
-      expect(jsonDecode(edit!)['ok'], isTrue);
-
-      final shell = await SandboxToolsService.tryHandleToolCall(
-        name: LinuxSandboxToolNames.shell,
-        args: {'command': 'echo hi', 'timeout_seconds': 10},
-        sandbox: sandbox,
-        runtime: runtime,
-      );
-      expect(jsonDecode(shell!)['exit_code'], 0);
-
-      expect(runtime.calls, contains('ensureReady'));
-      expect(runtime.calls, contains('read:a.txt'));
-      expect(runtime.calls, contains('write:a.txt:hi'));
-      expect(runtime.calls, contains('edit:a.txt:a->b'));
-      expect(runtime.calls, contains('shell:echo hi:10'));
+      expect(await errorFor(LinuxSandboxStatus.broken), 'sandbox_broken');
+      expect(runtime.calls, isEmpty);
     });
 
     test('tryHandleToolCall reports disabled tool', () async {
-      final sandbox = LinuxSandbox(
-        id: '1',
-        name: 's',
+      final sandbox = _readySandbox(
         tools: {
           ...LinuxSandbox.defaultTools(),
           LinuxSandboxToolNames.read: const LinuxSandboxToolConfig(

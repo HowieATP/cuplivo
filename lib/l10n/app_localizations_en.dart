@@ -7350,14 +7350,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linuxSandboxAndroidUnsupported =>
-      'Sandbox tools are not available on Android in this version. You can still manage sandboxes here.';
+      'Sandbox tools are not available on this Android device ABI. You can still manage sandboxes here.';
+
+  @override
+  String get linuxSandboxAndroidDownloadNote =>
+      'On Android, installing the base environment downloads an Ubuntu rootfs (~30–40 MB) and extracts it on this device. A network connection is required.';
+
+  @override
+  String get linuxSandboxAndroidProotBanner =>
+      'Android sandbox uses PRoot for convenience isolation — not a hard security boundary. Network access remains unrestricted.';
+
+  @override
+  String linuxSandboxInstallProgress(String stage) {
+    return 'Installing: $stage';
+  }
 
   @override
   String get linuxSandboxPlatformUnsupported =>
-      'Sandbox tools currently run only on Windows. You can still manage sandboxes here.';
+      'Sandbox tools currently run on Windows, Linux, and Android. You can still manage sandboxes here.';
 
   @override
   String get linuxSandboxMissingMessage => 'This sandbox no longer exists.';
+
+  @override
+  String get linuxSandboxWindowsLocalJailBanner =>
+      'Running as a Windows folder jail — not a Linux environment. Install or enable WSL for a real Linux shell.';
+
+  @override
+  String get linuxSandboxStatusDisabled => 'Disabled';
+
+  @override
+  String get linuxSandboxStatusNotReady => 'Not ready';
+
+  @override
+  String get linuxSandboxStatusInstalling => 'Installing';
+
+  @override
+  String get linuxSandboxStatusReady => 'Ready';
+
+  @override
+  String get linuxSandboxStatusBroken => 'Broken';
+
+  @override
+  String get linuxSandboxRuntimeModeLocalJail => 'Folder jail';
+
+  @override
+  String get linuxSandboxRuntimeModeWsl => 'WSL';
+
+  @override
+  String get linuxSandboxRuntimeModeNativeLinux => 'Native Linux';
+
+  @override
+  String get linuxSandboxRuntimeModeProot => 'PRoot (Android)';
+
+  @override
+  String get linuxSandboxRuntimeModeUnknown => 'Unknown';
+
+  @override
+  String get linuxSandboxInstallBaseEnvAction => 'Install base environment';
+
+  @override
+  String get linuxSandboxReinstallBaseEnvAction => 'Reinstall base environment';
+
+  @override
+  String get linuxSandboxRetryWslAction => 'Retry WSL';
+
+  @override
+  String get linuxSandboxInstallFailed => 'Failed to install base environment.';
+
+  @override
+  String get linuxSandboxInstallSuccess => 'Base environment is ready.';
 
   @override
   String get assistantEditPageLinuxSandboxTab => 'Sandbox';
@@ -7379,6 +7441,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantEditLinuxSandboxMissing =>
       'The selected sandbox is missing. Choose another or turn sandbox off.';
+
+  @override
+  String get assistantEditLinuxSandboxNotReady =>
+      'Selected sandbox is not ready. Install its base environment first.';
 
   @override
   String get assistantEditLinuxSandboxManageCta => 'Manage sandboxes';

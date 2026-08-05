@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
-
-import '../../../utils/app_directories.dart';
-import 'linux_sandbox_path.dart';
+import '../models/linux_sandbox.dart';
+import 'local_jail_fs.dart';
+import 'sandbox_disk_layout.dart';
 import 'sandbox_runtime.dart';
 
 class UnsupportedSandboxRuntime implements SandboxRuntime {
@@ -15,26 +14,41 @@ class UnsupportedSandboxRuntime implements SandboxRuntime {
   @override
   bool get isSupported => false;
 
-  Future<Directory> _root() async {
-    final base = await AppDirectories.getLinuxSandboxesDirectory();
-    return Directory(p.join(base.path, sandboxId));
+  @override
+  LinuxSandboxRuntimeMode get runtimeMode =>
+      LinuxSandboxRuntimeMode.unsupported;
+
+  Future<LocalJailFs> _fs() async {
+    await ensureReady();
+    final files = await SandboxDiskLayout.filesDir(sandboxId);
+    return LocalJailFs(files);
   }
 
   @override
-  Future<Directory> rootDirectory() => _root();
+  Future<Directory> rootDirectory() => SandboxDiskLayout.filesDir(sandboxId);
 
   @override
-  Future<void> ensureReady() async {
-    final root = await _root();
-    if (!await root.exists()) {
-      await root.create(recursive: true);
-    }
+  Future<void> ensureReady() => SandboxDiskLayout.ensureLayout(sandboxId);
+
+  @override
+  Future<SandboxInstallResult> installBaseEnv({
+    void Function(double? progress, String stage)? onProgress,
+  }) async {
+    return SandboxInstallResult.failure(
+      runtimeMode,
+      'Linux Sandbox base env is not supported on this platform',
+    );
+  }
+
+  @override
+  Future<LinuxSandboxStatus> probeStatus() async {
+    return LinuxSandboxStatus.disabled;
   }
 
   SandboxToolResult _unsupported() {
     return SandboxToolResult.failure(
       'platform_unsupported',
-      'Linux Sandbox tools are not supported on this platform in v1',
+      'Linux Sandbox tools are not supported on this platform',
     );
   }
 
@@ -58,46 +72,10 @@ class UnsupportedSandboxRuntime implements SandboxRuntime {
 
   @override
   Future<List<SandboxFsEntry>> listDir([String path = '']) async {
-    final root = await _root();
-    if (!await root.exists()) return const <SandboxFsEntry>[];
-    String hostPath;
-    try {
-      hostPath = await LinuxSandboxPath.resolveHostPath(
-        jailRoot: root.path,
-        guestPath: path,
-      );
-    } on LinuxSandboxPathException {
-      return const <SandboxFsEntry>[];
-    }
-    final dir = Directory(hostPath);
-    if (!await dir.exists()) return const <SandboxFsEntry>[];
-    final entries = <SandboxFsEntry>[];
-    await for (final entity in dir.list(followLinks: false)) {
-      final stat = await entity.stat();
-      final isDir = entity is Directory;
-      entries.add(
-        SandboxFsEntry(
-          name: p.basename(entity.path),
-          isDirectory: isDir,
-          size: isDir ? null : stat.size,
-          modifiedAt: stat.modified,
-        ),
-      );
-    }
-    entries.sort((a, b) {
-      if (a.isDirectory != b.isDirectory) {
-        return a.isDirectory ? -1 : 1;
-      }
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
-    return entries;
+    final fs = await _fs();
+    return fs.listDir(path);
   }
 
   @override
-  Future<void> destroyDisk() async {
-    final root = await _root();
-    if (await root.exists()) {
-      await root.delete(recursive: true);
-    }
-  }
+  Future<void> destroyDisk() => SandboxDiskLayout.destroySandboxTree(sandboxId);
 }

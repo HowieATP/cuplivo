@@ -7034,14 +7034,76 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get linuxSandboxAndroidUnsupported =>
-      '当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。';
+      '此 Android 设备架构不支持沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxAndroidDownloadNote =>
+      '在 Android 上安装基础环境会下载 Ubuntu 根文件系统（约 30–40 MB）并解压到本机，需要网络连接。';
+
+  @override
+  String get linuxSandboxAndroidProotBanner =>
+      'Android 沙箱通过 PRoot 提供便利隔离——并非硬安全边界。网络访问仍不受限制。';
+
+  @override
+  String linuxSandboxInstallProgress(String stage) {
+    return '正在安装：$stage';
+  }
 
   @override
   String get linuxSandboxPlatformUnsupported =>
-      '沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。';
+      '沙箱工具目前可在 Windows、Linux 与 Android 上运行。你仍可在此管理沙箱。';
 
   @override
   String get linuxSandboxMissingMessage => '该沙箱已不存在。';
+
+  @override
+  String get linuxSandboxWindowsLocalJailBanner =>
+      '当前以 Windows 文件夹隔离方式运行——并非 Linux 环境。安装或启用 WSL 后可使用真正的 Linux Shell。';
+
+  @override
+  String get linuxSandboxStatusDisabled => '已禁用';
+
+  @override
+  String get linuxSandboxStatusNotReady => '未就绪';
+
+  @override
+  String get linuxSandboxStatusInstalling => '安装中';
+
+  @override
+  String get linuxSandboxStatusReady => '就绪';
+
+  @override
+  String get linuxSandboxStatusBroken => '已损坏';
+
+  @override
+  String get linuxSandboxRuntimeModeLocalJail => '文件夹隔离';
+
+  @override
+  String get linuxSandboxRuntimeModeWsl => 'WSL';
+
+  @override
+  String get linuxSandboxRuntimeModeNativeLinux => '原生 Linux';
+
+  @override
+  String get linuxSandboxRuntimeModeProot => 'PRoot（Android）';
+
+  @override
+  String get linuxSandboxRuntimeModeUnknown => '未知';
+
+  @override
+  String get linuxSandboxInstallBaseEnvAction => '安装基础环境';
+
+  @override
+  String get linuxSandboxReinstallBaseEnvAction => '重新安装基础环境';
+
+  @override
+  String get linuxSandboxRetryWslAction => '重试 WSL';
+
+  @override
+  String get linuxSandboxInstallFailed => '安装基础环境失败。';
+
+  @override
+  String get linuxSandboxInstallSuccess => '基础环境已就绪。';
 
   @override
   String get assistantEditPageLinuxSandboxTab => '沙箱';
@@ -7060,6 +7122,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditLinuxSandboxMissing => '所选沙箱已丢失。请另选一个，或关闭沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxNotReady => '所选沙箱尚未就绪。请先安装基础环境。';
 
   @override
   String get assistantEditLinuxSandboxManageCta => '管理沙箱';
@@ -14095,14 +14160,76 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get linuxSandboxAndroidUnsupported =>
-      '当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。';
+      '此 Android 设备架构不支持沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxAndroidDownloadNote =>
+      '在 Android 上安装基础环境会下载 Ubuntu 根文件系统（约 30–40 MB）并解压到本机，需要网络连接。';
+
+  @override
+  String get linuxSandboxAndroidProotBanner =>
+      'Android 沙箱通过 PRoot 提供便利隔离——并非硬安全边界。网络访问仍不受限制。';
+
+  @override
+  String linuxSandboxInstallProgress(String stage) {
+    return '正在安装：$stage';
+  }
 
   @override
   String get linuxSandboxPlatformUnsupported =>
-      '沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。';
+      '沙箱工具目前可在 Windows、Linux 与 Android 上运行。你仍可在此管理沙箱。';
 
   @override
   String get linuxSandboxMissingMessage => '该沙箱已不存在。';
+
+  @override
+  String get linuxSandboxWindowsLocalJailBanner =>
+      '当前以 Windows 文件夹隔离方式运行——并非 Linux 环境。安装或启用 WSL 后可使用真正的 Linux Shell。';
+
+  @override
+  String get linuxSandboxStatusDisabled => '已禁用';
+
+  @override
+  String get linuxSandboxStatusNotReady => '未就绪';
+
+  @override
+  String get linuxSandboxStatusInstalling => '安装中';
+
+  @override
+  String get linuxSandboxStatusReady => '就绪';
+
+  @override
+  String get linuxSandboxStatusBroken => '已损坏';
+
+  @override
+  String get linuxSandboxRuntimeModeLocalJail => '文件夹隔离';
+
+  @override
+  String get linuxSandboxRuntimeModeWsl => 'WSL';
+
+  @override
+  String get linuxSandboxRuntimeModeNativeLinux => '原生 Linux';
+
+  @override
+  String get linuxSandboxRuntimeModeProot => 'PRoot（Android）';
+
+  @override
+  String get linuxSandboxRuntimeModeUnknown => '未知';
+
+  @override
+  String get linuxSandboxInstallBaseEnvAction => '安装基础环境';
+
+  @override
+  String get linuxSandboxReinstallBaseEnvAction => '重新安装基础环境';
+
+  @override
+  String get linuxSandboxRetryWslAction => '重试 WSL';
+
+  @override
+  String get linuxSandboxInstallFailed => '安装基础环境失败。';
+
+  @override
+  String get linuxSandboxInstallSuccess => '基础环境已就绪。';
 
   @override
   String get assistantEditPageLinuxSandboxTab => '沙箱';
@@ -14121,6 +14248,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditLinuxSandboxMissing => '所选沙箱已丢失。请另选一个，或关闭沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxNotReady => '所选沙箱尚未就绪。请先安装基础环境。';
 
   @override
   String get assistantEditLinuxSandboxManageCta => '管理沙箱';
@@ -21156,14 +21286,76 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get linuxSandboxAndroidUnsupported =>
-      '目前版本 Android 尚不支援沙箱工具。你仍可在此管理沙箱。';
+      '此 Android 裝置架構不支援沙箱工具。你仍可在此管理沙箱。';
+
+  @override
+  String get linuxSandboxAndroidDownloadNote =>
+      '在 Android 上安裝基礎環境會下載 Ubuntu 根檔案系統（約 30–40 MB）並解壓到本機，需要網路連線。';
+
+  @override
+  String get linuxSandboxAndroidProotBanner =>
+      'Android 沙箱透過 PRoot 提供便利隔離——並非硬安全邊界。網路存取仍不受限制。';
+
+  @override
+  String linuxSandboxInstallProgress(String stage) {
+    return '正在安裝：$stage';
+  }
 
   @override
   String get linuxSandboxPlatformUnsupported =>
-      '沙箱工具目前僅在 Windows 上執行。你仍可在此管理沙箱。';
+      '沙箱工具目前可在 Windows、Linux 與 Android 上執行。你仍可在此管理沙箱。';
 
   @override
   String get linuxSandboxMissingMessage => '此沙箱已不存在。';
+
+  @override
+  String get linuxSandboxWindowsLocalJailBanner =>
+      '目前以 Windows 資料夾隔離方式執行——並非 Linux 環境。安裝或啟用 WSL 後可使用真正的 Linux Shell。';
+
+  @override
+  String get linuxSandboxStatusDisabled => '已停用';
+
+  @override
+  String get linuxSandboxStatusNotReady => '未就緒';
+
+  @override
+  String get linuxSandboxStatusInstalling => '安裝中';
+
+  @override
+  String get linuxSandboxStatusReady => '就緒';
+
+  @override
+  String get linuxSandboxStatusBroken => '已損壞';
+
+  @override
+  String get linuxSandboxRuntimeModeLocalJail => '資料夾隔離';
+
+  @override
+  String get linuxSandboxRuntimeModeWsl => 'WSL';
+
+  @override
+  String get linuxSandboxRuntimeModeNativeLinux => '原生 Linux';
+
+  @override
+  String get linuxSandboxRuntimeModeProot => 'PRoot（Android）';
+
+  @override
+  String get linuxSandboxRuntimeModeUnknown => '未知';
+
+  @override
+  String get linuxSandboxInstallBaseEnvAction => '安裝基礎環境';
+
+  @override
+  String get linuxSandboxReinstallBaseEnvAction => '重新安裝基礎環境';
+
+  @override
+  String get linuxSandboxRetryWslAction => '重試 WSL';
+
+  @override
+  String get linuxSandboxInstallFailed => '安裝基礎環境失敗。';
+
+  @override
+  String get linuxSandboxInstallSuccess => '基礎環境已就緒。';
 
   @override
   String get assistantEditPageLinuxSandboxTab => '沙箱';
@@ -21182,6 +21374,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLinuxSandboxMissing => '所選沙箱已遺失。請另選一個，或關閉沙箱。';
+
+  @override
+  String get assistantEditLinuxSandboxNotReady => '所選沙箱尚未就緒。請先安裝基礎環境。';
 
   @override
   String get assistantEditLinuxSandboxManageCta => '管理沙箱';

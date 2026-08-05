@@ -1,3 +1,14 @@
+enum LinuxSandboxStatus { disabled, notReady, installing, ready, broken }
+
+enum LinuxSandboxRuntimeMode {
+  unknown,
+  unsupported,
+  localJail,
+  wsl,
+  nativeLinux,
+  proot,
+}
+
 class LinuxSandboxToolNames {
   const LinuxSandboxToolNames._();
 
@@ -48,6 +59,10 @@ class LinuxSandbox {
   final DateTime updatedAt;
   final Map<String, LinuxSandboxToolConfig> tools;
   final List<String> enabledEnvPacks;
+  final LinuxSandboxStatus status;
+  final LinuxSandboxRuntimeMode runtimeMode;
+  final String? statusMessage;
+  final String? lastInstallError;
 
   LinuxSandbox({
     required this.id,
@@ -57,6 +72,10 @@ class LinuxSandbox {
     DateTime? updatedAt,
     Map<String, LinuxSandboxToolConfig>? tools,
     List<String>? enabledEnvPacks,
+    this.status = LinuxSandboxStatus.notReady,
+    this.runtimeMode = LinuxSandboxRuntimeMode.unknown,
+    this.statusMessage,
+    this.lastInstallError,
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
        tools = Map<String, LinuxSandboxToolConfig>.from(
@@ -94,6 +113,12 @@ class LinuxSandbox {
     DateTime? updatedAt,
     Map<String, LinuxSandboxToolConfig>? tools,
     List<String>? enabledEnvPacks,
+    LinuxSandboxStatus? status,
+    LinuxSandboxRuntimeMode? runtimeMode,
+    String? statusMessage,
+    bool clearStatusMessage = false,
+    String? lastInstallError,
+    bool clearLastInstallError = false,
   }) {
     return LinuxSandbox(
       id: id ?? this.id,
@@ -103,6 +128,14 @@ class LinuxSandbox {
       updatedAt: updatedAt ?? this.updatedAt,
       tools: tools ?? this.tools,
       enabledEnvPacks: enabledEnvPacks ?? this.enabledEnvPacks,
+      status: status ?? this.status,
+      runtimeMode: runtimeMode ?? this.runtimeMode,
+      statusMessage: clearStatusMessage
+          ? null
+          : (statusMessage ?? this.statusMessage),
+      lastInstallError: clearLastInstallError
+          ? null
+          : (lastInstallError ?? this.lastInstallError),
     );
   }
 
@@ -114,6 +147,10 @@ class LinuxSandbox {
     'updatedAt': updatedAt.toIso8601String(),
     'tools': tools.map((k, v) => MapEntry(k, v.toJson())),
     'enabledEnvPacks': enabledEnvPacks,
+    'status': status.name,
+    'runtimeMode': runtimeMode.name,
+    'statusMessage': statusMessage,
+    'lastInstallError': lastInstallError,
   };
 
   static LinuxSandbox fromJson(Map<String, dynamic> json) {
@@ -148,8 +185,34 @@ class LinuxSandbox {
       updatedAt: _readDateTime(json['updatedAt']) ?? DateTime.now(),
       tools: tools,
       enabledEnvPacks: packs,
+      status: _parseStatus(json['status']),
+      runtimeMode: _parseRuntimeMode(json['runtimeMode']),
+      statusMessage: _readString(json['statusMessage']),
+      lastInstallError: _readString(json['lastInstallError']),
     );
   }
+}
+
+/// Missing status key (v1 metadata) → ready so existing sandboxes keep working.
+/// Empty or unknown status string → broken (never silent-ready).
+LinuxSandboxStatus _parseStatus(Object? value) {
+  if (value == null) return LinuxSandboxStatus.ready;
+  final s = value.toString().trim();
+  if (s.isEmpty) return LinuxSandboxStatus.broken;
+  for (final e in LinuxSandboxStatus.values) {
+    if (e.name == s) return e;
+  }
+  return LinuxSandboxStatus.broken;
+}
+
+LinuxSandboxRuntimeMode _parseRuntimeMode(Object? value) {
+  if (value == null) return LinuxSandboxRuntimeMode.unknown;
+  final s = value.toString().trim();
+  if (s.isEmpty) return LinuxSandboxRuntimeMode.unknown;
+  for (final e in LinuxSandboxRuntimeMode.values) {
+    if (e.name == s) return e;
+  }
+  return LinuxSandboxRuntimeMode.unknown;
 }
 
 bool _readBool(Object? value, {required bool fallback}) {

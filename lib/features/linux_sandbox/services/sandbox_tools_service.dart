@@ -15,6 +15,7 @@ class SandboxToolsService {
     return cfg.needsApproval;
   }
 
+  /// Tools are only offered when [sandbox.status] is [LinuxSandboxStatus.ready].
   static List<Map<String, dynamic>> buildToolDefinitions({
     required LinuxSandbox? sandbox,
     required bool supportsTools,
@@ -22,18 +23,22 @@ class SandboxToolsService {
     if (!supportsTools || sandbox == null) {
       return const <Map<String, dynamic>>[];
     }
+    if (sandbox.status != LinuxSandboxStatus.ready) {
+      return const <Map<String, dynamic>>[];
+    }
 
     final tools = <Map<String, dynamic>>[];
     final cfg = sandbox.tools;
+    final shellDescription = _shellDescription(sandbox.runtimeMode);
 
     if (cfg[LinuxSandboxToolNames.read]?.enabled == true) {
-      tools.add(const {
+      tools.add({
         'type': 'function',
         'function': {
           'name': LinuxSandboxToolNames.read,
           'description':
-              'Read a text file or list a directory inside the Linux sandbox jail. '
-              'Paths are relative to the sandbox root (forward slashes). '
+              'Read a text file or list a directory inside the sandbox workspace. '
+              'Paths are relative to the sandbox files root (forward slashes). '
               'Do not use absolute host paths.',
           'parameters': {
             'type': 'object',
@@ -51,13 +56,13 @@ class SandboxToolsService {
     }
 
     if (cfg[LinuxSandboxToolNames.write]?.enabled == true) {
-      tools.add(const {
+      tools.add({
         'type': 'function',
         'function': {
           'name': LinuxSandboxToolNames.write,
           'description':
-              'Create or overwrite a text file inside the Linux sandbox jail. '
-              'Parent directories are created as needed. Paths are relative to the sandbox root.',
+              'Create or overwrite a text file inside the sandbox workspace. '
+              'Parent directories are created as needed. Paths are relative to the files root.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -77,13 +82,13 @@ class SandboxToolsService {
     }
 
     if (cfg[LinuxSandboxToolNames.edit]?.enabled == true) {
-      tools.add(const {
+      tools.add({
         'type': 'function',
         'function': {
           'name': LinuxSandboxToolNames.edit,
           'description':
               'Replace the first occurrence of old_string with new_string in a '
-              'file inside the Linux sandbox jail. Errors when old_string is not found.',
+              'file inside the sandbox workspace. Errors when old_string is not found.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -107,14 +112,11 @@ class SandboxToolsService {
     }
 
     if (cfg[LinuxSandboxToolNames.shell]?.enabled == true) {
-      tools.add(const {
+      tools.add({
         'type': 'function',
         'function': {
           'name': LinuxSandboxToolNames.shell,
-          'description':
-              'Run a shell command with the working directory set to the Linux '
-              'sandbox root. Output is capped; long-running commands time out. '
-              'Prefer read/write/edit for simple file operations.',
+          'description': shellDescription,
           'parameters': {
             'type': 'object',
             'properties': {
@@ -137,6 +139,60 @@ class SandboxToolsService {
     return tools;
   }
 
+  static String _shellDescription(LinuxSandboxRuntimeMode mode) {
+    switch (mode) {
+      case LinuxSandboxRuntimeMode.localJail:
+        return 'Run a shell command in a local folder jail (not a Linux environment). '
+            'Commands run with host privileges outside a real sandbox boundary. '
+            'Working directory is the sandbox files root. Output is capped; '
+            'long-running commands time out. Prefer read/write/edit for simple file operations.';
+      case LinuxSandboxRuntimeMode.wsl:
+        return 'Run a shell command inside the WSL Linux sandbox. '
+            'Working directory is the sandbox files root. Output is capped; '
+            'long-running commands time out. Prefer read/write/edit for simple file operations.';
+      case LinuxSandboxRuntimeMode.nativeLinux:
+        return 'Run a shell command via /bin/sh in the native Linux sandbox. '
+            'Working directory is the sandbox files root. Output is capped; '
+            'long-running commands time out. Prefer read/write/edit for simple file operations.';
+      case LinuxSandboxRuntimeMode.proot:
+        return 'Run a shell command inside the Android PRoot sandbox (convenience isolation, '
+            'not a hard security boundary). Working directory is the sandbox files root. '
+            'Output is capped; long-running commands time out.';
+      case LinuxSandboxRuntimeMode.unsupported:
+      case LinuxSandboxRuntimeMode.unknown:
+        return 'Run a shell command with the working directory set to the sandbox '
+            'files root. Output is capped; long-running commands time out. '
+            'Prefer read/write/edit for simple file operations.';
+    }
+  }
+
+  static String? _statusGateError(LinuxSandbox sandbox) {
+    switch (sandbox.status) {
+      case LinuxSandboxStatus.ready:
+        return null;
+      case LinuxSandboxStatus.installing:
+        return jsonEncode({
+          'ok': false,
+          'error': 'sandbox_installing',
+          'message': 'Sandbox base environment is still installing.',
+        });
+      case LinuxSandboxStatus.broken:
+        return jsonEncode({
+          'ok': false,
+          'error': 'sandbox_broken',
+          'message': 'Sandbox is broken and needs repair or reinstall.',
+        });
+      case LinuxSandboxStatus.disabled:
+      case LinuxSandboxStatus.notReady:
+        return jsonEncode({
+          'ok': false,
+          'error': 'sandbox_not_ready',
+          'message':
+              'Sandbox is not ready. Install the base environment first.',
+        });
+    }
+  }
+
   static Future<String?> tryHandleToolCall({
     required String name,
     required Map<String, dynamic> args,
@@ -153,6 +209,9 @@ class SandboxToolsService {
         'message': 'Tool "$name" is disabled for this sandbox.',
       });
     }
+
+    final gate = _statusGateError(sandbox);
+    if (gate != null) return gate;
 
     await runtime.ensureReady();
     SandboxToolResult result;

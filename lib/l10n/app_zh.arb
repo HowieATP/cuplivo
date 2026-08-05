@@ -2856,14 +2856,41 @@
   "linuxSandboxBrowseTitle": "文件",
   "linuxSandboxBrowseEmpty": "此文件夹为空。",
   "linuxSandboxBrowseUp": "上级",
-  "linuxSandboxAndroidUnsupported": "当前版本 Android 尚不支持沙箱工具。你仍可在此管理沙箱。",
-  "linuxSandboxPlatformUnsupported": "沙箱工具目前仅在 Windows 上运行。你仍可在此管理沙箱。",
+  "linuxSandboxAndroidUnsupported": "此 Android 设备架构不支持沙箱工具。你仍可在此管理沙箱。",
+  "linuxSandboxAndroidDownloadNote": "在 Android 上安装基础环境会下载 Ubuntu 根文件系统（约 30–40 MB）并解压到本机，需要网络连接。",
+  "linuxSandboxAndroidProotBanner": "Android 沙箱通过 PRoot 提供便利隔离——并非硬安全边界。网络访问仍不受限制。",
+  "linuxSandboxInstallProgress": "正在安装：{stage}",
+  "@linuxSandboxInstallProgress": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "linuxSandboxPlatformUnsupported": "沙箱工具目前可在 Windows、Linux 与 Android 上运行。你仍可在此管理沙箱。",
   "linuxSandboxMissingMessage": "该沙箱已不存在。",
+  "linuxSandboxWindowsLocalJailBanner": "当前以 Windows 文件夹隔离方式运行——并非 Linux 环境。安装或启用 WSL 后可使用真正的 Linux Shell。",
+  "linuxSandboxStatusDisabled": "已禁用",
+  "linuxSandboxStatusNotReady": "未就绪",
+  "linuxSandboxStatusInstalling": "安装中",
+  "linuxSandboxStatusReady": "就绪",
+  "linuxSandboxStatusBroken": "已损坏",
+  "linuxSandboxRuntimeModeLocalJail": "文件夹隔离",
+  "linuxSandboxRuntimeModeWsl": "WSL",
+  "linuxSandboxRuntimeModeNativeLinux": "原生 Linux",
+  "linuxSandboxRuntimeModeProot": "PRoot（Android）",
+  "linuxSandboxRuntimeModeUnknown": "未知",
+  "linuxSandboxInstallBaseEnvAction": "安装基础环境",
+  "linuxSandboxReinstallBaseEnvAction": "重新安装基础环境",
+  "linuxSandboxRetryWslAction": "重试 WSL",
+  "linuxSandboxInstallFailed": "安装基础环境失败。",
+  "linuxSandboxInstallSuccess": "基础环境已就绪。",
   "assistantEditPageLinuxSandboxTab": "沙箱",
   "assistantEditLinuxSandboxEnable": "启用沙箱",
   "assistantEditLinuxSandboxEnableSubtitle": "允许此助手使用本地沙箱工作区。",
   "assistantEditLinuxSandboxPick": "选择沙箱",
   "assistantEditLinuxSandboxNone": "暂无沙箱。请先在设置中创建。",
   "assistantEditLinuxSandboxMissing": "所选沙箱已丢失。请另选一个，或关闭沙箱。",
+  "assistantEditLinuxSandboxNotReady": "所选沙箱尚未就绪。请先安装基础环境。",
   "assistantEditLinuxSandboxManageCta": "管理沙箱"
 }

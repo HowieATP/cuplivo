@@ -5,9 +5,11 @@ class _LinuxSandboxTab extends StatelessWidget {
   final String assistantId;
 
   String? _platformBanner(AppLocalizations l10n) {
-    if (Platform.isAndroid) return l10n.linuxSandboxAndroidUnsupported;
-    if (!Platform.isWindows) return l10n.linuxSandboxPlatformUnsupported;
-    return null;
+    // Real runtimes: Windows (WSL/localJail), Android (PRoot), Linux desktop.
+    if (Platform.isWindows || Platform.isAndroid || Platform.isLinux) {
+      return null;
+    }
+    return l10n.linuxSandboxPlatformUnsupported;
   }
 
   @override
@@ -26,6 +28,13 @@ class _LinuxSandboxTab extends StatelessWidget {
         selectedId != null && sandboxProvider.getById(selectedId) != null;
     final missingSelected =
         selectedId != null && selectedId.isNotEmpty && !selectedExists;
+    final selectedSandbox = selectedExists
+        ? sandboxProvider.getById(selectedId!)
+        : null;
+    final selectedNotReady =
+        enabled &&
+        selectedSandbox != null &&
+        selectedSandbox.status != LinuxSandboxStatus.ready;
     final platformBanner = _platformBanner(l10n);
 
     Future<void> setEnabled(bool value) async {
@@ -161,6 +170,21 @@ class _LinuxSandboxTab extends StatelessWidget {
             child: Text(
               l10n.assistantEditLinuxSandboxMissing,
               style: TextStyle(fontSize: 13, color: cs.onErrorContainer),
+            ),
+          ),
+        ],
+        if (selectedNotReady) ...[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: cs.tertiaryContainer.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              l10n.assistantEditLinuxSandboxNotReady,
+              style: TextStyle(fontSize: 13, color: cs.onTertiaryContainer),
             ),
           ),
         ],

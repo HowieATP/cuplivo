@@ -1,5 +1,7 @@
 # Linux Sandbox v1: Windows local path jail; Android UI stub
 
+> Superseded in part by [ADR-0021](0021-linux-sandbox-real-runtimes.md) (per-sandbox `{files,linux,tmp}/` layout, explicit `installBaseEnv`, status gating, real runtime modes).
+
 v1 ships a **Windows local path jail** runtime: each sandbox is a directory under app support `linux_sandboxes/<id>/`. Guest paths are resolved, normalized, and canonicalized (`resolveSymbolicLinks` where possible); escapes via `..`, absolute host paths, unsafe Win32 segments, and symlink targets outside the jail are rejected. Shell runs with `workingDirectory` set to the jail root, default timeout 30s (max 120s), stdout/stderr capped at 256KB, process killed on timeout. Write/edit/shell default to `needsApproval=true`; read does not.
 
 Android/iOS/macOS/Linux use `UnsupportedSandboxRuntime` (`isSupported=false`) so the management UI can exist as a stub while tool calls return `platform_unsupported`. A pluggable `SandboxRuntime` factory is the extension point for a future Android/container runtime.

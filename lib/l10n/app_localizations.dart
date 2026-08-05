@@ -13391,13 +13391,31 @@ abstract class AppLocalizations {
   /// No description provided for @linuxSandboxAndroidUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'Sandbox tools are not available on Android in this version. You can still manage sandboxes here.'**
+  /// **'Sandbox tools are not available on this Android device ABI. You can still manage sandboxes here.'**
   String get linuxSandboxAndroidUnsupported;
+
+  /// No description provided for @linuxSandboxAndroidDownloadNote.
+  ///
+  /// In en, this message translates to:
+  /// **'On Android, installing the base environment downloads an Ubuntu rootfs (~30–40 MB) and extracts it on this device. A network connection is required.'**
+  String get linuxSandboxAndroidDownloadNote;
+
+  /// No description provided for @linuxSandboxAndroidProotBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Android sandbox uses PRoot for convenience isolation — not a hard security boundary. Network access remains unrestricted.'**
+  String get linuxSandboxAndroidProotBanner;
+
+  /// No description provided for @linuxSandboxInstallProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing: {stage}'**
+  String linuxSandboxInstallProgress(String stage);
 
   /// No description provided for @linuxSandboxPlatformUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'Sandbox tools currently run only on Windows. You can still manage sandboxes here.'**
+  /// **'Sandbox tools currently run on Windows, Linux, and Android. You can still manage sandboxes here.'**
   String get linuxSandboxPlatformUnsupported;
 
   /// No description provided for @linuxSandboxMissingMessage.
@@ -13405,6 +13423,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This sandbox no longer exists.'**
   String get linuxSandboxMissingMessage;
+
+  /// No description provided for @linuxSandboxWindowsLocalJailBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Running as a Windows folder jail — not a Linux environment. Install or enable WSL for a real Linux shell.'**
+  String get linuxSandboxWindowsLocalJailBanner;
+
+  /// No description provided for @linuxSandboxStatusDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get linuxSandboxStatusDisabled;
+
+  /// No description provided for @linuxSandboxStatusNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Not ready'**
+  String get linuxSandboxStatusNotReady;
+
+  /// No description provided for @linuxSandboxStatusInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing'**
+  String get linuxSandboxStatusInstalling;
+
+  /// No description provided for @linuxSandboxStatusReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get linuxSandboxStatusReady;
+
+  /// No description provided for @linuxSandboxStatusBroken.
+  ///
+  /// In en, this message translates to:
+  /// **'Broken'**
+  String get linuxSandboxStatusBroken;
+
+  /// No description provided for @linuxSandboxRuntimeModeLocalJail.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder jail'**
+  String get linuxSandboxRuntimeModeLocalJail;
+
+  /// No description provided for @linuxSandboxRuntimeModeWsl.
+  ///
+  /// In en, this message translates to:
+  /// **'WSL'**
+  String get linuxSandboxRuntimeModeWsl;
+
+  /// No description provided for @linuxSandboxRuntimeModeNativeLinux.
+  ///
+  /// In en, this message translates to:
+  /// **'Native Linux'**
+  String get linuxSandboxRuntimeModeNativeLinux;
+
+  /// No description provided for @linuxSandboxRuntimeModeProot.
+  ///
+  /// In en, this message translates to:
+  /// **'PRoot (Android)'**
+  String get linuxSandboxRuntimeModeProot;
+
+  /// No description provided for @linuxSandboxRuntimeModeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get linuxSandboxRuntimeModeUnknown;
+
+  /// No description provided for @linuxSandboxInstallBaseEnvAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Install base environment'**
+  String get linuxSandboxInstallBaseEnvAction;
+
+  /// No description provided for @linuxSandboxReinstallBaseEnvAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinstall base environment'**
+  String get linuxSandboxReinstallBaseEnvAction;
+
+  /// No description provided for @linuxSandboxRetryWslAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry WSL'**
+  String get linuxSandboxRetryWslAction;
+
+  /// No description provided for @linuxSandboxInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to install base environment.'**
+  String get linuxSandboxInstallFailed;
+
+  /// No description provided for @linuxSandboxInstallSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Base environment is ready.'**
+  String get linuxSandboxInstallSuccess;
 
   /// No description provided for @assistantEditPageLinuxSandboxTab.
   ///
@@ -13441,6 +13555,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The selected sandbox is missing. Choose another or turn sandbox off.'**
   String get assistantEditLinuxSandboxMissing;
+
+  /// No description provided for @assistantEditLinuxSandboxNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected sandbox is not ready. Install its base environment first.'**
+  String get assistantEditLinuxSandboxNotReady;
 
   /// No description provided for @assistantEditLinuxSandboxManageCta.
   ///

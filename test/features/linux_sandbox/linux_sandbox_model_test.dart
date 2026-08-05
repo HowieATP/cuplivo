@@ -13,7 +13,15 @@ void main() {
       expect(tools[LinuxSandboxToolNames.shell]!.needsApproval, isTrue);
     });
 
-    test('toJson/fromJson round-trip', () {
+    test('new sandbox defaults to notReady', () {
+      final s = LinuxSandbox(id: '1', name: 'n');
+      expect(s.status, LinuxSandboxStatus.notReady);
+      expect(s.runtimeMode, LinuxSandboxRuntimeMode.unknown);
+      expect(s.statusMessage, isNull);
+      expect(s.lastInstallError, isNull);
+    });
+
+    test('toJson/fromJson round-trip includes status fields', () {
       final original = LinuxSandbox(
         id: 'sb-1',
         name: 'Dev',
@@ -28,6 +36,10 @@ void main() {
           ),
         },
         enabledEnvPacks: const <String>[],
+        status: LinuxSandboxStatus.ready,
+        runtimeMode: LinuxSandboxRuntimeMode.localJail,
+        statusMessage: 'ok',
+        lastInstallError: null,
       );
 
       final restored = LinuxSandbox.fromJson(original.toJson());
@@ -42,6 +54,27 @@ void main() {
         restored.tools[LinuxSandboxToolNames.read]!.needsApproval,
         isFalse,
       );
+      expect(restored.status, LinuxSandboxStatus.ready);
+      expect(restored.runtimeMode, LinuxSandboxRuntimeMode.localJail);
+      expect(restored.statusMessage, 'ok');
+      expect(restored.lastInstallError, isNull);
+    });
+
+    test('fromJson missing status (v1) defaults to ready', () {
+      final restored = LinuxSandbox.fromJson({'id': 'x', 'name': 'n'});
+      expect(restored.status, LinuxSandboxStatus.ready);
+      expect(restored.runtimeMode, LinuxSandboxRuntimeMode.unknown);
+    });
+
+    test('fromJson unknown status becomes broken (not silent-ready)', () {
+      final restored = LinuxSandbox.fromJson({
+        'id': 'x',
+        'name': 'n',
+        'status': 'totally_unknown_status',
+        'runtimeMode': 'localJail',
+      });
+      expect(restored.status, LinuxSandboxStatus.broken);
+      expect(restored.runtimeMode, LinuxSandboxRuntimeMode.localJail);
     });
 
     test('fromJson fills missing tools from defaults', () {
@@ -58,12 +91,27 @@ void main() {
       expect(restored.tools[LinuxSandboxToolNames.shell]!.enabled, isTrue);
     });
 
-    test('copyWith clearDescription', () {
-      final s = LinuxSandbox(id: '1', name: 'n', description: 'd');
-      final cleared = s.copyWith(clearDescription: true);
-      expect(cleared.description, isNull);
-      expect(cleared.name, 'n');
-    });
+    test(
+      'copyWith clearDescription / clearStatusMessage / clearLastInstallError',
+      () {
+        final s = LinuxSandbox(
+          id: '1',
+          name: 'n',
+          description: 'd',
+          statusMessage: 'm',
+          lastInstallError: 'e',
+        );
+        final cleared = s.copyWith(
+          clearDescription: true,
+          clearStatusMessage: true,
+          clearLastInstallError: true,
+        );
+        expect(cleared.description, isNull);
+        expect(cleared.statusMessage, isNull);
+        expect(cleared.lastInstallError, isNull);
+        expect(cleared.name, 'n');
+      },
+    );
   });
 
   group('LinuxSandboxToolConfig', () {

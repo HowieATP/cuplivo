@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +26,8 @@ class _LinuxSandboxCreatePageState extends State<LinuxSandboxCreatePage> {
   final _nameController = TextEditingController();
   bool _baseEnv = true;
   bool _creating = false;
+  double? _installProgress;
+  String? _installStage;
 
   @override
   void dispose() {
@@ -45,12 +49,39 @@ class _LinuxSandboxCreatePageState extends State<LinuxSandboxCreatePage> {
     }
     setState(() => _creating = true);
     try {
-      final sandbox = await context.read<LinuxSandboxProvider>().create(
+      final provider = context.read<LinuxSandboxProvider>();
+      final sandbox = await provider.create(
         name: name,
         enabledEnvPacks: _baseEnv
             ? const [LinuxSandbox.baseEnvPackId]
             : const <String>[],
       );
+      if (_baseEnv) {
+        final result = await provider.installBaseEnv(
+          sandbox.id,
+          onProgress: (progress, stage) {
+            if (!mounted) return;
+            setState(() {
+              _installProgress = progress;
+              _installStage = stage;
+            });
+          },
+        );
+        if (!result.ok && mounted) {
+          setState(() => _creating = false);
+          showAppSnackBar(
+            context,
+            message: result.errorMessage ?? l10n.linuxSandboxInstallFailed,
+            type: NotificationType.error,
+          );
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => LinuxSandboxDetailPage(sandboxId: sandbox.id),
+            ),
+          );
+          return;
+        }
+      }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -158,6 +189,31 @@ class _LinuxSandboxCreatePageState extends State<LinuxSandboxCreatePage> {
               ],
             ),
           ),
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: 12),
+            Text(
+              l10n.linuxSandboxAndroidDownloadNote,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
+          if (_creating) ...[
+            const SizedBox(height: 16),
+            LinearProgressIndicator(value: _installProgress),
+            if (_installStage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.linuxSandboxInstallProgress(_installStage!),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: 24),
           IosTileButton(
             icon: Lucide.Plus,

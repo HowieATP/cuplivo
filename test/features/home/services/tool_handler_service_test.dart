@@ -147,6 +147,8 @@ void main() {
       final sandbox = LinuxSandbox(
         id: 'sb-defs',
         name: 'Defs',
+        status: LinuxSandboxStatus.ready,
+        runtimeMode: LinuxSandboxRuntimeMode.localJail,
         tools: {
           LinuxSandboxToolNames.read: const LinuxSandboxToolConfig(
             enabled: true,

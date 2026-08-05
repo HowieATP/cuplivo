@@ -12,16 +12,38 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../models/linux_sandbox.dart';
 import '../providers/linux_sandbox_provider.dart';
+import '../services/android_linux_sandbox_channel.dart';
 import 'linux_sandbox_create_page.dart';
 import 'linux_sandbox_detail_page.dart';
 
-class LinuxSandboxListPage extends StatelessWidget {
+class LinuxSandboxListPage extends StatefulWidget {
   const LinuxSandboxListPage({super.key});
 
-  String? _platformBanner(AppLocalizations l10n) {
-    if (Platform.isAndroid) return l10n.linuxSandboxAndroidUnsupported;
-    if (!Platform.isWindows) return l10n.linuxSandboxPlatformUnsupported;
-    return null;
+  @override
+  State<LinuxSandboxListPage> createState() => _LinuxSandboxListPageState();
+}
+
+class _LinuxSandboxListPageState extends State<LinuxSandboxListPage> {
+  Future<String>? _androidAbiFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid) {
+      _androidAbiFuture = AndroidLinuxSandboxChannel().getSupportedAbi();
+    }
+  }
+
+  String? _platformBanner(AppLocalizations l10n, {String? androidAbi}) {
+    if (Platform.isWindows || Platform.isLinux) return null;
+    if (Platform.isAndroid) {
+      if (androidAbi == null) return null;
+      if (androidAbi == 'unsupported') {
+        return l10n.linuxSandboxAndroidUnsupported;
+      }
+      return null;
+    }
+    return l10n.linuxSandboxPlatformUnsupported;
   }
 
   Future<void> _confirmDelete(
@@ -84,8 +106,45 @@ class LinuxSandboxListPage extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<LinuxSandboxProvider>();
     final sandboxes = provider.sandboxes;
-    final banner = _platformBanner(l10n);
 
+    if (Platform.isAndroid && _androidAbiFuture != null) {
+      return FutureBuilder<String>(
+        future: _androidAbiFuture,
+        builder: (context, snapshot) {
+          final banner = _platformBanner(l10n, androidAbi: snapshot.data);
+          return _buildBody(
+            context,
+            l10n: l10n,
+            cs: cs,
+            isDark: isDark,
+            provider: provider,
+            sandboxes: sandboxes,
+            banner: banner,
+          );
+        },
+      );
+    }
+
+    return _buildBody(
+      context,
+      l10n: l10n,
+      cs: cs,
+      isDark: isDark,
+      provider: provider,
+      sandboxes: sandboxes,
+      banner: _platformBanner(l10n),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context, {
+    required AppLocalizations l10n,
+    required ColorScheme cs,
+    required bool isDark,
+    required LinuxSandboxProvider provider,
+    required List<LinuxSandbox> sandboxes,
+    required String? banner,
+  }) {
     final canPop = Navigator.of(context).canPop();
     return Scaffold(
       appBar: AppBar(
@@ -167,94 +226,166 @@ class LinuxSandboxListPage extends StatelessWidget {
                                     .where((t) => t.enabled)
                                     .length;
                                 final total = sandbox.tools.length;
+                                final localJail =
+                                    sandbox.runtimeMode ==
+                                    LinuxSandboxRuntimeMode.localJail;
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
-                                  child: IosCardPress(
-                                    borderRadius: BorderRadius.circular(14),
-                                    baseColor: isDark
-                                        ? Colors.white10
-                                        : Colors.white.withValues(alpha: 0.96),
-                                    border: Border.all(
-                                      color: cs.outlineVariant.withValues(
-                                        alpha: isDark ? 0.1 : 0.08,
-                                      ),
-                                      width: 0.6,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    onTap: () =>
-                                        _openDetail(context, sandbox.id),
-                                    onLongPress: () =>
-                                        _confirmDelete(context, sandbox),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 42,
-                                          height: 42,
-                                          decoration: BoxDecoration(
-                                            color: isDark
-                                                ? Colors.white10
-                                                : const Color(0xFFF2F3F5),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (localJail)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          child: Material(
+                                            color: cs.tertiaryContainer
+                                                .withValues(alpha: 0.55),
                                             borderRadius: BorderRadius.circular(
                                               10,
                                             ),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Icon(
-                                            Lucide.Box,
-                                            size: 20,
-                                            color: cs.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                sandbox.name,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontWeight:
-                                                      AppFontWeights.emphasis,
-                                                  color: cs.onSurface,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                l10n.linuxSandboxToolsCount(
-                                                  enabledCount,
-                                                  total,
-                                                ),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                    12,
+                                                    8,
+                                                    12,
+                                                    8,
+                                                  ),
+                                              child: Text(
+                                                l10n.linuxSandboxWindowsLocalJailBanner,
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: cs.onSurface
-                                                      .withValues(alpha: 0.6),
+                                                  height: 1.35,
+                                                  color: cs.onTertiaryContainer,
                                                 ),
                                               ),
-                                            ],
+                                            ),
                                           ),
                                         ),
-                                        IosIconButton(
-                                          icon: Lucide.Trash2,
-                                          size: 18,
-                                          color: cs.error,
-                                          onTap: () =>
-                                              _confirmDelete(context, sandbox),
-                                        ),
-                                        Icon(
-                                          Lucide.ChevronRight,
-                                          size: 16,
-                                          color: cs.onSurface.withValues(
-                                            alpha: 0.45,
+                                      IosCardPress(
+                                        borderRadius: BorderRadius.circular(14),
+                                        baseColor: isDark
+                                            ? Colors.white10
+                                            : Colors.white.withValues(
+                                                alpha: 0.96,
+                                              ),
+                                        border: Border.all(
+                                          color: cs.outlineVariant.withValues(
+                                            alpha: isDark ? 0.1 : 0.08,
                                           ),
+                                          width: 0.6,
                                         ),
-                                      ],
-                                    ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
+                                        onTap: () =>
+                                            _openDetail(context, sandbox.id),
+                                        onLongPress: () =>
+                                            _confirmDelete(context, sandbox),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 42,
+                                              height: 42,
+                                              decoration: BoxDecoration(
+                                                color: isDark
+                                                    ? Colors.white10
+                                                    : const Color(0xFFF2F3F5),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Icon(
+                                                Lucide.Box,
+                                                size: 20,
+                                                color: cs.primary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    sandbox.name,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontWeight: AppFontWeights
+                                                          .emphasis,
+                                                      color: cs.onSurface,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    l10n.linuxSandboxToolsCount(
+                                                      enabledCount,
+                                                      total,
+                                                    ),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: cs.onSurface
+                                                          .withValues(
+                                                            alpha: 0.6,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    runSpacing: 4,
+                                                    children: [
+                                                      _ListChip(
+                                                        label: _listStatusLabel(
+                                                          l10n,
+                                                          sandbox.status,
+                                                        ),
+                                                        color: _listStatusColor(
+                                                          cs,
+                                                          sandbox.status,
+                                                        ),
+                                                      ),
+                                                      _ListChip(
+                                                        label: _listModeLabel(
+                                                          l10n,
+                                                          sandbox.runtimeMode,
+                                                        ),
+                                                        color: cs.onSurface
+                                                            .withValues(
+                                                              alpha: 0.55,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            IosIconButton(
+                                              icon: Lucide.Trash2,
+                                              size: 18,
+                                              color: cs.error,
+                                              onTap: () => _confirmDelete(
+                                                context,
+                                                sandbox,
+                                              ),
+                                            ),
+                                            Icon(
+                                              Lucide.ChevronRight,
+                                              size: 16,
+                                              color: cs.onSurface.withValues(
+                                                alpha: 0.45,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 );
                               },
@@ -272,6 +403,78 @@ class LinuxSandboxListPage extends StatelessWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+String _listStatusLabel(AppLocalizations l10n, LinuxSandboxStatus status) {
+  switch (status) {
+    case LinuxSandboxStatus.disabled:
+      return l10n.linuxSandboxStatusDisabled;
+    case LinuxSandboxStatus.notReady:
+      return l10n.linuxSandboxStatusNotReady;
+    case LinuxSandboxStatus.installing:
+      return l10n.linuxSandboxStatusInstalling;
+    case LinuxSandboxStatus.ready:
+      return l10n.linuxSandboxStatusReady;
+    case LinuxSandboxStatus.broken:
+      return l10n.linuxSandboxStatusBroken;
+  }
+}
+
+String _listModeLabel(AppLocalizations l10n, LinuxSandboxRuntimeMode mode) {
+  switch (mode) {
+    case LinuxSandboxRuntimeMode.localJail:
+      return l10n.linuxSandboxRuntimeModeLocalJail;
+    case LinuxSandboxRuntimeMode.wsl:
+      return l10n.linuxSandboxRuntimeModeWsl;
+    case LinuxSandboxRuntimeMode.nativeLinux:
+      return l10n.linuxSandboxRuntimeModeNativeLinux;
+    case LinuxSandboxRuntimeMode.proot:
+      return l10n.linuxSandboxRuntimeModeProot;
+    case LinuxSandboxRuntimeMode.unsupported:
+    case LinuxSandboxRuntimeMode.unknown:
+      return l10n.linuxSandboxRuntimeModeUnknown;
+  }
+}
+
+Color _listStatusColor(ColorScheme cs, LinuxSandboxStatus status) {
+  switch (status) {
+    case LinuxSandboxStatus.ready:
+      return cs.primary;
+    case LinuxSandboxStatus.installing:
+      return cs.tertiary;
+    case LinuxSandboxStatus.broken:
+      return cs.error;
+    case LinuxSandboxStatus.disabled:
+    case LinuxSandboxStatus.notReady:
+      return cs.onSurface.withValues(alpha: 0.55);
+  }
+}
+
+class _ListChip extends StatelessWidget {
+  const _ListChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }

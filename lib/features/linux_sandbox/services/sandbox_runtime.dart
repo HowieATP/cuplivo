@@ -1,7 +1,10 @@
 import 'dart:io';
 
+import '../models/linux_sandbox.dart';
+import 'android_proot_sandbox_runtime.dart';
+import 'native_linux_sandbox_runtime.dart';
 import 'unsupported_sandbox_runtime.dart';
-import 'windows_local_jail_runtime.dart';
+import 'windows_sandbox_runtime.dart';
 
 class SandboxFsEntry {
   final String name;
@@ -83,14 +86,62 @@ class SandboxToolResult {
   }
 }
 
+class SandboxInstallResult {
+  final bool ok;
+  final LinuxSandboxRuntimeMode mode;
+  final String? errorMessage;
+  final String? statusMessage;
+
+  const SandboxInstallResult({
+    required this.ok,
+    required this.mode,
+    this.errorMessage,
+    this.statusMessage,
+  });
+
+  factory SandboxInstallResult.success(
+    LinuxSandboxRuntimeMode mode, {
+    String? statusMessage,
+  }) {
+    return SandboxInstallResult(
+      ok: true,
+      mode: mode,
+      statusMessage: statusMessage,
+    );
+  }
+
+  factory SandboxInstallResult.failure(
+    LinuxSandboxRuntimeMode mode,
+    String errorMessage,
+  ) {
+    return SandboxInstallResult(
+      ok: false,
+      mode: mode,
+      errorMessage: errorMessage,
+    );
+  }
+}
+
 abstract class SandboxRuntime {
   String get sandboxId;
 
   bool get isSupported;
 
+  LinuxSandboxRuntimeMode get runtimeMode;
+
+  /// User workspace root (`files/`), not the sandbox tree root.
   Future<Directory> rootDirectory();
 
+  /// Layout only: create `{files,linux,tmp}/` and migrate v1 flat trees.
   Future<void> ensureReady();
+
+  /// Explicit base-env install. Local modes layout + mark ready.
+  Future<SandboxInstallResult> installBaseEnv({
+    void Function(double? progress, String stage)? onProgress,
+  });
+
+  /// Integrity probe for provider status reconciliation.
+  Future<LinuxSandboxStatus> probeStatus();
 
   Future<SandboxToolResult> read(String path);
 
@@ -111,7 +162,13 @@ abstract class SandboxRuntime {
 
 SandboxRuntime createSandboxRuntime(String sandboxId) {
   if (Platform.isWindows) {
-    return WindowsLocalJailRuntime(sandboxId);
+    return WindowsSandboxRuntime(sandboxId);
+  }
+  if (Platform.isLinux) {
+    return NativeLinuxSandboxRuntime(sandboxId);
+  }
+  if (Platform.isAndroid) {
+    return AndroidProotSandboxRuntime(sandboxId);
   }
   return UnsupportedSandboxRuntime(sandboxId);
 }

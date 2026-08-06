@@ -110,6 +110,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 - Optimized title generation logic (auto-retry on first failure)
 - Large base64 images no longer cause regex stack overflow
 - Win+V clipboard history paste fix for Flutter engine bug on Windows
+- iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16 (#193)
 - Various other stability improvements
 
 ## ⚠️ Note

@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.6.1] - 2026-08-06
+
+> v2.6.0 was a preview release; highlights include the new app icon, built-in filesystem MCP server, and Smart OCR mode decisions.
+
+### Fixed
+
+- Multi-assistant group chat: fixed a crash on Windows when navigating back from a group conversation (#206)
+- Chat rendering: fixed a white screen on mobile when opening tool details while the AI is streaming (#208)
+- Image sharing: fixed abnormal table background colors in exported images on iOS since v1.1.16 (#193)
+- Backup restore: fixed skills failing to restore from backups and MCP servers being lost (#204, #207)
+- Skills: completed the assistant-level quick entry on mobile (#201)
+- Fixed several uncaught but non-crashing bugs (#191)
+
 ## [2.6.0] - 2026-08-04
 
 ### Added

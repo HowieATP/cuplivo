@@ -4,7 +4,7 @@
 
   一个 Flutter LLM 聊天客户端 — 社区分支
   
-  Kelivo 二群 (QQ) `856321431`
+  Cuplivo 官方 QQ 群 `1101061750`
 
   [Read the English version](README.md)
 </div>
@@ -116,7 +116,7 @@ Cuplivo 与大多数个人定制 / 单功能 Fork 不同，旨在添加多特性
 
 ### ⚠️ 注意事项
 
-Cuplivo 是一个社区分支，尚未与原项目完全切割。赞赏码和社区群组（Discord、QQ）仍指向原作者。过渡期间部分地方可能存在名称混用。App 图标已更换为 Cuplivo 个性图片（由 @Pheobe-Southwood 约稿）。
+Cuplivo 是一个社区分支，尚未与原项目完全切割。QQ 群已归属 Cuplivo（群号 `1101061750`），赞赏码和 Discord 仍指向原作者。过渡期间部分地方可能存在名称混用。App 图标已更换为 Cuplivo 个性图片（由 @Pheobe-Southwood 约稿）。
 
 ---
 
@@ -129,12 +129,9 @@ Cuplivo 是一个社区分支，尚未与原项目完全切割。赞赏码和社
 
 ## 🚀 下载
 
-[![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/us/app/kelivo/id6752122930)
-
-
 🔗 [下载最新版本](https://github.com/Chevey339/kelivo/releases/latest)
 
-🔗 [TestFlight](https://testflight.apple.com/join/erbGGykR) 参与测试版体验。
+> **iOS：** Cuplivo 未上架 App Store，请通过自签方式安装（如 Sideloadly、AltStore 或其他签名工具）。
 
 ## 💖 赞助
 

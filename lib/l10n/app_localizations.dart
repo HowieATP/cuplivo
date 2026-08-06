@@ -8126,17 +8126,11 @@ abstract class AppLocalizations {
   /// **'Join our QQ Group'**
   String get aboutPageJoinQQGroup;
 
-  /// No description provided for @aboutPageQQGroupOne.
+  /// No description provided for @aboutPageQQGroup.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo Group 1'**
-  String get aboutPageQQGroupOne;
-
-  /// No description provided for @aboutPageQQGroupTwo.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo Group 2'**
-  String get aboutPageQQGroupTwo;
+  /// **'Cuplivo Group'**
+  String get aboutPageQQGroup;
 
   /// No description provided for @aboutPageJoinDiscord.
   ///

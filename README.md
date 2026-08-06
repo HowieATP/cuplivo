@@ -4,7 +4,7 @@
 
   A Flutter LLM Chat Client — A community fork
   
-  See [Kelivo](https://github.com/Chevey339/kelivo) for community links
+  Cuplivo official QQ group: `1101061750`
 
   [阅读简体中文文档](README_ZH_CN.md)快速查看特性
 </div>
@@ -115,7 +115,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ## ⚠️ Note
 
-Cuplivo is a community fork and has not been fully separated from the upstream project. Donation QR codes and community groups (Discord, QQ) still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
+Cuplivo is a community fork and has not been fully separated from the upstream project. The QQ group now belongs to Cuplivo (group `1101061750`); donation QR codes and Discord still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
 
 ---
 
@@ -128,11 +128,9 @@ Cuplivo is a community fork and has not been fully separated from the upstream p
 
 ## 🚀 Download
 
-[![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/us/app/kelivo/id6752122930)
-
 🔗 [Download the latest version](https://github.com/Chevey339/kelivo/releases/latest)
 
-🔗 [TestFlight](https://testflight.apple.com/join/erbGGykR) for beta testing.
+> **iOS:** Cuplivo is not on the App Store. Please install it by self-signing (e.g. Sideloadly, AltStore, or other signing tools).
 
 ## 💖 Sponsors
 

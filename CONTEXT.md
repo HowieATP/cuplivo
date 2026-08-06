@@ -61,7 +61,7 @@
 
 ## Incremental Backup (Experimental)
 
-- **Data scope**: Chat data (conversations + messages + toolEvents + geminiThoughtSigs). Optionally includes files (upload/, images/, avatars/, fonts/) when `includeFiles=true`, filtered by mtime >= since.
+- **Data scope**: Chat data (conversations + messages + toolEvents + geminiThoughtSigs). Optionally includes files (upload/, images/, avatars/, fonts/) when `includeFiles=true`, filtered by mtime >= since. `skills/` is always included regardless of `includeFiles` (see Skill System).
 - **Filtering unit**: Message-level (`message.timestamp >= since`). Conversations created before `since` are still included if they have recent messages; only those messages are exported. Uses `updatedAt` as a fast pre-filter to skip inactive conversations. See `docs/adr/0002-conversation-level-incremental-filtering.md`.
 - **File naming**: `cuplivo_incr_<export_ts_YYYYMMDD-HHmmss-ffffff>_<since_ts_YYYYMMDD-HHmmss>.zip`. The `cuplivo_incr_` prefix is the single identification mechanism for the restore path.
 - **Restore behavior**: `cuplivo_incr_` prefix detected → skip the "Overwrite/Merge" dialog entirely → force `RestoreMode.merge` at both UI and DataSync layers.
@@ -186,7 +186,7 @@
 ### Backup Integration
 
 - `skills/` directory is always included in backup ZIPs — NOT gated by `includeFiles`. Rationale: skill files are small (pure text) and fundamental to assistant behavior. Incremental backup filters by mtime via existing `_addDirectoryToZip(since:)`.
-- Restore: `_extractZipSync` decompresses `skills/` entries, preserving mtime from ZIP entry `lastModTime`. `SkillManager` discovers imported skills on next `listSkills()`.
+- Restore: `_restoreFromBackupFile` restores `skills/` unconditionally (independent of `includeFiles`, symmetric with export): overwrite = wipe local `skills/` then copy all entries; merge = per-file newer-wins — a backup entry replaces the local copy only when strictly newer (`backup mtime > local mtime`), ties/older keep local. File mtimes are preserved from the ZIP entry `lastModTime` via `_extractZipSync`, making the comparison self-contained (no `since` needed) and bidirectional-sync safe (a peer with a newer local edit is never regressed). `SkillManager` discovers restored skills on next `listSkills()`. The incremental scope preview (`analyzeIncrementalScope`) counts `skills/` files unconditionally for the same reason.
 
 ### Relationship to Existing Concepts
 

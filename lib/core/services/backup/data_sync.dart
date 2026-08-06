@@ -899,6 +899,27 @@ class DataSync {
       }
     }
 
+    // skills/ is always exported independent of includeFiles (see
+    // _packZipSync), so count it unconditionally to match the actual ZIP.
+    final skillsDir = await _getSkillsDir();
+    if (await skillsDir.exists()) {
+      await for (final ent in skillsDir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (ent is File) {
+          try {
+            final mod = await ent.lastModified();
+            if (mod.isBefore(since)) continue;
+          } catch (_) {
+            // Cannot read modification time — include conservatively
+          }
+          fileCount++;
+          totalBytes += await ent.length();
+        }
+      }
+    }
+
     return IncrementalScope(
       newConversations: ConvRange(
         count: newConvs.length,
@@ -1798,6 +1819,44 @@ class DataSync {
                 }
               }
             }
+          }
+        }
+      }
+
+      // Restore skills/ -- always exported independent of includeFiles (see
+      // _packZipSync), so restore it symmetrically and unconditionally.
+      final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
+      if (await skillsSrc.exists()) {
+        final dst = await _getSkillsDir();
+        if (mode == RestoreMode.overwrite && await dst.exists()) {
+          try {
+            await dst.delete(recursive: true);
+          } catch (_) {}
+        }
+        if (!await dst.exists()) {
+          await dst.create(recursive: true);
+        }
+        for (final ent in skillsSrc.listSync(recursive: true)) {
+          if (ent is File) {
+            final rel = p.relative(ent.path, from: skillsSrc.path);
+            final target = File(p.join(dst.path, rel));
+            if (mode == RestoreMode.merge && await target.exists()) {
+              // Newer-wins per file: replace a local copy only when the
+              // backup entry is strictly newer; ties/older keep local.
+              try {
+                final backupMod = await ent.lastModified();
+                final localMod = await target.lastModified();
+                if (!backupMod.isAfter(localMod)) continue;
+              } catch (_) {
+                // Cannot compare mtimes — keep the local copy conservatively
+                continue;
+              }
+            }
+            await target.parent.create(recursive: true);
+            await ent.copy(target.path);
+            try {
+              await target.setLastModified(await ent.lastModified());
+            } catch (_) {}
           }
         }
       }

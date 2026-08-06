@@ -2532,15 +2532,19 @@ class HomePageController extends ChangeNotifier {
 
   void onDidPopNext() {
     if (isDesktopPlatform) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _inputFocus.requestFocus();
-      });
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) => dismissKeyboard());
+      debugPrint(
+        '[HomePageController] didPopNext: skip desktop input refocus '
+        'to avoid TextInput transition race',
+      );
+      return;
     }
+
+    debugPrint('[HomePageController] didPopNext: dismiss mobile keyboard');
+    WidgetsBinding.instance.addPostFrameCallback((_) => dismissKeyboard());
   }
 
   void onDidPushNext() {
+    debugPrint('[HomePageController] didPushNext: dismiss keyboard');
     dismissKeyboard();
   }
 

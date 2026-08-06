@@ -14,6 +14,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/restore_refresher.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
@@ -999,22 +1000,28 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     if (!rootCtx.mounted) return;
                     await showDialog(
                       context: rootCtx,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(l10n.backupPageRestartContent),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              Navigator.of(rootCtx).pop();
-                              PlatformUtils.restartApp();
-                            },
-                            child: Text(l10n.backupPageOK),
+                      barrierDismissible: false,
+                      builder: (dctx) => PopScope(
+                        // Import contract matches restore: restart is
+                        // required for the imported data to take effect.
+                        canPop: false,
+                        child: AlertDialog(
+                          backgroundColor: cs.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ],
+                          title: Text(l10n.backupPageRestartRequired),
+                          content: Text(l10n.backupPageRestartContent),
+                          actions: [
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.of(rootCtx).pop();
+                                PlatformUtils.restartApp();
+                              },
+                              child: Text(l10n.backupPageOK),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   } catch (e) {
@@ -1467,6 +1474,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
+    await refreshProvidersAfterRestore(rootCtx);
+    if (!rootCtx.mounted) return;
     await showRestartRequiredDialog(rootCtx);
   }
 
@@ -1495,6 +1504,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (!rootCtx.mounted) return;
+    await refreshProvidersAfterRestore(rootCtx);
     if (!rootCtx.mounted) return;
     await showRestartRequiredDialog(rootCtx);
   }

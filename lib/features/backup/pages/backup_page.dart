@@ -12,15 +12,14 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/models/backup.dart';
-import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
-import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../../core/services/backup/data_sync.dart';
+import '../../../core/services/backup/restore_refresher.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/dialogs/incremental_backup_dialog.dart';
@@ -1279,25 +1278,31 @@ class _BackupPageState extends State<BackupPage> {
                   if (!context.mounted) return;
                   await showDialog(
                     context: context,
-                    builder: (dctx) => AlertDialog(
-                      title: Text(l10n.backupPageRestartRequired),
-                      content: Text(
-                        '${l10n.backupPageImportFromChatbox}:\n'
-                        ' • Providers: ${res.providers}\n'
-                        ' • Assistants: ${res.assistants}\n'
-                        ' • Conversations: ${res.conversations}\n'
-                        ' • Messages: ${res.messages}\n\n'
-                        '${l10n.backupPageRestartContent}',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.of(dctx).pop();
-                            PlatformUtils.restartApp();
-                          },
-                          child: Text(l10n.backupPageOK),
+                    barrierDismissible: false,
+                    builder: (dctx) => PopScope(
+                      // Import contract matches restore: restart is required
+                      // for the imported data to take effect.
+                      canPop: false,
+                      child: AlertDialog(
+                        title: Text(l10n.backupPageRestartRequired),
+                        content: Text(
+                          '${l10n.backupPageImportFromChatbox}:\n'
+                          ' • Providers: ${res.providers}\n'
+                          ' • Assistants: ${res.assistants}\n'
+                          ' • Conversations: ${res.conversations}\n'
+                          ' • Messages: ${res.messages}\n\n'
+                          '${l10n.backupPageRestartContent}',
                         ),
-                      ],
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.of(dctx).pop();
+                              PlatformUtils.restartApp();
+                            },
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 } catch (e) {
@@ -1371,25 +1376,10 @@ class _BackupPageState extends State<BackupPage> {
 
   /// After wipe/restore, providers must re-read SQLite; otherwise UI keeps a
   /// cleared or pre-restore in-memory snapshot (P0 empty chats/assistants).
+  /// Delegates to the shared refresh list so every restore entry point
+  /// (mobile page, desktop pane, LAN sync) stays in sync.
   Future<void> _refreshProvidersAfterRestore(BuildContext context) async {
-    final chatService = context.read<ChatService>();
-    final assistantProvider = context.read<AssistantProvider>();
-    final groupChatProvider = context.read<GroupChatProvider>();
-    try {
-      await chatService.reloadCachesFromDb();
-    } catch (e) {
-      debugPrint('backup refresh ChatService: $e');
-    }
-    try {
-      await assistantProvider.reloadFromRepo();
-    } catch (e) {
-      debugPrint('backup refresh AssistantProvider: $e');
-    }
-    try {
-      await groupChatProvider.load();
-    } catch (e) {
-      debugPrint('backup refresh GroupChatProvider: $e');
-    }
+    await refreshProvidersAfterRestore(context);
   }
 
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {

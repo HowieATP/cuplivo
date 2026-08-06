@@ -465,6 +465,21 @@ class McpProvider extends ChangeNotifier {
   int get requestTimeoutSeconds => _requestTimeout.inSeconds;
 
   Future<void> _load() async {
+    await _reloadServersFromPrefs();
+
+    // Refresh @kelivo/subagent tool definitions when assistants change
+    assistantProvider?.addListener(_onAssistantsChanged);
+  }
+
+  /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
+  /// SharedPreferences, rebuilds the in-memory server list (including built-in
+  /// servers), and auto-connects enabled servers.
+  ///
+  /// Used by the constructor and by [reloadFromPrefs] after a backup/import
+  /// restore rewrote the prefs, so the in-memory state never diverges from
+  /// disk. Listener registration (e.g. assistant changes) is NOT repeated
+  /// here — callers own it.
+  Future<void> _reloadServersFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final timeoutMs = prefs.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
@@ -502,9 +517,27 @@ class McpProvider extends ChangeNotifier {
       // fire and forget
       unawaited(connect(s.id));
     }
+  }
 
-    // Refresh @kelivo/subagent tool definitions when assistants change
-    assistantProvider?.addListener(_onAssistantsChanged);
+  /// Reloads the server list and connections from SharedPreferences.
+  ///
+  /// After a backup/import restore rewrote `mcp_servers_v1`, the in-memory
+  /// list would otherwise keep the pre-restore servers while disk already
+  /// holds the restored ones. This disconnects every live client, rebuilds
+  /// the list from disk, and reconnects enabled servers.
+  Future<void> reloadFromPrefs() async {
+    for (final id in _clients.keys.toList()) {
+      try {
+        await disconnect(id);
+      } catch (e) {
+        debugPrint('[MCP/Reload] disconnect $id failed: $e');
+      }
+    }
+    _servers = <McpServerConfig>[];
+    _status.clear();
+    _errors.clear();
+    _reconnecting.clear();
+    await _reloadServersFromPrefs();
   }
 
   void _onAssistantsChanged() {
@@ -1721,6 +1754,12 @@ class McpProvider extends ChangeNotifier {
     try {
       // debugPrint('[MCP/Tools] listTools() ...');
       final tools = await client.listTools();
+      // The client may have been disconnected or replaced while listTools was
+      // in flight (e.g. restore reload rebuilt the server list). Never write
+      // a stale tool refresh back to disk — it would clobber the restored
+      // mcp_servers_v1 with the pre-restore list (assistant changes trigger
+      // this refresh, and restore reloads assistants).
+      if (!identical(_clients[id], client)) return;
       // debugPrint('[MCP/Tools] listTools() returned ${tools.length} tools');
       // Preserve enabled state from existing config
       final idx = _servers.indexWhere((e) => e.id == id);

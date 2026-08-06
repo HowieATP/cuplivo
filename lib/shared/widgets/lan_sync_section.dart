@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/backup.dart';
 import '../../core/services/backup/data_sync.dart';
+import '../../core/services/backup/restore_refresher.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/sync/lan_sync_client.dart';
 import '../../core/services/sync/lan_sync_models.dart';
@@ -80,6 +81,10 @@ class _LanSyncSectionState extends State<LanSyncSection> {
       const WebDavConfig(includeChats: true, includeFiles: true),
       mode: RestoreMode.merge,
     );
+    if (!mounted) return;
+    // Keep the in-memory providers consistent with the merged disk state
+    // while the restart prompt is up (and defensively if it is dismissed).
+    await refreshProvidersAfterRestore(context);
     if (!mounted) return;
     await showRestartRequiredDialog(context);
   }

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:Cuplivo/theme/app_font_weights.dart';
+
+import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../core/providers/world_book_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../home/widgets/instruction_injection_sheet.dart';
 import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
+import '../../skills/pages/skills_page.dart';
 import '../../world_book/pages/world_book_page.dart';
-import 'package:Cuplivo/theme/app_font_weights.dart';
 
 class BottomToolsSheet extends StatelessWidget {
   const BottomToolsSheet({
@@ -22,6 +25,7 @@ class BottomToolsSheet extends StatelessWidget {
     this.clearLabel,
     this.assistantId,
     this.onDocumentProcessing,
+    this.onOpenSkills,
   });
 
   final VoidCallback? onCamera;
@@ -31,6 +35,7 @@ class BottomToolsSheet extends StatelessWidget {
   final String? clearLabel;
   final String? assistantId;
   final VoidCallback? onDocumentProcessing;
+  final VoidCallback? onOpenSkills;
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +147,7 @@ class BottomToolsSheet extends StatelessWidget {
                       onClear: onClear,
                       assistantId: assistantId,
                       onDocumentProcessing: onDocumentProcessing,
+                      onOpenSkills: onOpenSkills,
                     ),
                   ],
                 ),
@@ -160,11 +166,13 @@ class _LearningAndClearSection extends StatefulWidget {
     this.clearLabel,
     this.assistantId,
     this.onDocumentProcessing,
+    this.onOpenSkills,
   });
   final VoidCallback? onClear;
   final String? clearLabel;
   final String? assistantId;
   final VoidCallback? onDocumentProcessing;
+  final VoidCallback? onOpenSkills;
 
   @override
   State<_LearningAndClearSection> createState() =>
@@ -231,6 +239,11 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     final worldBookProvider = context.watch<WorldBookProvider>();
     final cs = Theme.of(context).colorScheme;
     final hasWorldBooks = worldBookProvider.books.isNotEmpty;
+    final ap = context.watch<AssistantProvider>();
+    final assistant = widget.assistantId != null
+        ? ap.getById(widget.assistantId!)
+        : ap.currentAssistant;
+    final skillsActive = assistant?.skillIds.isNotEmpty ?? false;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -293,6 +306,31 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             ),
           ),
         ],
+        const SizedBox(height: 8),
+        _row(
+          icon: Lucide.Sparkles,
+          label: l10n.skillsTitle,
+          selected: skillsActive,
+          onTap: () {
+            Haptics.light();
+            widget.onOpenSkills?.call();
+          },
+          onLongPress: () {
+            Haptics.light();
+            final rootNav = Navigator.of(context, rootNavigator: true);
+            Navigator.of(context).maybePop();
+            Future.microtask(() {
+              rootNav.push(
+                MaterialPageRoute(builder: (_) => const SkillsPage()),
+              );
+            });
+          },
+          trailing: Icon(
+            Lucide.ChevronRight,
+            size: 18,
+            color: cs.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
         // Document processing: always visible, navigates to config panel.
         const SizedBox(height: 8),
         _row(

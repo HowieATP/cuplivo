@@ -1759,6 +1759,10 @@ class _HomePageState extends State<HomePage>
               Navigator.of(ctx).maybePop();
               _openDocumentProcessingPopover();
             },
+            onOpenSkills: () {
+              Navigator.of(ctx).maybePop();
+              _openSkillsPopover();
+            },
           ),
         );
       },

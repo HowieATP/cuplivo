@@ -275,6 +275,14 @@ String _prettyToolJson(String raw) {
   }
 }
 
+String _prettyArgumentsJson(Map<String, dynamic> args) {
+  try {
+    return const JsonEncoder.withIndent('  ').convert(args);
+  } catch (_) {
+    return args.toString();
+  }
+}
+
 Widget _buildToolImageFromPath(
   BuildContext context,
   String path, {
@@ -341,7 +349,7 @@ void _showToolFullImage(BuildContext context, String path) {
 void _showToolDetail(BuildContext context, ToolUIPart part) {
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
-  final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
+  final argsPretty = _prettyArgumentsJson(part.arguments);
   final (cleanText, images) = _parseMcpImagePaths(part.content);
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
@@ -367,11 +375,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: 360,
-              maxWidth: 560,
-              maxHeight: 560,
-            ),
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Material(
@@ -392,7 +396,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                           Expanded(
                             child: Text(
                               _toolTitleFor(
-                                context,
+                                ctx,
                                 part.toolName,
                                 part.arguments,
                                 isResult: !part.loading,
@@ -440,7 +444,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color:
-                                      Theme.of(context).brightness ==
+                                      Theme.of(ctx).brightness ==
                                           Brightness.dark
                                       ? Colors.white10
                                       : const Color(0xFFF7F7F9),
@@ -470,7 +474,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color:
-                                      Theme.of(context).brightness ==
+                                      Theme.of(ctx).brightness ==
                                           Brightness.dark
                                       ? Colors.white10
                                       : const Color(0xFFF7F7F9),
@@ -502,11 +506,11 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                   children: images.map((path) {
                                     return GestureDetector(
                                       onTap: () =>
-                                          _showToolFullImage(context, path),
+                                          _showToolFullImage(ctx, path),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: _buildToolImageFromPath(
-                                          context,
+                                          ctx,
                                           path,
                                           height: 280,
                                         ),
@@ -560,7 +564,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                       Expanded(
                         child: Text(
                           _toolTitleFor(
-                            context,
+                            ctx,
                             part.toolName,
                             part.arguments,
                             isResult: !part.loading,
@@ -586,7 +590,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
+                      color: Theme.of(ctx).brightness == Brightness.dark
                           ? Colors.white10
                           : const Color(0xFFF7F7F9),
                       borderRadius: BorderRadius.circular(10),
@@ -612,7 +616,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
+                      color: Theme.of(ctx).brightness == Brightness.dark
                           ? Colors.white10
                           : const Color(0xFFF7F7F9),
                       borderRadius: BorderRadius.circular(10),
@@ -644,11 +648,11 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                         itemBuilder: (ctx, i) {
                           final path = images[i];
                           return GestureDetector(
-                            onTap: () => _showToolFullImage(context, path),
+                            onTap: () => _showToolFullImage(ctx, path),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: _buildToolImageFromPath(
-                                context,
+                                ctx,
                                 path,
                                 height: 220,
                               ),
@@ -4740,9 +4744,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final argsPretty = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(widget.part.arguments);
+    final argsPretty = _prettyArgumentsJson(widget.part.arguments);
     final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
     final resultText = cleanText.isNotEmpty
         ? _prettyJson(cleanText)
@@ -4768,11 +4770,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 360,
-                maxWidth: 560,
-                maxHeight: 560,
-              ),
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Material(
@@ -4797,7 +4795,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                             Expanded(
                               child: Text(
                                 _titleFor(
-                                  context,
+                                  ctx,
                                   widget.part.toolName,
                                   widget.part.arguments,
                                   isResult: !widget.part.loading,
@@ -4846,7 +4844,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color:
-                                        Theme.of(context).brightness ==
+                                        Theme.of(ctx).brightness ==
                                             Brightness.dark
                                         ? Colors.white10
                                         : const Color(0xFFF7F7F9),
@@ -4876,7 +4874,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color:
-                                        Theme.of(context).brightness ==
+                                        Theme.of(ctx).brightness ==
                                             Brightness.dark
                                         ? Colors.white10
                                         : const Color(0xFFF7F7F9),
@@ -4910,8 +4908,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                     runSpacing: 8,
                                     children: images.map((path) {
                                       return GestureDetector(
-                                        onTap: () =>
-                                            _showFullImage(context, path),
+                                        onTap: () => _showFullImage(ctx, path),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(
                                             8,
@@ -4971,7 +4968,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         Expanded(
                           child: Text(
                             _titleFor(
-                              context,
+                              ctx,
                               widget.part.toolName,
                               widget.part.arguments,
                               isResult: !widget.part.loading,
@@ -4997,7 +4994,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
+                        color: Theme.of(ctx).brightness == Brightness.dark
                             ? Colors.white10
                             : const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(10),
@@ -5023,7 +5020,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
+                        color: Theme.of(ctx).brightness == Brightness.dark
                             ? Colors.white10
                             : const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(10),
@@ -5052,7 +5049,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         runSpacing: 8,
                         children: images.map((path) {
                           return GestureDetector(
-                            onTap: () => _showFullImage(context, path),
+                            onTap: () => _showFullImage(ctx, path),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: _buildImageFromPath(path, height: 240),

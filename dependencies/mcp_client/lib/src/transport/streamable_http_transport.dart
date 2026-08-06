@@ -166,6 +166,22 @@ class StreamableHttpClientTransport implements ClientTransport {
   @override
   Future<void> get onClose => _closeCompleter.future;
 
+  /// Emit a message to [onMessage], dropping events that race with [close].
+  ///
+  /// Requests can still be in flight when [close] closes the stream
+  /// controller; a late response or error must not throw
+  /// "Cannot add new events after calling close".
+  void _emit(dynamic message) {
+    if (_isClosed || _messageController.isClosed) return;
+    _messageController.add(message);
+  }
+
+  /// Emit an error to [onMessage], dropping errors that race with [close].
+  void _emitError(dynamic error) {
+    if (_isClosed || _messageController.isClosed) return;
+    _messageController.addError(error);
+  }
+
   /// Get the base URL
   String get baseUrl => _baseUrl;
 
@@ -194,7 +210,7 @@ class StreamableHttpClientTransport implements ClientTransport {
     }
 
     _sendRequest(message).catchError((error) {
-      _messageController.addError(error);
+      _emitError(error);
     });
   }
 
@@ -237,7 +253,7 @@ class StreamableHttpClientTransport implements ClientTransport {
         } on OAuthError catch (e) {
           if (e.error == 'no_valid_token') {
             // Send 401 to trigger OAuth flow
-            _messageController.add({
+            _emit({
               'jsonrpc': '2.0',
               'error': {
                 'code': -32001,
@@ -296,7 +312,7 @@ class StreamableHttpClientTransport implements ClientTransport {
       if (response.statusCode == 404) {
         // Session terminated
         if (requestId != null) {
-          _messageController.add({
+          _emit({
             'jsonrpc': '2.0',
             'id': requestId,
             'error': {'code': 32600, 'message': 'Session terminated'},
@@ -308,7 +324,7 @@ class StreamableHttpClientTransport implements ClientTransport {
 
       if (response.statusCode == 401) {
         // Authentication required - trigger OAuth flow
-        _messageController.add({
+        _emit({
           'jsonrpc': '2.0',
           'error': {
             'code': -32001,
@@ -341,7 +357,7 @@ class StreamableHttpClientTransport implements ClientTransport {
         final responseBody = await response.stream.bytesToString();
         if (responseBody.isNotEmpty) {
           final responseMessage = jsonDecode(responseBody);
-          _messageController.add(responseMessage);
+          _emit(responseMessage);
         }
       } else if (contentType.startsWith('text/event-stream')) {
         // SSE response — process each event as it arrives so
@@ -355,7 +371,7 @@ class StreamableHttpClientTransport implements ClientTransport {
         if (responseBody.isNotEmpty) {
           try {
             final responseMessage = jsonDecode(responseBody);
-            _messageController.add(responseMessage);
+            _emit(responseMessage);
           } catch (e) {
             _logger.error('Failed to parse response: $e');
           }
@@ -429,7 +445,7 @@ class StreamableHttpClientTransport implements ClientTransport {
       if (data.isEmpty || data == '[DONE]') continue;
       try {
         final decoded = jsonDecode(data);
-        _messageController.add(decoded);
+        _emit(decoded);
       } catch (e) {
         _logger.debug('Failed to parse SSE data: $data');
       }
@@ -488,12 +504,12 @@ class StreamableHttpClientTransport implements ClientTransport {
         onMessage: (data) {
           if (data is Map) {
             _logger.debug('Received SSE message: $data');
-            _messageController.add(data);
+            _emit(data);
           } else if (data is String) {
             try {
               final message = jsonDecode(data);
               _logger.debug('Received SSE message: $message');
-              _messageController.add(message);
+              _emit(message);
             } catch (e) {
               _logger.debug('Failed to parse SSE message: $data');
             }

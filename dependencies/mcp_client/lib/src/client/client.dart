@@ -161,7 +161,15 @@ class Client {
 
     _connecting = true;
     _transport = transport;
-    _transport!.onMessage.listen(_handleMessage);
+    // Listen with an explicit error handler: transports may push errors onto
+    // the message stream (e.g. authentication failures), and without onError
+    // they would surface as unhandled zone exceptions.
+    _transport!.onMessage.listen(
+      _handleMessage,
+      onError: (Object error) {
+        _logger.debug('Transport message stream error: $error');
+      },
+    );
     _transport!.onClose
         .then((_) {
           // Only send disconnect event if we're still connected
@@ -942,7 +950,16 @@ class Client {
       // Server-initiated request — sampling / elicitation / roots / etc.
       await _handleIncomingRequest(message);
     } else {
-      _logger.debug('Ignoring unexpected message type: ${message.toJson()}');
+      if (message.error != null) {
+        // An error response without an id is a failed fire-and-forget
+        // notification (e.g. a dead session) — worth surfacing in logs,
+        // not invisible debug noise.
+        _logger.warning(
+          'Ignoring unexpected error message without id: ${message.toJson()}',
+        );
+      } else {
+        _logger.debug('Ignoring unexpected message type: ${message.toJson()}');
+      }
     }
   }
 

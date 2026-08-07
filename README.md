@@ -111,6 +111,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 - Large base64 images no longer cause regex stack overflow
 - Win+V clipboard history paste fix for Flutter engine bug on Windows
 - iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16 (#193)
+- iOS: storage space manager now counts and clears the real iOS tmp directory (#223)
 - Various other stability improvements
 
 ## ⚠️ Note

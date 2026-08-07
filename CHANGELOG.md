@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.6.2] - 2026-08-07
+
+### Fixed
+
+- Temporary conversation: user messages can now be edited and resent (#215)
+- Storage: iOS can now clear its temp file directory, and the system frees finished temp files more promptly (#223)
+- Gemini API: parallel tool calls are now consolidated (#214)
+- MCP OAuth: expired tokens are automatically refreshed (#225)
+- Stability: uncaught errors are handled more gracefully — logged forcibly instead of crashing (#216)
+- Rebranding: replaced the remaining icons, moved the QQ group to a dedicated one, and updated iOS usage instructions
+
 ## [2.6.1] - 2026-08-06
 
 > v2.6.0 was a preview release; highlights include the new app icon, built-in filesystem MCP server, and Smart OCR mode decisions.

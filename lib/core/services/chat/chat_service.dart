@@ -1558,7 +1558,8 @@ class ChatService extends ChangeNotifier {
     required String content,
   }) async {
     if (!_initialized) await init();
-    final original = _repo.getMessageSync(messageId);
+    final original =
+        _repo.getMessageSync(messageId) ?? _cachedTemporaryMessage(messageId);
     if (original == null) return null;
 
     final cid = original.conversationId;

@@ -189,6 +189,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubCacheSystem => 'System cache';
 
   @override
+  String get storageSpaceSubCacheTmp => 'Temp files';
+
+  @override
+  String get storageSpaceSubDescAvatarCache =>
+      'Downloaded avatar images; they are re-downloaded automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescOtherCache =>
+      'Temporary data such as notification icons; regenerated automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescSystemCache =>
+      'System-level cache (image decoding, web content, etc.); regenerated as needed.';
+
+  @override
+  String get storageSpaceSubDescTmpCache =>
+      'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.';
+
+  @override
   String get storageSpaceSubLogsFlutter => 'Flutter logs';
 
   @override

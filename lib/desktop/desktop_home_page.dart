@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
+import 'window_size_manager.dart';
 import 'window_title_bar.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
@@ -179,8 +180,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   Widget build(BuildContext context) {
     // Ensure a reasonable min size to avoid overflow on aggressive resize.
-    const minWidth = 960.0;
-    const minHeight = 640.0;
+    // Single source of truth lives in WindowSizeManager.
+    const minWidth = WindowSizeManager.minWindowWidth;
+    const minHeight = WindowSizeManager.minWindowHeight;
 
     final isWindows = defaultTargetPlatform == TargetPlatform.windows;
 

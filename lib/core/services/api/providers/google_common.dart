@@ -353,6 +353,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Extract system messages into systemInstruction (Google Gemini API best practice)
     String systemPrompt = '';
     final contents = <Map<String, dynamic>>[];
+    final pendingFunctionResponses = <Map<String, dynamic>>[];
+    void flushPendingFunctionResponses() {
+      if (pendingFunctionResponses.isEmpty) return;
+      contents.add({
+        'role': 'user',
+        'parts': List<Map<String, dynamic>>.from(pendingFunctionResponses),
+      });
+      pendingFunctionResponses.clear();
+    }
+
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
       final roleRaw = (msg['role'] ?? 'user').toString();
@@ -363,14 +373,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
         continue;
       }
-      final role = roleRaw == 'assistant' ? 'model' : 'user';
       if (roleRaw == 'tool') {
-        contents.add({
-          'role': 'user',
-          'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
-        });
+        pendingFunctionResponses.add(
+          _googleFunctionResponsePartFromToolMessage(msg),
+        );
         continue;
       }
+      flushPendingFunctionResponses();
+      final role = roleRaw == 'assistant' ? 'model' : 'user';
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
         final parts = <Map<String, dynamic>>[];
         final raw = _extractGeminiThoughtMeta(
@@ -494,6 +504,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       contents.add({'role': role, 'parts': parts});
     }
+    flushPendingFunctionResponses();
 
     // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
     List<Map<String, dynamic>>? geminiTools;
@@ -794,6 +805,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   // Extract system messages into systemInstruction (Google Gemini API best practice)
   String systemPrompt = '';
   final contents = <Map<String, dynamic>>[];
+  final pendingFunctionResponses = <Map<String, dynamic>>[];
+  void flushPendingFunctionResponses() {
+    if (pendingFunctionResponses.isEmpty) return;
+    contents.add({
+      'role': 'user',
+      'parts': List<Map<String, dynamic>>.from(pendingFunctionResponses),
+    });
+    pendingFunctionResponses.clear();
+  }
+
   for (int i = 0; i < messages.length; i++) {
     final msg = messages[i];
     final roleRaw = (msg['role'] ?? 'user').toString();
@@ -804,14 +825,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       continue;
     }
-    final role = roleRaw == 'assistant' ? 'model' : 'user';
     if (roleRaw == 'tool') {
-      contents.add({
-        'role': 'user',
-        'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
-      });
+      pendingFunctionResponses.add(
+        _googleFunctionResponsePartFromToolMessage(msg),
+      );
       continue;
     }
+    flushPendingFunctionResponses();
+    final role = roleRaw == 'assistant' ? 'model' : 'user';
     if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
       final parts = <Map<String, dynamic>>[];
       final raw = (msg['content'] ?? '').toString();
@@ -938,6 +959,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
     contents.add({'role': role, 'parts': parts});
   }
+  flushPendingFunctionResponses();
 
   final wantsImageOutput = effective.output.contains(Modality.image);
   bool expectImage = wantsImageOutput;

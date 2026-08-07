@@ -185,6 +185,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubCacheSystem => '系统缓存';
 
   @override
+  String get storageSpaceSubCacheTmp => '临时文件';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下载的头像图片，删除后聊天中会自动重新下载。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知图标等运行产生的临时数据，删除后会自动重新生成。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系统级缓存（图片解码、网页等），删除后按需重新生成。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '粘贴的图片、选择的附件等临时副本，删除不影响聊天记录。';
+
+  @override
   String get storageSpaceSubLogsFlutter => '运行日志';
 
   @override
@@ -7108,6 +7123,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSubCacheSystem => '系统缓存';
 
   @override
+  String get storageSpaceSubCacheTmp => '临时文件';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下载的头像图片，删除后聊天中会自动重新下载。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知图标等运行产生的临时数据，删除后会自动重新生成。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系统级缓存（图片解码、网页等），删除后按需重新生成。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '粘贴的图片、选择的附件等临时副本，删除不影响聊天记录。';
+
+  @override
   String get storageSpaceSubLogsFlutter => '运行日志';
 
   @override
@@ -14029,6 +14059,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubCacheSystem => '系統快取';
+
+  @override
+  String get storageSpaceSubCacheTmp => '暫存檔案';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下載的頭像圖片，刪除後聊天中會自動重新下載。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知圖示等運行產生的暫存資料，刪除後會自動重新產生。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系統級快取（圖片解碼、網頁等），刪除後按需重新產生。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '貼上的圖片、選擇的附件等暫存副本，刪除不影響聊天記錄。';
 
   @override
   String get storageSpaceSubLogsFlutter => '執行日誌';

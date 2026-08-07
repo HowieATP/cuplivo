@@ -436,6 +436,36 @@ abstract class AppLocalizations {
   /// **'System cache'**
   String get storageSpaceSubCacheSystem;
 
+  /// No description provided for @storageSpaceSubCacheTmp.
+  ///
+  /// In en, this message translates to:
+  /// **'Temp files'**
+  String get storageSpaceSubCacheTmp;
+
+  /// No description provided for @storageSpaceSubDescAvatarCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded avatar images; they are re-downloaded automatically when needed.'**
+  String get storageSpaceSubDescAvatarCache;
+
+  /// No description provided for @storageSpaceSubDescOtherCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary data such as notification icons; regenerated automatically when needed.'**
+  String get storageSpaceSubDescOtherCache;
+
+  /// No description provided for @storageSpaceSubDescSystemCache.
+  ///
+  /// In en, this message translates to:
+  /// **'System-level cache (image decoding, web content, etc.); regenerated as needed.'**
+  String get storageSpaceSubDescSystemCache;
+
+  /// No description provided for @storageSpaceSubDescTmpCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.'**
+  String get storageSpaceSubDescTmpCache;
+
   /// No description provided for @storageSpaceSubLogsFlutter.
   ///
   /// In en, this message translates to:

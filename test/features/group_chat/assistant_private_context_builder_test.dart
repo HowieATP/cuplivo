@@ -166,7 +166,11 @@ void main() {
   );
 
   test('group member injection is null when disabled', () {
-    final group = GroupChat(name: 'G', conversationId: 'c1');
+    final group = GroupChat(
+      name: 'G',
+      conversationId: 'c1',
+      injectGroupMembersIntoAssistantSystemPrompt: false,
+    );
     final injection = AssistantPrivateContextBuilder.buildGroupMemberInjection(
       group: group,
       userName: 'User',
@@ -191,5 +195,16 @@ void main() {
     expect(injection, contains('User'));
     expect(injection, contains('Alpha'));
     expect(injection, contains('Beta'));
+  });
+
+  test('group member injection is enabled by default for new groups', () {
+    final group = GroupChat(name: 'G', conversationId: 'c1');
+    final injection = AssistantPrivateContextBuilder.buildGroupMemberInjection(
+      group: group,
+      userName: 'User',
+      memberNames: const ['Alpha'],
+    );
+    expect(injection, isNotNull);
+    expect(injection, contains('Alpha'));
   });
 }

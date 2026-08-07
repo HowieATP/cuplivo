@@ -288,7 +288,7 @@ class GroupChatRows extends Table {
   IntColumn get assistantDetailInjectionN =>
       integer().withDefault(const Constant(5))();
   BoolColumn get injectGroupMembersIntoAssistantSystemPrompt =>
-      boolean().withDefault(const Constant(false))();
+      boolean().withDefault(const Constant(true))();
   TextColumn get pendingCapAssistantMessageId => text().nullable()();
   IntColumn get assistantMessagesThisRound =>
       integer().withDefault(const Constant(0))();
@@ -561,7 +561,7 @@ class AppDatabase extends _$AppDatabase {
     await _ensureColumn(
       'group_chat_rows',
       'inject_group_members_into_assistant_system_prompt',
-      'ALTER TABLE group_chat_rows ADD COLUMN inject_group_members_into_assistant_system_prompt INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE group_chat_rows ADD COLUMN inject_group_members_into_assistant_system_prompt INTEGER NOT NULL DEFAULT 1',
     );
   }
 

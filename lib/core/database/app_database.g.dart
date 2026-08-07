@@ -6827,7 +6827,7 @@ class $GroupChatRowsTable extends GroupChatRows
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'CHECK ("inject_group_members_into_assistant_system_prompt" IN (0, 1))',
     ),
-    defaultValue: const Constant(false),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _pendingCapAssistantMessageIdMeta =
       const VerificationMeta('pendingCapAssistantMessageId');

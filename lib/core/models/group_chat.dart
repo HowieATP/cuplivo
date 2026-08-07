@@ -16,7 +16,7 @@ class GroupChat {
     this.assistantDetailInjectionMode =
         AssistantDetailInjectionMode.endOfEveryUserMessage,
     this.assistantDetailInjectionN = 5,
-    this.injectGroupMembersIntoAssistantSystemPrompt = false,
+    this.injectGroupMembersIntoAssistantSystemPrompt = true,
     this.pendingCapAssistantMessageId,
     this.assistantMessagesThisRound = 0,
     DateTime? createdAt,
@@ -186,7 +186,7 @@ Members: {member_names}
           (json['assistantDetailInjectionN'] as num?)?.toInt() ?? 5,
       injectGroupMembersIntoAssistantSystemPrompt:
           (json['injectGroupMembersIntoAssistantSystemPrompt'] as bool?) ??
-          false,
+          true,
       pendingCapAssistantMessageId:
           json['pendingCapAssistantMessageId'] as String?,
       assistantMessagesThisRound:

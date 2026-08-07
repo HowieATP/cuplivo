@@ -353,6 +353,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Extract system messages into systemInstruction (Google Gemini API best practice)
     String systemPrompt = '';
     final contents = <Map<String, dynamic>>[];
+    final pendingFunctionResponses = <Map<String, dynamic>>[];
+    void flushPendingFunctionResponses() {
+      if (pendingFunctionResponses.isEmpty) return;
+      contents.add({
+        'role': 'user',
+        'parts': List<Map<String, dynamic>>.from(pendingFunctionResponses),
+      });
+      pendingFunctionResponses.clear();
+    }
+
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
       final roleRaw = (msg['role'] ?? 'user').toString();
@@ -363,14 +373,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
         continue;
       }
-      final role = roleRaw == 'assistant' ? 'model' : 'user';
       if (roleRaw == 'tool') {
-        contents.add({
-          'role': 'user',
-          'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
-        });
+        pendingFunctionResponses.add(
+          _googleFunctionResponsePartFromToolMessage(msg),
+        );
         continue;
       }
+      flushPendingFunctionResponses();
+      final role = roleRaw == 'assistant' ? 'model' : 'user';
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
         final parts = <Map<String, dynamic>>[];
         final raw = _extractGeminiThoughtMeta(
@@ -494,6 +504,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       contents.add({'role': role, 'parts': parts});
     }
+    flushPendingFunctionResponses();
 
     // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
     List<Map<String, dynamic>>? geminiTools;
@@ -794,6 +805,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   // Extract system messages into systemInstruction (Google Gemini API best practice)
   String systemPrompt = '';
   final contents = <Map<String, dynamic>>[];
+  final pendingFunctionResponses = <Map<String, dynamic>>[];
+  void flushPendingFunctionResponses() {
+    if (pendingFunctionResponses.isEmpty) return;
+    contents.add({
+      'role': 'user',
+      'parts': List<Map<String, dynamic>>.from(pendingFunctionResponses),
+    });
+    pendingFunctionResponses.clear();
+  }
+
   for (int i = 0; i < messages.length; i++) {
     final msg = messages[i];
     final roleRaw = (msg['role'] ?? 'user').toString();
@@ -804,14 +825,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       continue;
     }
-    final role = roleRaw == 'assistant' ? 'model' : 'user';
     if (roleRaw == 'tool') {
-      contents.add({
-        'role': 'user',
-        'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
-      });
+      pendingFunctionResponses.add(
+        _googleFunctionResponsePartFromToolMessage(msg),
+      );
       continue;
     }
+    flushPendingFunctionResponses();
+    final role = roleRaw == 'assistant' ? 'model' : 'user';
     if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
       final parts = <Map<String, dynamic>>[];
       final raw = (msg['content'] ?? '').toString();
@@ -938,6 +959,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
     contents.add({'role': role, 'parts': parts});
   }
+  flushPendingFunctionResponses();
 
   final wantsImageOutput = effective.output.contains(Modality.image);
   bool expectImage = wantsImageOutput;
@@ -1644,41 +1666,46 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       convo.add({'role': 'user', 'parts': responseParts});
     } else {
-      // Gemini 2.x: existing per-call reconstruction
+      // Gemini 2.x: replay all parallel calls in one model turn. The previous
+      // per-call model/user alternation made later calls look sequential.
+      final modelParts = <Map<String, dynamic>>[];
+      final responseParts = <Map<String, dynamic>>[];
       for (final c in calls) {
         final name = (c['name'] ?? '').toString();
         final args =
             (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+        final apiId = c['apiId'] as String?;
         final resText = (c['result'] ?? '').toString();
         final thoughtSigKey = c['thoughtSigKey'] as String?;
         final thoughtSigVal = c['thoughtSigVal'];
-
         final part = <String, dynamic>{
-          'functionCall': {'name': name, 'args': args},
+          'functionCall': {
+            if (apiId != null) 'id': apiId,
+            'name': name,
+            'args': args,
+          },
         };
         if (thoughtSigKey != null && thoughtSigVal != null) {
           part[thoughtSigKey] = thoughtSigVal;
         }
+        modelParts.add(part);
 
-        convo.add({
-          'role': 'model',
-          'parts': [part],
-        });
         Map<String, dynamic> responseObj;
         try {
           responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
         } catch (_) {
           responseObj = {'result': resText};
         }
-        convo.add({
-          'role': 'user',
-          'parts': [
-            {
-              'functionResponse': {'name': name, 'response': responseObj},
-            },
-          ],
+        responseParts.add({
+          'functionResponse': {
+            'name': name,
+            'response': responseObj,
+            if (apiId != null) 'id': apiId,
+          },
         });
       }
+      convo.add({'role': 'model', 'parts': modelParts});
+      convo.add({'role': 'user', 'parts': responseParts});
     }
     // Continue while(true) for next round
   }

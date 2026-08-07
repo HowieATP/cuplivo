@@ -91,7 +91,7 @@ http.Client _oauthHttpClient(SettingsProvider sp) {
 }
 
 Future<void> main() async {
-  await runZoned(
+  await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
@@ -122,7 +122,19 @@ Future<void> main() async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
-      await SkillManager.initRoot();
+      // Skills root is feature-level: a resolution failure (e.g. path_provider
+      // channel unavailable) must not block app startup. Degrade to "skills
+      // unavailable this session" instead of dying before runApp.
+      try {
+        await SkillManager.initRoot();
+      } catch (e, st) {
+        debugPrint('[main] SkillManager.initRoot failed: $e\n$st');
+        FlutterLogger.log(
+          'SkillManager.initRoot failed: $e\n$st',
+          tag: 'Startup',
+          force: true,
+        );
+      }
       await CodexDeviceCodeController.instance.init();
       await GrokDeviceCodeController.instance.init();
       // Enable edge-to-edge to allow content under system bars (Android)
@@ -133,6 +145,13 @@ Future<void> main() async {
       }
       // Start app (Flutter log capture is toggleable and off by default)
       runApp(const MyApp());
+    },
+    // Unhandled root-isolate errors must not kill the process silently: log
+    // them (console + Flutter log file, forced regardless of the log toggle)
+    // and keep the app alive.
+    (Object error, StackTrace stack) {
+      debugPrint('[main] uncaught error: $error\n$stack');
+      FlutterLogger.log('$error\n$stack', tag: 'Uncaught', force: true);
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {

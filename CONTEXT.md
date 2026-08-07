@@ -412,6 +412,15 @@
 
 - "orchestrator" was used informally in the Handoff example dialogue (the delegating assistant) and as part of the controller class name `GroupChatOrchestrator` — neither is a domain term. The domain term for the group-chat decision-making model is **Director**.
 
+## MCP Server Edit Sheet (MCP 服务器编辑面板)
+
+- **Essential fields**: enabled, name, transport, URL, custom headers — always visible in the edit sheet/dialog. Custom headers are first-class because Authorization is the most common reason to add them.
+- **OAuth section**: switch-gated, placed after headers (connection config, not advanced).
+- **高级设置 (Advanced Settings)**: An inline chevron disclosure at the bottom of the Basic form, default collapsed, in-memory (not persisted — resets on reopen, mirroring the OAuth section's `advancedExpanded`). Contains connection-tuning fields: heartbeat interval, tool prefix, and (stdio transport only) environment variables.
+- **Field placement rule**: "if you don't change it on >95% of setups, it folds." New MCP fields must be classified against this rule when added.
+- **Stdio (desktop only)**: command, args, working directory stay visible (they ARE the transport config — without them there is no server); the env editor folds.
+- **Parallel surfaces**: the layout is identical in the mobile sheet (`lib/features/mcp/widgets/mcp_server_edit_sheet.dart`) and the desktop dialog (`lib/desktop/setting/mcp_edit_dialog.dart`) — restructure both together.
+
 ## MCP OAuth (v2, automated)
 
 - **OAuth 授权流程 (authorization flow)**: The flow for connecting a remote MCP server that requires OAuth. v2 is AUTO-first: the user enables the switch and taps 开始授权 — the app auto-discovers the authorization server metadata (RFC 8414, `{origin}/.well-known/oauth-authorization-server`), auto-registers a public client (RFC 7591 DCR, `token_endpoint_auth_method: none`), and starts a loopback callback server (RFC 8252) so the browser redirect lands back in the app. Manual paste is the fallback. See `docs/adr/0016-mcp-oauth-auto-flow.md`.
@@ -421,7 +430,7 @@
 - **Token persistence**: `OAuthToken` stored inside `McpServerConfig` JSON (SharedPreferences). v1 only — a secure-storage refactor (Keychain/Credential Manager) is planned; the persisted shape stays compatible. Tokens ARE included in backups (settings.json round-trip) until the security refactor changes this.
 - **Token refresh**: Reuses the vendored library's built-in proactive refresh (`OAuthTokenManager` timer / SSE 80%-lifetime timer). The library gains a persistence hook so refreshed tokens are written back to `McpServerConfig`. No reactive 401-retry layer in v1. Refresh failure surfaces as the standard `McpStatus.error` on the server card → "需要重新授权".
 - **Re-auth**: The server card error state IS the re-auth entry point — error text says re-authorization is needed; the edit page's OAuth section hosts the flow. No blocking dialogs mid-conversation.
-- **OAuth section UI**: Switch-gated in the edit page (mobile sheet + desktop dialog), placed right after the server URL (it is connection config, not an advanced setting). When enabled: status row (authorized/unauthorized + clear token) → primary [开始授权] button → collapsed "高级配置" (endpoints/clientId/secret/scopes/redirectUri — only needed when auto-discovery fails). Saving with the switch off clears BOTH config and token (`clearOauth` + `clearOauthToken`).
+- **OAuth section UI**: Switch-gated in the edit page (mobile sheet + desktop dialog), placed after the URL and custom headers (it is connection config, not an advanced setting). When enabled: status row (authorized/unauthorized + clear token) → primary [开始授权] button → collapsed "高级配置" (endpoints/clientId/secret/scopes/redirectUri — only needed when auto-discovery fails). Saving with the switch off clears BOTH config and token (`clearOauth` + `clearOauthToken`).
 - **Header precedence**: When OAuth is enabled, the Bearer token overwrites any manual `Authorization` header from `McpServerConfig.headers` (natural library behavior: merged headers first, token written last). No save-time validation.
 
 ## MCP 图片回传 (MCP Image Round-Trip)

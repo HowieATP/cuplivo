@@ -63,6 +63,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   final _cwdCtrl = TextEditingController();
   final List<_HeaderEntry> _env = [];
   final _toolPrefixCtrl = TextEditingController();
+  bool _advancedExpanded = false;
   // OAuth section: shared logic lives in McpOAuthSectionController
   // (mobile sheet + desktop dialog reuse it). Built in
   // didChangeDependencies — constructing it needs AppLocalizations
@@ -797,139 +798,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                 : 'http://localhost:3000',
             bold: true,
           ),
-        if (!isBuiltin && _transport != McpTransportType.stdio) _oauthSection(),
-        if (!isBuiltin) ...[
-          const SizedBox(height: 16),
-          Text(
-            l10n.mcpServerEditSheetHeartbeatLabel,
-            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
-          ),
-          const SizedBox(height: 6),
-          _heartbeatPicker(),
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              l10n.mcpServerEditSheetHeartbeatHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-        ],
-        if (!isBuiltin) ...[
-          const SizedBox(height: 16),
-          _labeledField(
-            label: l10n.mcpServerEditSheetToolPrefixLabel,
-            controller: _toolPrefixCtrl,
-            hint: l10n.mcpServerEditSheetToolPrefixHint,
-            bold: false,
-          ),
-        ],
-        if (!isBuiltin && _transport == McpTransportType.stdio) ...[
-          _labeledField(
-            label: l10n.mcpServerEditSheetStdioCommandLabel,
-            controller: _cmdCtrl,
-            hint: 'npx',
-            bold: false,
-          ),
-          const SizedBox(height: 10),
-          _labeledField(
-            label: l10n.mcpServerEditSheetStdioArgumentsLabel,
-            controller: _argsCtrl,
-            hint: "-y @modelcontextprotocol/server-filesystem",
-            bold: false,
-          ),
-          const SizedBox(height: 10),
-          _labeledField(
-            label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
-            controller: _cwdCtrl,
-            hint: '',
-            bold: false,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.mcpServerEditSheetStdioEnvironmentTitle,
-            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
-          ),
-          const SizedBox(height: 8),
-          Column(
-            children: [
-              for (int i = 0; i < _env.length; i++) ...[
-                _card(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _labeledField(
-                        label: l10n.mcpServerEditSheetStdioEnvNameLabel,
-                        controller: _env[i].key,
-                        hint: 'ENV_NAME',
-                        bold: false,
-                      ),
-                      const SizedBox(height: 10),
-                      _labeledField(
-                        label: l10n.mcpServerEditSheetStdioEnvValueLabel,
-                        controller: _env[i].value,
-                        hint: 'value',
-                        bold: false,
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _SmallIconBtn(
-                          icon: lucide.Lucide.Trash2,
-                          tooltip: l10n.mcpServerEditSheetRemoveHeaderTooltip,
-                          onTap: () => setState(() => _env.removeAt(i)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  icon: const Icon(lucide.Lucide.Plus, size: 16),
-                  label: Text(l10n.mcpServerEditSheetStdioAddEnv),
-                  style:
-                      OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ).copyWith(
-                        splashFactory: NoSplash.splashFactory,
-                        overlayColor: const WidgetStatePropertyAll(
-                          Colors.transparent,
-                        ),
-                        backgroundColor: WidgetStateProperty.resolveWith((
-                          states,
-                        ) {
-                          if (states.contains(WidgetState.hovered)) {
-                            return isDark
-                                ? Colors.white.withValues(alpha: 0.06)
-                                : Colors.black.withValues(alpha: 0.05);
-                          }
-                          return Colors.transparent;
-                        }),
-                      ),
-                  onPressed: () => setState(
-                    () => _env.add(
-                      _HeaderEntry(
-                        TextEditingController(),
-                        TextEditingController(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: 16),
         if (!isBuiltin && _transport != McpTransportType.stdio) ...[
+          const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetCustomHeadersTitle,
             style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
@@ -1009,6 +879,175 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               ),
             ],
           ),
+        ],
+        if (!isBuiltin && _transport != McpTransportType.stdio) _oauthSection(),
+        if (!isBuiltin && _transport == McpTransportType.stdio) ...[
+          _labeledField(
+            label: l10n.mcpServerEditSheetStdioCommandLabel,
+            controller: _cmdCtrl,
+            hint: 'npx',
+            bold: false,
+          ),
+          const SizedBox(height: 10),
+          _labeledField(
+            label: l10n.mcpServerEditSheetStdioArgumentsLabel,
+            controller: _argsCtrl,
+            hint: "-y @modelcontextprotocol/server-filesystem",
+            bold: false,
+          ),
+          const SizedBox(height: 10),
+          _labeledField(
+            label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
+            controller: _cwdCtrl,
+            hint: '',
+            bold: false,
+          ),
+        ],
+        if (!isBuiltin) ...[
+          const SizedBox(height: 16),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () =>
+                  setState(() => _advancedExpanded = !_advancedExpanded),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _advancedExpanded
+                        ? lucide.Lucide.ChevronDown
+                        : lucide.Lucide.ChevronRight,
+                    size: 16,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.mcpServerEditSheetAdvancedLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_advancedExpanded) ...[
+            const SizedBox(height: 12),
+            Text(
+              l10n.mcpServerEditSheetHeartbeatLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _heartbeatPicker(),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                l10n.mcpServerEditSheetHeartbeatHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _labeledField(
+              label: l10n.mcpServerEditSheetToolPrefixLabel,
+              controller: _toolPrefixCtrl,
+              hint: l10n.mcpServerEditSheetToolPrefixHint,
+              bold: false,
+            ),
+            if (_transport == McpTransportType.stdio) ...[
+              const SizedBox(height: 16),
+              Text(
+                l10n.mcpServerEditSheetStdioEnvironmentTitle,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Column(
+                children: [
+                  for (int i = 0; i < _env.length; i++) ...[
+                    _card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _labeledField(
+                            label: l10n.mcpServerEditSheetStdioEnvNameLabel,
+                            controller: _env[i].key,
+                            hint: 'ENV_NAME',
+                            bold: false,
+                          ),
+                          const SizedBox(height: 10),
+                          _labeledField(
+                            label: l10n.mcpServerEditSheetStdioEnvValueLabel,
+                            controller: _env[i].value,
+                            hint: 'value',
+                            bold: false,
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _SmallIconBtn(
+                              icon: lucide.Lucide.Trash2,
+                              tooltip:
+                                  l10n.mcpServerEditSheetRemoveHeaderTooltip,
+                              onTap: () => setState(() => _env.removeAt(i)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(lucide.Lucide.Plus, size: 16),
+                      label: Text(l10n.mcpServerEditSheetStdioAddEnv),
+                      style:
+                          OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ).copyWith(
+                            splashFactory: NoSplash.splashFactory,
+                            overlayColor: const WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
+                            backgroundColor: WidgetStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(WidgetState.hovered)) {
+                                return isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.05);
+                              }
+                              return Colors.transparent;
+                            }),
+                          ),
+                      onPressed: () => setState(
+                        () => _env.add(
+                          _HeaderEntry(
+                            TextEditingController(),
+                            TextEditingController(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ],
         const SizedBox(height: 8),
       ],

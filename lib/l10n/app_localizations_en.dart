@@ -3153,6 +3153,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'If you encounter frequent 429 (rate limit) errors, try increasing this interval.';
 
   @override
+  String get mcpServerEditSheetAdvancedLabel => 'Advanced Settings';
+
+  @override
   String get mcpServerEditSheetUrlLabel => 'Server URL';
 
   @override

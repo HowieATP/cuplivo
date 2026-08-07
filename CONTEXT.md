@@ -465,3 +465,19 @@
 - **Resolution**: `resolveOcrActive()` (`lib/features/model/utils/ocr_model_capability.dart`) is the single source of truth for the effective OCR boolean, consumed by `processUserMessagesForApi`, both generation-context builders and the input-bar "images ignored" warning. `never` → false; no OCR model → false; `always` → true; `auto` → `!modelSupportsOcrImageInput`.
 - **Legacy migration**: `ocr_enabled_v1` → all existing assistants: `true` → `auto`, `false` → `never`. One-time, provider-layer (`AssistantProvider._doLoad`), key consumed only after a successful DB write (retried on next launch on failure; mirrors the `assistants_v1` migration). Backup restore **captures** the key and applies the same mapping to pre-v15 assistants lacking `ocrMode` — never writing it back to prefs, so restore semantics match an in-place upgrade. New assistants default to `auto`. See `docs/adr/0018-per-assistant-ocr-mode.md`.
 - **Boundaries**: Group-chat speakers each apply their own `ocrMode` (per-speaker pipeline); the Director never receives images; sub-agent handoffs use the target assistant's mode. The document processing panel's OCR section is inert in group chats (no `currentAssistant`), consistent with the docx/pdf sections.
+
+## Temporary Conversation (临时对话)
+
+- **Temporary Conversation (临时对话)**: A conversation created via `createDraftConversation(temporary: true)` (`chat_service.dart`) and discarded on switch/exit (`_discardTemporaryConversation`). Its messages exist ONLY in memory (`_messagesCache` + `_draftConversations`) — never written to SQLite (`addMessage` skips `_repo.putMessage` when temporary). Not searchable, not in history, not backed up, not synced, not trashable.
+- **Read-path rule (读路径铁律)**: Any by-id message read that must see temporary messages uses the repo-or-cache fallback — `_repo.getMessageSync(id) ?? _cachedTemporaryMessage(id)`. Established in `updateMessage`, `updateMessageSilent`, `deleteMessage`. `appendMessageVersion` lacked it (issue #210: edit-user-message → send silently failed in temporary conversations); it now follows the same pattern. The bare `_repo.getMessageSync` calls in `_resetStaleStreamingFlags` (tracked IDs exclude temporary), the `deleteMessage` persisted branch (behind the temporary early-return), trash restore, and LAN sync fork-point lookup are structurally temporary-proof and must stay that way.
+- **Editing**: Temporary conversations support edit / versioning / regenerate via the draft write path (`appendMessageVersion` draft branch, `setSelectedVersion` draft branch, `deleteMessage` temporary branch).
+
+### Example Dialogue
+
+> **Dev:** "I edited a user message in a temporary chat and hit send — nothing happened. The edit UI is stuck."
+> **Domain expert:** "Temporary messages never reach SQLite, so a by-id lookup against the repo alone misses them. Any read path that must see those messages goes repo-first, then falls back to the in-memory cache — exactly like `updateMessage` and `deleteMessage` already do. `appendMessageVersion` was the one path that skipped the fallback."
+
+### Flagged Ambiguities
+
+- "临时会话" is used in the UI as both a toggle state and the conversation itself — resolved: the **Temporary Conversation** is the conversation; the toggle in the nav bar is its lifecycle control.
+- "draft conversation" (`createDraftConversation`, `_draftConversations`) is a broader class that includes both unpersisted regular conversations (persisted on first message) and **Temporary Conversations** (never persisted) — the `temporary` flag is the discriminator. Do not equate the two.

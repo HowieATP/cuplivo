@@ -324,13 +324,73 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
-  String get workspaceFilesPageTitle => '工作区文件';
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暂无工作区文件';
+  String get mountFilesEmptyDir => '空目录';
 
   @override
-  String get workspaceFilesSortName => '按名称';
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '删除文件';
@@ -7247,13 +7307,73 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
-  String get workspaceFilesPageTitle => '工作区文件';
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暂无工作区文件';
+  String get mountFilesEmptyDir => '空目录';
 
   @override
-  String get workspaceFilesSortName => '按名称';
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '删除文件';
@@ -14169,13 +14289,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路徑不存在或不是目錄';
 
   @override
-  String get workspaceFilesPageTitle => '工作區檔案';
+  String mountFilesPageTitle(Object alias) {
+    return '檔案 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暫無工作區檔案';
+  String get mountFilesEmptyDir => '空目錄';
 
   @override
-  String get workspaceFilesSortName => '按名稱';
+  String get mountFilesUploadButton => '上傳';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上傳 $count 個檔案';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上傳 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已略過 $name：檔名不允許';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已略過 $name：同名檔案已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下載';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已儲存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下載 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 過大，無法在此裝置上下載';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二進位檔案，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 過大，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '讀取 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '預覽已截斷：僅顯示 $total 行中的開頭部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '刪除檔案';

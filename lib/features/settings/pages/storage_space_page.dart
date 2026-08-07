@@ -27,8 +27,8 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
+import 'mount_files_page.dart';
 import 'trash_detail_page.dart';
-import 'workspace_files_page.dart';
 import '../../../theme/app_font_weights.dart';
 
 class StorageSpacePage extends StatefulWidget {
@@ -340,9 +340,24 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   }
 
   Future<void> _openWorkspaceFiles() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const WorkspaceFilesPage()));
+    // The provider's async init is normally done long before the user
+    // reaches this page; fall back to a direct path resolve if not.
+    final navigator = Navigator.of(context);
+    final provider = context.read<FilesystemMountsProvider>();
+    final path =
+        provider.workspaces?.path ??
+        (await AppDirectories.getWorkspacesDirectory()).path;
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) => MountFilesPage(
+          mount: FilesystemMount(
+            alias: FilesystemMountsProvider.workspacesAlias,
+            path: path,
+            readOnly: false,
+          ),
+        ),
+      ),
+    );
     await _refreshReport();
   }
 
@@ -2524,6 +2539,12 @@ class _MountsPanel extends StatelessWidget {
     );
   }
 
+  Future<void> _openPreview(BuildContext context, FilesystemMount mount) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => MountFilesPage(mount: mount)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -2577,7 +2598,8 @@ class _MountsPanel extends StatelessWidget {
                 path: m.path,
                 readOnly: m.readOnly,
                 builtin: false,
-                onTap: () => _openEdit(context, provider, existing: m),
+                onTap: () => _openPreview(context, m),
+                onEdit: () => _openEdit(context, provider, existing: m),
                 onDelete: () => _confirmRemove(context, provider, m),
               ),
             ],
@@ -2605,6 +2627,7 @@ class _MountRow extends StatelessWidget {
     required this.readOnly,
     required this.builtin,
     required this.onTap,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -2613,6 +2636,7 @@ class _MountRow extends StatelessWidget {
   final bool readOnly;
   final bool builtin;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   @override
@@ -2675,13 +2699,22 @@ class _MountRow extends StatelessWidget {
               ],
             ),
           ),
-          if (!builtin && onDelete != null)
-            _TactileIconButton(
-              icon: Lucide.Trash2,
-              color: cs.error.withValues(alpha: 0.8),
-              size: 16,
-              onTap: onDelete!,
-            ),
+          if (!builtin) ...[
+            if (onEdit != null)
+              _TactileIconButton(
+                icon: Lucide.Pencil,
+                color: cs.onSurface.withValues(alpha: 0.7),
+                size: 16,
+                onTap: onEdit!,
+              ),
+            if (onDelete != null)
+              _TactileIconButton(
+                icon: Lucide.Trash2,
+                color: cs.error.withValues(alpha: 0.8),
+                size: 16,
+                onTap: onDelete!,
+              ),
+          ],
         ],
       ),
     );

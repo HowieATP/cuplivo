@@ -58,12 +58,20 @@ class FlutterLogger {
     _originalPlatformOnError = ui.PlatformDispatcher.instance.onError;
     ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
       try {
-        log('$error\n$stack', tag: 'Uncaught');
+        // force: uncaught root-isolate errors are written to the log file even
+        // when the log toggle is off, so release crashes remain diagnosable.
+        log('$error\n$stack', tag: 'Uncaught', force: true);
+      } catch (_) {}
+      try {
+        debugPrint('[Uncaught] $error\n$stack');
       } catch (_) {}
 
       final original = _originalPlatformOnError;
       if (original != null) return original(error, stack);
-      return false;
+      // Returning true keeps the isolate alive. With the default `false` the
+      // engine terminates the process on the first unhandled root-isolate
+      // error, which surfaces as a silent window close in release builds.
+      return true;
     };
   }
 
@@ -127,8 +135,8 @@ class FlutterLogger {
     return _sink!;
   }
 
-  static void log(String message, {String? tag}) {
-    if (!_enabled) return;
+  static void log(String message, {String? tag, bool force = false}) {
+    if (!_enabled && !force) return;
     final now = DateTime.now();
     final prefix = '[${_formatTs(now)}]${tag == null ? '' : ' [$tag]'} ';
     final normalized = message.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -140,7 +148,7 @@ class FlutterLogger {
     final text = buffer.toString();
 
     _writeQueue = _writeQueue.then((_) async {
-      if (!_enabled) return;
+      if (!_enabled && !force) return;
       try {
         final sink = await _ensureSink();
         sink.write(text);

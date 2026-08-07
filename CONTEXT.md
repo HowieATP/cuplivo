@@ -473,3 +473,19 @@
 - **Floor derivation**: 720×432 was chosen so quarter-snap is reachable at common DPI scalings: 100%/125% on 1080p, 150% on 4K, 175% on 2560×1600 (1260×756 physical ≤ 1280×800 ✓). Fixed logical constants, deliberately NOT screen-adaptive — runtime DPI changes are out of scope.
 - **Narrow layout acceptance**: Below 900 logical width the shared chat page renders its narrow (mobile) layout inside the desktop shell (drawer instead of embedded sidebar). This is an accepted consequence of the 720-wide floor, deliberately chosen to satisfy quarter-snap. Desktop interactions (right-click menus) still work — they live in shared widgets, not the tablet layout. Do NOT "fix" this by raising the floor back to 960.
 - **No migration**: Persisted sizes (prefs keys `window_width_v1`/`window_height_v1`) have always been ≥ the old floor, so lowering the floor never clamps existing users' windows; `_clamp` only lifts sizes below the floor.
+
+## Temporary Conversation (临时对话)
+
+- **Temporary Conversation (临时对话)**: A conversation created via `createDraftConversation(temporary: true)` (`chat_service.dart`) and discarded on switch/exit (`_discardTemporaryConversation`). Its messages exist ONLY in memory (`_messagesCache` + `_draftConversations`) — never written to SQLite (`addMessage` skips `_repo.putMessage` when temporary). Not searchable, not in history, not backed up, not synced, not trashable.
+- **Read-path rule (读路径铁律)**: Any by-id message read that must see temporary messages uses the repo-or-cache fallback — `_repo.getMessageSync(id) ?? _cachedTemporaryMessage(id)`. Established in `updateMessage`, `updateMessageSilent`, `deleteMessage`. `appendMessageVersion` lacked it (issue #210: edit-user-message → send silently failed in temporary conversations); it now follows the same pattern. The bare `_repo.getMessageSync` calls in `_resetStaleStreamingFlags` (tracked IDs exclude temporary), the `deleteMessage` persisted branch (behind the temporary early-return), trash restore, and LAN sync fork-point lookup are structurally temporary-proof and must stay that way.
+- **Editing**: Temporary conversations support edit / versioning / regenerate via the draft write path (`appendMessageVersion` draft branch, `setSelectedVersion` draft branch, `deleteMessage` temporary branch).
+
+### Example Dialogue
+
+> **Dev:** "I edited a user message in a temporary chat and hit send — nothing happened. The edit UI is stuck."
+> **Domain expert:** "Temporary messages never reach SQLite, so a by-id lookup against the repo alone misses them. Any read path that must see those messages goes repo-first, then falls back to the in-memory cache — exactly like `updateMessage` and `deleteMessage` already do. `appendMessageVersion` was the one path that skipped the fallback."
+
+### Flagged Ambiguities
+
+- "临时会话" is used in the UI as both a toggle state and the conversation itself — resolved: the **Temporary Conversation** is the conversation; the toggle in the nav bar is its lifecycle control.
+- "draft conversation" (`createDraftConversation`, `_draftConversations`) is a broader class that includes both unpersisted regular conversations (persisted on first message) and **Temporary Conversations** (never persisted) — the `temporary` flag is the discriminator. Do not equate the two.

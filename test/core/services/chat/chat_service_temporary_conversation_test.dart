@@ -178,6 +178,90 @@ void main() {
       expect(service.getMessages(conversation.id), isEmpty);
       expect(service.getConversation(conversation.id)?.messageIds, isEmpty);
     });
+
+    test('temporary user message edit appends an in-memory version', () async {
+      final service = createService();
+      await service.init();
+
+      final conversation = await service.createDraftConversation(
+        title: 'Temporary Chat',
+        temporary: true,
+      );
+      final original = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'hello',
+      );
+
+      final edited = await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'hello, edited',
+      );
+
+      expect(edited, isNotNull);
+      expect(edited!.role, 'user');
+      expect(edited.content, 'hello, edited');
+      expect(edited.conversationId, conversation.id);
+      expect(edited.groupId ?? edited.id, original.id);
+      expect(edited.version, 1);
+
+      expect(service.getMessages(conversation.id), hasLength(2));
+      final convo = service.getConversation(conversation.id);
+      expect(convo?.messageIds, contains(edited.id));
+      expect(service.getVersionSelections(conversation.id), {original.id: 1});
+    });
+
+    test(
+      'successive temporary edits increment the version within the group',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'hello',
+        );
+
+        final first = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'first edit',
+        );
+        final second = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'second edit',
+        );
+
+        expect(first?.version, 1);
+        expect(second?.version, 2);
+        expect(second?.groupId ?? second?.id, original.id);
+        expect(service.getVersionSelections(conversation.id), {original.id: 2});
+      },
+    );
+
+    test(
+      'appendMessageVersion returns null for an unknown message id',
+      () async {
+        final service = createService();
+        await service.init();
+
+        await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+
+        final edited = await service.appendMessageVersion(
+          messageId: 'no-such-message',
+          content: 'edited',
+        );
+
+        expect(edited, isNull);
+      },
+    );
   });
 
   group('ChatService fork conversations', () {

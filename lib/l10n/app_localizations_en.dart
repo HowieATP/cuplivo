@@ -6406,6 +6406,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change or select a preset, then tap Save to apply';
 
   @override
+  String get compressPresetStandard => 'Standard (Default)';
+
+  @override
+  String get compressPresetDetailed => 'Detailed';
+
+  @override
+  String get ocrPresetStandard => 'Standard (Default)';
+
+  @override
+  String get ocrPresetCoordinate => 'Coordinate-precise';
+
+  @override
+  String get promptPresetCustom => 'Custom';
+
+  @override
   String get imageCompressionDialogTitle => 'Compress Image';
 
   @override

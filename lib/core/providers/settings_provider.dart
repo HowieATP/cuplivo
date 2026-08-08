@@ -24,6 +24,8 @@ import '../../utils/avatar_cache.dart';
 import '../utils/openai_model_compat.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
+import '../prompts/constants/compress_prompts.dart' as compress_prompts;
+import '../prompts/constants/ocr_prompts.dart' as ocr_prompts;
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -3079,19 +3081,7 @@ Please translate the <source_text> section:
       ? '${_ocrModelProvider!}::${_ocrModelId!}'
       : null;
 
-  static const String defaultOcrPrompt = '''You are an OCR assistant.
-
-Extract all visible text from the image and also describe any non-text elements (icons, shapes, arrows, objects, symbols, or emojis).
-
-For each element, specify:
-- The exact text (for text) or a short description (for non-text).
-- For document-type content, please use markdown and latex format.
-- If there are objects like buildings or characters, try to identify who they are.
-- Its approximate position in the image (e.g., 'top left', 'center right', 'bottom middle').
-- Its spatial relationship to nearby elements (e.g., 'above', 'below', 'next to', 'on the left of').
-
-Keep the original reading order and layout structure as much as possible.
-Do not interpret or translate—only transcribe and describe what is visually present.''';
+  static const String defaultOcrPrompt = ocr_prompts.defaultOcrPrompt;
 
   String _ocrPrompt = defaultOcrPrompt;
   String get ocrPrompt => _ocrPrompt;
@@ -3256,26 +3246,7 @@ Rules:
       : null;
 
   static const String defaultCompressPrompt =
-      '''Provide a detailed summary of the following conversation for continuing in a new session.
-
-The new session will not have access to the original conversation history, so preserve all context needed to continue seamlessly.
-
-Focus on:
-- Key topics discussed and why they matter
-- Important decisions made and their reasoning
-- Current work in progress and its state
-- Next steps or open questions to address
-- Any relevant technical details, code snippets, or configurations mentioned
-
-Requirements:
-1. Write in {locale} language, matching the original conversation language
-2. Be concise but complete — do not omit important context
-3. Output the summary directly without prefaces or meta-commentary
-4. Start with a clear indicator (e.g., "[Summary of previous conversation]" or equivalent)
-
-<conversation>
-{content}
-</conversation>''';
+      compress_prompts.defaultCompressPrompt;
 
   String _compressPrompt = defaultCompressPrompt;
   String get compressPrompt => _compressPrompt;

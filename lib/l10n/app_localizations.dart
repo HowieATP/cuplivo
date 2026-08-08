@@ -11720,6 +11720,36 @@ abstract class AppLocalizations {
   /// **'Change or select a preset, then tap Save to apply'**
   String get titlePresetUnsavedHint;
 
+  /// No description provided for @compressPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get compressPresetStandard;
+
+  /// No description provided for @compressPresetDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed'**
+  String get compressPresetDetailed;
+
+  /// No description provided for @ocrPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get ocrPresetStandard;
+
+  /// No description provided for @ocrPresetCoordinate.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinate-precise'**
+  String get ocrPresetCoordinate;
+
+  /// No description provided for @promptPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get promptPresetCustom;
+
   /// Title for the image compression dialog
   ///
   /// In en, this message translates to:

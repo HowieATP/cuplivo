@@ -6149,6 +6149,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -13087,6 +13102,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -20022,6 +20052,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
+
+  @override
+  String get compressPresetStandard => '標準（預設）';
+
+  @override
+  String get compressPresetDetailed => '詳細版';
+
+  @override
+  String get ocrPresetStandard => '標準（預設）';
+
+  @override
+  String get ocrPresetCoordinate => '座標精確定位版';
+
+  @override
+  String get promptPresetCustom => '自定義';
 
   @override
   String get imageCompressionDialogTitle => '壓縮圖片';

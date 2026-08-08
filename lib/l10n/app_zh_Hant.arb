@@ -2264,6 +2264,11 @@
     "description": "當自定義提示詞不匹配任何預設時顯示的標籤"
   },
   "titlePresetUnsavedHint": "更改或選擇預設後，需點擊「儲存」方可生效",
+  "compressPresetStandard": "標準（預設）",
+  "compressPresetDetailed": "詳細版",
+  "ocrPresetStandard": "標準（預設）",
+  "ocrPresetCoordinate": "座標精確定位版",
+  "promptPresetCustom": "自定義",
   "@titlePresetUnsavedHint": {
     "description": "標題提示詞編輯器中提醒用戶在更改預設後儲存的提示"
   },

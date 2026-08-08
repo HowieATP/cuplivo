@@ -2784,6 +2784,11 @@
     "description": "Title preset label when custom prompt doesn't match any preset"
   },
   "titlePresetUnsavedHint": "Change or select a preset, then tap Save to apply",
+  "compressPresetStandard": "Standard (Default)",
+  "compressPresetDetailed": "Detailed",
+  "ocrPresetStandard": "Standard (Default)",
+  "ocrPresetCoordinate": "Coordinate-precise",
+  "promptPresetCustom": "Custom",
   "@titlePresetUnsavedHint": {
     "description": "Hint shown in title prompt editor reminding user to save after changing preset"
   },

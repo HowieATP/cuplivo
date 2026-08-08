@@ -23,6 +23,37 @@ String? parseAndroidApkArch(String assetName) {
   return null;
 }
 
+/// iOS release ipa arch tags. Real iOS devices ship arm64-only; the x86_64
+/// variant covers Intel-Mac simulators. Order doubles as static fallback
+/// priority (arm64 first, mirroring the Android arm64-first default).
+const List<String> kIosIpaArchTags = ['arm64', 'x86_64'];
+
+String? parseIosIpaArch(String assetName) {
+  final lower = assetName.toLowerCase();
+  for (final arch in kIosIpaArchTags) {
+    if (lower.contains('_$arch.ipa')) return arch;
+  }
+  return null;
+}
+
+String? selectIosDownloadUrl({
+  required Map<String, String> ipaByArch,
+  String? universalUrl,
+  String? deviceArch,
+}) {
+  if (deviceArch != null) {
+    final url = ipaByArch[deviceArch];
+    if (url != null && url.isNotEmpty) return url;
+  }
+  for (final arch in kIosIpaArchTags) {
+    final url = ipaByArch[arch];
+    if (url != null && url.isNotEmpty) return url;
+  }
+  if (universalUrl != null && universalUrl.isNotEmpty) return universalUrl;
+  if (ipaByArch.isNotEmpty) return ipaByArch.values.first;
+  return null;
+}
+
 String? selectAndroidDownloadUrl({
   required Map<String, String> apkByArch,
   String? unarchUrl,
@@ -113,6 +144,7 @@ class UpdateInfo {
   factory UpdateInfo.fromGithubRelease(
     Map<String, dynamic> json, {
     List<String> androidAbis = const [],
+    String? iosArch,
   }) {
     final tag = (json['tag_name'] ?? '').toString();
     // Strip leading 'v' prefix if present (e.g. "v1.2.3" -> "1.2.3")
@@ -129,7 +161,9 @@ class UpdateInfo {
     // Map release assets to platform download keys
     final downloads = <String, String>{};
     final apkByArch = <String, String>{};
+    final ipaByArch = <String, String>{};
     String? unarchApkUrl;
+    String? universalIpaUrl;
     final assets = (json['assets'] as List?) ?? const [];
     for (final asset in assets) {
       if (asset is! Map) continue;
@@ -144,7 +178,12 @@ class UpdateInfo {
           unarchApkUrl = url;
         }
       } else if (name.endsWith('.ipa')) {
-        downloads['ios'] = url;
+        final arch = parseIosIpaArch(name);
+        if (arch != null) {
+          ipaByArch[arch] = url;
+        } else {
+          universalIpaUrl = url;
+        }
       } else if (name.endsWith('.dmg') || name.endsWith('.pkg')) {
         downloads['macos'] = url;
       } else if (name.endsWith('.exe') || name.endsWith('.msix')) {
@@ -163,6 +202,15 @@ class UpdateInfo {
     );
     if (androidUrl != null) {
       downloads['android'] = androidUrl;
+    }
+
+    final iosUrl = selectIosDownloadUrl(
+      ipaByArch: ipaByArch,
+      universalUrl: universalIpaUrl,
+      deviceArch: iosArch,
+    );
+    if (iosUrl != null) {
+      downloads['ios'] = iosUrl;
     }
 
     return UpdateInfo(
@@ -212,7 +260,12 @@ class UpdateProvider extends ChangeNotifier {
       final data =
           jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
       final androidAbis = await _androidSupportedAbis();
-      final info = UpdateInfo.fromGithubRelease(data, androidAbis: androidAbis);
+      final iosArch = await _iosDeviceArch();
+      final info = UpdateInfo.fromGithubRelease(
+        data,
+        androidAbis: androidAbis,
+        iosArch: iosArch,
+      );
 
       final pkg = await PackageInfo.fromPlatform();
       final currentVer = pkg.version; // e.g., 1.0.0
@@ -239,6 +292,26 @@ class UpdateProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('UpdateProvider: failed to read Android ABIs: $e');
       return const [];
+    }
+  }
+
+  /// iOS has no ABI list like Android. Real iOS devices ship arm64-only since
+  /// 2013, so a physical device maps to arm64. Simulators report the host CPU
+  /// through utsname.machine (e.g. x86_64 / arm64).
+  Future<String?> _iosDeviceArch() async {
+    if (!Platform.isIOS) return null;
+    try {
+      final info = await DeviceInfoPlugin().iosInfo;
+      if (info.isPhysicalDevice) return 'arm64';
+      final machine = info.utsname.machine.toLowerCase();
+      if (machine.contains('x86_64')) return 'x86_64';
+      if (machine.contains('arm64') || machine.contains('aarch64')) {
+        return 'arm64';
+      }
+      return null;
+    } catch (e) {
+      debugPrint('UpdateProvider: failed to read iOS architecture: $e');
+      return null;
     }
   }
 

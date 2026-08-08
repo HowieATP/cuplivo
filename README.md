@@ -36,6 +36,8 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 2. **Deletion recovery (trash bin)** — Deleted conversations go to a trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries deletion markers so content removed on one side is promptly purged on the other (#137).
 
+3. **Import from RikkaHub** — Convert a RikkaHub backup into a Cuplivo-compatible backup through the migration website, then import it via "Import Backup File" (#165).
+
 ### Signature Chat Experience
 
 1. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).

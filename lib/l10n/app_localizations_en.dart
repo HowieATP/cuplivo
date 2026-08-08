@@ -1911,6 +1911,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromRikkaHub => 'Import from RikkaHub';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => 'Usage Tutorial';
+
+  @override
+  String get backupPageRikkaHubStep1 =>
+      'After opening the website, tap “Click to Select”.';
+
+  @override
+  String get backupPageRikkaHubStep2 =>
+      'Find your RikkaHub backup and tap Confirm.';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep4 =>
+      'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep5 =>
+      'If you have any issues, join the Cuplivo QQ group to give feedback.';
+
+  @override
   String get backupPageNotSupportedYet => 'Not supported yet';
 
   @override

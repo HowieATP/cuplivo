@@ -3575,6 +3575,54 @@ abstract class AppLocalizations {
   /// **'Import from RikkaHub'**
   String get backupPageImportFromRikkaHub;
 
+  /// No description provided for @backupPageRikkaHubMigrateUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/migrate'**
+  String get backupPageRikkaHubMigrateUrl;
+
+  /// No description provided for @backupPageRikkaHubMigrateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:'**
+  String get backupPageRikkaHubMigrateHint;
+
+  /// No description provided for @backupPageRikkaHubTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageRikkaHubTutorialTitle;
+
+  /// No description provided for @backupPageRikkaHubStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'After opening the website, tap “Click to Select”.'**
+  String get backupPageRikkaHubStep1;
+
+  /// No description provided for @backupPageRikkaHubStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your RikkaHub backup and tap Confirm.'**
+  String get backupPageRikkaHubStep2;
+
+  /// No description provided for @backupPageRikkaHubStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.'**
+  String get backupPageRikkaHubStep3;
+
+  /// No description provided for @backupPageRikkaHubStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.'**
+  String get backupPageRikkaHubStep4;
+
+  /// No description provided for @backupPageRikkaHubStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'If you have any issues, join the Cuplivo QQ group to give feedback.'**
+  String get backupPageRikkaHubStep5;
+
   /// No description provided for @backupPageNotSupportedYet.
   ///
   /// In en, this message translates to:

@@ -1846,6 +1846,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 备份可通过迁移网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageRikkaHubStep1 => '进入这个网站后，点击“点击选择”';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 备份，并点击确认';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待 15 秒左右，会提示迁移完成，点击下载迁移包，会下载到一个与原文件名字相同、在后面加入了 kelivo 后缀的压缩包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，点击“备份文件导入”，导入刚刚下载的迁移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -8866,6 +8893,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 备份可通过迁移网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageRikkaHubStep1 => '进入这个网站后，点击“点击选择”';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 备份，并点击确认';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待 15 秒左右，会提示迁移完成，点击下载迁移包，会下载到一个与原文件名字相同、在后面加入了 kelivo 后缀的压缩包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，点击“备份文件导入”，导入刚刚下载的迁移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -15883,6 +15937,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromRikkaHub => '從 RikkaHub 匯入';
+
+  @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 備份可透過遷移網站轉換為 Cuplivo 相容的備份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教學';
+
+  @override
+  String get backupPageRikkaHubStep1 => '進入這個網站後，點擊「點擊選擇」';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 備份，並點擊確認';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待約 15 秒，會提示遷移完成，點擊下載遷移包，會下載到一個與原檔案名稱相同、並在後方加上 kelivo 後綴的壓縮包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，點擊「備份檔案匯入」，匯入剛下載的遷移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有問題可進入 Cuplivo 的 QQ 群回饋';
 
   @override
   String get backupPageNotSupportedYet => '暫不支援';

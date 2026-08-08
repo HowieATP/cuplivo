@@ -88,8 +88,6 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 5. **Multi-category request logging** — Request logs now cover MCP, TTS, and search services, each in its own category with independent toggles and history (#162).
 
-6. **In-app update reminder with architecture-matched downloads** — The app checks GitHub Releases on startup and surfaces a new-version entry with its changelog (the same prompt UI as the Android update flow). The iOS download link is matched to the device architecture (arm64 device / x86_64 simulator), so unsigned .ipa users always fetch the package built for their device (#233).
-
 ### UI & Rendering
 
 1. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).

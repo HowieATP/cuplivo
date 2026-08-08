@@ -193,13 +193,13 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "版本号: $VERSION"
-      - name: 🏗️ 构建 iOS (无签名)
+      - name: 🏗️ 构建 iOS (无签名, arm64 真机)
         run: |
           flutter build ios --release --no-codesign
           cd build/ios/iphoneos
           mkdir Payload
           cp -r Runner.app Payload/
-          zip -r ../../../Cuplivo_ios_${VERSION}.ipa Payload
+          zip -r ../../../Cuplivo_ios_${VERSION}_arm64.ipa Payload
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2

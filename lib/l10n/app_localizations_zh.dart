@@ -2015,6 +2015,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -2024,7 +2027,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -2066,10 +2069,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -2094,6 +2093,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -8953,6 +8972,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -8962,7 +8984,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -9004,10 +9026,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -9032,6 +9050,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -15890,6 +15928,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未偵測到區域網路位址（裝置可能離線或未連接網路）。';
+
+  @override
   String get lanSyncServerStop => '停止服務';
 
   @override
@@ -15899,7 +15940,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步計畫已發送，等待接收資料...';
 
   @override
-  String get lanSyncServerReceived => '已接收資料，正在準備回傳...';
+  String get lanSyncServerExchanging => '正在交換資料...';
 
   @override
   String get lanSyncServerDone => '交換完成，即將套用並重啟。';
@@ -15941,10 +15982,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncSecurityNote => '同一區域網路的裝置均可連接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他裝置連線逾時，請在 Windows 防火牆中允許 Cuplivo 入站（TCP 9527 連接埠）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 個對話待發送';
   }
@@ -15969,6 +16006,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '連接失敗：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '請填寫主機、連接埠和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '連接埠無效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火牆放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在新增防火牆規則...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已新增防火牆規則（連入 TCP 連接埠 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '無法自動新增防火牆規則，點擊立即放行（需要系統管理員權限）。';
 
   @override
   String get lanSyncApplyAndRestart => '套用並重啟';

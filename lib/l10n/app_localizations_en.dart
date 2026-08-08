@@ -2083,6 +2083,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress =>
+      'No LAN address detected (device offline or not connected to a network).';
+
+  @override
   String get lanSyncServerStop => 'Stop Server';
 
   @override
@@ -2092,7 +2096,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPlanSent => 'Sync plan sent. Waiting for zip...';
 
   @override
-  String get lanSyncServerReceived => 'Received zip. Preparing response...';
+  String get lanSyncServerExchanging => 'Exchanging data...';
 
   @override
   String get lanSyncServerDone => 'Exchange complete. Apply and restart.';
@@ -2135,10 +2139,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Devices on the same network can connect (minimum version: v2.2.2).';
 
   @override
-  String get lanSyncFirewallHint =>
-      'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count conversations to send';
   }
@@ -2163,6 +2163,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return 'Connection failed: $error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => 'Host, port and PIN are required.';
+
+  @override
+  String get lanSyncErrorInvalidPort => 'Invalid port.';
+
+  @override
+  String get lanSyncFirewallAllow => 'Allow in Firewall';
+
+  @override
+  String get lanSyncFirewallAdding => 'Adding firewall rule...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return 'Firewall rule added (inbound TCP port $port).';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed =>
+      'Could not add the firewall rule automatically. Click to add it now (requires administrator).';
 
   @override
   String get lanSyncApplyAndRestart => 'Apply and restart';

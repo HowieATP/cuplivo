@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:path/path.dart' as p;
 
 import '../chat/chat_service.dart';
@@ -14,6 +15,19 @@ import 'lan_sync_models.dart';
 /// Callback for delivering the received zip file to the UI for restore + restart.
 typedef SyncClientZipReceivedCallback = Future<void> Function(File zipFile);
 
+/// LAN sync targets are always LAN IPs typed by the user — never route
+/// through the environment proxy. dart:io's [HttpClient] defaults to
+/// [HttpClient.findProxyFromEnvironment], which silently hijacks LAN
+/// requests when `HTTP_PROXY`/`http_proxy` is set (and `NO_PROXY` cannot
+/// express plain-IP exclusions reliably). Always DIRECT.
+String lanSyncFindProxy(Uri url) => 'DIRECT';
+
+/// Builds the [http.Client] used by [LanSyncClient]: a dart:io [HttpClient]
+/// forced to direct connections (see [lanSyncFindProxy]).
+http.Client buildLanSyncHttpClient() {
+  return IOClient(HttpClient()..findProxy = lanSyncFindProxy);
+}
+
 /// Client-side logic for the LAN sync initiator (device A).
 ///
 /// Protocol (two round trips):
@@ -23,10 +37,12 @@ typedef SyncClientZipReceivedCallback = Future<void> Function(File zipFile);
 class LanSyncClient extends ChangeNotifier {
   final ChatService _chatService;
   final DataSync _dataSync;
+  final http.Client _http;
+  final bool _ownsHttpClient;
 
-  /// Current status message for UI display.
-  String _status = '';
-  String get status => _status;
+  /// Current protocol phase for UI display.
+  LanSyncPhase _phase = LanSyncPhase.idle;
+  LanSyncPhase get phase => _phase;
 
   /// The last computed sync plan (null until round 1 completes).
   SyncPlan? _plan;
@@ -39,7 +55,20 @@ class LanSyncClient extends ChangeNotifier {
   /// Called when the server's zip arrives and has been saved to disk.
   SyncClientZipReceivedCallback? onZipReceived;
 
-  LanSyncClient({required this._chatService, required this._dataSync});
+  LanSyncClient({
+    required this._chatService,
+    required this._dataSync,
+    http.Client? httpClient,
+  }) : _http = httpClient ?? buildLanSyncHttpClient(),
+       _ownsHttpClient = httpClient == null;
+
+  /// Releases the internally-created HTTP client. Never closes an injected
+  /// one (the caller owns it).
+  void close() {
+    if (_ownsHttpClient) {
+      _http.close();
+    }
+  }
 
   /// Builds an HTTP URI, wrapping IPv6 hosts in brackets as required by RFC 3986.
   static String _buildUri(String host, int port, String path) {
@@ -59,16 +88,14 @@ class LanSyncClient extends ChangeNotifier {
     required String pin,
   }) async {
     _busy = true;
-    _status = 'Connecting to $host:$port...';
+    _phase = LanSyncPhase.waiting;
     notifyListeners();
 
     try {
       final index = await _buildIndex();
-      _status = 'Sending index...';
-      notifyListeners();
 
       final uri = Uri.parse(_buildUri(host, port, '/sync/plan'));
-      final response = await http
+      final response = await _http
           .post(
             uri,
             headers: {'Content-Type': 'application/json', 'X-Sync-Pin': pin},
@@ -87,11 +114,7 @@ class LanSyncClient extends ChangeNotifier {
 
       final plan = SyncPlan.fromJsonString(response.body);
       _plan = plan;
-      _status =
-          'Sync plan received: '
-          '${plan.initiatorOnlyCount} to send, '
-          '${plan.serverOnlyCount} to receive, '
-          '${plan.forkCount} forks';
+      _phase = LanSyncPhase.planReceived;
       notifyListeners();
       return plan;
     } finally {
@@ -113,7 +136,7 @@ class LanSyncClient extends ChangeNotifier {
     }
 
     _busy = true;
-    _status = 'Building incremental zip...';
+    _phase = LanSyncPhase.exchanging;
     notifyListeners();
 
     try {
@@ -130,9 +153,6 @@ class LanSyncClient extends ChangeNotifier {
         myZip = await _dataSync.exportToFile(cfg, incremental: incremental);
       }
 
-      _status = 'Sending zip to server...';
-      notifyListeners();
-
       final uri = Uri.parse(_buildUri(host, port, '/sync/exchange'));
       final request = http.MultipartRequest('POST', uri)
         ..headers['X-Sync-Pin'] = pin;
@@ -144,9 +164,9 @@ class LanSyncClient extends ChangeNotifier {
         request.fields['since'] = plan.since!.toIso8601String();
       }
 
-      final streamedResponse = await request.send().timeout(
-        const Duration(minutes: 10),
-      );
+      final streamedResponse = await _http
+          .send(request)
+          .timeout(const Duration(minutes: 10));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 401) {
@@ -162,7 +182,7 @@ class LanSyncClient extends ChangeNotifier {
       final contentType = response.headers['content-type'] ?? '';
       if (contentType.contains('application/json') &&
           response.body.contains('"empty"')) {
-        _status = 'No data to receive from server.';
+        _phase = LanSyncPhase.noData;
         notifyListeners();
       } else {
         // Save the server's zip to a temp file.
@@ -174,8 +194,7 @@ class LanSyncClient extends ChangeNotifier {
         final receivedFile = File(receivedPath);
         await receivedFile.writeAsBytes(response.bodyBytes);
 
-        _status =
-            'Received zip (${response.bodyBytes.length} bytes). Ready to apply.';
+        _phase = LanSyncPhase.done;
         notifyListeners();
 
         // Notify the UI to restore.
@@ -190,6 +209,15 @@ class LanSyncClient extends ChangeNotifier {
           await myZip.delete();
         } catch (_) {}
       }
+    } on Object {
+      // Back to the confirm state so the UI shows the plan again and the
+      // user can retry. Not applied when the error came from the restore
+      // flow (phase was already `done` — the sheet was popped there).
+      if (_phase == LanSyncPhase.exchanging) {
+        _phase = LanSyncPhase.planReceived;
+        notifyListeners();
+      }
+      rethrow;
     } finally {
       _busy = false;
       notifyListeners();
@@ -221,7 +249,7 @@ class LanSyncClient extends ChangeNotifier {
   /// Resets the client state for a new sync session.
   void reset() {
     _plan = null;
-    _status = '';
+    _phase = LanSyncPhase.idle;
     _busy = false;
     notifyListeners();
   }

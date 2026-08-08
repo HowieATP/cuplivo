@@ -2313,6 +2313,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextStartButton => 'Compress';
 
   @override
+  String get compressContextKeepRecentMessages => 'Keep N';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return 'Keep the most recent $count user messages';
+  }
+
+  @override
+  String get compressContextKeepAllMessages =>
+      'Keeping that many covers all messages — nothing to compress';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return 'Summarize $summarized chars, keep $kept chars verbatim → about $minTokens–$maxTokens tokens (original about $totalTokens tokens)';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
 
   @override

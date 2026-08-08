@@ -3124,6 +3124,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
 
   @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
+
+  @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
 
   @override
@@ -10141,6 +10144,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
 
   @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
+
+  @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
 
   @override
@@ -17154,6 +17160,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若頻繁遇到 429 (限流) 錯誤，建議延長心跳間隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '進階設定';
 
   @override
   String get mcpServerEditSheetUrlLabel => '伺服器地址';

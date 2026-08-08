@@ -5963,6 +5963,12 @@ abstract class AppLocalizations {
   /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
   String get mcpServerEditSheetHeartbeatHint;
 
+  /// No description provided for @mcpServerEditSheetAdvancedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get mcpServerEditSheetAdvancedLabel;
+
   /// No description provided for @mcpServerEditSheetUrlLabel.
   ///
   /// In en, this message translates to:

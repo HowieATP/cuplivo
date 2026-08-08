@@ -3941,6 +3941,12 @@ abstract class AppLocalizations {
   /// **'PIN'**
   String get lanSyncServerPin;
 
+  /// No description provided for @lanSyncNoLanAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No LAN address detected (device offline or not connected to a network).'**
+  String get lanSyncNoLanAddress;
+
   /// No description provided for @lanSyncServerStop.
   ///
   /// In en, this message translates to:
@@ -3959,11 +3965,11 @@ abstract class AppLocalizations {
   /// **'Sync plan sent. Waiting for zip...'**
   String get lanSyncServerPlanSent;
 
-  /// No description provided for @lanSyncServerReceived.
+  /// No description provided for @lanSyncServerExchanging.
   ///
   /// In en, this message translates to:
-  /// **'Received zip. Preparing response...'**
-  String get lanSyncServerReceived;
+  /// **'Exchanging data...'**
+  String get lanSyncServerExchanging;
 
   /// No description provided for @lanSyncServerDone.
   ///
@@ -4043,12 +4049,6 @@ abstract class AppLocalizations {
   /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
   String get lanSyncSecurityNote;
 
-  /// No description provided for @lanSyncFirewallHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).'**
-  String get lanSyncFirewallHint;
-
   /// No description provided for @lanSyncPlanToSend.
   ///
   /// In en, this message translates to:
@@ -4084,6 +4084,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection failed: {error}'**
   String lanSyncErrorConnection(Object error);
+
+  /// No description provided for @lanSyncErrorFieldsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Host, port and PIN are required.'**
+  String get lanSyncErrorFieldsRequired;
+
+  /// No description provided for @lanSyncErrorInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port.'**
+  String get lanSyncErrorInvalidPort;
+
+  /// No description provided for @lanSyncFirewallAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in Firewall'**
+  String get lanSyncFirewallAllow;
+
+  /// No description provided for @lanSyncFirewallAdding.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding firewall rule...'**
+  String get lanSyncFirewallAdding;
+
+  /// No description provided for @lanSyncFirewallRuleAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rule added (inbound TCP port {port}).'**
+  String lanSyncFirewallRuleAdded(Object port);
+
+  /// No description provided for @lanSyncFirewallRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the firewall rule automatically. Click to add it now (requires administrator).'**
+  String get lanSyncFirewallRuleFailed;
 
   /// No description provided for @lanSyncApplyAndRestart.
   ///

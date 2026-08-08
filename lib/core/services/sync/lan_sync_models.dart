@@ -1,5 +1,32 @@
 import 'dart:convert';
 
+/// The current protocol phase of a LAN sync peer (server or client).
+///
+/// UI-facing only: the widgets map a phase to a localized status line.
+/// The services never emit user-visible strings themselves.
+enum LanSyncPhase {
+  /// No sync operation in progress.
+  idle,
+
+  /// Server: listening for the initiator. Client: connecting / sending index.
+  waiting,
+
+  /// Server: sync plan sent, waiting for the initiator's zip.
+  planSent,
+
+  /// Client: sync plan received, awaiting user confirmation.
+  planReceived,
+
+  /// Both: incremental zip is being built / transferred.
+  exchanging,
+
+  /// Client: the server had nothing to send (empty exchange response).
+  noData,
+
+  /// Both: exchange complete; apply and restart.
+  done,
+}
+
 /// Index sent from the initiator (device A) to the server (device B) in round 1.
 ///
 /// Contains per-conversation message IDs (ordered by messageOrder) and the

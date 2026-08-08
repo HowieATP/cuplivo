@@ -16,6 +16,16 @@ import 'lan_sync_models.dart';
 /// Callback for delivering the received zip file to the UI for restore + restart.
 typedef SyncServerZipReceivedCallback = Future<void> Function(File zipFile);
 
+/// Keeps unique non-loopback IPv4 address strings (e.g. from
+/// `NetworkInterface.list`), preserving order.
+List<String> filterLanIps(Iterable<String> addresses) {
+  final seen = <String>{};
+  return [
+    for (final address in addresses)
+      if (!address.startsWith('127.') && seen.add(address)) address,
+  ];
+}
+
 /// HTTP server for LAN sync. Single-use lifecycle.
 ///
 /// Protocol (two round trips):
@@ -28,7 +38,14 @@ class LanSyncServer extends ChangeNotifier {
 
   HttpServer? _server;
   String? _pin;
-  String? _address;
+
+  /// The port requested at [start]. Null when not running.
+  int? _preferredPort;
+
+  /// All non-loopback IPv4 addresses of this device (LAN candidates).
+  List<String> _addresses = const [];
+  List<String> get addresses => _addresses;
+
   int? _port;
 
   /// Whether the server is listening.
@@ -38,13 +55,16 @@ class LanSyncServer extends ChangeNotifier {
   /// The 4-digit PIN for this session. Null when not running.
   String? get pin => _pin;
 
-  /// The displayed address (IP:port). Null when not running.
-  String? get address => _address;
   int? get port => _port;
 
-  /// Current status message for UI display.
-  String _status = '';
-  String get status => _status;
+  /// Whether the bound port is the one requested at [start] (true) or a
+  /// random fallback because the preferred port was busy (false).
+  bool get usedPreferredPort =>
+      _running && _port != null && _port == _preferredPort;
+
+  /// Current protocol phase for UI display.
+  LanSyncPhase _phase = LanSyncPhase.idle;
+  LanSyncPhase get phase => _phase;
 
   /// Called when the initiator's zip arrives and has been saved to disk.
   /// The UI is responsible for merge-restoring and restarting.
@@ -57,11 +77,12 @@ class LanSyncServer extends ChangeNotifier {
 
   LanSyncServer({required this._chatService, required this._dataSync});
 
-  /// Starts the HTTP server. Returns the address string (IP:port) or throws.
-  Future<String> start({int preferredPort = 9527}) async {
+  /// Starts the HTTP server. Throws on failure.
+  Future<void> start({int preferredPort = 9527}) async {
     if (_running) throw Exception('Server already running');
 
     _pin = _generatePin();
+    _preferredPort = preferredPort;
 
     // Bind to all interfaces (0.0.0.0) so LAN peers can connect.
     HttpServer server;
@@ -73,13 +94,14 @@ class LanSyncServer extends ChangeNotifier {
     }
     _server = server;
     _port = server.port;
-    _address = await _getLocalIp();
+    // May be empty when the machine has no non-loopback IPv4 — the UI
+    // shows a dedicated empty state instead of a bogus connect address.
+    _addresses = await _getLocalIps();
     _running = true;
-    _status = 'Listening on $_address:$_port';
+    _phase = LanSyncPhase.waiting;
     notifyListeners();
 
     _handleRequests(server);
-    return '$_address:$_port';
   }
 
   /// Stops the server and cleans up.
@@ -88,9 +110,9 @@ class LanSyncServer extends ChangeNotifier {
     _server = null;
     _running = false;
     _pin = null;
-    _address = null;
+    _addresses = const [];
     _port = null;
-    _status = '';
+    _phase = LanSyncPhase.idle;
     _receivedZip = null;
     notifyListeners();
   }
@@ -151,11 +173,7 @@ class LanSyncServer extends ChangeNotifier {
       myAssistantIds: myAssistantIds,
     );
 
-    _status =
-        'Sync plan sent: '
-        '${plan.initiatorOnlyCount} to receive, '
-        '${plan.serverOnlyCount} to send, '
-        '${plan.forkCount} forks';
+    _phase = LanSyncPhase.planSent;
     notifyListeners();
 
     request.response
@@ -196,14 +214,10 @@ class LanSyncServer extends ChangeNotifier {
       );
       receivedFile = File(receivedPath);
       await receivedFile.writeAsBytes(zipPart);
-
-      _status =
-          'Received zip (${zipPart.length} bytes). Building response zip...';
-      notifyListeners();
-    } else {
-      _status = 'No zip received from initiator. Building response zip...';
-      notifyListeners();
     }
+
+    _phase = LanSyncPhase.exchanging;
+    notifyListeners();
 
     // Determine the `since` for building our zip.
     // Re-parse the plan from the request body if available, otherwise
@@ -232,7 +246,7 @@ class LanSyncServer extends ChangeNotifier {
     }
 
     _receivedZip = receivedFile;
-    _status = 'Response zip ready. Waiting for apply.';
+    _phase = LanSyncPhase.done;
     notifyListeners();
 
     // Send our zip as the response.
@@ -361,22 +375,20 @@ class LanSyncServer extends ChangeNotifier {
     return code.toString().padLeft(4, '0');
   }
 
-  static Future<String> _getLocalIp() async {
+  /// All unique non-loopback IPv4 addresses, in interface order.
+  static Future<List<String>> _getLocalIps() async {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
       );
-      for (final iface in interfaces) {
-        for (final addr in iface.addresses) {
-          if (!addr.isLoopback) {
-            return addr.address;
-          }
-        }
-      }
+      return filterLanIps([
+        for (final iface in interfaces)
+          for (final addr in iface.addresses) addr.address,
+      ]);
     } catch (e) {
-      debugPrint('Failed to get local IP: $e');
+      debugPrint('Failed to get local IPs: $e');
     }
-    return '127.0.0.1';
+    return const [];
   }
 
   Future<Directory> _getTempDir() async {

@@ -4523,6 +4523,36 @@ abstract class AppLocalizations {
   /// **'Compress'**
   String get compressContextStartButton;
 
+  /// No description provided for @compressContextKeepRecentMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep N'**
+  String get compressContextKeepRecentMessages;
+
+  /// No description provided for @compressContextKeepCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the most recent {count} user messages'**
+  String compressContextKeepCountLabel(Object count);
+
+  /// No description provided for @compressContextKeepAllMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping that many covers all messages — nothing to compress'**
+  String get compressContextKeepAllMessages;
+
+  /// Keep-recent compression preview: summarized/kept char counts and the estimated result token band
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)'**
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  );
+
   /// No description provided for @bottomToolsSheetLearningMode.
   ///
   /// In en, this message translates to:
@@ -11881,6 +11911,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change or select a preset, then tap Save to apply'**
   String get titlePresetUnsavedHint;
+
+  /// No description provided for @compressPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get compressPresetStandard;
+
+  /// No description provided for @compressPresetDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed'**
+  String get compressPresetDetailed;
+
+  /// No description provided for @ocrPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get ocrPresetStandard;
+
+  /// No description provided for @ocrPresetCoordinate.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinate-precise'**
+  String get ocrPresetCoordinate;
+
+  /// No description provided for @promptPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get promptPresetCustom;
 
   /// Title for the image compression dialog
   ///

@@ -1917,6 +1917,12 @@ class HomePageController extends ChangeNotifier {
     return _chatController.collapseVersions(items);
   }
 
+  /// Complete history of the current conversation (not the loaded window),
+  /// mirroring the data source used by `compressContext`.
+  List<ChatMessage> allMessagesForCurrentConversationContext() {
+    return _chatController.allMessagesForCurrentConversationContext();
+  }
+
   // ============================================================================
   // Public Methods - Multi-AI Comparison Mode
   // ============================================================================

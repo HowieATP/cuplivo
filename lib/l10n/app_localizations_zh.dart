@@ -2344,6 +2344,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextStartButton => '开始压缩';
 
   @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 条用户消息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -6258,6 +6280,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -9389,6 +9426,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressContextStartButton => '开始压缩';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 条用户消息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => '学习模式';
@@ -13305,6 +13364,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -16434,6 +16508,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressContextStartButton => '開始壓縮';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N條';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 條用戶訊息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留條數涵蓋全部訊息，無內容可壓縮';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '總結 $summarized 字元，原樣保留 $kept 字元 → 壓縮後約 $minTokens–$maxTokens tokens（原文約 $totalTokens tokens）';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => '學習模式';
@@ -20349,6 +20445,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
+
+  @override
+  String get compressPresetStandard => '標準（預設）';
+
+  @override
+  String get compressPresetDetailed => '詳細版';
+
+  @override
+  String get ocrPresetStandard => '標準（預設）';
+
+  @override
+  String get ocrPresetCoordinate => '座標精確定位版';
+
+  @override
+  String get promptPresetCustom => '自定義';
 
   @override
   String get imageCompressionDialogTitle => '壓縮圖片';

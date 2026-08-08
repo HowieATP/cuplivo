@@ -818,6 +818,14 @@
   "compressContextMaxCharsLabel": "字符数",
   "compressContextInvalidLimit": "请输入大于 0 的字符数",
   "compressContextStartButton": "开始压缩",
+  "compressContextKeepRecentMessages": "保留N条",
+  "compressContextKeepCountLabel": "保留最近 {count} 条用户消息",
+  "compressContextKeepAllMessages": "保留条数覆盖全部消息，无内容可压缩",
+  "compressContextEstimatePreview": "总结 {summarized} 字符，原样保留 {kept} 字符 → 压缩后约 {minTokens}–{maxTokens} tokens（原文约 {totalTokens} tokens）",
+  "@compressContextEstimatePreview": {
+    "description": "保留最近压缩预览：总结/保留字符数与预估结果 token 区间",
+    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+  },
   "bottomToolsSheetLearningMode": "学习模式",
   "bottomToolsSheetLearningModeDescription": "帮助你循序渐进地学习知识",
   "bottomToolsSheetConfigurePrompt": "设置提示词",
@@ -2291,6 +2299,11 @@
     "description": "当自定义提示词不匹配任何预设时显示的标签"
   },
   "titlePresetUnsavedHint": "更改或选择预设后，需点击「保存」方可生效",
+  "compressPresetStandard": "标准（默认）",
+  "compressPresetDetailed": "详细版",
+  "ocrPresetStandard": "标准（默认）",
+  "ocrPresetCoordinate": "坐标精确定位版",
+  "promptPresetCustom": "自定义",
   "@titlePresetUnsavedHint": {
     "description": "标题提示词编辑器中提醒用户在更改预设后保存的提示"
   },

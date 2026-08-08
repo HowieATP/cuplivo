@@ -351,13 +351,73 @@ class AppLocalizationsEn extends AppLocalizations {
       'Path does not exist or is not a directory';
 
   @override
-  String get workspaceFilesPageTitle => 'Workspace Files';
+  String mountFilesPageTitle(Object alias) {
+    return 'Files · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => 'No workspace files yet';
+  String get mountFilesEmptyDir => 'Empty directory';
 
   @override
-  String get workspaceFilesSortName => 'By name';
+  String get mountFilesUploadButton => 'Upload';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return 'Uploaded $count files';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return 'Failed to upload $name: $error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return 'Skipped $name: the file name is not allowed';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return 'Skipped $name: a file with this name already exists';
+  }
+
+  @override
+  String get mountFilesDownloadButton => 'Download';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return 'Saved $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return 'Failed to download $name: $error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name is too large to download on this device';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name is a binary file — cannot preview';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name is too large to preview';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return 'Failed to read $name: $error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return 'Preview truncated: showing the first lines of $total';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => 'Delete File';
@@ -2083,6 +2143,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress =>
+      'No LAN address detected (device offline or not connected to a network).';
+
+  @override
   String get lanSyncServerStop => 'Stop Server';
 
   @override
@@ -2092,7 +2156,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPlanSent => 'Sync plan sent. Waiting for zip...';
 
   @override
-  String get lanSyncServerReceived => 'Received zip. Preparing response...';
+  String get lanSyncServerExchanging => 'Exchanging data...';
 
   @override
   String get lanSyncServerDone => 'Exchange complete. Apply and restart.';
@@ -2135,10 +2199,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Devices on the same network can connect (minimum version: v2.2.2).';
 
   @override
-  String get lanSyncFirewallHint =>
-      'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count conversations to send';
   }
@@ -2163,6 +2223,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return 'Connection failed: $error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => 'Host, port and PIN are required.';
+
+  @override
+  String get lanSyncErrorInvalidPort => 'Invalid port.';
+
+  @override
+  String get lanSyncFirewallAllow => 'Allow in Firewall';
+
+  @override
+  String get lanSyncFirewallAdding => 'Adding firewall rule...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return 'Firewall rule added (inbound TCP port $port).';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed =>
+      'Could not add the firewall rule automatically. Click to add it now (requires administrator).';
 
   @override
   String get lanSyncApplyAndRestart => 'Apply and restart';
@@ -3174,6 +3255,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpServerEditSheetHeartbeatHint =>
       'If you encounter frequent 429 (rate limit) errors, try increasing this interval.';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => 'Advanced Settings';
 
   @override
   String get mcpServerEditSheetUrlLabel => 'Server URL';

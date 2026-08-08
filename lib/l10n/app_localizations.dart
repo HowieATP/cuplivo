@@ -706,23 +706,95 @@ abstract class AppLocalizations {
   /// **'Path does not exist or is not a directory'**
   String get storageMountsErrorPathNotFound;
 
-  /// No description provided for @workspaceFilesPageTitle.
+  /// No description provided for @mountFilesPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Workspace Files'**
-  String get workspaceFilesPageTitle;
+  /// **'Files · {alias}'**
+  String mountFilesPageTitle(Object alias);
 
-  /// No description provided for @workspaceFilesEmpty.
+  /// No description provided for @mountFilesEmptyDir.
   ///
   /// In en, this message translates to:
-  /// **'No workspace files yet'**
-  String get workspaceFilesEmpty;
+  /// **'Empty directory'**
+  String get mountFilesEmptyDir;
 
-  /// No description provided for @workspaceFilesSortName.
+  /// No description provided for @mountFilesUploadButton.
   ///
   /// In en, this message translates to:
-  /// **'By name'**
-  String get workspaceFilesSortName;
+  /// **'Upload'**
+  String get mountFilesUploadButton;
+
+  /// No description provided for @mountFilesUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {count} files'**
+  String mountFilesUploaded(Object count);
+
+  /// No description provided for @mountFilesUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload {name}: {error}'**
+  String mountFilesUploadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesUploadNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: the file name is not allowed'**
+  String mountFilesUploadNameInvalid(Object name);
+
+  /// No description provided for @mountFilesUploadConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: a file with this name already exists'**
+  String mountFilesUploadConflict(Object name);
+
+  /// No description provided for @mountFilesDownloadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get mountFilesDownloadButton;
+
+  /// No description provided for @mountFilesDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}'**
+  String mountFilesDownloaded(Object name);
+
+  /// No description provided for @mountFilesDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download {name}: {error}'**
+  String mountFilesDownloadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesDownloadTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to download on this device'**
+  String mountFilesDownloadTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewBinary.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is a binary file — cannot preview'**
+  String mountFilesPreviewBinary(Object name);
+
+  /// No description provided for @mountFilesPreviewTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to preview'**
+  String mountFilesPreviewTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to read {name}: {error}'**
+  String mountFilesPreviewReadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesPreviewTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview truncated: showing the first lines of {total}'**
+  String mountFilesPreviewTruncated(Object total);
 
   /// No description provided for @workspaceFilesDeleteConfirmTitle.
   ///
@@ -3941,6 +4013,12 @@ abstract class AppLocalizations {
   /// **'PIN'**
   String get lanSyncServerPin;
 
+  /// No description provided for @lanSyncNoLanAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No LAN address detected (device offline or not connected to a network).'**
+  String get lanSyncNoLanAddress;
+
   /// No description provided for @lanSyncServerStop.
   ///
   /// In en, this message translates to:
@@ -3959,11 +4037,11 @@ abstract class AppLocalizations {
   /// **'Sync plan sent. Waiting for zip...'**
   String get lanSyncServerPlanSent;
 
-  /// No description provided for @lanSyncServerReceived.
+  /// No description provided for @lanSyncServerExchanging.
   ///
   /// In en, this message translates to:
-  /// **'Received zip. Preparing response...'**
-  String get lanSyncServerReceived;
+  /// **'Exchanging data...'**
+  String get lanSyncServerExchanging;
 
   /// No description provided for @lanSyncServerDone.
   ///
@@ -4043,12 +4121,6 @@ abstract class AppLocalizations {
   /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
   String get lanSyncSecurityNote;
 
-  /// No description provided for @lanSyncFirewallHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).'**
-  String get lanSyncFirewallHint;
-
   /// No description provided for @lanSyncPlanToSend.
   ///
   /// In en, this message translates to:
@@ -4084,6 +4156,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection failed: {error}'**
   String lanSyncErrorConnection(Object error);
+
+  /// No description provided for @lanSyncErrorFieldsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Host, port and PIN are required.'**
+  String get lanSyncErrorFieldsRequired;
+
+  /// No description provided for @lanSyncErrorInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port.'**
+  String get lanSyncErrorInvalidPort;
+
+  /// No description provided for @lanSyncFirewallAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in Firewall'**
+  String get lanSyncFirewallAllow;
+
+  /// No description provided for @lanSyncFirewallAdding.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding firewall rule...'**
+  String get lanSyncFirewallAdding;
+
+  /// No description provided for @lanSyncFirewallRuleAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rule added (inbound TCP port {port}).'**
+  String lanSyncFirewallRuleAdded(Object port);
+
+  /// No description provided for @lanSyncFirewallRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the firewall rule automatically. Click to add it now (requires administrator).'**
+  String get lanSyncFirewallRuleFailed;
 
   /// No description provided for @lanSyncApplyAndRestart.
   ///
@@ -5884,6 +5992,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
   String get mcpServerEditSheetHeartbeatHint;
+
+  /// No description provided for @mcpServerEditSheetAdvancedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get mcpServerEditSheetAdvancedLabel;
 
   /// No description provided for @mcpServerEditSheetUrlLabel.
   ///

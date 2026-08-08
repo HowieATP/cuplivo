@@ -339,13 +339,73 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
-  String get workspaceFilesPageTitle => '工作区文件';
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暂无工作区文件';
+  String get mountFilesEmptyDir => '空目录';
 
   @override
-  String get workspaceFilesSortName => '按名称';
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '删除文件';
@@ -2015,6 +2075,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -2024,7 +2087,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -2066,10 +2129,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -2094,6 +2153,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -3065,6 +3144,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
@@ -7314,13 +7396,73 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
-  String get workspaceFilesPageTitle => '工作区文件';
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暂无工作区文件';
+  String get mountFilesEmptyDir => '空目录';
 
   @override
-  String get workspaceFilesSortName => '按名称';
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '删除文件';
@@ -8990,6 +9132,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -8999,7 +9144,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -9041,10 +9186,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncSecurityNote => '同一局域网的设备均可连接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他设备连接超时，请在 Windows 防火墙中允许 Cuplivo 入站（TCP 9527 端口）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 个对话待发送';
   }
@@ -9069,6 +9210,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -10040,6 +10201,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
@@ -14288,13 +14452,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路徑不存在或不是目錄';
 
   @override
-  String get workspaceFilesPageTitle => '工作區檔案';
+  String mountFilesPageTitle(Object alias) {
+    return '檔案 · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => '暫無工作區檔案';
+  String get mountFilesEmptyDir => '空目錄';
 
   @override
-  String get workspaceFilesSortName => '按名稱';
+  String get mountFilesUploadButton => '上傳';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上傳 $count 個檔案';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上傳 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已略過 $name：檔名不允許';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已略過 $name：同名檔案已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下載';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已儲存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下載 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 過大，無法在此裝置上下載';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二進位檔案，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 過大，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '讀取 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '預覽已截斷：僅顯示 $total 行中的開頭部分';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => '刪除檔案';
@@ -15964,6 +16188,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未偵測到區域網路位址（裝置可能離線或未連接網路）。';
+
+  @override
   String get lanSyncServerStop => '停止服務';
 
   @override
@@ -15973,7 +16200,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步計畫已發送，等待接收資料...';
 
   @override
-  String get lanSyncServerReceived => '已接收資料，正在準備回傳...';
+  String get lanSyncServerExchanging => '正在交換資料...';
 
   @override
   String get lanSyncServerDone => '交換完成，即將套用並重啟。';
@@ -16015,10 +16242,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncSecurityNote => '同一區域網路的裝置均可連接（最低版本：v2.2.2）。';
 
   @override
-  String get lanSyncFirewallHint =>
-      '若其他裝置連線逾時，請在 Windows 防火牆中允許 Cuplivo 入站（TCP 9527 連接埠）。';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count 個對話待發送';
   }
@@ -16043,6 +16266,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '連接失敗：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '請填寫主機、連接埠和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '連接埠無效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火牆放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在新增防火牆規則...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已新增防火牆規則（連入 TCP 連接埠 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '無法自動新增防火牆規則，點擊立即放行（需要系統管理員權限）。';
 
   @override
   String get lanSyncApplyAndRestart => '套用並重啟';
@@ -17013,6 +17256,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若頻繁遇到 429 (限流) 錯誤，建議延長心跳間隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '進階設定';
 
   @override
   String get mcpServerEditSheetUrlLabel => '伺服器地址';

@@ -746,6 +746,37 @@ String _preprocessFences(
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
 
+  // Ensure \[...\] display math gets the same standalone-block treatment as
+  // $$...$$ (issue #218). Unlike $, \[ has no inline-literal ambiguity, so the
+  // normalization is unconditional — except on markdown table rows (a \n
+  // inside a cell would break the whole table; cells already render \[...\]
+  // via gpt_markdown's static LatexMathMultiLine) and for \\[-prefixed
+  // openers (row-break spacing args like \\[2pt] in aligned environments).
+  // $$...$$ spans are matched first and passed through untouched, so \[
+  // inside a $$ body is never re-normalized. Gated on enableMath: with math
+  // rendering off no renderer exists, so the rewrite would only split
+  // paragraphs and lists for no benefit.
+  if (enableMath) {
+    final inlineBracketDisplayMath = RegExp(
+      r'\$\$[\s\S]*?\$\$|(?<!\\)\\\[([\s\S]*?)\\\]',
+    );
+    out = out.replaceAllMapped(inlineBracketDisplayMath, (m) {
+      final body = m.group(1);
+      if (body == null) return m[0]!; // $$...$$ span: pass through untouched
+      final trimmed = body.trim();
+      if (trimmed.isEmpty) return m[0]!;
+      if (_isDollarMathOnMarkdownTableRow(out, m.start)) return m[0]!;
+      final prefix = m.start == 0 || out.substring(0, m.start).endsWith('\n\n')
+          ? ''
+          : '\n';
+      final suffix =
+          m.end == out.length || out.substring(m.end).startsWith('\n\n')
+          ? ''
+          : '\n';
+      return '$prefix\\[\n$trimmed\n\\]$suffix';
+    });
+  }
+
   // 2) Dedent opening fences: leading spaces before ```lang
   final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
   out = out.replaceAllMapped(dedentOpen, (m) => "```${m[1]}");
@@ -1569,7 +1600,8 @@ bool _isCjkCodeUnit(int codeUnit) {
 }
 
 String _normalizeMathTex(String tex) {
-  final escapedSpecials = _escapeInlineMathSpecials(tex);
+  final tagRewritten = _rewriteTagCommands(tex);
+  final escapedSpecials = _escapeInlineMathSpecials(tagRewritten);
   final normalizedBraces = _escapeLikelyLiteralMathBraces(escapedSpecials);
   return normalizedBraces.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (
     match,
@@ -1578,6 +1610,36 @@ String _normalizeMathTex(String tex) {
     return r'\lVert '
         '$body'
         r' \rVert';
+  });
+}
+
+// flutter_math_fork 0.7.4 (latest) stubs \tag: it expands to
+// \gdef\df@tag{...}, but \gdef is undefined → ParseException → the WHOLE
+// formula falls back to raw plain text. Rewrite \tag{X} → \qquad\text{(X)}
+// and \tag*{X} → \qquad\text{X} so the number renders inline right after the
+// equation — an approximation, NOT right-aligned at the margin like real
+// LaTeX (proper tags via a vendored flutter_math_fork are a deferred task).
+// \notag/\nonumber produce nothing by design → strip. Only flat labels
+// without backslashes are rewritten: labels with nested braces or TeX
+// commands (e.g. \tag{\alpha} — \text cannot parse math commands) and
+// unbraced \tag 1 stay untouched (raw-text fallback keeps the original tex).
+String _rewriteTagCommands(String tex) {
+  final tag = RegExp(
+    r'(?<!\\)\\tag(\*?)\{([^{}\\]*)\}'
+    r'|(?<!\\)\\notag(?![a-zA-Z])'
+    r'|(?<!\\)\\nonumber(?![a-zA-Z])',
+  );
+  return tex.replaceAllMapped(tag, (m) {
+    final label = (m.group(2) ?? '').trim();
+    if (label.isEmpty) return '';
+    final starred = m.group(1) == '*';
+    return starred
+        ? r'\qquad\text{'
+              '$label'
+              '}'
+        : r'\qquad\text{'
+              '($label)'
+              '}';
   });
 }
 

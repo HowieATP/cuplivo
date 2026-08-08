@@ -2177,6 +2177,225 @@ A-->B
   );
 
   testWidgets(
+    r'MarkdownWithCodeHighlight renders multiline \[...\] inside list items',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+1. \[
+   \boxed{v=\frac{s}{t}}
+   \]
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'\['), findsNothing);
+      expect(find.textContaining(r'\boxed{v=\frac{s}{t}}'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders single-line \[...\] inside list items',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'1. \[E=mc^2\]'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'E=mc^2'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \[...\] embedded in a paragraph',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'公式：\[E=mc^2\]，很重要。'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('公式：'), findsOneWidget);
+      expect(find.textContaining('，很重要。'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \[...\] inside table cells intact',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| 名称 | 公式 |
+| --- | --- |
+| 动能 | \[E_k=\frac{1}{2}mv^2\] |
+'''),
+      );
+      await tester.pump();
+
+      // The table block must survive: cell-level \[...\] renders via
+      // gpt_markdown's static LatexMathMultiLine (a top-level \[...\] rewrite
+      // would inject \n into the row and break the table).
+      expect(
+        find.byKey(const ValueKey('markdown-table-block')),
+        findsOneWidget,
+      );
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('名称', findRichText: true), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight does not treat \\[2pt] as display math',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'行内 \\[2pt] 调整，公式 \[x\] 结束'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('调整'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps multiline $$ in list items working',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+1. $$
+   \boxed{v=\frac{s}{t}}
+   $$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \tag{...} display math without fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag{1} E = mc^2$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(_encodedMathTex(tester).first, contains('(1)'));
+      expect(find.textContaining(r'\tag'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \tag*{...} without parentheses',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag*{A} x = y$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(_encodedMathTex(tester).first, contains('A'));
+      expect(_encodedMathTex(tester).first, isNot(contains('(A)')));
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders multiple \tag rows in aligned',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+$$
+\begin{aligned}
+E &= mc^2 \tag{1} \\
+p &= mv \tag{2}
+\end{aligned}
+$$
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+    },
+  );
+
+  testWidgets(r'MarkdownWithCodeHighlight strips \notag in aligned rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(
+        r'$$\begin{aligned}a &= b \notag \\ c &= d\end{aligned}$$',
+      ),
+    );
+    await tester.pump();
+
+    final mathWidgets = _mathWidgets(tester);
+    expect(mathWidgets, hasLength(1));
+    expect(mathWidgets.single.parseError, isNull);
+  });
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders inline \tag without raw-text fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'内联 $E=mc^2 \tag{1}$ 结束'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(find.textContaining('内联'), findsOneWidget);
+      expect(find.textContaining('结束'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps unknown TeX as raw-text fallback',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'$$\begin{equation}x\end{equation}$$'),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNotNull);
+      expect(find.textContaining(r'\begin{equation}'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \[...\] inline when math rendering is off',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'公式：\[E=mc^2\]，很重要。',
+          preferences: const {'display_enable_math_rendering_v1': false},
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing);
+      expect(
+        find.textContaining('公式：[E=mc^2]，很重要。', findRichText: true),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \tag{\alpha} untouched for fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag{\alpha} x = y$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNotNull);
+      // The fallback shows the ORIGINAL tex, not the rewritten approximation.
+      expect(find.textContaining(r'\tag{\alpha}'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight follows GitHub-like dollar math boundaries',
     (tester) async {
       await tester.pumpWidget(

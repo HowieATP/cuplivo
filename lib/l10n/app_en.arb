@@ -1164,6 +1164,8 @@
   "displaySettingsPageEnableMathSubtitle": "Render LaTeX math (inline and block)",
   "displaySettingsPageEnableUserMarkdownTitle": "Render user messages with Markdown",
   "displaySettingsPageEnableReasoningMarkdownTitle": "Render reasoning (thinking) with Markdown",
+  "displaySettingsPageStreamingThinkingPreviewTruncateTitle": "Limit streaming thinking preview",
+  "displaySettingsPageStreamingThinkingPreviewTruncateSubtitle": "While thinking streams, only the tail of the preview is rendered for speed. Turn off to restore the original full-length live preview.",
   "displaySettingsPageEnableAssistantMarkdownTitle": "Render assistant messages with Markdown",
   "displaySettingsPageMobileCodeBlockWrapTitle": "Mobile Code Block Word Wrap",
   "displaySettingsPageAutoCollapseCodeBlockTitle": "Auto-collapse Code Blocks",

@@ -1911,6 +1911,19 @@ class RenderingSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.ChevronsDownUp,
+                label: l10n
+                    .displaySettingsPageStreamingThinkingPreviewTruncateTitle,
+                subtitle: l10n
+                    .displaySettingsPageStreamingThinkingPreviewTruncateSubtitle,
+                value: sp.streamingThinkingPreviewTruncate,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setStreamingThinkingPreviewTruncate(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.MessageSquare,
                 label: l10n.displaySettingsPageEnableAssistantMarkdownTitle,
                 value: sp.enableAssistantMarkdown,

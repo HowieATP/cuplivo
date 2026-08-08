@@ -2662,6 +2662,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制流式思考预览长度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考过程中只渲染预览的尾部以提升流畅度。关闭可恢复原有的全量实时预览。';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
 
@@ -9682,6 +9690,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制流式思考预览长度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考过程中只渲染预览的尾部以提升流畅度。关闭可恢复原有的全量实时预览。';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
 
@@ -16698,6 +16714,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableReasoningMarkdownTitle =>
       '思维鏈 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制串流思考預覽長度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考過程中僅渲染預覽的尾部以提升流暢度。關閉可恢復原有的全量即時預覽。';
 
   @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>

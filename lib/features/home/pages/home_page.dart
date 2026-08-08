@@ -159,7 +159,7 @@ class _CompressContextOptionsDialogState
   late final TextEditingController _maxCharsController;
   late final String _totalTextForEstimate;
   String? _error;
-  int _keepCount = CompressContextOptions.defaultKeepUserMessages;
+  late int _keepCount;
 
   int get _userMessageCount => countUserMessages(widget.collapsedMessages);
 
@@ -175,6 +175,7 @@ class _CompressContextOptionsDialogState
     _totalTextForEstimate = buildConversationTextForCompression(
       widget.collapsedMessages,
     );
+    _keepCount = defaultKeepUserMessageCountFor(_userMessageCount);
   }
 
   @override

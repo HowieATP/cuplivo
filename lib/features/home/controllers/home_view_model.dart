@@ -103,6 +103,15 @@ int countUserMessages(List<ChatMessage> messages) {
       .length;
 }
 
+/// Default keep count for the keep-recent mode, scaling with conversation
+/// size (<5 user messages → 1, <10 → 2, ≥10 → 3) so a small conversation's
+/// default never covers all of its user messages.
+int defaultKeepUserMessageCountFor(int userMessageCount) {
+  if (userMessageCount < 5) return 1;
+  if (userMessageCount < 10) return 2;
+  return 3;
+}
+
 class CompressionTokenEstimate {
   const CompressionTokenEstimate({
     required this.totalTokens,

@@ -367,6 +367,25 @@ void main() {
     });
   });
 
+  group('defaultKeepUserMessageCountFor', () {
+    test('少于 5 条用户消息时默认 1', () {
+      expect(defaultKeepUserMessageCountFor(0), 1);
+      expect(defaultKeepUserMessageCountFor(1), 1);
+      expect(defaultKeepUserMessageCountFor(2), 1);
+      expect(defaultKeepUserMessageCountFor(4), 1);
+    });
+
+    test('5-9 条用户消息时默认 2', () {
+      expect(defaultKeepUserMessageCountFor(5), 2);
+      expect(defaultKeepUserMessageCountFor(9), 2);
+    });
+
+    test('10 条及以上用户消息时默认 3', () {
+      expect(defaultKeepUserMessageCountFor(10), 3);
+      expect(defaultKeepUserMessageCountFor(100), 3);
+    });
+  });
+
   group('estimateCompressionTokens', () {
     test('保留区按长度占比折算 token', () {
       final est = estimateCompressionTokens(

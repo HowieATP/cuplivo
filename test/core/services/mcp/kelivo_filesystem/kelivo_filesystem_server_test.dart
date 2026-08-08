@@ -271,7 +271,7 @@ void main() {
         'path': ws('.fetch_cache/cache.bin'),
       });
       expect(r['isError'], false);
-      // Never-synced content must not produce markers (ADR-0018).
+      // Never-synced content must not produce markers (ADR-0021).
       expect(deleted, isEmpty);
     });
 

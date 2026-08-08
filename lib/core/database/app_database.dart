@@ -263,7 +263,7 @@ class DeletionMarkerRows extends Table {
 // membership join (same shape as ConversationMcpServerRows). The Director
 // session is ephemeral — rebuilt from the public transcript on every call,
 // never persisted (the v13 `director_message_rows` table was dropped in v14).
-// See docs/adr/0015 and CONTEXT.md.
+// See docs/adr/0014-multi-assistant-group-chat-schema.md and CONTEXT.md.
 // Sync rule: any new group-related table must be wired into clearAllData
 // (child-before-parent FK order), _exportChatsToFile and _restoreFromBackupFile
 // in the same change.
@@ -364,7 +364,7 @@ class AppDatabase extends _$AppDatabase {
   // column stays missing (real incidents on schema v8 and v12). The schema
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
-  // See docs/adr/0017-schema-self-heal.md.
+  // See docs/adr/0019-schema-self-heal.md.
   int get schemaVersion => 15;
 
   /// Whether [table] has a physical column named [column] (sqlite name).

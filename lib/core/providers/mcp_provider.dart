@@ -437,7 +437,7 @@ class McpProvider extends ChangeNotifier {
   final FilesystemMountsProvider? filesystemMounts;
   final BuildContext Function() contextProvider;
 
-  /// Provider-agnostic OAuth flow orchestration (see ADR-0016).
+  /// Provider-agnostic OAuth flow orchestration (see ADR-0015).
   final OAuthFlowService oauthFlowService;
 
   final Map<String, mcp.Client> _clients = {};
@@ -449,6 +449,12 @@ class McpProvider extends ChangeNotifier {
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
+
+  /// Client-side request cap for the built-in in-memory `@kelivo/fetch`
+  /// server — see the clientConfig comment at connect time. The engine's own
+  /// timeouts (30 s header, 60 s per-chunk) bound every call; this cap only
+  /// exists so the client-side guard does not undercut long downloads.
+  static const Duration _builtinFetchRequestTimeout = Duration(minutes: 10);
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
@@ -1212,7 +1218,17 @@ class McpProvider extends ChangeNotifier {
         version: '1.0.0',
         // Turn on library-internal verbose logs
         enableDebugLogging: false,
-        requestTimeout: _requestTimeout,
+        // The global MCP timeout (30 s default) targets network MCP servers.
+        // The built-in in-memory @kelivo/fetch server must NOT be capped by
+        // it: the engine bounds its own work in both modes (text mode: 60 s
+        // total; download mode: 30 s header + 60 s per-chunk timeouts), so
+        // this client-side cap is only a safety net. A tighter cap would
+        // report "Request timed out" while the fetch still completes
+        // in-isolate, leaving a silently-written file the model believes
+        // failed.
+        requestTimeout: server.id == 'kelivo_fetch'
+            ? _builtinFetchRequestTimeout
+            : _requestTimeout,
         logListener: McpLogBridge.onEvent,
         logServerLabel: server.name,
       );

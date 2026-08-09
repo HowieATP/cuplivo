@@ -408,7 +408,8 @@ bool _shouldUseLongCatOmniPayload(
 /// allowlist decides: only providers whose tool-message content arrays have
 /// been verified against a real API are enabled by default (OpenAI official,
 /// OpenRouter, LongCat). Unverified OpenAI-compatible vendors stay on plain
-/// text until a user explicitly opts in. See docs/adr/0017.
+/// text until a user explicitly opts in. See
+/// docs/adr/0016-mcp-image-round-trip-provider-side-parsing.md.
 bool _shouldSendToolResultImages(ProviderConfig config, String modelId) {
   final explicit = config.enableToolResultImages;
   if (explicit != null) return explicit;

@@ -446,6 +446,10 @@ class HttpOAuthClient implements OAuthClient {
 
 /// OAuth token manager with automatic refresh
 class OAuthTokenManager {
+  /// Bounds a token refresh call so a dead/unreachable authorization server
+  /// cannot hang a request or the proactive refresh timer indefinitely.
+  static const Duration _refreshTimeout = Duration(seconds: 15);
+
   final HttpOAuthClient _client;
   OAuthToken? _currentToken;
   Timer? _refreshTimer;
@@ -490,9 +494,9 @@ class OAuthTokenManager {
 
     if (_currentToken?.refreshToken != null) {
       try {
-        final newToken = await _client.refreshToken(
-          refreshToken: _currentToken!.refreshToken!,
-        );
+        final newToken = await _client
+            .refreshToken(refreshToken: _currentToken!.refreshToken!)
+            .timeout(_refreshTimeout);
         // refreshToken() stores the token and fires the persistence hook
         // (onTokenRefresh) — refreshed tokens must reach the host.
         await refreshToken(newToken);
@@ -502,9 +506,9 @@ class OAuthTokenManager {
           e is OAuthError
               ? e
               : OAuthError(
-                  error: 'refresh_failed',
-                  errorDescription: e.toString(),
-                ),
+                error: 'refresh_failed',
+                errorDescription: e.toString(),
+              ),
         );
         rethrow;
       }
@@ -531,9 +535,9 @@ class OAuthTokenManager {
 
     _refreshTimer = Timer(refreshIn, () async {
       try {
-        final newToken = await _client.refreshToken(
-          refreshToken: _currentToken!.refreshToken!,
-        );
+        final newToken = await _client
+            .refreshToken(refreshToken: _currentToken!.refreshToken!)
+            .timeout(_refreshTimeout);
         // refreshToken() stores the token and fires the persistence hook
         // (onTokenRefresh) — refreshed tokens must reach the host.
         await refreshToken(newToken);
@@ -542,9 +546,9 @@ class OAuthTokenManager {
           e is OAuthError
               ? e
               : OAuthError(
-                  error: 'auto_refresh_failed',
-                  errorDescription: e.toString(),
-                ),
+                error: 'auto_refresh_failed',
+                errorDescription: e.toString(),
+              ),
         );
       }
     });

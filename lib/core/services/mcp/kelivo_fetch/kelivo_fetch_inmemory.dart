@@ -74,6 +74,7 @@ Future<mcp.CallToolResult> callFetchTool(
   int? maxLength,
   int? startIndex,
   bool raw = false,
+  String? downloadPath,
 }) async {
   final result = await client.callTool('kelivo_fetch', {
     'url': url,
@@ -81,6 +82,7 @@ Future<mcp.CallToolResult> callFetchTool(
     if (maxLength != null) 'max_length': maxLength,
     if (startIndex != null) 'start_index': startIndex,
     if (raw) 'raw': true,
+    if (downloadPath != null) 'download_path': downloadPath,
   });
   return result;
 }

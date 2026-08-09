@@ -189,6 +189,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubCacheSystem => 'System cache';
 
   @override
+  String get storageSpaceSubCacheTmp => 'Temp files';
+
+  @override
+  String get storageSpaceSubDescAvatarCache =>
+      'Downloaded avatar images; they are re-downloaded automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescOtherCache =>
+      'Temporary data such as notification icons; regenerated automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescSystemCache =>
+      'System-level cache (image decoding, web content, etc.); regenerated as needed.';
+
+  @override
+  String get storageSpaceSubDescTmpCache =>
+      'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.';
+
+  @override
   String get storageSpaceSubLogsFlutter => 'Flutter logs';
 
   @override
@@ -332,13 +351,73 @@ class AppLocalizationsEn extends AppLocalizations {
       'Path does not exist or is not a directory';
 
   @override
-  String get workspaceFilesPageTitle => 'Workspace Files';
+  String mountFilesPageTitle(Object alias) {
+    return 'Files · $alias';
+  }
 
   @override
-  String get workspaceFilesEmpty => 'No workspace files yet';
+  String get mountFilesEmptyDir => 'Empty directory';
 
   @override
-  String get workspaceFilesSortName => 'By name';
+  String get mountFilesUploadButton => 'Upload';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return 'Uploaded $count files';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return 'Failed to upload $name: $error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return 'Skipped $name: the file name is not allowed';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return 'Skipped $name: a file with this name already exists';
+  }
+
+  @override
+  String get mountFilesDownloadButton => 'Download';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return 'Saved $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return 'Failed to download $name: $error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name is too large to download on this device';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name is a binary file — cannot preview';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name is too large to preview';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return 'Failed to read $name: $error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return 'Preview truncated: showing the first lines of $total';
+  }
 
   @override
   String get workspaceFilesDeleteConfirmTitle => 'Delete File';
@@ -1832,6 +1911,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromRikkaHub => 'Import from RikkaHub';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => 'Usage Tutorial';
+
+  @override
+  String get backupPageRikkaHubStep1 =>
+      'After opening the website, tap “Click to Select”.';
+
+  @override
+  String get backupPageRikkaHubStep2 =>
+      'Find your RikkaHub backup and tap Confirm.';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep4 =>
+      'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep5 =>
+      'If you have any issues, join the Cuplivo QQ group to give feedback.';
+
+  @override
   String get backupPageNotSupportedYet => 'Not supported yet';
 
   @override
@@ -2064,6 +2174,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress =>
+      'No LAN address detected (device offline or not connected to a network).';
+
+  @override
   String get lanSyncServerStop => 'Stop Server';
 
   @override
@@ -2073,7 +2187,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPlanSent => 'Sync plan sent. Waiting for zip...';
 
   @override
-  String get lanSyncServerReceived => 'Received zip. Preparing response...';
+  String get lanSyncServerExchanging => 'Exchanging data...';
 
   @override
   String get lanSyncServerDone => 'Exchange complete. Apply and restart.';
@@ -2116,10 +2230,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Devices on the same network can connect (minimum version: v2.2.2).';
 
   @override
-  String get lanSyncFirewallHint =>
-      'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).';
-
-  @override
   String lanSyncPlanToSend(Object count) {
     return '$count conversations to send';
   }
@@ -2144,6 +2254,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return 'Connection failed: $error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => 'Host, port and PIN are required.';
+
+  @override
+  String get lanSyncErrorInvalidPort => 'Invalid port.';
+
+  @override
+  String get lanSyncFirewallAllow => 'Allow in Firewall';
+
+  @override
+  String get lanSyncFirewallAdding => 'Adding firewall rule...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return 'Firewall rule added (inbound TCP port $port).';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed =>
+      'Could not add the firewall rule automatically. Click to add it now (requires administrator).';
 
   @override
   String get lanSyncApplyAndRestart => 'Apply and restart';
@@ -2292,6 +2423,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressContextStartButton => 'Compress';
+
+  @override
+  String get compressContextKeepRecentMessages => 'Keep N';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return 'Keep the most recent $count user messages';
+  }
+
+  @override
+  String get compressContextKeepAllMessages =>
+      'Keeping that many covers all messages — nothing to compress';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return 'Summarize $summarized chars, keep $kept chars verbatim → about $minTokens–$maxTokens tokens (original about $totalTokens tokens)';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
@@ -3132,6 +3286,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpServerEditSheetHeartbeatHint =>
       'If you encounter frequent 429 (rate limit) errors, try increasing this interval.';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => 'Advanced Settings';
 
   @override
   String get mcpServerEditSheetUrlLabel => 'Server URL';
@@ -6385,6 +6542,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get titlePresetUnsavedHint =>
       'Change or select a preset, then tap Save to apply';
+
+  @override
+  String get compressPresetStandard => 'Standard (Default)';
+
+  @override
+  String get compressPresetDetailed => 'Detailed';
+
+  @override
+  String get ocrPresetStandard => 'Standard (Default)';
+
+  @override
+  String get ocrPresetCoordinate => 'Coordinate-precise';
+
+  @override
+  String get promptPresetCustom => 'Custom';
 
   @override
   String get imageCompressionDialogTitle => 'Compress Image';

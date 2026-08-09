@@ -27,8 +27,8 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
+import 'mount_files_page.dart';
 import 'trash_detail_page.dart';
-import 'workspace_files_page.dart';
 import '../../../theme/app_font_weights.dart';
 
 class StorageSpacePage extends StatefulWidget {
@@ -161,6 +161,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubCacheOther;
       case 'system_cache':
         return l10n.storageSpaceSubCacheSystem;
+      case 'tmp_cache':
+        return l10n.storageSpaceSubCacheTmp;
       case 'flutter_logs':
         return l10n.storageSpaceSubLogsFlutter;
       case 'request_logs':
@@ -169,6 +171,21 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubLogsOther;
       default:
         return id;
+    }
+  }
+
+  String? _subDescFor(String id, AppLocalizations l10n) {
+    switch (id) {
+      case 'avatar_cache':
+        return l10n.storageSpaceSubDescAvatarCache;
+      case 'other_cache':
+        return l10n.storageSpaceSubDescOtherCache;
+      case 'system_cache':
+        return l10n.storageSpaceSubDescSystemCache;
+      case 'tmp_cache':
+        return l10n.storageSpaceSubDescTmpCache;
+      default:
+        return null;
     }
   }
 
@@ -305,6 +322,40 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearTmpCache() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceSubCacheTmp;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearTmpCache();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _doClearLogs() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -340,9 +391,24 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   }
 
   Future<void> _openWorkspaceFiles() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const WorkspaceFilesPage()));
+    // The provider's async init is normally done long before the user
+    // reaches this page; fall back to a direct path resolve if not.
+    final navigator = Navigator.of(context);
+    final provider = context.read<FilesystemMountsProvider>();
+    final path =
+        provider.workspaces?.path ??
+        (await AppDirectories.getWorkspacesDirectory()).path;
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) => MountFilesPage(
+          mount: FilesystemMount(
+            alias: FilesystemMountsProvider.workspacesAlias,
+            path: path,
+            readOnly: false,
+          ),
+        ),
+      ),
+    );
     await _refreshReport();
   }
 
@@ -367,6 +433,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           initialReport: report,
           fmtBytes: formatBytes,
           subTitleFor: (id) => _subTitleFor(id, l10n),
+          subDescFor: (id) => _subDescFor(id, l10n),
           refreshReport: _refreshReport,
         ),
       ),
@@ -547,6 +614,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                               title: _titleFor(selectedCat.key, l10n),
                               fmtBytes: formatBytes,
                               subTitleFor: (id) => _subTitleFor(id, l10n),
+                              subDescFor: (id) => _subDescFor(id, l10n),
                               clearing: _clearing,
                               onClearCache: _clearing ? null : _doClearCache,
                               onClearOtherCache: _clearing
@@ -555,6 +623,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                               onClearSystemCache: _clearing
                                   ? null
                                   : _doClearSystemCache,
+                              onClearTmpCache: _clearing
+                                  ? null
+                                  : _doClearTmpCache,
                               onClearLogs: _clearing ? null : _doClearLogs,
                               refreshReport: _refreshReport,
                             ),
@@ -682,6 +753,7 @@ class _StorageCategoryPage extends StatefulWidget {
     required this.initialReport,
     required this.fmtBytes,
     required this.subTitleFor,
+    required this.subDescFor,
     required this.refreshReport,
   });
 
@@ -690,6 +762,7 @@ class _StorageCategoryPage extends StatefulWidget {
   final StorageUsageReport initialReport;
   final String Function(int) fmtBytes;
   final String Function(String) subTitleFor;
+  final String? Function(String) subDescFor;
   final Future<StorageUsageReport?> Function() refreshReport;
 
   @override
@@ -845,6 +918,39 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearTmpCache() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceSubCacheTmp;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearTmpCache();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _clearLogs() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -913,6 +1019,7 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           title: widget.title,
           fmtBytes: widget.fmtBytes,
           subTitleFor: widget.subTitleFor,
+          subDescFor: widget.subDescFor,
           clearing: _clearing,
           onClearCache: (category.key == StorageUsageCategoryKey.cache)
               ? _clearCache
@@ -922,6 +1029,9 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
               : null,
           onClearSystemCache: (category.key == StorageUsageCategoryKey.cache)
               ? _clearSystemCache
+              : null,
+          onClearTmpCache: (category.key == StorageUsageCategoryKey.cache)
+              ? _clearTmpCache
               : null,
           onClearLogs: (category.key == StorageUsageCategoryKey.logs)
               ? _clearLogs
@@ -1121,10 +1231,12 @@ class _CategoryDetail extends StatelessWidget {
     required this.title,
     required this.fmtBytes,
     required this.subTitleFor,
+    required this.subDescFor,
     required this.clearing,
     required this.onClearCache,
     required this.onClearOtherCache,
     required this.onClearSystemCache,
+    required this.onClearTmpCache,
     required this.onClearLogs,
     required this.refreshReport,
   });
@@ -1133,10 +1245,12 @@ class _CategoryDetail extends StatelessWidget {
   final String title;
   final String Function(int) fmtBytes;
   final String Function(String) subTitleFor;
+  final String? Function(String) subDescFor;
   final bool clearing;
   final Future<void> Function({required bool avatarsOnly})? onClearCache;
   final Future<void> Function()? onClearOtherCache;
   final Future<void> Function()? onClearSystemCache;
+  final Future<void> Function()? onClearTmpCache;
   final Future<void> Function()? onClearLogs;
   final Future<void> Function() refreshReport;
 
@@ -1304,6 +1418,19 @@ class _CategoryDetail extends StatelessWidget {
                                     fontWeight: AppFontWeights.semibold,
                                   ),
                                 ),
+                                if (subDescFor(s.id) case final desc?
+                                    when desc.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    desc,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 2),
                                 Text(
                                   '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
@@ -1350,6 +1477,13 @@ class _CategoryDetail extends StatelessWidget {
                               label: l10n.storageSpaceClearButton,
                               enabled: !clearing,
                               onTap: () => onClearSystemCache?.call(),
+                            ),
+                          if (category.key == StorageUsageCategoryKey.cache &&
+                              s.id == 'tmp_cache')
+                            _MiniActionButton(
+                              label: l10n.storageSpaceClearButton,
+                              enabled: !clearing,
+                              onTap: () => onClearTmpCache?.call(),
                             ),
                         ],
                       ),
@@ -2524,6 +2658,12 @@ class _MountsPanel extends StatelessWidget {
     );
   }
 
+  Future<void> _openPreview(BuildContext context, FilesystemMount mount) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => MountFilesPage(mount: mount)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -2577,7 +2717,8 @@ class _MountsPanel extends StatelessWidget {
                 path: m.path,
                 readOnly: m.readOnly,
                 builtin: false,
-                onTap: () => _openEdit(context, provider, existing: m),
+                onTap: () => _openPreview(context, m),
+                onEdit: () => _openEdit(context, provider, existing: m),
                 onDelete: () => _confirmRemove(context, provider, m),
               ),
             ],
@@ -2605,6 +2746,7 @@ class _MountRow extends StatelessWidget {
     required this.readOnly,
     required this.builtin,
     required this.onTap,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -2613,6 +2755,7 @@ class _MountRow extends StatelessWidget {
   final bool readOnly;
   final bool builtin;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   @override
@@ -2675,13 +2818,22 @@ class _MountRow extends StatelessWidget {
               ],
             ),
           ),
-          if (!builtin && onDelete != null)
-            _TactileIconButton(
-              icon: Lucide.Trash2,
-              color: cs.error.withValues(alpha: 0.8),
-              size: 16,
-              onTap: onDelete!,
-            ),
+          if (!builtin) ...[
+            if (onEdit != null)
+              _TactileIconButton(
+                icon: Lucide.Pencil,
+                color: cs.onSurface.withValues(alpha: 0.7),
+                size: 16,
+                onTap: onEdit!,
+              ),
+            if (onDelete != null)
+              _TactileIconButton(
+                icon: Lucide.Trash2,
+                color: cs.error.withValues(alpha: 0.8),
+                size: 16,
+                onTap: onDelete!,
+              ),
+          ],
         ],
       ),
     );

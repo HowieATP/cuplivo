@@ -13,7 +13,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// Reproduces: user_version already advanced while silent migration failures
 /// left columns missing. The schema self-heal (see
-/// docs/adr/0017-schema-self-heal.md) must repair these before Drift INSERTs
+/// docs/adr/0019-schema-self-heal.md) must repair these before Drift INSERTs
 /// run, otherwise inserts crash with "table X has no column named Y".
 ///
 /// Two real-incident shapes:

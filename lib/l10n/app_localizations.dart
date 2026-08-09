@@ -436,6 +436,36 @@ abstract class AppLocalizations {
   /// **'System cache'**
   String get storageSpaceSubCacheSystem;
 
+  /// No description provided for @storageSpaceSubCacheTmp.
+  ///
+  /// In en, this message translates to:
+  /// **'Temp files'**
+  String get storageSpaceSubCacheTmp;
+
+  /// No description provided for @storageSpaceSubDescAvatarCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded avatar images; they are re-downloaded automatically when needed.'**
+  String get storageSpaceSubDescAvatarCache;
+
+  /// No description provided for @storageSpaceSubDescOtherCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary data such as notification icons; regenerated automatically when needed.'**
+  String get storageSpaceSubDescOtherCache;
+
+  /// No description provided for @storageSpaceSubDescSystemCache.
+  ///
+  /// In en, this message translates to:
+  /// **'System-level cache (image decoding, web content, etc.); regenerated as needed.'**
+  String get storageSpaceSubDescSystemCache;
+
+  /// No description provided for @storageSpaceSubDescTmpCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.'**
+  String get storageSpaceSubDescTmpCache;
+
   /// No description provided for @storageSpaceSubLogsFlutter.
   ///
   /// In en, this message translates to:
@@ -676,23 +706,95 @@ abstract class AppLocalizations {
   /// **'Path does not exist or is not a directory'**
   String get storageMountsErrorPathNotFound;
 
-  /// No description provided for @workspaceFilesPageTitle.
+  /// No description provided for @mountFilesPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Workspace Files'**
-  String get workspaceFilesPageTitle;
+  /// **'Files · {alias}'**
+  String mountFilesPageTitle(Object alias);
 
-  /// No description provided for @workspaceFilesEmpty.
+  /// No description provided for @mountFilesEmptyDir.
   ///
   /// In en, this message translates to:
-  /// **'No workspace files yet'**
-  String get workspaceFilesEmpty;
+  /// **'Empty directory'**
+  String get mountFilesEmptyDir;
 
-  /// No description provided for @workspaceFilesSortName.
+  /// No description provided for @mountFilesUploadButton.
   ///
   /// In en, this message translates to:
-  /// **'By name'**
-  String get workspaceFilesSortName;
+  /// **'Upload'**
+  String get mountFilesUploadButton;
+
+  /// No description provided for @mountFilesUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {count} files'**
+  String mountFilesUploaded(Object count);
+
+  /// No description provided for @mountFilesUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload {name}: {error}'**
+  String mountFilesUploadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesUploadNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: the file name is not allowed'**
+  String mountFilesUploadNameInvalid(Object name);
+
+  /// No description provided for @mountFilesUploadConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: a file with this name already exists'**
+  String mountFilesUploadConflict(Object name);
+
+  /// No description provided for @mountFilesDownloadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get mountFilesDownloadButton;
+
+  /// No description provided for @mountFilesDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}'**
+  String mountFilesDownloaded(Object name);
+
+  /// No description provided for @mountFilesDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download {name}: {error}'**
+  String mountFilesDownloadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesDownloadTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to download on this device'**
+  String mountFilesDownloadTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewBinary.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is a binary file — cannot preview'**
+  String mountFilesPreviewBinary(Object name);
+
+  /// No description provided for @mountFilesPreviewTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to preview'**
+  String mountFilesPreviewTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to read {name}: {error}'**
+  String mountFilesPreviewReadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesPreviewTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview truncated: showing the first lines of {total}'**
+  String mountFilesPreviewTruncated(Object total);
 
   /// No description provided for @workspaceFilesDeleteConfirmTitle.
   ///
@@ -3473,6 +3575,54 @@ abstract class AppLocalizations {
   /// **'Import from RikkaHub'**
   String get backupPageImportFromRikkaHub;
 
+  /// No description provided for @backupPageRikkaHubMigrateUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/migrate'**
+  String get backupPageRikkaHubMigrateUrl;
+
+  /// No description provided for @backupPageRikkaHubMigrateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:'**
+  String get backupPageRikkaHubMigrateHint;
+
+  /// No description provided for @backupPageRikkaHubTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageRikkaHubTutorialTitle;
+
+  /// No description provided for @backupPageRikkaHubStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'After opening the website, tap “Click to Select”.'**
+  String get backupPageRikkaHubStep1;
+
+  /// No description provided for @backupPageRikkaHubStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your RikkaHub backup and tap Confirm.'**
+  String get backupPageRikkaHubStep2;
+
+  /// No description provided for @backupPageRikkaHubStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.'**
+  String get backupPageRikkaHubStep3;
+
+  /// No description provided for @backupPageRikkaHubStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.'**
+  String get backupPageRikkaHubStep4;
+
+  /// No description provided for @backupPageRikkaHubStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'If you have any issues, join the Cuplivo QQ group to give feedback.'**
+  String get backupPageRikkaHubStep5;
+
   /// No description provided for @backupPageNotSupportedYet.
   ///
   /// In en, this message translates to:
@@ -3911,6 +4061,12 @@ abstract class AppLocalizations {
   /// **'PIN'**
   String get lanSyncServerPin;
 
+  /// No description provided for @lanSyncNoLanAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No LAN address detected (device offline or not connected to a network).'**
+  String get lanSyncNoLanAddress;
+
   /// No description provided for @lanSyncServerStop.
   ///
   /// In en, this message translates to:
@@ -3929,11 +4085,11 @@ abstract class AppLocalizations {
   /// **'Sync plan sent. Waiting for zip...'**
   String get lanSyncServerPlanSent;
 
-  /// No description provided for @lanSyncServerReceived.
+  /// No description provided for @lanSyncServerExchanging.
   ///
   /// In en, this message translates to:
-  /// **'Received zip. Preparing response...'**
-  String get lanSyncServerReceived;
+  /// **'Exchanging data...'**
+  String get lanSyncServerExchanging;
 
   /// No description provided for @lanSyncServerDone.
   ///
@@ -4013,12 +4169,6 @@ abstract class AppLocalizations {
   /// **'Devices on the same network can connect (minimum version: v2.2.2).'**
   String get lanSyncSecurityNote;
 
-  /// No description provided for @lanSyncFirewallHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If the other device cannot connect (timeout), allow Cuplivo in the Windows Firewall (inbound TCP port 9527).'**
-  String get lanSyncFirewallHint;
-
   /// No description provided for @lanSyncPlanToSend.
   ///
   /// In en, this message translates to:
@@ -4054,6 +4204,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection failed: {error}'**
   String lanSyncErrorConnection(Object error);
+
+  /// No description provided for @lanSyncErrorFieldsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Host, port and PIN are required.'**
+  String get lanSyncErrorFieldsRequired;
+
+  /// No description provided for @lanSyncErrorInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port.'**
+  String get lanSyncErrorInvalidPort;
+
+  /// No description provided for @lanSyncFirewallAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in Firewall'**
+  String get lanSyncFirewallAllow;
+
+  /// No description provided for @lanSyncFirewallAdding.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding firewall rule...'**
+  String get lanSyncFirewallAdding;
+
+  /// No description provided for @lanSyncFirewallRuleAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rule added (inbound TCP port {port}).'**
+  String lanSyncFirewallRuleAdded(Object port);
+
+  /// No description provided for @lanSyncFirewallRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the firewall rule automatically. Click to add it now (requires administrator).'**
+  String get lanSyncFirewallRuleFailed;
 
   /// No description provided for @lanSyncApplyAndRestart.
   ///
@@ -4336,6 +4522,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compress'**
   String get compressContextStartButton;
+
+  /// No description provided for @compressContextKeepRecentMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep N'**
+  String get compressContextKeepRecentMessages;
+
+  /// No description provided for @compressContextKeepCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the most recent {count} user messages'**
+  String compressContextKeepCountLabel(Object count);
+
+  /// No description provided for @compressContextKeepAllMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping that many covers all messages — nothing to compress'**
+  String get compressContextKeepAllMessages;
+
+  /// Keep-recent compression preview: summarized/kept char counts and the estimated result token band
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)'**
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  );
 
   /// No description provided for @bottomToolsSheetLearningMode.
   ///
@@ -5824,6 +6040,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
   String get mcpServerEditSheetHeartbeatHint;
+
+  /// No description provided for @mcpServerEditSheetAdvancedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get mcpServerEditSheetAdvancedLabel;
 
   /// No description provided for @mcpServerEditSheetUrlLabel.
   ///
@@ -11689,6 +11911,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change or select a preset, then tap Save to apply'**
   String get titlePresetUnsavedHint;
+
+  /// No description provided for @compressPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get compressPresetStandard;
+
+  /// No description provided for @compressPresetDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed'**
+  String get compressPresetDetailed;
+
+  /// No description provided for @ocrPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get ocrPresetStandard;
+
+  /// No description provided for @ocrPresetCoordinate.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinate-precise'**
+  String get ocrPresetCoordinate;
+
+  /// No description provided for @promptPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get promptPresetCustom;
 
   /// Title for the image compression dialog
   ///

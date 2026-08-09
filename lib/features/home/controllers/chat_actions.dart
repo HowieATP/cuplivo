@@ -9,6 +9,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/headless_generation_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -970,6 +971,15 @@ class ChatActions {
 
       // Cancel active stream for current conversation only
       ChatApiService.cancelRequest(cid);
+      // Cascading cancellation: a wait-mode sub-agent spawned by this
+      // conversation is cancelled too (fire-and-forget keeps running).
+      // No-op when this conversation has no headless jobs.
+      try {
+        // ignore: use_build_context_synchronously (root context)
+        contextProvider.read<HeadlessGenerationService>().cancel(cid);
+      } catch (e) {
+        debugPrint('[CancelTrace] headless cascade cancel failed: $e');
+      }
       final sub = _conversationStreams.remove(cid);
       try {
         await sub?.cancel();

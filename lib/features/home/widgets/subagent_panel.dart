@@ -1,0 +1,400 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/headless_generation_service.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../services/ask_user_interaction_service.dart';
+import '../services/tool_approval_service.dart';
+
+/// 子代理面板 (subagent panel): transient live-status widget pinned above the
+/// parent conversation's input bar while a wait-mode sub-agent runs.
+///
+/// Collapsed pill ↔ expanded card. Shows phase (思考中/输出中/等待批准), the
+/// child's last step, elapsed time, and [查看子对话]. Auto-expands into an
+/// interactive approval card when the child raises a pending approval/ask_user
+/// request. The ✕ button cancels the sub-agent after a confirmation dialog.
+class SubagentPanel extends StatefulWidget {
+  const SubagentPanel({super.key, this.onOpenChild});
+
+  /// Called with the child conversation id when the user taps 查看子对话 /
+  /// 去回答.
+  final ValueChanged<String>? onOpenChild;
+
+  @override
+  State<SubagentPanel> createState() => _SubagentPanelState();
+}
+
+class _SubagentPanelState extends State<SubagentPanel> {
+  Timer? _ticker;
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_activeJob() == null) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  SubagentJob? _activeJob() {
+    final chatService = context.read<ChatService>();
+    final parentId = chatService.currentConversationId;
+    if (parentId == null) return null;
+    final headlessGen = context.read<HeadlessGenerationService>();
+    for (final job in headlessGen.waitJobsFor(parentId)) {
+      if (job.status == SubagentJobStatus.running) return job;
+    }
+    return null;
+  }
+
+  ToolApprovalRequest? _pendingApproval(SubagentJob job) {
+    final service = context.watch<ToolApprovalService>();
+    for (final req in service.pendingRequests.values) {
+      if (req.conversationId == job.conversationId) return req;
+    }
+    return null;
+  }
+
+  AskUserRequest? _pendingAskUser(SubagentJob job) {
+    final service = context.watch<AskUserInteractionService>();
+    for (final req in service.pendingRequests.values) {
+      if (req.conversationId == job.conversationId) return req;
+    }
+    return null;
+  }
+
+  Future<void> _confirmCancel(SubagentJob job) async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l10n.subagentPanelCancelConfirmTitle),
+        content: Text(l10n.subagentPanelCancelConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(false),
+            child: Text(l10n.subagentPanelCancelConfirmKeep),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(l10n.subagentPanelCancelConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    // Release any pending approval/ask_user the child is suspended on FIRST:
+    // the child's generator is awaiting that completer with no in-flight
+    // HTTP request, so token cancellation alone cannot unwind it.
+    context.read<ToolApprovalService>().cancelForConversation(
+      job.conversationId,
+    );
+    context.read<AskUserInteractionService>().cancelForConversation(
+      job.conversationId,
+    );
+    context.read<HeadlessGenerationService>().cancel(job.conversationId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final job = _activeJob();
+    if (job == null) return const SizedBox.shrink();
+
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? cs.surfaceContainerHighest : cs.surface;
+    final approval = _pendingApproval(job);
+    final askUser = _pendingAskUser(job);
+    final waitingInteraction = approval != null || askUser != null;
+    final forceExpanded = waitingInteraction;
+    final showExpanded = forceExpanded || _expanded;
+
+    final phaseText = waitingInteraction
+        ? l10n.subagentPanelWaitingApproval
+        : job.streamedChars > 0
+        ? l10n.subagentPanelStreaming
+        : l10n.subagentPanelThinking;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IosCardPress(
+            borderRadius: BorderRadius.circular(12),
+            baseColor: base,
+            pressedScale: 0.99,
+            onTap: waitingInteraction
+                ? null
+                : () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CupertinoActivityIndicator(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${job.targetName ?? job.conversationId} ▸ '
+                      '$phaseText${job.streamedChars > 0 ? '… ${job.streamedChars}' : ''}'
+                      ' · ${_formatElapsed(job)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (!waitingInteraction)
+                    Icon(
+                      showExpanded
+                          ? Icons.keyboard_arrow_down
+                          : Icons.keyboard_arrow_up,
+                      size: 18,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  const SizedBox(width: 4),
+                  IosIconButton(
+                    icon: Icons.close,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
+                    semanticLabel: l10n.subagentPanelCancelTooltip,
+                    onTap: () => _confirmCancel(job),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (showExpanded)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: base,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: _buildExpandedBody(context, job, approval, askUser),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandedBody(
+    BuildContext context,
+    SubagentJob job,
+    ToolApprovalRequest? approval,
+    AskUserRequest? askUser,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    final children = <Widget>[];
+    if (approval != null) {
+      children.add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              approval.toolName,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _argsSummary(approval.arguments),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: IosCardPress(
+                    borderRadius: BorderRadius.circular(10),
+                    baseColor: cs.primaryContainer,
+                    onTap: () => context.read<ToolApprovalService>().approve(
+                      approval.toolCallId,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        l10n.subagentPanelApprove,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: IosCardPress(
+                    borderRadius: BorderRadius.circular(10),
+                    baseColor: cs.surfaceContainerHighest,
+                    onTap: () => context.read<ToolApprovalService>().deny(
+                      approval.toolCallId,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        l10n.subagentPanelDeny,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    } else if (askUser != null) {
+      children.add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.subagentPanelAskUserPending,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            IosCardPress(
+              borderRadius: BorderRadius.circular(10),
+              baseColor: cs.primaryContainer,
+              onTap: () => widget.onOpenChild?.call(job.conversationId),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  l10n.subagentPanelAnswerNow,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      if (job.lastStep != null) {
+        children.add(
+          Text(
+            job.lastStepKind == SubagentLastStepKind.call
+                ? l10n.subagentPanelLastStepCall(job.lastStep!)
+                : l10n.subagentPanelLastStepDone(job.lastStep!),
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+        );
+      }
+      children.add(const SizedBox(height: 10));
+      children.add(
+        Row(
+          children: [
+            Expanded(
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(10),
+                baseColor: cs.primaryContainer,
+                onTap: () => widget.onOpenChild?.call(job.conversationId),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    l10n.subagentPanelViewChild,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(10),
+                baseColor: cs.surfaceContainerHighest,
+                onTap: () => _confirmCancel(job),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    l10n.subagentPanelCancelTooltip,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+
+  static String _argsSummary(Map<String, dynamic> args) {
+    final entries = args.entries.map((e) => '${e.key}: ${e.value}').toList();
+    return entries.isEmpty ? '{}' : entries.join('\n');
+  }
+
+  static String _formatElapsed(SubagentJob job) {
+    final d = DateTime.now().difference(job.startedAt);
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final s = d.inSeconds % 60;
+    final mm = m.toString().padLeft(2, '0');
+    final ss = s.toString().padLeft(2, '0');
+    return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+  }
+}

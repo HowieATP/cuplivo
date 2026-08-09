@@ -339,6 +339,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
+  String get storageMountsErrorSyncOverlap => '该文件夹与同步范围重叠（备份/同步目录）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '该文件夹位于当前工作区文件夹内部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '该文件夹不为空——移动工作区文件时请选择空文件夹';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作区位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作区位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '将现有文件移动到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作区位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已将工作区文件移动到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移动工作区文件失败：$error';
+  }
+
+  @override
   String mountFilesPageTitle(Object alias) {
     return '文件 · $alias';
   }
@@ -405,6 +437,25 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String mountFilesPreviewTruncated(Object total) {
     return '预览已截断：仅显示 $total 行中的开头部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '打开';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '打开 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失败：$error';
   }
 
   @override
@@ -7423,6 +7474,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
 
   @override
+  String get storageMountsErrorSyncOverlap => '该文件夹与同步范围重叠（备份/同步目录）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '该文件夹位于当前工作区文件夹内部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '该文件夹不为空——移动工作区文件时请选择空文件夹';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作区位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作区位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '将现有文件移动到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作区位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已将工作区文件移动到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移动工作区文件失败：$error';
+  }
+
+  @override
   String mountFilesPageTitle(Object alias) {
     return '文件 · $alias';
   }
@@ -7489,6 +7572,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String mountFilesPreviewTruncated(Object total) {
     return '预览已截断：仅显示 $total 行中的开头部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '打开';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '打开 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失败：$error';
   }
 
   @override
@@ -14506,6 +14608,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageMountsErrorPathNotFound => '路徑不存在或不是目錄';
 
   @override
+  String get storageMountsErrorSyncOverlap => '該資料夾與同步範圍重疊（備份/同步目錄）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '該資料夾位於目前工作區資料夾內部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '該資料夾不是空的——移動工作區檔案時請選擇空資料夾';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作區位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作區位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '將現有檔案移動到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作區位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已將工作區檔案移動到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移動工作區檔案失敗：$error';
+  }
+
+  @override
   String mountFilesPageTitle(Object alias) {
     return '檔案 · $alias';
   }
@@ -14572,6 +14706,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String mountFilesPreviewTruncated(Object total) {
     return '預覽已截斷：僅顯示 $total 行中的開頭部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '開啟';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '開啟 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失敗：$error';
   }
 
   @override

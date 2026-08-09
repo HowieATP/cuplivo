@@ -706,6 +706,60 @@ abstract class AppLocalizations {
   /// **'Path does not exist or is not a directory'**
   String get storageMountsErrorPathNotFound;
 
+  /// No description provided for @storageMountsErrorSyncOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder overlaps the sync scope (backup/sync folders)'**
+  String get storageMountsErrorSyncOverlap;
+
+  /// No description provided for @storageMountsErrorInsideWorkspaces.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is inside the current workspace folder'**
+  String get storageMountsErrorInsideWorkspaces;
+
+  /// No description provided for @storageMountsErrorDestinationNotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is not empty — choose an empty folder when moving workspace files'**
+  String get storageMountsErrorDestinationNotEmpty;
+
+  /// No description provided for @storageMountsWorkspacesLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace Location'**
+  String get storageMountsWorkspacesLocationTitle;
+
+  /// No description provided for @storageMountsWorkspacesLocationDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Workspace Location'**
+  String get storageMountsWorkspacesLocationDialogTitle;
+
+  /// No description provided for @storageMountsWorkspacesMoveFilesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move existing files to the new location'**
+  String get storageMountsWorkspacesMoveFilesLabel;
+
+  /// No description provided for @storageMountsWorkspacesLocationChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace location changed'**
+  String get storageMountsWorkspacesLocationChanged;
+
+  /// No description provided for @storageMountsWorkspacesMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved workspace files to {path}'**
+  String storageMountsWorkspacesMoved(Object path);
+
+  /// No description provided for @storageMountsWorkspacesMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to move workspace files: {error}'**
+  String storageMountsWorkspacesMoveFailed(Object error);
+
   /// No description provided for @mountFilesPageTitle.
   ///
   /// In en, this message translates to:
@@ -795,6 +849,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preview truncated: showing the first lines of {total}'**
   String mountFilesPreviewTruncated(Object total);
+
+  /// No description provided for @mountFilesMoreButton.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get mountFilesMoreButton;
+
+  /// No description provided for @mountFilesOpenButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get mountFilesOpenButton;
+
+  /// No description provided for @mountFilesShareButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get mountFilesShareButton;
+
+  /// No description provided for @mountFilesOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open {name}: {error}'**
+  String mountFilesOpenFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to share {name}: {error}'**
+  String mountFilesShareFailed(Object error, Object name);
 
   /// No description provided for @workspaceFilesDeleteConfirmTitle.
   ///

@@ -351,6 +351,43 @@ class AppLocalizationsEn extends AppLocalizations {
       'Path does not exist or is not a directory';
 
   @override
+  String get storageMountsErrorSyncOverlap =>
+      'This folder overlaps the sync scope (backup/sync folders)';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces =>
+      'This folder is inside the current workspace folder';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      'This folder is not empty — choose an empty folder when moving workspace files';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => 'Workspace Location';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle =>
+      'Change Workspace Location';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel =>
+      'Move existing files to the new location';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged =>
+      'Workspace location changed';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return 'Moved workspace files to $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return 'Failed to move workspace files: $error';
+  }
+
+  @override
   String mountFilesPageTitle(Object alias) {
     return 'Files · $alias';
   }
@@ -417,6 +454,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String mountFilesPreviewTruncated(Object total) {
     return 'Preview truncated: showing the first lines of $total';
+  }
+
+  @override
+  String get mountFilesMoreButton => 'More';
+
+  @override
+  String get mountFilesOpenButton => 'Open';
+
+  @override
+  String get mountFilesShareButton => 'Share';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return 'Failed to open $name: $error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return 'Failed to share $name: $error';
   }
 
   @override

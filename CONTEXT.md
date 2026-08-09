@@ -48,10 +48,13 @@
 ## Input Draft Persistence
 
 - **InputDraftPersistence**: `lib/features/home/services/input_draft_persistence.dart`. Owns debounced (800ms) writes + lifecycle immediate save of chat input draft via `SharedPreferences`.
-- **Scope**: Single global draft (`chat_draft_v1` key). Not per-conversation — the input is shared across conversations.
+- **Scope**: Single global draft (`chat_draft_v1` key). Not per-conversation — the input is shared across conversations. Applies to the normal chat input bar ONLY: a `ChatInputMode.groupChat` bar neither saves nor restores (group chat is a distinct surface; its composer stays draft-free).
 - **Persistence**: JSON blob with `{text, images[], documents[{path,fileName,mime}]}`.
 - **Restore**: On cold start only, in `_ChatInputBarState._restoreDraft()`. Sets `TextEditingController.text` + media lists.
-- **Clear**: On send success or when input is fully empty. Debounce skips empty content.
+- **Synchronous preload (no restore race)**: The draft is preloaded in `main()` (right after the existing `SharedPreferences.getInstance()` await, same pattern as `SkillManager.initRoot`), so `_restoreDraft()` at input-bar mount is fully synchronous — the event loop cannot deliver user input before the first frame, so "user typed before the draft restored" is impossible. Deliberately NO overwrite-confirm dialog exists (a lazy async read would create the race; preload eliminates it). Restore fires ONCE per process — a desktop window recreate is NOT a cold start and never re-restores.
+- **Local-only (backup/sync excluded)**: `chat_draft_v1` is registered in `SharedPreferencesAsync._localOnlyKeys` (`data_sync.dart`) — the draft never leaves the device via settings backup/restore or LAN sync. A backup restored on another device never resurrects a stale draft, and sync peers never overwrite each other's drafts.
+- **Clear**: IMMEDIATE (not debounced) on `ChatInputSubmissionResult.sent` AND `.queued` — the content has moved to the conversation or the queue, and a debounced clear would resurrect the draft if the process dies within 800ms of sending. `rejected` does NOT clear (the bar keeps its content, the debounce keeps writing). Also cleared when the input becomes fully empty (whitespace-only text counts as empty) — the debounced writer removes the key rather than storing empty content. **Best-effort guarantee**: the underlying SharedPreferences writes are async fire-and-forget (platform channel + native disk write), so a kill inside the write window can still leave a stale key — the "no resurrection" property minimizes the window, it is not absolute.
+- **Edit-mode & queued-cancel interplay**: the draft mirrors the bar content at all times. Entering user-message edit mode replaces the bar content, so the persisted draft becomes the message content being edited (a kill mid-edit restores that content as input next start; exiting edit always clears). Cancelling a queued send restores the content into the bar, which re-drafts it. Both are consequences of the "always in sync" contract, not special cases.
 
 ## App Update Notice (新版本提示)
 

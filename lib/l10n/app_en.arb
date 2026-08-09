@@ -228,6 +228,11 @@
   "storageSpaceComputeRefs": "Compute refs",
   "storageSpaceLocateTitle": "Referenced by",
   "storageSpaceDeleteRefWarning": "{count} files are referenced by messages — deleting will break their display",
+  "storageSpaceDeleteDraftWarning": "{count} files are still referenced by your unsaved draft",
+  "@storageSpaceDeleteDraftWarning": {
+    "description": "Storage delete guardrail: selected files are still referenced by the unsent input draft",
+    "placeholders": {"count": {"type": "int"}}
+  },
   "@storageSpaceDeleteRefWarning": {
     "placeholders": {
       "count": {

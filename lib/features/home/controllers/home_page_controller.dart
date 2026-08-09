@@ -854,6 +854,7 @@ class HomePageController extends ChangeNotifier {
       selection: TextSelection.collapsed(offset: text.length),
       composing: TextRange.empty,
     );
+    _mediaController.syncDraft();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_context.mounted) return;
       _inputFocus.requestFocus();
@@ -2040,6 +2041,7 @@ class HomePageController extends ChangeNotifier {
     final prompt = _resolveSynthesizePrompt(l10n, task.defaultPromptKey);
     _inputController.text = prompt;
     _inputController.selection = TextSelection.collapsed(offset: prompt.length);
+    _mediaController.syncDraft();
 
     notifyListeners();
   }
@@ -2364,6 +2366,7 @@ class HomePageController extends ChangeNotifier {
       ),
       composing: TextRange.empty,
     );
+    _mediaController.syncDraft();
     notifyListeners();
   }
 
@@ -2382,6 +2385,7 @@ class HomePageController extends ChangeNotifier {
       selection: TextSelection.collapsed(offset: insertPos + quoted.length),
       composing: TextRange.empty,
     );
+    _mediaController.syncDraft();
     _inputFocus.requestFocus();
     notifyListeners();
   }

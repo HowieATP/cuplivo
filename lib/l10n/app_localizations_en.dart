@@ -494,6 +494,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '$count files are still referenced by your unsaved draft';
+  }
+
+  @override
   String get storageSpaceAiGenerated => 'AI generated';
 
   @override

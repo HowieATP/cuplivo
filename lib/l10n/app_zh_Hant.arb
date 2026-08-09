@@ -134,6 +134,7 @@
   "storageSpaceComputeRefs": "計算引用",
   "storageSpaceLocateTitle": "引用此檔案的消息",
   "storageSpaceDeleteRefWarning": "其中 {count} 個檔案被訊息引用——刪除後將無法顯示",
+  "storageSpaceDeleteDraftWarning": "其中 {count} 個檔案仍被未發送的草稿引用",
   "storageSpaceAiGenerated": "AI 生成",
   "storageSpaceMarkdownRefLimitation": "註：不統計 Markdown 格式引用的本地圖片。images/ 下的 AI 生成圖片顯示為「AI 生成」——請勿誤刪。",
   "settingsPageAboutSection": "關於",

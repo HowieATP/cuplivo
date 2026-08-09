@@ -481,6 +481,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 个文件仍被未发送的草稿引用';
+  }
+
+  @override
   String get storageSpaceAiGenerated => 'AI 生成';
 
   @override
@@ -7565,6 +7570,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 个文件仍被未发送的草稿引用';
+  }
+
+  @override
   String get storageSpaceAiGenerated => 'AI 生成';
 
   @override
@@ -14645,6 +14655,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String storageSpaceDeleteRefWarning(int count) {
     return '其中 $count 個檔案被訊息引用——刪除後將無法顯示';
+  }
+
+  @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 個檔案仍被未發送的草稿引用';
   }
 
   @override

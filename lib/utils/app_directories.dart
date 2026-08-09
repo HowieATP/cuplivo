@@ -104,15 +104,24 @@ class AppDirectories {
   static Future<bool> _isSafeWorkspacesLocation(String path) async {
     final trimmed = path.trim();
     if (trimmed.isEmpty || !_looksAbsolute(trimmed)) return false;
-    final canon = canonPath(trimmed);
-    if (canon == '/' || (canon.length <= 3 && canon.endsWith('/'))) {
-      return false;
-    }
+    if (isFilesystemRootPath(trimmed)) return false;
     final roots = await getSyncRootPaths(includeWorkspaces: false);
     for (final r in roots) {
       if (pathsOverlap(trimmed, r)) return false;
     }
     return true;
+  }
+
+  /// True when [path] canonicalizes to a filesystem root. Platform trap: a
+  /// drive root normalizes differently per platform — Windows keeps the
+  /// trailing slash (`C:/`), POSIX strips it to a bare drive letter (`C:`)
+  /// — so both forms must be recognized (and a bare letter drive is exactly
+  /// what a Windows restore value becomes on a POSIX host).
+  static bool isFilesystemRootPath(String path) {
+    final canon = canonPath(path);
+    return canon == '/' ||
+        (canon.length <= 3 && canon.endsWith('/')) ||
+        RegExp(r'^[a-zA-Z]:$').hasMatch(canon);
   }
 
   static bool _looksAbsolute(String path) {

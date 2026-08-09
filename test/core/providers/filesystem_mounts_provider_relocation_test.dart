@@ -65,6 +65,19 @@ void main() {
       expect(AppDirectories.pathsOverlap('C:/', 'C:/appdata/upload'), isTrue);
       expect(AppDirectories.pathsOverlap('D:/', 'C:/appdata/upload'), isFalse);
     });
+
+    test('isFilesystemRootPath recognizes roots in both canonical forms', () {
+      // 'C:/' — the Windows-normalized drive root (trailing slash kept).
+      // 'C:'  — the same path after POSIX normalization (slash stripped).
+      // The load-time guard must reject both or a restored pref slips
+      // through on the other platform.
+      expect(AppDirectories.isFilesystemRootPath('C:/'), isTrue);
+      expect(AppDirectories.isFilesystemRootPath('C:'), isTrue);
+      expect(AppDirectories.isFilesystemRootPath('c:'), isTrue);
+      expect(AppDirectories.isFilesystemRootPath('/'), isTrue);
+      expect(AppDirectories.isFilesystemRootPath('C:/Users'), isFalse);
+      expect(AppDirectories.isFilesystemRootPath('/tmp/x'), isFalse);
+    });
   });
 
   group('setWorkspacesLocation validation', () {

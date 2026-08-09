@@ -26,6 +26,7 @@ import '../../../utils/platform_utils.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
 import '../../chat/pages/image_viewer_page.dart';
+import '../../home/services/input_draft_persistence.dart';
 import 'log_viewer_page.dart';
 import 'mount_files_page.dart';
 import 'trash_detail_page.dart';
@@ -1651,9 +1652,19 @@ class _UploadManagerState extends State<_UploadManager> {
         ? _selected.where((p) => _refCountFor(p) > 0).length
         : 0;
     final hasRefs = refCount > 0;
-    final content = hasRefs
+    final draftFiles = context
+        .read<InputDraftPersistence>()
+        .draftReferencedFiles();
+    final draftHitCount = _selected.where(draftFiles.contains).length;
+    var content = hasRefs
         ? '${l10n.storageSpaceDeleteUploadsConfirmMessage(count)}\n\n${l10n.storageSpaceDeleteRefWarning(refCount)}'
         : l10n.storageSpaceDeleteSimpleConfirm(count);
+    // Deletion guardrail: warn (but do not block) when the selected files
+    // are still referenced by the unsent input draft.
+    if (draftHitCount > 0) {
+      content =
+          '$content\n\n${l10n.storageSpaceDeleteDraftWarning(draftHitCount)}';
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {

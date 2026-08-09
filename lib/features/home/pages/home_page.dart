@@ -750,6 +750,7 @@ class _HomePageState extends State<HomePage>
       selection: TextSelection.collapsed(offset: start + trimmed.length),
       composing: TextRange.empty,
     );
+    _mediaController.syncDraft();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _controller.forceScrollToBottomSoon(animate: false);

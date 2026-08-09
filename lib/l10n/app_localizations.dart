@@ -910,6 +910,12 @@ abstract class AppLocalizations {
   /// **'{count} files are referenced by messages — deleting will break their display'**
   String storageSpaceDeleteRefWarning(int count);
 
+  /// Storage delete guardrail: selected files are still referenced by the unsent input draft
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files are still referenced by your unsaved draft'**
+  String storageSpaceDeleteDraftWarning(int count);
+
   /// No description provided for @storageSpaceAiGenerated.
   ///
   /// In en, this message translates to:

@@ -1184,6 +1184,18 @@ class ChatDatabaseRepository {
     }
   }
 
+  /// Tri-state bool read: null stays null (missing column or SQL NULL);
+  /// legacy columns are INTEGER 0/1.
+  static bool? _readOptionalBool(sqlite.Row row, String column) {
+    try {
+      final value = row[column];
+      if (value == null) return null;
+      return value == 1;
+    } catch (_) {
+      return null;
+    }
+  }
+
   ConversationRowsCompanion _conversationCompanion(Conversation conversation) {
     return ConversationRowsCompanion.insert(
       id: conversation.id,
@@ -1229,6 +1241,8 @@ class ChatDatabaseRepository {
       durationMs: row.durationMs,
       isPreset: row.isPreset,
       speakerAssistantId: row.speakerAssistantId,
+      requestAllowImagesApiRouting: row.requestAllowImagesApiRouting,
+      requestExtraBodyJson: row.requestExtraBodyJson,
     );
   }
 
@@ -1262,6 +1276,11 @@ class ChatDatabaseRepository {
       durationMs: row['duration_ms'] as int?,
       isPreset: row['is_preset'] == 1,
       speakerAssistantId: _readOptionalString(row, 'speaker_assistant_id'),
+      requestAllowImagesApiRouting: _readOptionalBool(
+        row,
+        'request_allow_images_api_routing',
+      ),
+      requestExtraBodyJson: _readOptionalString(row, 'request_extra_body_json'),
     );
   }
 
@@ -1307,6 +1326,8 @@ class ChatDatabaseRepository {
       durationMs: Value(message.durationMs),
       isPreset: Value(message.isPreset),
       speakerAssistantId: Value(message.speakerAssistantId),
+      requestAllowImagesApiRouting: Value(message.requestAllowImagesApiRouting),
+      requestExtraBodyJson: Value(message.requestExtraBodyJson),
       messageOrder: messageOrder,
     );
   }

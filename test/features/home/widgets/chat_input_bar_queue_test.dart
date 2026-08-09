@@ -1,6 +1,7 @@
 import 'package:Cuplivo/core/models/chat_input_data.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/features/group_chat/models/chat_input_mode.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
@@ -32,6 +33,7 @@ void main() {
     bool backgroundImageActive = false,
     double inputBackgroundOpacityLight = 0.8236,
     double inputBackgroundOpacityDark = 0.7396,
+    ChatInputMode mode = ChatInputMode.normal,
   }) {
     return MultiProvider(
       providers: [
@@ -65,6 +67,7 @@ void main() {
             backgroundImageActive: backgroundImageActive,
             inputBackgroundOpacityLight: inputBackgroundOpacityLight,
             inputBackgroundOpacityDark: inputBackgroundOpacityDark,
+            mode: mode,
           ),
         ),
       ),
@@ -190,7 +193,7 @@ void main() {
       ),
     );
     await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
-    ChatInputData? submitted;
+    final submissions = <ChatInputData>[];
 
     await tester.pumpWidget(
       buildHarness(
@@ -199,13 +202,19 @@ void main() {
         mediaController: mediaController,
         settingsProvider: settings,
         onSend: (input) async {
-          submitted = input;
+          submissions.add(input);
           return ChatInputSubmissionResult.rejected;
         },
       ),
     );
 
     expect(find.text('Image mode'), findsOneWidget);
+
+    await tapSendButton(tester);
+
+    expect(submissions.single.text, 'draw a cat');
+    expect(submissions.single.allowImagesApiRouting, isTrue);
+    expect(submissions.single.extraBody, isEmpty);
 
     await tester.tap(find.byIcon(Lucide.X));
     await tester.pumpAndSettle();
@@ -215,8 +224,208 @@ void main() {
 
     await tapSendButton(tester);
 
-    expect(submitted?.text, 'draw a cat');
+    expect(submissions.last.text, 'draw a cat');
+    expect(submissions.last.allowImagesApiRouting, isFalse);
+    expect(submissions.last.extraBody, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('恢复排队输入时会恢复图片路由开关状态', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final settings = SettingsProvider();
+    await settings.setProviderConfig(
+      'OpenAITest',
+      ProviderConfig(
+        id: 'OpenAITest',
+        enabled: true,
+        name: 'OpenAITest',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+      ),
+    );
+    await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settingsProvider: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(find.text('Image mode'), findsOneWidget);
+    expect(mediaController.allowImagesApiRouting, isTrue);
+
+    mediaController.restoreInput(
+      const ChatInputData(text: 'draw a cat', allowImagesApiRouting: false),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Image mode'), findsNothing);
+    expect(mediaController.allowImagesApiRouting, isFalse);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('恢复队列时不为非绘图模型恢复图片路由', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    expect(find.text('Image mode'), findsNothing);
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'draw a cat',
+        allowImagesApiRouting: true,
+        extraBody: {'quality': 'low'},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(mediaController.allowImagesApiRouting, isFalse);
+
+    await tapSendButton(tester);
+
     expect(submitted?.allowImagesApiRouting, isFalse);
+    expect(submitted?.extraBody, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('恢复队列的标志只影响恢复后的第一次发送', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final submissions = <ChatInputData>[];
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submissions.add(input);
+          return ChatInputSubmissionResult.sent;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(text: 'draw a cat', allowImagesApiRouting: true),
+    );
+    await tester.pumpAndSettle();
+
+    await tapSendButton(tester);
+
+    expect(submissions, hasLength(1));
+    expect(submissions.first.allowImagesApiRouting, isFalse);
+
+    // The send path clears the input on success; refill via real input
+    // (programmatic controller.text does not fire onChanged, so the outer
+    // build — and the send button's enabled state — would stay stale).
+    await tester.enterText(find.byType(TextField), 'draw a cat');
+    await tester.pump();
+
+    await tapSendButton(tester);
+
+    expect(submissions, hasLength(2));
+    expect(submissions.last.allowImagesApiRouting, isTrue);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('恢复标志在用户改动输入后失效', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final submissions = <ChatInputData>[];
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submissions.add(input);
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(text: 'draw a cat', allowImagesApiRouting: true),
+    );
+    await tester.pumpAndSettle();
+
+    // A rejected send does not consume the flag...
+    await tapSendButton(tester);
+    expect(submissions.last.allowImagesApiRouting, isFalse);
+
+    // ...but user typing is a NEW input: the flag no longer applies.
+    await tester.enterText(find.byType(TextField), 'draw a dog');
+    await tester.pump();
+
+    await tapSendButton(tester);
+    expect(submissions.last.allowImagesApiRouting, isTrue);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('群聊输入栏不显示生图参数面板按钮', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final settings = SettingsProvider();
+    await settings.setProviderConfig(
+      'OpenAITest',
+      ProviderConfig(
+        id: 'OpenAITest',
+        enabled: true,
+        name: 'OpenAITest',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+      ),
+    );
+    await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        settingsProvider: settings,
+        mode: ChatInputMode.groupChat,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    // Image mode itself is active (the model supports it) but group chat
+    // never consumes generation options — the palette must be hidden.
+    expect(find.byIcon(Lucide.Palette), findsNothing);
 
     controller.dispose();
     focusNode.dispose();

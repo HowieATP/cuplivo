@@ -74,6 +74,12 @@ class MessageRows extends Table {
   /// Speaker assistant id for group chats; null for user messages / 1:1.
   TextColumn get speakerAssistantId => text().nullable()();
 
+  /// Per-request routing/body metadata persisted on the originating user
+  /// message (schema v15) so regenerate can replay image-mode routing and
+  /// image generation options. See docs/adr/0018-per-message-request-metadata.md.
+  BoolColumn get requestAllowImagesApiRouting => boolean().nullable()();
+  TextColumn get requestExtraBodyJson => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -363,7 +369,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0017-schema-self-heal.md.
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -510,6 +516,16 @@ class AppDatabase extends _$AppDatabase {
       'message_rows',
       'speaker_assistant_id',
       'ALTER TABLE message_rows ADD COLUMN speaker_assistant_id TEXT NULL',
+    );
+    await _ensureColumn(
+      'message_rows',
+      'request_allow_images_api_routing',
+      'ALTER TABLE message_rows ADD COLUMN request_allow_images_api_routing INTEGER NULL',
+    );
+    await _ensureColumn(
+      'message_rows',
+      'request_extra_body_json',
+      'ALTER TABLE message_rows ADD COLUMN request_extra_body_json TEXT NULL',
     );
 
     // --- conversation_rows ---
@@ -699,6 +715,27 @@ class AppDatabase extends _$AppDatabase {
         // The Director session is ephemeral (rebuilt from the public
         // transcript); the v13 table is unused by the live flow.
         await customStatement('DROP TABLE IF EXISTS director_message_rows');
+      }
+      if (from < 15) {
+        // Per-message request metadata for image-mode routing + image
+        // generation options replay on regenerate. See
+        // docs/adr/0018-per-message-request-metadata.md.
+        try {
+          await migrator.addColumn(
+            messageRows,
+            messageRows.requestAllowImagesApiRouting,
+          );
+        } catch (_) {
+          // column may already exist on migration replay
+        }
+        try {
+          await migrator.addColumn(
+            messageRows,
+            messageRows.requestExtraBodyJson,
+          );
+        } catch (_) {
+          // column may already exist on migration replay
+        }
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

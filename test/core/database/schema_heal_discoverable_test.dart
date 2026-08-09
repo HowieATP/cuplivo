@@ -131,6 +131,43 @@ void main() {
       await repo.close();
     },
   );
+
+  test('heal adds per-message request metadata on a v15 DB missing it '
+      '(v15 incident shape)', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 15,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingV15RequestMetadata: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    // Must succeed: heal adds request_allow_images_api_routing /
+    // request_extra_body_json before the Drift INSERT, and the metadata
+    // must round-trip through the repository mapper.
+    final conv = Conversation(title: 'Conv', assistantId: 'a1');
+    await repo.putConversation(conv);
+    await repo.putMessage(
+      ChatMessage(
+        role: 'user',
+        content: 'draw a cat',
+        conversationId: conv.id,
+        requestAllowImagesApiRouting: false,
+        requestExtraBodyJson: '{"quality":"high","n":2}',
+      ),
+    );
+
+    final rows = await repo.db.select(repo.db.messageRows).get();
+    expect(rows, hasLength(1));
+    final loaded = await repo.getMessage(rows.first.id);
+    expect(loaded?.requestAllowImagesApiRouting, isFalse);
+    expect(loaded?.requestExtraBody, {'quality': 'high', 'n': 2});
+
+    await repo.close();
+  });
 }
 
 /// Builds a v13-era DB shape (assistant/conversation/message tables only —
@@ -142,6 +179,7 @@ void _createLegacyDb(
   required int userVersion,
   required bool missingIsPreset,
   required bool missingHandoffColumns,
+  bool missingV15RequestMetadata = false,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -219,6 +257,12 @@ CREATE TABLE conversation_rows (
       : '''
   is_preset INTEGER NOT NULL DEFAULT 0,
 ''';
+  final v15Columns = missingV15RequestMetadata
+      ? ''
+      : '''
+  request_allow_images_api_routing INTEGER NULL,
+  request_extra_body_json TEXT NULL,
+''';
   raw.execute('''
 CREATE TABLE message_rows (
   id TEXT NOT NULL PRIMARY KEY,
@@ -244,6 +288,7 @@ CREATE TABLE message_rows (
   duration_ms INTEGER NULL,
   message_order INTEGER NOT NULL,
   $isPresetColumn
+  $v15Columns
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );
 ''');

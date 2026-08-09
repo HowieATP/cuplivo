@@ -1258,6 +1258,13 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  /// Encode a request body map for persistence; an empty map means "no
+  /// options" and clears the field (null), never stores `{}`.
+  static String? _encodeRequestExtraBody(Map<String, dynamic>? body) {
+    if (body == null || body.isEmpty) return null;
+    return jsonEncode(body);
+  }
+
   Future<void> updateMessage(
     String messageId, {
     String? content,
@@ -1275,6 +1282,8 @@ class ChatService extends ChangeNotifier {
     Object? groupId = ChatMessage.sentinel,
     Object? subgroupId = ChatMessage.sentinel,
     Object? version = ChatMessage.sentinel,
+    Object? requestAllowImagesApiRouting = ChatMessage.sentinel,
+    Object? requestExtraBody = ChatMessage.sentinel,
   }) async {
     if (!_initialized) return;
 
@@ -1299,6 +1308,13 @@ class ChatService extends ChangeNotifier {
       groupId: groupId,
       subgroupId: subgroupId,
       version: version,
+      requestAllowImagesApiRouting:
+          identical(requestAllowImagesApiRouting, ChatMessage.sentinel)
+          ? message.requestAllowImagesApiRouting
+          : requestAllowImagesApiRouting as bool?,
+      requestExtraBodyJson: identical(requestExtraBody, ChatMessage.sentinel)
+          ? message.requestExtraBodyJson
+          : _encodeRequestExtraBody(requestExtraBody as Map<String, dynamic>?),
     );
 
     if (isTemporaryConversation(message.conversationId)) {
@@ -1308,7 +1324,6 @@ class ChatService extends ChangeNotifier {
     }
 
     await _repo.updateMessage(updatedMessage);
-
     // Update streaming tracking for crash-recovery
     if (isStreaming == false) {
       _untrackStreamingId(messageId);
@@ -1532,6 +1547,8 @@ class ChatService extends ChangeNotifier {
         translation: src.translation,
         reasoningSegmentsJson: src.reasoningSegmentsJson,
         isPreset: src.isPreset,
+        requestAllowImagesApiRouting: src.requestAllowImagesApiRouting,
+        requestExtraBodyJson: src.requestExtraBodyJson,
       );
       await _repo.putMessage(clone, messageOrder: ids.length);
       ids.add(clone.id);
@@ -1588,6 +1605,8 @@ class ChatService extends ChangeNotifier {
       groupId: gid,
       version: nextVersion,
       speakerAssistantId: original.speakerAssistantId,
+      requestAllowImagesApiRouting: original.requestAllowImagesApiRouting,
+      requestExtraBodyJson: original.requestExtraBodyJson,
     );
     // Append to conversation order at the end (we'll group when rendering)
     if (_draftConversations.containsKey(cid)) {

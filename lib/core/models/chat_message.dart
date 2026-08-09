@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:uuid/uuid.dart';
 
 class ChatMessage {
@@ -59,6 +61,29 @@ class ChatMessage {
   /// AssistantPrivateContextBuilder._collapseVersions — change both together.
   final String? speakerAssistantId;
 
+  // Per-request routing/body metadata persisted on the originating user
+  // message so regenerate/continue can replay how the request was sent
+  // (image-mode routing + image generation options). See
+  // docs/adr/0018-per-message-request-metadata.md.
+  final bool? requestAllowImagesApiRouting;
+
+  final String? requestExtraBodyJson;
+
+  Map<String, dynamic> get requestExtraBody {
+    final raw = requestExtraBodyJson?.trim();
+    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.cast<String, dynamic>();
+      }
+    } catch (_) {
+      // Malformed metadata is treated as absent; regenerate falls back to
+      // current defaults. Never throw on bad historical rows.
+    }
+    return const <String, dynamic>{};
+  }
+
   factory ChatMessage({
     String? id,
     required String role,
@@ -83,6 +108,8 @@ class ChatMessage {
     int? durationMs,
     bool isPreset = false,
     String? speakerAssistantId,
+    bool? requestAllowImagesApiRouting,
+    String? requestExtraBodyJson,
   }) {
     final resolvedId = id ?? const Uuid().v4();
     return ChatMessage._(
@@ -109,6 +136,8 @@ class ChatMessage {
       durationMs: durationMs,
       isPreset: isPreset,
       speakerAssistantId: speakerAssistantId,
+      requestAllowImagesApiRouting: requestAllowImagesApiRouting,
+      requestExtraBodyJson: requestExtraBodyJson,
     );
   }
 
@@ -136,6 +165,8 @@ class ChatMessage {
     this.durationMs,
     this.isPreset = false,
     this.speakerAssistantId,
+    this.requestAllowImagesApiRouting,
+    this.requestExtraBodyJson,
   });
 
   // Sentinel for copyWith — not passed vs explicitly null.
@@ -165,6 +196,8 @@ class ChatMessage {
     Object? durationMs = sentinel,
     Object? isPreset = sentinel,
     Object? speakerAssistantId = sentinel,
+    Object? requestAllowImagesApiRouting = sentinel,
+    Object? requestExtraBodyJson = sentinel,
   }) {
     return ChatMessage(
       id: identical(id, sentinel) ? this.id : id as String,
@@ -224,6 +257,13 @@ class ChatMessage {
       speakerAssistantId: identical(speakerAssistantId, sentinel)
           ? this.speakerAssistantId
           : speakerAssistantId as String?,
+      requestAllowImagesApiRouting:
+          identical(requestAllowImagesApiRouting, sentinel)
+          ? this.requestAllowImagesApiRouting
+          : requestAllowImagesApiRouting as bool?,
+      requestExtraBodyJson: identical(requestExtraBodyJson, sentinel)
+          ? this.requestExtraBodyJson
+          : requestExtraBodyJson as String?,
     );
   }
 
@@ -252,6 +292,8 @@ class ChatMessage {
       'durationMs': durationMs,
       'isPreset': isPreset,
       'speakerAssistantId': speakerAssistantId,
+      'requestAllowImagesApiRouting': requestAllowImagesApiRouting,
+      'requestExtraBodyJson': requestExtraBodyJson,
     };
   }
 
@@ -284,6 +326,9 @@ class ChatMessage {
       durationMs: json['durationMs'] as int?,
       isPreset: json['isPreset'] as bool? ?? false,
       speakerAssistantId: json['speakerAssistantId'] as String?,
+      requestAllowImagesApiRouting:
+          json['requestAllowImagesApiRouting'] as bool?,
+      requestExtraBodyJson: json['requestExtraBodyJson'] as String?,
     );
   }
 }

@@ -2725,6 +2725,7 @@
   "subagentPanelDeny": "拒绝",
   "subagentPanelAskUserPending": "需要您的回答",
   "subagentPanelAnswerNow": "去回答",
+  "subagentPanelToolCalls": "{count, plural, =0{0 次工具调用} =1{1 次工具调用} other{{count} 次工具调用}}",
   "groupChatMyGroupChats": "我的群聊",
   "groupChatCreate": "新建群聊",
   "groupChatDefaultName": "群聊",

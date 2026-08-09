@@ -3275,6 +3275,7 @@
   "subagentPanelDeny": "Deny",
   "subagentPanelAskUserPending": "Your answer is needed",
   "subagentPanelAnswerNow": "Answer now",
+  "subagentPanelToolCalls": "{count, plural, =0{0 tool calls} =1{1 tool call} other{{count} tool calls}}",
   "groupChatMyGroupChats": "My group chats",
   "groupChatCreate": "New group chat",
   "groupChatDefaultName": "Group chat",

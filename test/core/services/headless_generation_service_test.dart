@@ -10,7 +10,18 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 
 class _FakeChatService extends ChatService {
   final messagesByConversation = <String, List<ChatMessage>>{};
+  final toolEventsByMessage = <String, List<Map<String, dynamic>>>{};
   int _nextMessageId = 1;
+
+  @override
+  Future<void> setToolEvents(
+    String assistantMessageId,
+    List<Map<String, dynamic>> events,
+  ) async {
+    toolEventsByMessage[assistantMessageId] = List<Map<String, dynamic>>.of(
+      events,
+    );
+  }
 
   @override
   Future<ChatMessage> addMessage({
@@ -68,6 +79,7 @@ class _FakeChatService extends ChatService {
             content: content,
             totalTokens: totalTokens,
             isStreaming: isStreaming,
+            reasoningText: reasoningText,
           );
         }
       }
@@ -217,6 +229,75 @@ void main() {
       final job = service.jobFor('child-1');
       expect(job!.lastStep, 'kelivo_read');
       expect(job.lastStepKind, SubagentLastStepKind.done);
+      expect(job.toolCallCount, 1);
+    });
+
+    test(
+      'tool events are persisted so tool cards render after completion',
+      () async {
+        await startChild(id: 'child-1', parent: 'parent-1');
+        final future = service.waitFor('child-1');
+
+        pumpChunk(
+          'child-1',
+          'answer',
+          calls: [
+            ToolCallInfo(id: 'call-1', name: 'kelivo_read', arguments: {}),
+            ToolCallInfo(id: 'call-2', name: 'kelivo_write', arguments: {}),
+          ],
+        );
+        pumpChunk(
+          'child-1',
+          '',
+          results: [
+            ToolResultInfo(
+              id: 'call-1',
+              name: 'kelivo_read',
+              arguments: {},
+              content: 'file content',
+            ),
+          ],
+        );
+        await closeStream('child-1');
+        await future;
+
+        final mid = service.jobFor('child-1')!.assistantMessageId!;
+        final events = chatService.toolEventsByMessage[mid]!;
+        expect(events.length, 2);
+        final byId = {for (final e in events) e['id'] as String: e};
+        expect(byId['call-1']!['content'], 'file content');
+        expect(byId['call-2']!['content'], isNull);
+        expect(byId['call-2']!['name'], 'kelivo_write');
+      },
+    );
+
+    test('reasoning is accumulated and persisted with the message', () async {
+      await startChild(id: 'child-1', parent: 'parent-1');
+      final future = service.waitFor('child-1');
+
+      streamControllers['child-1']!.add(
+        ChatStreamChunk(
+          content: '',
+          reasoning: 'thinking step 1',
+          isDone: false,
+          totalTokens: 0,
+        ),
+      );
+      streamControllers['child-1']!.add(
+        ChatStreamChunk(
+          content: 'final answer',
+          reasoning: ' step 2',
+          isDone: false,
+          totalTokens: 0,
+        ),
+      );
+      await closeStream('child-1');
+      await future;
+
+      final messages = chatService.messagesByConversation['child-1']!;
+      expect(messages.last.content, 'final answer');
+      expect(messages.last.reasoningText, 'thinking step 1 step 2');
+      expect(messages.last.isStreaming, isFalse);
     });
 
     test(

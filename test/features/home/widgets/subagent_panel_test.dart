@@ -75,8 +75,60 @@ void main() {
       await pumpPanel(tester);
 
       expect(find.textContaining('Research Bot'), findsOneWidget);
-      expect(find.textContaining('Thinking'), findsOneWidget);
+      expect(find.textContaining('▸'), findsNothing);
       expect(find.byIcon(Icons.close), findsOneWidget);
+    });
+
+    testWidgets('expanded row shows tool calls and opens the child', (
+      tester,
+    ) async {
+      headlessGen.prepareJob(
+        conversationId: 'child-conv',
+        parentConversationId: 'parent-conv',
+        wait: true,
+        targetName: 'Research Bot',
+      );
+      final job = headlessGen.jobFor('child-conv')!;
+      job.toolCallCount = 3;
+      job.lastStep = 'kelivo_read';
+      job.lastStepKind = SubagentLastStepKind.done;
+      String? openedChildId;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: MultiProvider(
+            providers: [
+              ChangeNotifierProvider<SettingsProvider>(
+                create: (_) => SettingsProvider(),
+              ),
+              ChangeNotifierProvider<ChatService>.value(value: chatService),
+              ChangeNotifierProvider<HeadlessGenerationService>.value(
+                value: headlessGen,
+              ),
+              ChangeNotifierProvider<ToolApprovalService>.value(
+                value: approvalService,
+              ),
+              ChangeNotifierProvider<AskUserInteractionService>.value(
+                value: askUserService,
+              ),
+            ],
+            child: Scaffold(
+              body: SubagentPanel(onOpenChild: (id) => openedChildId = id),
+            ),
+          ),
+        ),
+      );
+
+      // Expand, then the row is tappable and opens the child.
+      await tester.tap(find.textContaining('Research Bot'));
+      await tester.pump();
+      expect(find.textContaining('3 tool calls'), findsOneWidget);
+      expect(find.text('kelivo_read'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_forward_ios), findsOneWidget);
+
+      await tester.tap(find.textContaining('3 tool calls'));
+      await tester.pump();
+      expect(openedChildId, 'child-conv');
     });
 
     testWidgets('renders nothing when the job belongs to another conversation', (

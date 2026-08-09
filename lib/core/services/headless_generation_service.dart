@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 
+import '../../../features/home/controllers/streaming_content_notifier.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
 import 'chat/chat_service.dart';
@@ -79,9 +80,18 @@ class SubagentJob {
   /// Cumulative streamed content length.
   int streamedChars = 0;
 
-  /// Cumulative streamed content. The page seeds its live notifier from this
-  /// on (re)subscription, because the broadcast chunk stream does not replay.
+  /// Cumulative streamed content. Used to seed the page's live notifier on
+  /// (re)subscription, because the broadcast chunk stream does not replay.
   final StringBuffer streamedText = StringBuffer();
+
+  /// Count of tool calls made by the child so far (面板 expanded row).
+  int toolCallCount = 0;
+
+  /// The page's live-rendering notifier, registered while the child
+  /// conversation is being viewed. `_run` updates it per chunk (content +
+  /// reasoning); null when nobody is watching. Single state source — the
+  /// page no longer keeps its own chunk buffer.
+  StreamingContentNotifier? uiNotifier;
 
   /// The streaming assistant placeholder's message id, set once `addMessage`
   /// lands. The page uses it to key live `StreamingContentNotifier` updates.
@@ -303,6 +313,8 @@ class HeadlessGenerationService extends ChangeNotifier {
       notifyListeners();
 
       var chunkCount = 0;
+      final reasoningBuf = StringBuffer();
+      final toolEventsById = <String, Map<String, dynamic>>{};
       await for (final chunk in _chatStreamProvider(
         config: config,
         modelId: modelId,
@@ -317,20 +329,70 @@ class HeadlessGenerationService extends ChangeNotifier {
         requestId: conversationId,
       )) {
         chunkCount++;
+        final mid = record.job.assistantMessageId;
         if (chunk.content.isNotEmpty) {
           buf.write(chunk.content);
           record.job.streamedChars += chunk.content.length;
           record.job.streamedText.write(chunk.content);
+          if (mid != null) {
+            record.job.uiNotifier?.updateContent(
+              mid,
+              buf.toString(),
+              chunk.totalTokens,
+            );
+          }
+        }
+        if (chunk.reasoning != null && chunk.reasoning!.isNotEmpty) {
+          reasoningBuf.write(chunk.reasoning);
+          if (mid != null) {
+            record.job.uiNotifier?.updateReasoning(
+              mid,
+              reasoningText: reasoningBuf.toString(),
+            );
+          }
         }
         if ((chunk.toolCalls ?? const []).isNotEmpty) {
           final first = chunk.toolCalls!.first;
           record.job.lastStep = first.name;
           record.job.lastStepKind = SubagentLastStepKind.call;
+          record.job.toolCallCount += chunk.toolCalls!.length;
+          for (final c in chunk.toolCalls!) {
+            toolEventsById[c.id] = {
+              'id': c.id,
+              'name': c.name,
+              'arguments': c.arguments,
+              'content': null,
+              if (c.metadata != null && c.metadata!.isNotEmpty)
+                'metadata': c.metadata,
+            };
+          }
+          if (mid != null) {
+            await _chatService.setToolEvents(
+              mid,
+              toolEventsById.values.toList(),
+            );
+          }
         }
         if ((chunk.toolResults ?? const []).isNotEmpty) {
           final first = chunk.toolResults!.first;
           record.job.lastStep = first.name;
           record.job.lastStepKind = SubagentLastStepKind.done;
+          for (final r in chunk.toolResults!) {
+            toolEventsById[r.id] = {
+              'id': r.id,
+              'name': r.name,
+              'arguments': r.arguments,
+              'content': r.content,
+              if (r.metadata != null && r.metadata!.isNotEmpty)
+                'metadata': r.metadata,
+            };
+          }
+          if (mid != null) {
+            await _chatService.setToolEvents(
+              mid,
+              toolEventsById.values.toList(),
+            );
+          }
         }
         controller.add(chunk);
       }
@@ -344,6 +406,7 @@ class HeadlessGenerationService extends ChangeNotifier {
         assistantMessageId,
         content: buf.toString(),
         isStreaming: false,
+        reasoningText: reasoningBuf.isEmpty ? null : reasoningBuf.toString(),
       );
       debugPrint(
         '[HeadlessGen] message updated: id=$assistantMessageId '

@@ -126,12 +126,6 @@ class _SubagentPanelState extends State<SubagentPanel> {
     final forceExpanded = waitingInteraction;
     final showExpanded = forceExpanded || _expanded;
 
-    final phaseText = waitingInteraction
-        ? l10n.subagentPanelWaitingApproval
-        : job.streamedChars > 0
-        ? l10n.subagentPanelStreaming
-        : l10n.subagentPanelThinking;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Column(
@@ -156,9 +150,9 @@ class _SubagentPanelState extends State<SubagentPanel> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${job.targetName ?? job.conversationId} ▸ '
-                      '$phaseText${job.streamedChars > 0 ? '… ${job.streamedChars}' : ''}'
-                      ' · ${_formatElapsed(job)}',
+                      // {assistant name} · {elapsed} — no phase, no arrow
+                      '${job.targetName ?? job.conversationId} · '
+                      '${_formatElapsed(job)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -319,60 +313,46 @@ class _SubagentPanelState extends State<SubagentPanel> {
         ),
       );
     } else {
-      if (job.lastStep != null) {
-        children.add(
-          Text(
-            job.lastStepKind == SubagentLastStepKind.call
-                ? l10n.subagentPanelLastStepCall(job.lastStep!)
-                : l10n.subagentPanelLastStepDone(job.lastStep!),
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-          ),
-        );
-      }
-      children.add(const SizedBox(height: 10));
+      // One row: {N} tool calls · last step, tap anywhere to open the child.
       children.add(
-        Row(
-          children: [
-            Expanded(
-              child: IosCardPress(
-                borderRadius: BorderRadius.circular(10),
-                baseColor: cs.primaryContainer,
-                onTap: () => widget.onOpenChild?.call(job.conversationId),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+        IosCardPress(
+          borderRadius: BorderRadius.circular(10),
+          baseColor: cs.surfaceContainerHighest,
+          pressedScale: 0.98,
+          onTap: () => widget.onOpenChild?.call(job.conversationId),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.hub_outlined, size: 15, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    l10n.subagentPanelViewChild,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onPrimaryContainer,
-                    ),
+                    l10n.subagentPanelToolCalls(job.toolCallCount),
+                    style: TextStyle(fontSize: 13, color: cs.onSurface),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: IosCardPress(
-                borderRadius: BorderRadius.circular(10),
-                baseColor: cs.surfaceContainerHighest,
-                onTap: () => _confirmCancel(job),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    l10n.subagentPanelCancelTooltip,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
+                if (job.lastStep != null)
+                  Expanded(
+                    child: Text(
+                      job.lastStep!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: cs.onSurfaceVariant,
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       );
     }

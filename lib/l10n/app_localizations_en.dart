@@ -7051,6 +7051,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subagentPanelAnswerNow => 'Answer now';
 
   @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tool calls',
+      one: '1 tool call',
+      zero: '0 tool calls',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => 'My group chats';
 
   @override

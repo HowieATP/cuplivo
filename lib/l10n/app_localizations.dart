@@ -12782,6 +12782,12 @@ abstract class AppLocalizations {
   /// **'Answer now'**
   String get subagentPanelAnswerNow;
 
+  /// No description provided for @subagentPanelToolCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 tool calls} =1{1 tool call} other{{count} tool calls}}'**
+  String subagentPanelToolCalls(num count);
+
   /// No description provided for @groupChatMyGroupChats.
   ///
   /// In en, this message translates to:

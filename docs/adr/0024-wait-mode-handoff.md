@@ -97,5 +97,18 @@ non-existent jobs.
   CONTEXT.md is implemented (it did not exist): the child conversation renders its
   streaming message via `StreamingContentNotifier`; the DB write stays one-shot at
   completion.
-- **Parallel waits**: impossible in one turn (providers await `onToolCall`
-  sequentially), so the panel needs exactly one active job slot.
+- **Parallel waits**: Same-turn tool calls are executed CONCURRENTLY by all
+  providers (`Future.wait` over `onToolCall`), so two `kelivo_handoff_sync`
+  calls in one turn start both sub-agents simultaneously; results map back by
+  `tool_call_id` in call order. Event-stream paths that yield per-event
+  results stay serial. Same-turn tools no longer have order guarantees.
+- **Rendering state source**: the headless job owns the accumulated
+  text/reasoning buffer and persists tool events + reasoning itself; the page
+  registers its `StreamingContentNotifier` on the job while viewing the child
+  (no page-side chunk buffer). Long-term (cuplivo v3): extract the
+  page-independent chunk-processing pipeline from `stream_controller` and
+  reuse it in the headless run, eliminating the functional subset entirely.
+- **Live rendering via registered notifier**: `_run` updates the registered
+  notifier per chunk (content + reasoning) and persists tool events /
+  reasoningText so the child conversation renders tool cards and thinking
+  after completion.

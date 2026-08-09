@@ -6759,6 +6759,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subagentPanelAnswerNow => '去回答';
 
   @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -13892,6 +13904,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get subagentPanelAnswerNow => '去回答';
 
   @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -21022,6 +21046,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具呼叫',
+      one: '1 次工具呼叫',
+      zero: '0 次工具呼叫',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get groupChatMyGroupChats => '我的群聊';

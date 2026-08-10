@@ -9,7 +9,11 @@ import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 
-ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
+ProviderConfig _openAiConfig(
+  String baseUrl, {
+  bool useResponseApi = false,
+  Map<String, dynamic> modelOverrides = const {},
+}) {
   return ProviderConfig(
     id: 'OpenAITest',
     enabled: true,
@@ -18,6 +22,7 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    modelOverrides: modelOverrides,
   );
 }
 
@@ -99,6 +104,139 @@ void main() {
         '![image](https://example.com/generated.png)',
       );
       expect(chunks.single.usage?.totalTokens, 8);
+    });
+
+    test('does not force optional image parameters by default', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a detailed tabby cat'},
+        ],
+      ).toList();
+
+      expect(requestBody.containsKey('quality'), isFalse);
+      expect(requestBody.containsKey('size'), isFalse);
+      expect(requestBody.containsKey('output_format'), isFalse);
+    });
+
+    test('allows image quality and format to be configured', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.webp'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(
+          _baseUrl(server),
+          modelOverrides: const {
+            'gpt-image-2': {
+              'body': [
+                {'key': 'quality', 'value': 'medium'},
+              ],
+            },
+          },
+        ),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a small icon'},
+        ],
+        extraBody: const {'output_format': 'webp'},
+      ).toList();
+
+      expect(requestBody['quality'], 'medium');
+      expect(requestBody['output_format'], 'webp');
+    });
+
+    test('omits null-cleared image fields from generation requests', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(
+          _baseUrl(server),
+          modelOverrides: const {
+            'gpt-image-2': {
+              'body': [
+                {'key': 'size', 'value': '3840x2160'},
+                {'key': 'output_format', 'value': 'webp'},
+                {'key': 'output_compression', 'value': '80'},
+              ],
+            },
+          },
+        ),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a reset test image'},
+        ],
+        extraBody: const {
+          'size': null,
+          'output_format': 'png',
+          'output_compression': null,
+        },
+      ).toList();
+
+      expect(requestBody.containsKey('size'), isFalse);
+      expect(requestBody['output_format'], 'png');
+      expect(requestBody.containsKey('output_compression'), isFalse);
     });
 
     test(
@@ -423,6 +561,58 @@ void main() {
       expect(requestBody, contains('filename="source.png"'));
       expect(chunks.single.content, '![image](https://example.com/edited.png)');
     });
+
+    test(
+      'omits null-cleared image fields from all-remote JSON edits',
+      () async {
+        late Map<String, dynamic> requestBody;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestBody =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/remote-edit.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        await ChatApiService.sendMessageStream(
+          config: _openAiConfig(
+            _baseUrl(server),
+            modelOverrides: const {
+              'gpt-image-2': {
+                'body': [
+                  {'key': 'size', 'value': '3840x2160'},
+                ],
+              },
+            },
+          ),
+          modelId: 'gpt-image-2',
+          messages: [
+            {
+              'role': 'user',
+              'content':
+                  'make it brighter ![source](http://example.com/remote.png)',
+            },
+          ],
+          extraBody: const {'size': null, 'output_compression': null},
+        ).toList();
+
+        expect(requestBody.containsKey('size'), isFalse);
+        expect(requestBody.containsKey('output_compression'), isFalse);
+      },
+    );
 
     test('sets jpeg content type for jpg image edit uploads', () async {
       late String requestBody;
@@ -755,8 +945,303 @@ void main() {
       },
     );
 
+    test('saves data URL image fields as local files', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_data_url_output_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {
+                'image_url':
+                    'data:image/png;base64,${base64Encode(const [5, 6, 7, 8])}',
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a data url cat'},
+        ],
+      ).toList();
+
+      final imagePath = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(chunks.single.content)!.group(1)!;
+      expect(imagePath.startsWith('data:image/'), isFalse);
+      expect(await File(imagePath).readAsBytes(), const [5, 6, 7, 8]);
+    });
+
     test(
-      'throws useful exception on non-success Images API response',
+      'count fallback also applies to n configured via model override',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestBodies.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/override-1.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(
+            _baseUrl(server),
+            modelOverrides: const {
+              'gpt-image-2': {
+                'body': [
+                  {'key': 'n', 'value': '2'},
+                ],
+              },
+            },
+          ),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw override variants'},
+          ],
+        ).toList();
+
+        expect(requestBodies, hasLength(2));
+        expect(requestBodies.first['n'], 2);
+        expect(requestBodies.skip(1).every((body) => body['n'] == 1), isTrue);
+        expect(
+          chunks.single.content,
+          [
+            '![image](https://example.com/override-1.png)',
+            '![image](https://example.com/override-1.png)',
+          ].join('\n\n'),
+        );
+      },
+    );
+
+    test('fills requested count when provider returns fewer images', () async {
+      final requestBodies = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      var requestIndex = 0;
+      server.listen((request) async {
+        requestBodies.add(
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>,
+        );
+        requestIndex += 1;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated-$requestIndex.png'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 2},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw image variants'},
+        ],
+        extraBody: const {'n': 3},
+      ).toList();
+
+      expect(requestBodies, hasLength(3));
+      expect(requestBodies.first['n'], 3);
+      expect(requestBodies.skip(1).every((body) => body['n'] == 1), isTrue);
+      expect(
+        chunks.single.content,
+        [
+          '![image](https://example.com/generated-1.png)',
+          '![image](https://example.com/generated-2.png)',
+          '![image](https://example.com/generated-3.png)',
+        ].join('\n\n'),
+      );
+      expect(chunks.single.usage?.totalTokens, 9);
+    });
+
+    test('passes 4K image options unchanged to generations', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated-4k.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a 4K landscape'},
+        ],
+        extraBody: const {
+          'quality': 'high',
+          'size': '3840x2160',
+          'output_format': 'png',
+        },
+      ).toList();
+
+      expect(requestBody['quality'], 'high');
+      expect(requestBody['size'], '3840x2160');
+      expect(requestBody['output_format'], 'png');
+      expect(
+        chunks.single.content,
+        '![image](https://example.com/generated-4k.png)',
+      );
+    });
+
+    test(
+      'fills requested count from Images API event stream responses',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        var requestIndex = 0;
+        server.listen((request) async {
+          requestBodies.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          requestIndex += 1;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'data: ${jsonEncode({'type': 'image_generation.completed', 'url': 'https://example.com/stream-$requestIndex.png'})}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw streamed variants'},
+          ],
+          extraBody: const {'n': 3},
+        ).toList();
+
+        expect(requestBodies, hasLength(3));
+        expect(requestBodies.first['n'], 3);
+        expect(requestBodies.skip(1).every((body) => body['n'] == 1), isTrue);
+        expect(
+          chunks.single.content,
+          [
+            '![image](https://example.com/stream-1.png)',
+            '![image](https://example.com/stream-2.png)',
+            '![image](https://example.com/stream-3.png)',
+          ].join('\n\n'),
+        );
+      },
+    );
+
+    test(
+      'parses nested Images API data lists from compatible providers',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': {
+                'data': [
+                  {'url': 'https://example.com/nested-1.png'},
+                  {'image_url': 'https://example.com/nested-2.png'},
+                ],
+              },
+            }),
+          );
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw nested variants'},
+          ],
+        ).toList();
+
+        expect(
+          chunks.single.content,
+          [
+            '![image](https://example.com/nested-1.png)',
+            '![image](https://example.com/nested-2.png)',
+          ].join('\n\n'),
+        );
+      },
+    );
+
+    test(
+      'throws useful UTF-8 exception on non-success Images API response',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() async {
@@ -766,8 +1251,11 @@ void main() {
         server.listen((request) async {
           await request.drain<void>();
           request.response.statusCode = HttpStatus.badRequest;
-          request.response.headers.contentType = ContentType.json;
-          request.response.write(jsonEncode({'error': 'bad image request'}));
+          request.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'application/json',
+          );
+          request.response.add(utf8.encode(jsonEncode({'error': '图像请求错误'})));
           await request.response.close();
         });
 
@@ -780,11 +1268,17 @@ void main() {
             ],
           ).toList(),
           throwsA(
-            isA<HttpException>().having(
-              (error) => error.message,
-              'message',
-              contains('HTTP 400'),
-            ),
+            isA<HttpException>()
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('HTTP 400'),
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('图像请求错误'),
+                ),
           ),
         );
       },

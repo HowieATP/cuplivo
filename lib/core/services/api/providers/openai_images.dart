@@ -38,6 +38,7 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
   List<String>? userMediaPaths,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
+  String Function(int received, int requested)? partialImageNotice,
 }) async* {
   final input = await _openAIImagesInput(messages, userMediaPaths);
   final outputMime = _openAIImagesOutputMime(config, modelId, extraBody);
@@ -48,36 +49,168 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
       'OpenAI Images API model $upstreamModelId does not support image edits with input images.',
     );
   }
-  final response = input.imageRefs.isEmpty
-      ? await _sendOpenAIImageGeneration(
-          client,
-          config,
-          modelId,
-          input.prompt,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-        )
-      : await _sendOpenAIImageEdit(
-          client,
-          config,
-          modelId,
-          input.prompt,
-          input.imageRefs,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-        );
+  // Count must be read from the MERGED body: `n` may also be configured via
+  // the provider custom body / model override, not only the panel's extraBody.
+  final mergedBody = <String, dynamic>{};
+  _applyOpenAIImagesExtraBody(mergedBody, config, modelId, extraBody);
+  final requestedCount = _openAIImagesRequestedCount(mergedBody);
+  final response = await _sendOpenAIImagesWithCountFallback(
+    client,
+    config,
+    modelId,
+    input,
+    extraHeaders: extraHeaders,
+    extraBody: extraBody,
+  );
   final markdown = await _openAIImagesResponseToMarkdown(
     response,
     outputMime: outputMime,
   );
+  final notice = _openAIImagesPartialNotice(
+    partialImageNotice,
+    received: _openAIImagesDataCount(response),
+    requested: requestedCount,
+  );
   final usage = _openAIImagesUsage(response);
   yield ChatStreamChunk(
-    content: markdown,
+    content: notice == null ? markdown : '$markdown\n\n$notice',
     isDone: true,
     totalTokens: usage?.totalTokens ?? 0,
     usage: usage,
     consumedUsage: usage,
   );
+}
+
+/// Some OpenAI-compatible vendors ignore or reject `n` > 1 (returning fewer
+/// images than requested). Fall back to repeated `n=1` requests until the
+/// requested count is reached. Under-delivery is surfaced by the caller via
+/// a localized notice (never silent) — see
+/// [_openAIImagesPartialNotice].
+Future<Map<String, dynamic>> _sendOpenAIImagesWithCountFallback(
+  http.Client client,
+  ProviderConfig config,
+  String modelId,
+  _OpenAIImagesInput input, {
+  Map<String, String>? extraHeaders,
+  Map<String, dynamic>? extraBody,
+}) async {
+  final mergedBody = <String, dynamic>{};
+  _applyOpenAIImagesExtraBody(mergedBody, config, modelId, extraBody);
+  final requestedCount = _openAIImagesRequestedCount(mergedBody);
+
+  Future<Map<String, dynamic>> sendOnce(Map<String, dynamic>? body) {
+    return input.imageRefs.isEmpty
+        ? _sendOpenAIImageGeneration(
+            client,
+            config,
+            modelId,
+            input.prompt,
+            extraHeaders: extraHeaders,
+            extraBody: body,
+          )
+        : _sendOpenAIImageEdit(
+            client,
+            config,
+            modelId,
+            input.prompt,
+            input.imageRefs,
+            extraHeaders: extraHeaders,
+            extraBody: body,
+          );
+  }
+
+  final response = await sendOnce(extraBody);
+  var combined = response;
+  var received = _openAIImagesDataCount(combined);
+  if (requestedCount <= 1 || received >= requestedCount) {
+    return combined;
+  }
+
+  final singleBody = _openAIImagesExtraBodyWithCount(extraBody, 1);
+  while (received < requestedCount) {
+    final next = await sendOnce(singleBody);
+    combined = _combineOpenAIImagesResponses(combined, next);
+    final nextCount = _openAIImagesDataCount(next);
+    if (nextCount <= 0) break;
+    received += nextCount;
+  }
+  return combined;
+}
+
+int _openAIImagesRequestedCount(Map<String, dynamic>? extraBody) {
+  final raw = extraBody?['n'];
+  // Model override / assistant customBody values pass through
+  // _parseOverrideValue, so `n` may arrive as a double (e.g. 3.0) or a
+  // numeric string. Only an integral value is a valid count.
+  final parsed = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '');
+  if (parsed == null) return 1;
+  return parsed.clamp(1, 10).toInt();
+}
+
+Map<String, dynamic>? _openAIImagesExtraBodyWithCount(
+  Map<String, dynamic>? extraBody,
+  int count,
+) {
+  final body = <String, dynamic>{
+    if (extraBody != null) ...extraBody,
+    'n': count,
+  };
+  return body;
+}
+
+int _openAIImagesDataCount(Map<String, dynamic> response) {
+  final data = response['data'];
+  return data is List ? data.length : 0;
+}
+
+Map<String, dynamic> _combineOpenAIImagesResponses(
+  Map<String, dynamic> first,
+  Map<String, dynamic> second,
+) {
+  final data = <dynamic>[
+    if (first['data'] is List) ...(first['data'] as List),
+    if (second['data'] is List) ...(second['data'] as List),
+  ];
+  final combined = <String, dynamic>{...first, 'data': data};
+  final usage = _combineOpenAIImagesUsage(first['usage'], second['usage']);
+  if (usage != null) combined['usage'] = usage;
+  return combined;
+}
+
+Map<String, dynamic>? _combineOpenAIImagesUsage(dynamic first, dynamic second) {
+  if (first is! Map && second is! Map) return null;
+  final keys = <String>{
+    if (first is Map) ...first.keys.map((key) => key.toString()),
+    if (second is Map) ...second.keys.map((key) => key.toString()),
+  };
+  final usage = <String, dynamic>{};
+  for (final key in keys) {
+    final a = first is Map ? first[key] : null;
+    final b = second is Map ? second[key] : null;
+    if (a is num || b is num) {
+      usage[key] = (a is num ? a : 0) + (b is num ? b : 0);
+    } else if (b != null) {
+      usage[key] = b;
+    } else if (a != null) {
+      usage[key] = a;
+    }
+  }
+  return usage;
+}
+
+/// Localized (or English-fallback) notice appended to the markdown output when
+/// fewer images arrived than requested. Never silent: vendors that ignore `n`
+/// still surface under-delivery to the user.
+String? _openAIImagesPartialNotice(
+  String Function(int received, int requested)? resolver, {
+  required int received,
+  required int requested,
+}) {
+  if (requested <= 1 || received >= requested) return null;
+  final text = resolver != null
+      ? resolver(received, requested)
+      : 'Only $received/$requested images were generated.';
+  return '> $text';
 }
 
 Future<Map<String, dynamic>> _sendOpenAIImageGeneration(
@@ -93,6 +226,7 @@ Future<Map<String, dynamic>> _sendOpenAIImageGeneration(
     'prompt': prompt,
   };
   _applyOpenAIImagesExtraBody(body, config, modelId, extraBody);
+  body.removeWhere((_, value) => value == null);
   final response = await client.post(
     _openAIImagesUrl(config, '/images/generations'),
     headers: _openAIImagesJsonHeaders(
@@ -124,6 +258,7 @@ Future<Map<String, dynamic>> _sendOpenAIImageEdit(
       ],
     };
     _applyOpenAIImagesExtraBody(body, config, modelId, extraBody);
+    body.removeWhere((_, value) => value == null);
     final response = await client.post(
       _openAIImagesUrl(config, '/images/edits'),
       headers: _openAIImagesJsonHeaders(
@@ -470,15 +605,264 @@ String _openAIImagesOutputMime(
 
 Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw HttpException('HTTP ${response.statusCode}: ${response.body}');
+    final responseText = _decodeOpenAIImagesUtf8Body(
+      response,
+      allowMalformed: true,
+    );
+    throw HttpException('HTTP ${response.statusCode}: $responseText');
   }
-  final decoded = jsonDecode(response.body);
+  final contentType = response.headers[HttpHeaders.contentTypeHeader]
+      ?.toLowerCase();
+  final responseText = _decodeOpenAIImagesUtf8Body(response);
+  final body = responseText.trimLeft();
+  if ((contentType?.contains('text/event-stream') ?? false) ||
+      body.startsWith('data:')) {
+    return _decodeOpenAIImagesStreamResponse(responseText);
+  }
+  final decoded = jsonDecode(responseText);
+  return _normalizeOpenAIImagesPayload(decoded);
+}
+
+String _decodeOpenAIImagesUtf8Body(
+  http.Response response, {
+  bool allowMalformed = false,
+}) {
+  return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
+}
+
+Map<String, dynamic> _decodeOpenAIImagesStreamResponse(String body) {
+  Map<String, dynamic>? resultPayload;
+  final completedItems = <Map<String, dynamic>>[];
+  final outputItems = <Map<String, dynamic>>[];
+
+  for (final payload in _openAIImagesSsePayloads(body)) {
+    if (payload == '[DONE]') continue;
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) continue;
+    final event = decoded.cast<String, dynamic>();
+    final errorMessage = _openAIImagesStreamErrorMessage(event);
+    if (errorMessage != null) throw HttpException(errorMessage);
+
+    final type = (event['type'] ?? '').toString();
+    final object = (event['object'] ?? '').toString();
+    if (object == 'image.generation.result' || object == 'image.edit.result') {
+      resultPayload = _normalizeOpenAIImagesPayload(event);
+      continue;
+    }
+    if (type == 'image_generation.completed' ||
+        type == 'image_edit.completed') {
+      completedItems.add(_normalizeOpenAIImagesItem(event));
+      continue;
+    }
+    if (type == 'response.output_item.done') {
+      final item = event['item'];
+      if (item is Map && item['type'] == 'image_generation_call') {
+        outputItems.add(item.cast<String, dynamic>());
+      }
+      continue;
+    }
+    if (type == 'response.completed') {
+      final response = event['response'];
+      if (response is Map) {
+        final normalized = _normalizeOpenAIImagesPayload(response);
+        final data = normalized['data'];
+        if (data is List && data.isNotEmpty) resultPayload = normalized;
+      }
+    }
+  }
+
+  if (resultPayload != null) return resultPayload;
+  if (completedItems.isNotEmpty) {
+    return <String, dynamic>{'data': completedItems};
+  }
+  final outputData = _openAIImagesItemsFromResponsesOutput(outputItems);
+  if (outputData.isNotEmpty) return <String, dynamic>{'data': outputData};
+  throw const FormatException(
+    'OpenAI Images API stream returned no final image data.',
+  );
+}
+
+Iterable<String> _openAIImagesSsePayloads(String body) sync* {
+  final normalized = body.replaceAll('\r\n', '\n');
+  for (final block in normalized.split(RegExp(r'\n\n+'))) {
+    final dataLines = <String>[];
+    for (final line in block.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      dataLines.add(line.substring(5).trimLeft());
+    }
+    final data = dataLines.join('\n').trim();
+    if (data.isNotEmpty) yield data;
+  }
+}
+
+String? _openAIImagesStreamErrorMessage(Map<String, dynamic> event) {
+  final error = event['error'];
+  if (error is Map) {
+    final message = (error['message'] ?? error['error']).toString().trim();
+    if (message.isNotEmpty && message != 'null') return message;
+  }
+  if (error is String && error.trim().isNotEmpty) return error.trim();
+  final type = (event['type'] ?? '').toString();
+  if (type.endsWith('.failed')) {
+    final message = (event['message'] ?? 'OpenAI Images API stream failed')
+        .toString()
+        .trim();
+    return message.isEmpty ? 'OpenAI Images API stream failed' : message;
+  }
+  return null;
+}
+
+Map<String, dynamic> _normalizeOpenAIImagesPayload(dynamic decoded) {
+  if (decoded is List) {
+    return <String, dynamic>{'data': _normalizeOpenAIImagesItems(decoded)};
+  }
   if (decoded is! Map) {
     throw const FormatException(
       'OpenAI Images API returned a non-object body.',
     );
   }
-  return decoded.cast<String, dynamic>();
+  final map = decoded.cast<String, dynamic>();
+  final data = map['data'];
+  if (data is List) {
+    return <String, dynamic>{...map, 'data': _normalizeOpenAIImagesItems(data)};
+  }
+  if (data is Map) {
+    final nested = _openAIImagesDataFromMap(data);
+    if (nested.isNotEmpty) {
+      return <String, dynamic>{...map, 'data': nested};
+    }
+  }
+  final output = map['output'];
+  if (output is List) {
+    final items = _openAIImagesItemsFromResponsesOutput(output);
+    if (items.isNotEmpty) return <String, dynamic>{...map, 'data': items};
+  }
+  final topLevelItem = _normalizeOpenAIImagesItem(map);
+  if (_openAIImagesItemHasImage(topLevelItem)) {
+    return <String, dynamic>{
+      ...map,
+      'data': [topLevelItem],
+    };
+  }
+  final knownListItems = _openAIImagesDataFromMap(map);
+  if (knownListItems.isNotEmpty) {
+    return <String, dynamic>{...map, 'data': knownListItems};
+  }
+  return map;
+}
+
+List<Map<String, dynamic>> _openAIImagesDataFromMap(Map<dynamic, dynamic> map) {
+  for (final key in const ['data', 'result', 'images', 'results', 'items']) {
+    final value = map[key];
+    if (value is List) return _normalizeOpenAIImagesItems(value);
+    if (value is Map) {
+      final nested = _openAIImagesDataFromMap(value);
+      if (nested.isNotEmpty) return nested;
+    }
+  }
+  return const <Map<String, dynamic>>[];
+}
+
+List<Map<String, dynamic>> _normalizeOpenAIImagesItems(List<dynamic> items) {
+  return items
+      .map((item) {
+        if (item is Map) return _normalizeOpenAIImagesItem(item);
+        if (item is String && item.trim().isNotEmpty) {
+          final value = item.trim();
+          return _normalizeOpenAIImagesItem(<String, dynamic>{
+            _looksLikeOpenAIImagesHttpUrl(value) ? 'url' : 'b64_json': value,
+          });
+        }
+        return const <String, dynamic>{};
+      })
+      .where(_openAIImagesItemHasImage)
+      .toList(growable: false);
+}
+
+Map<String, dynamic> _normalizeOpenAIImagesItem(Map<dynamic, dynamic> raw) {
+  final item = raw.cast<String, dynamic>();
+  final normalized = <String, dynamic>{...item};
+  final url = _firstOpenAIImagesString(item, const ['url', 'image_url']);
+  if (url != null) {
+    if (_looksLikeOpenAIImagesHttpUrl(url)) {
+      normalized['url'] = url;
+    } else if (_looksLikeOpenAIImagesDataUrl(url)) {
+      normalized['b64_json'] = _stripOpenAIImagesDataUrl(url);
+    }
+  }
+
+  final b64 = _firstOpenAIImagesString(item, const [
+    'b64_json',
+    'base64',
+    'image',
+    'data',
+    'result',
+  ]);
+  if (b64 != null) {
+    if (_looksLikeOpenAIImagesHttpUrl(b64)) {
+      normalized['url'] = b64;
+      normalized.remove('b64_json');
+    } else {
+      normalized['b64_json'] = _stripOpenAIImagesDataUrl(b64);
+    }
+  }
+  return normalized;
+}
+
+String? _firstOpenAIImagesString(Map<String, dynamic> item, List<String> keys) {
+  for (final key in keys) {
+    final value = item[key];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is Map) {
+      final nested = _normalizeOpenAIImagesItem(value);
+      final nestedUrl = (nested['url'] ?? '').toString().trim();
+      if (nestedUrl.isNotEmpty) return nestedUrl;
+      final nestedB64 = (nested['b64_json'] ?? '').toString().trim();
+      if (nestedB64.isNotEmpty) return nestedB64;
+    }
+  }
+  return null;
+}
+
+bool _openAIImagesItemHasImage(Map<String, dynamic> item) {
+  final url = (item['url'] ?? '').toString().trim();
+  final b64 = (item['b64_json'] ?? '').toString().trim();
+  return url.isNotEmpty || b64.isNotEmpty;
+}
+
+bool _looksLikeOpenAIImagesHttpUrl(String value) {
+  final lower = value.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://');
+}
+
+bool _looksLikeOpenAIImagesDataUrl(String value) {
+  return value.toLowerCase().startsWith('data:image/');
+}
+
+String _stripOpenAIImagesDataUrl(String value) {
+  if (!value.toLowerCase().startsWith('data:')) return value;
+  final commaIndex = value.indexOf(',');
+  return commaIndex >= 0 ? value.substring(commaIndex + 1) : value;
+}
+
+List<Map<String, dynamic>> _openAIImagesItemsFromResponsesOutput(
+  List<dynamic> output,
+) {
+  final items = <Map<String, dynamic>>[];
+  for (final raw in output) {
+    if (raw is! Map || raw['type'] != 'image_generation_call') continue;
+    final item = raw.cast<String, dynamic>();
+    final result = item['result'];
+    final merged = <String, dynamic>{...item};
+    if (result is Map) {
+      merged.addAll(result.cast<String, dynamic>());
+    } else if (result is String && result.trim().isNotEmpty) {
+      merged['b64_json'] = result.trim();
+    }
+    final normalized = _normalizeOpenAIImagesItem(merged);
+    if (_openAIImagesItemHasImage(normalized)) items.add(normalized);
+  }
+  return items;
 }
 
 Future<String> _openAIImagesResponseToMarkdown(
@@ -490,7 +874,10 @@ Future<String> _openAIImagesResponseToMarkdown(
   final lines = <String>[];
   for (final item in data) {
     if (item is! Map) continue;
-    final b64 = (item['b64_json'] ?? '').toString().trim();
+    final normalized = _normalizeOpenAIImagesItem(item);
+    // Local-first ordering (kept from the image-mode feature): base64/data
+    // URL payloads are persisted as local files; remote URLs stay remote.
+    final b64 = (normalized['b64_json'] ?? '').toString().trim();
     if (b64.isNotEmpty) {
       final path = await AppDirectories.saveBase64Image(outputMime, b64);
       if (path == null || path.isEmpty) {
@@ -501,8 +888,7 @@ Future<String> _openAIImagesResponseToMarkdown(
       lines.add('![image]($path)');
       continue;
     }
-
-    final url = (item['url'] ?? '').toString().trim();
+    final url = (normalized['url'] ?? '').toString().trim();
     if (url.isNotEmpty) {
       lines.add('![image]($url)');
     }

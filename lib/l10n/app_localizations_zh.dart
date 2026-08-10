@@ -7245,6 +7245,79 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get grokLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get imageGenTitle => '生图参数';
+
+  @override
+  String get imageGenReset => '重置';
+
+  @override
+  String get imageGenQualityLabel => '画质';
+
+  @override
+  String get imageGenSizeLabel => '清晰度';
+
+  @override
+  String get imageGenAspectRatioLabel => '图像比例';
+
+  @override
+  String get imageGenFormatLabel => '输出格式';
+
+  @override
+  String get imageGenCompressionLabel => '压缩质量';
+
+  @override
+  String get imageGenCountLabel => '数量';
+
+  @override
+  String get imageGenAuto => '自动';
+
+  @override
+  String get imageGenLow => '低';
+
+  @override
+  String get imageGenMedium => '中';
+
+  @override
+  String get imageGenHigh => '高';
+
+  @override
+  String get imageGenAutoSize => '自动尺寸';
+
+  @override
+  String get imageGenAutoRatio => '自动比例';
+
+  @override
+  String get imageGenCustomRatio => '自定义';
+
+  @override
+  String get imageGenCustomRatioLabel => '自定义比例';
+
+  @override
+  String get imageGenCustomRatioHint => '例如 7:5、2.39:1';
+
+  @override
+  String get imageGenActualSize => '实际尺寸';
+
+  @override
+  String get imageGenCurrent => '当前';
+
+  @override
+  String get imageGenPNG => 'PNG';
+
+  @override
+  String get imageGenLossless => '无损';
+
+  @override
+  String imageGenPaletteTooltip(Object summary) {
+    return '生图参数：$summary';
+  }
+
+  @override
+  String imageGenPartialNotice(Object received, Object requested) {
+    return '仅生成 $received/$requested 张图片';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -14488,6 +14561,79 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get grokLoginNetworkError => '网络错误，请重试';
+
+  @override
+  String get imageGenTitle => '生图参数';
+
+  @override
+  String get imageGenReset => '重置';
+
+  @override
+  String get imageGenQualityLabel => '画质';
+
+  @override
+  String get imageGenSizeLabel => '清晰度';
+
+  @override
+  String get imageGenAspectRatioLabel => '图像比例';
+
+  @override
+  String get imageGenFormatLabel => '输出格式';
+
+  @override
+  String get imageGenCompressionLabel => '压缩质量';
+
+  @override
+  String get imageGenCountLabel => '数量';
+
+  @override
+  String get imageGenAuto => '自动';
+
+  @override
+  String get imageGenLow => '低';
+
+  @override
+  String get imageGenMedium => '中';
+
+  @override
+  String get imageGenHigh => '高';
+
+  @override
+  String get imageGenAutoSize => '自动尺寸';
+
+  @override
+  String get imageGenAutoRatio => '自动比例';
+
+  @override
+  String get imageGenCustomRatio => '自定义';
+
+  @override
+  String get imageGenCustomRatioLabel => '自定义比例';
+
+  @override
+  String get imageGenCustomRatioHint => '例如 7:5、2.39:1';
+
+  @override
+  String get imageGenActualSize => '实际尺寸';
+
+  @override
+  String get imageGenCurrent => '当前';
+
+  @override
+  String get imageGenPNG => 'PNG';
+
+  @override
+  String get imageGenLossless => '无损';
+
+  @override
+  String imageGenPaletteTooltip(Object summary) {
+    return '生图参数：$summary';
+  }
+
+  @override
+  String imageGenPartialNotice(Object received, Object requested) {
+    return '仅生成 $received/$requested 张图片';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -21731,4 +21877,77 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get grokLoginNetworkError => '網路錯誤，請重試';
+
+  @override
+  String get imageGenTitle => '生圖參數';
+
+  @override
+  String get imageGenReset => '重置';
+
+  @override
+  String get imageGenQualityLabel => '畫質';
+
+  @override
+  String get imageGenSizeLabel => '清晰度';
+
+  @override
+  String get imageGenAspectRatioLabel => '圖像比例';
+
+  @override
+  String get imageGenFormatLabel => '輸出格式';
+
+  @override
+  String get imageGenCompressionLabel => '壓縮品質';
+
+  @override
+  String get imageGenCountLabel => '數量';
+
+  @override
+  String get imageGenAuto => '自動';
+
+  @override
+  String get imageGenLow => '低';
+
+  @override
+  String get imageGenMedium => '中';
+
+  @override
+  String get imageGenHigh => '高';
+
+  @override
+  String get imageGenAutoSize => '自動尺寸';
+
+  @override
+  String get imageGenAutoRatio => '自動比例';
+
+  @override
+  String get imageGenCustomRatio => '自定義';
+
+  @override
+  String get imageGenCustomRatioLabel => '自定義比例';
+
+  @override
+  String get imageGenCustomRatioHint => '例如 7:5、2.39:1';
+
+  @override
+  String get imageGenActualSize => '實際尺寸';
+
+  @override
+  String get imageGenCurrent => '當前';
+
+  @override
+  String get imageGenPNG => 'PNG';
+
+  @override
+  String get imageGenLossless => '無損';
+
+  @override
+  String imageGenPaletteTooltip(Object summary) {
+    return '生圖參數：$summary';
+  }
+
+  @override
+  String imageGenPartialNotice(Object received, Object requested) {
+    return '僅生成 $received/$requested 張圖片';
+  }
 }

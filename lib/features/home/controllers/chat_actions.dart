@@ -243,6 +243,21 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  /// Replay the per-message request metadata of the last user message in the
+  /// given context: the image-mode routing decision and the image options
+  /// body that were persisted at send time. See
+  /// docs/adr/0018-per-message-request-metadata.md.
+  ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
+  _resolveRequestOptionsFromMessages(
+    List<ChatMessage> messages, {
+    required bool fallbackAllowImagesApiRouting,
+  }) {
+    return MessageGenerationService.resolveRequestOptionsFromMessages(
+      messages,
+      fallbackAllowImagesApiRouting: fallbackAllowImagesApiRouting,
+    );
+  }
+
   Conversation _conversationForMessageContext(
     Conversation conversation,
     List<ChatMessage> messages, {
@@ -605,6 +620,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: true,
+        requestExtraBody: input.extraBody,
       );
 
       await _executeGeneration(ctx);
@@ -794,11 +810,15 @@ class ChatActions {
     );
 
     // Execute generation
+    final requestOptions = _resolveRequestOptionsFromMessages(
+      regenerationMessages,
+      fallbackAllowImagesApiRouting: allowImagesApiRouting,
+    );
     final ctx = messageGenerationService.buildGenerationContext(
       assistantMessage: assistantMessage,
       prepared: prepared,
       userMediaPaths: userMediaPaths,
-      allowImagesApiRouting: allowImagesApiRouting,
+      allowImagesApiRouting: requestOptions.allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
       assistant: assistant,
@@ -806,6 +826,7 @@ class ChatActions {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       generateTitleOnFinish: shouldGenerateTitleOnRetry,
+      requestExtraBody: requestOptions.requestExtraBody,
     );
 
     await _executeGeneration(ctx);
@@ -900,11 +921,19 @@ class ChatActions {
         assistant: assistant,
       );
 
+      // Replay the anchor's request metadata: scan only up to the continued
+      // assistant message, not the whole (possibly newer) history — the last
+      // user message in the full context may belong to an unrelated exchange.
+      final requestOptions = _resolveRequestOptionsFromMessages(
+        apiContextMessages.sublist(0, contextIndex + 1),
+        fallbackAllowImagesApiRouting: allowImagesApiRouting,
+      );
+
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: streamingMessage,
         prepared: prepared,
         userMediaPaths: userMediaPaths,
-        allowImagesApiRouting: allowImagesApiRouting,
+        allowImagesApiRouting: requestOptions.allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
         assistant: assistant,
@@ -912,6 +941,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        requestExtraBody: requestOptions.requestExtraBody,
       );
 
       await _executeGeneration(ctx);
@@ -1159,6 +1189,10 @@ class ChatActions {
         requestId: requestIdOverride ?? conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
+        partialImageNotice: _l10n == null
+            ? null
+            : (received, requested) =>
+                  _l10n!.imageGenPartialNotice('$received', '$requested'),
       );
 
       final streamKey = streamKeyOverride ?? conversationId;

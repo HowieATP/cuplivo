@@ -199,6 +199,14 @@ class MultiAIEngine extends ChangeNotifier {
     ChatInputData? inputData,
     bool allowImagesApiRouting = true,
   }) async {
+    // Send rounds carry the options via inputData; history rounds replay the
+    // persisted per-message request metadata of the anchor user message.
+    final requestOptions = inputData != null
+        ? (allowImagesApiRouting: allowImagesApiRouting, requestExtraBody: null)
+        : MessageGenerationService.resolveRequestOptionsFromMessages(
+            completeMessages,
+            fallbackAllowImagesApiRouting: allowImagesApiRouting,
+          );
     final convId = conversation.id;
     var pending = _models.length;
     debugPrint(
@@ -285,7 +293,8 @@ class MultiAIEngine extends ChangeNotifier {
         context: ctx,
         completeMessages: threadMessages,
         inputData: inputData,
-        allowImagesApiRouting: allowImagesApiRouting,
+        allowImagesApiRouting: requestOptions.allowImagesApiRouting,
+        requestExtraBody: requestOptions.requestExtraBody,
         generateTitleOnFinish: i == 0,
         onStreamComplete: onThreadDone,
       );
@@ -561,13 +570,20 @@ class MultiAIEngine extends ChangeNotifier {
       versionSelections: _chatController.versionSelections,
     );
 
+    final requestOptions =
+        MessageGenerationService.resolveRequestOptionsFromMessages(
+          threadMessages,
+          fallbackAllowImagesApiRouting: true,
+        );
+
     await _pipeline.executeAssistantResponse(
       assistantMessage: newMessage,
       providerKey: model.providerKey,
       modelId: model.modelId,
       context: ctx,
       completeMessages: threadMessages,
-      allowImagesApiRouting: true,
+      allowImagesApiRouting: requestOptions.allowImagesApiRouting,
+      requestExtraBody: requestOptions.requestExtraBody,
       generateTitleOnFinish: false,
     );
 
@@ -654,13 +670,19 @@ class MultiAIEngine extends ChangeNotifier {
       }).toList();
 
       _chatController.setConversationLoading(conversation.id, true);
+      final requestOptions =
+          MessageGenerationService.resolveRequestOptionsFromMessages(
+            threadMessages,
+            fallbackAllowImagesApiRouting: true,
+          );
       await _pipeline.executeAssistantResponse(
         assistantMessage: newMsg,
         providerKey: model.providerKey,
         modelId: model.modelId,
         context: ctx,
         completeMessages: threadMessages,
-        allowImagesApiRouting: true,
+        allowImagesApiRouting: requestOptions.allowImagesApiRouting,
+        requestExtraBody: requestOptions.requestExtraBody,
         generateTitleOnFinish: false,
       );
     }

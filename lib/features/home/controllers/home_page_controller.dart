@@ -827,6 +827,7 @@ class HomePageController extends ChangeNotifier {
       imagePaths: input.imagePaths,
       documents: input.documents,
       allowImagesApiRouting: input.allowImagesApiRouting,
+      extraBody: Map<String, dynamic>.of(input.extraBody),
     );
     final result = await _viewModel.sendMessage(syntheticInput);
     if (result != ChatInputSubmissionResult.rejected) {
@@ -1419,7 +1420,20 @@ class HomePageController extends ChangeNotifier {
       selection: TextSelection.collapsed(offset: input.text.length),
       composing: TextRange.empty,
     );
-    _mediaController.restoreInput(input);
+    // Restore the composer from the message's own request metadata (routing
+    // decision + image options), falling back to the current preference for
+    // legacy messages without persisted metadata.
+    _mediaController.restoreInput(
+      ChatInputData(
+        text: input.text,
+        imagePaths: input.imagePaths,
+        documents: input.documents,
+        allowImagesApiRouting:
+            message.requestAllowImagesApiRouting ??
+            _mediaController.allowImagesApiRouting,
+        extraBody: message.requestExtraBody,
+      ),
+    );
     _userMessageEditState = UserMessageEditState(
       messageId: message.id,
       previewText: input.text.isNotEmpty ? input.text : message.content.trim(),
@@ -1466,6 +1480,15 @@ class HomePageController extends ChangeNotifier {
       content: content,
     );
     if (newMsg == null) return null;
+    // Overwrite the version's request metadata with the CURRENT composer
+    // state — the user may have changed image options / routing while
+    // editing; the original message's metadata would otherwise replay stale
+    // options on regenerate.
+    await _chatService.updateMessage(
+      newMsg.id,
+      requestAllowImagesApiRouting: input.allowImagesApiRouting,
+      requestExtraBody: input.extraBody,
+    );
 
     if (_chatController.appendPersistedTailMessage(newMsg)) {
       _viewModel.restoreMessageUiState();

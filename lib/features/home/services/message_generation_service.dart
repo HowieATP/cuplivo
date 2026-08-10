@@ -233,6 +233,32 @@ class MessageGenerationService {
     );
   }
 
+  /// Replay the per-message request metadata of the last user message in the
+  /// given context: the image-mode routing decision and the image options
+  /// body persisted at send time. See
+  /// docs/adr/0018-per-message-request-metadata.md.
+  static ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
+  resolveRequestOptionsFromMessages(
+    List<ChatMessage> messages, {
+    required bool fallbackAllowImagesApiRouting,
+  }) {
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.role != 'user') continue;
+      final requestExtraBody = message.requestExtraBody;
+      return (
+        allowImagesApiRouting:
+            message.requestAllowImagesApiRouting ??
+            fallbackAllowImagesApiRouting,
+        requestExtraBody: requestExtraBody.isEmpty ? null : requestExtraBody,
+      );
+    }
+    return (
+      allowImagesApiRouting: fallbackAllowImagesApiRouting,
+      requestExtraBody: null,
+    );
+  }
+
   /// Create user message from input data.
   Future<ChatMessage> createUserMessage({
     required String conversationId,
@@ -240,7 +266,7 @@ class MessageGenerationService {
     required Assistant? assistant,
     String? groupId,
   }) async {
-    return chatService.addMessage(
+    final message = await chatService.addMessage(
       conversationId: conversationId,
       role: 'user',
       content: MessageGenerationService.buildPersistedUserMessageContent(
@@ -249,6 +275,15 @@ class MessageGenerationService {
       ),
       groupId: groupId,
     );
+    // Persist per-message request metadata (routing decision + image options
+    // body) so regenerate/continue can replay them. See
+    // docs/adr/0018-per-message-request-metadata.md.
+    await chatService.updateMessage(
+      message.id,
+      requestAllowImagesApiRouting: input.allowImagesApiRouting,
+      requestExtraBody: input.extraBody,
+    );
+    return message;
   }
 
   /// Build the persisted content string for a user message.
@@ -324,6 +359,7 @@ class MessageGenerationService {
     required bool supportsReasoning,
     required bool enableReasoning,
     required bool generateTitleOnFinish,
+    Map<String, dynamic>? requestExtraBody,
   }) {
     final bool ocrActive = resolveOcrActive(
       settings: settings,
@@ -331,6 +367,12 @@ class MessageGenerationService {
       providerKey: providerKey,
       modelId: modelId,
     );
+
+    final assistantBody = generationController.buildCustomBody(assistant);
+    final mergedExtraBody = <String, dynamic>{
+      if (assistantBody != null) ...assistantBody,
+      if (requestExtraBody != null) ...requestExtraBody,
+    };
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
@@ -348,7 +390,7 @@ class MessageGenerationService {
         conversationId: assistantMessage.conversationId,
         customHeaders: generationController.buildCustomHeaders(assistant),
       ),
-      extraBody: generationController.buildCustomBody(assistant),
+      extraBody: mergedExtraBody.isEmpty ? null : mergedExtraBody,
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: assistant?.streamOutput ?? true,

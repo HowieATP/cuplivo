@@ -98,6 +98,7 @@ class MessagePipeline {
     ChatInputData? inputData,
     bool allowImagesApiRouting = true,
     bool generateTitleOnFinish = false,
+    Map<String, dynamic>? requestExtraBody,
     VoidCallback? onStreamComplete,
   }) async {
     final assistant = context.assistant;
@@ -160,6 +161,7 @@ class MessagePipeline {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: generateTitleOnFinish,
+        requestExtraBody: requestExtraBody ?? inputData?.extraBody,
       );
 
       unawaited(

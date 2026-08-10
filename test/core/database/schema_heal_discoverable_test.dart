@@ -132,6 +132,45 @@ void main() {
     },
   );
 
+  test('heal adds per-message request metadata before message insert '
+      '(v18 column shape)', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 18,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingOcrMode: false,
+      missingContextTokens: false,
+      missingV15RequestMetadata: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    // Must succeed: heal adds request_allow_images_api_routing /
+    // request_extra_body_json before the Drift INSERT, and the metadata
+    // must round-trip through the repository mapper.
+    final conv = Conversation(title: 'Conv', assistantId: 'a1');
+    await repo.putConversation(conv);
+    await repo.putMessage(
+      ChatMessage(
+        role: 'user',
+        content: 'draw a cat',
+        conversationId: conv.id,
+        requestAllowImagesApiRouting: false,
+        requestExtraBodyJson: '{"quality":"high","n":2}',
+      ),
+    );
+
+    final rows = await repo.db.select(repo.db.messageRows).get();
+    expect(rows, hasLength(1));
+    final loaded = await repo.getMessage(rows.first.id);
+    expect(loaded?.requestAllowImagesApiRouting, isFalse);
+    expect(loaded?.requestExtraBody, {'quality': 'high', 'n': 2});
+
+    await repo.close();
+  });
+
   test(
     'heal adds ocr_mode before assistant insert (v15 column shape)',
     () async {
@@ -263,6 +302,7 @@ void _createLegacyDb(
   required bool missingHandoffColumns,
   bool missingOcrMode = false,
   bool missingContextTokens = true,
+  bool missingV15RequestMetadata = false,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -351,6 +391,12 @@ CREATE TABLE conversation_rows (
       : '''
   context_tokens INTEGER NULL,
 ''';
+  final v15Columns = missingV15RequestMetadata
+      ? ''
+      : '''
+  request_allow_images_api_routing INTEGER NULL,
+  request_extra_body_json TEXT NULL,
+''';
   raw.execute('''
 CREATE TABLE message_rows (
   id TEXT NOT NULL PRIMARY KEY,
@@ -377,6 +423,7 @@ CREATE TABLE message_rows (
   message_order INTEGER NOT NULL,
   $contextTokensColumn
   $isPresetColumn
+  $v15Columns
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );
 ''');

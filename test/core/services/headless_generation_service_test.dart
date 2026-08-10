@@ -73,6 +73,8 @@ class _FakeChatService extends ChatService {
     Object? groupId = ChatMessage.sentinel,
     Object? subgroupId = ChatMessage.sentinel,
     Object? version = ChatMessage.sentinel,
+    Object? requestAllowImagesApiRouting = ChatMessage.sentinel,
+    Object? requestExtraBody = ChatMessage.sentinel,
   }) async {
     for (final list in messagesByConversation.values) {
       for (int i = 0; i < list.length; i++) {

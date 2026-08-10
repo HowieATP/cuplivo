@@ -625,6 +625,7 @@ class ChatApiService {
     String? requestId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
+    String Function(int received, int requested)? partialImageNotice,
   }) async* {
     final kind = ProviderConfig.classify(
       config.id,
@@ -667,6 +668,7 @@ class ChatApiService {
             userMediaPaths: safeUserMediaPaths,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
+            partialImageNotice: partialImageNotice,
           );
         } else if (config.useResponseApi == true) {
           yield* _sendOpenAIResponsesStream(

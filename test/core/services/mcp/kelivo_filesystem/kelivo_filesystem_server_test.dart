@@ -147,6 +147,9 @@ void main() {
       final text = textOf(r);
       expect(text, contains('@workspaces (rw)'));
       expect(text, contains('@docs (ro)'));
+      // Host paths never enter the model context (ADR-0022).
+      expect(text, isNot(contains(wsDir.path)));
+      expect(text, isNot(contains(docsDir.path)));
     });
 
     test('write_file creates a file, read returns numbered lines', () async {

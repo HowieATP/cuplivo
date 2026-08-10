@@ -314,7 +314,9 @@ class KelivoFilesystemMcpServerEngine {
     if (raw == '/') {
       final buf = StringBuffer();
       for (final m in _mounts()) {
-        buf.writeln('${m.wireName} (${m.readOnly ? 'ro' : 'rw'}) ${m.path}');
+        // Alias + mode only — host paths never enter the model context
+        // (ADR-0022: host layout stays out of prompts and request logs).
+        buf.writeln('${m.wireName} (${m.readOnly ? 'ro' : 'rw'})');
       }
       return _toolOk(buf.toString().trim());
     }

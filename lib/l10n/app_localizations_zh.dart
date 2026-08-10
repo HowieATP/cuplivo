@@ -6795,6 +6795,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get handoffBackwardChipTooltip => '返回上一级对话';
 
   @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '输出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最后一步:调用 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最后一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子对话';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在运行的子代理将被终止,已生成的内容会保留在子对话中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '继续运行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '终止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒绝';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -13977,6 +14038,67 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get handoffBackwardChipTooltip => '返回上一级对话';
 
   @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '输出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最后一步:调用 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最后一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子对话';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在运行的子代理将被终止,已生成的内容会保留在子对话中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '继续运行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '终止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒绝';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -21156,6 +21278,67 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get handoffBackwardChipTooltip => '返回上一級對話';
+
+  @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '輸出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最後一步:呼叫 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最後一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子對話';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在執行的子代理將被終止,已生成的內容會保留在子對話中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '繼續執行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '終止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒絕';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具呼叫',
+      one: '1 次工具呼叫',
+      zero: '0 次工具呼叫',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get groupChatMyGroupChats => '我的群聊';

@@ -12836,6 +12836,102 @@ abstract class AppLocalizations {
   /// **'Back to the parent conversation'**
   String get handoffBackwardChipTooltip;
 
+  /// No description provided for @subagentPanelThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get subagentPanelThinking;
+
+  /// No description provided for @subagentPanelStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming'**
+  String get subagentPanelStreaming;
+
+  /// No description provided for @subagentPanelWaitingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval'**
+  String get subagentPanelWaitingApproval;
+
+  /// No description provided for @subagentPanelLastStepCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Last step: calling {tool}'**
+  String subagentPanelLastStepCall(Object tool);
+
+  /// No description provided for @subagentPanelLastStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Last step: {tool} done'**
+  String subagentPanelLastStepDone(Object tool);
+
+  /// No description provided for @subagentPanelViewChild.
+  ///
+  /// In en, this message translates to:
+  /// **'Open sub-conversation'**
+  String get subagentPanelViewChild;
+
+  /// No description provided for @subagentPanelCancelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sub-agent'**
+  String get subagentPanelCancelTooltip;
+
+  /// No description provided for @subagentPanelCancelConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sub-agent?'**
+  String get subagentPanelCancelConfirmTitle;
+
+  /// No description provided for @subagentPanelCancelConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The running sub-agent will be stopped. Content already generated is kept in the sub-conversation.'**
+  String get subagentPanelCancelConfirmBody;
+
+  /// No description provided for @subagentPanelCancelConfirmKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep running'**
+  String get subagentPanelCancelConfirmKeep;
+
+  /// No description provided for @subagentPanelCancelConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get subagentPanelCancelConfirmAction;
+
+  /// No description provided for @subagentPanelApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get subagentPanelApprove;
+
+  /// No description provided for @subagentPanelDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get subagentPanelDeny;
+
+  /// No description provided for @subagentPanelAskUserPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer is needed'**
+  String get subagentPanelAskUserPending;
+
+  /// No description provided for @subagentPanelAnswerNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer now'**
+  String get subagentPanelAnswerNow;
+
+  /// No description provided for @subagentPanelToolCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 tool calls} =1{1 tool call} other{{count} tool calls}}'**
+  String subagentPanelToolCalls(num count);
+
   /// No description provided for @groupChatMyGroupChats.
   ///
   /// In en, this message translates to:

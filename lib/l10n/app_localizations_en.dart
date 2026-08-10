@@ -7093,6 +7093,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String get handoffBackwardChipTooltip => 'Back to the parent conversation';
 
   @override
+  String get subagentPanelThinking => 'Thinking…';
+
+  @override
+  String get subagentPanelStreaming => 'Streaming';
+
+  @override
+  String get subagentPanelWaitingApproval => 'Waiting for approval';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return 'Last step: calling $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return 'Last step: $tool done';
+  }
+
+  @override
+  String get subagentPanelViewChild => 'Open sub-conversation';
+
+  @override
+  String get subagentPanelCancelTooltip => 'Cancel sub-agent';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => 'Cancel sub-agent?';
+
+  @override
+  String get subagentPanelCancelConfirmBody =>
+      'The running sub-agent will be stopped. Content already generated is kept in the sub-conversation.';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => 'Keep running';
+
+  @override
+  String get subagentPanelCancelConfirmAction => 'Stop';
+
+  @override
+  String get subagentPanelApprove => 'Approve';
+
+  @override
+  String get subagentPanelDeny => 'Deny';
+
+  @override
+  String get subagentPanelAskUserPending => 'Your answer is needed';
+
+  @override
+  String get subagentPanelAnswerNow => 'Answer now';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tool calls',
+      one: '1 tool call',
+      zero: '0 tool calls',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => 'My group chats';
 
   @override

@@ -21,6 +21,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../settings/pages/trash_detail_page.dart';
+import '../widgets/subagent_panel.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -1501,111 +1502,120 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {
-    return ChatInputSection(
-      inputBarKey: _inputBarKey,
-      inputFocus: _inputFocus,
-      inputController: _inputController,
-      mediaController: _mediaController,
-      isTablet: isTablet,
-      isLoading: _controller.isCurrentConversationLoading,
-      isToolModel: _controller.isToolModel,
-      isReasoningModel: _controller.isReasoningModel,
-      isReasoningEnabled: _controller.isReasoningEnabled,
-      conversationId: _controller.currentConversation?.id,
-      sendButtonTooltip: _controller.isUserMessageEditActive
-          ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
-          : null,
-      onMore: _toggleTools,
-      onSelectModel: () => showModelSelectSheet(
-        context,
-        onMultiSelectConfirm:
-            _controller.multiAIEngine.mode == MultiAIMode.synthesize
-            ? null
-            : _controller.enterMultiAIMode,
-      ),
-      onLongPressSelectModel: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
-      },
-      onOpenMcp: () {
-        final a = context.read<AssistantProvider>().currentAssistant;
-        if (a != null) {
-          if (PlatformUtils.isDesktop) {
-            showDesktopMcpServersPopover(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SubagentPanel(
+          onOpenChild: (childId) =>
+              _controller.switchConversationAnimated(childId),
+        ),
+        ChatInputSection(
+          inputBarKey: _inputBarKey,
+          inputFocus: _inputFocus,
+          inputController: _inputController,
+          mediaController: _mediaController,
+          isTablet: isTablet,
+          isLoading: _controller.isCurrentConversationLoading,
+          isToolModel: _controller.isToolModel,
+          isReasoningModel: _controller.isReasoningModel,
+          isReasoningEnabled: _controller.isReasoningEnabled,
+          conversationId: _controller.currentConversation?.id,
+          sendButtonTooltip: _controller.isUserMessageEditActive
+              ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
+              : null,
+          onMore: _toggleTools,
+          onSelectModel: () => showModelSelectSheet(
+            context,
+            onMultiSelectConfirm:
+                _controller.multiAIEngine.mode == MultiAIMode.synthesize
+                ? null
+                : _controller.enterMultiAIMode,
+          ),
+          onLongPressSelectModel: () {
+            Navigator.of(
               context,
-              anchorKey: _inputBarKey,
-              assistantId: a.id,
-            );
-          } else {
-            showAssistantMcpSheet(context, assistantId: a.id);
-          }
-        }
-      },
-      onLongPressMcp: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const McpPage()));
-      },
-      onOpenSearch: _openSearchSettings,
-      onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant != null) {
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
-      },
-      onSend: (text) async {
-        final result = await _controller.sendMessage(text);
-        if (!mounted) return result;
-        if (PlatformUtils.isMobile &&
-            result == ChatInputSubmissionResult.sent) {
-          _controller.dismissKeyboard();
-        }
-        return result;
-      },
-      onStop: _controller.cancelStreaming,
-      hasQueuedInput: _controller.currentQueuedInput != null,
-      queuedPreviewText: _controller.currentQueuedInput?.input.text,
-      onCancelQueuedInput: _controller.cancelQueuedMessage,
-      onQuickPhrase: _showQuickPhraseMenu,
-      onLongPressQuickPhrase: () {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
-      },
-      onDocumentProcessing: () => _openDocumentProcessingPopover(),
-      onOpenMiniMap: _openMiniMap,
-      onPickCamera: _controller.onPickCamera,
-      onPickPhotos: _controller.onPickPhotos,
-      onUploadFiles: _controller.onPickFiles,
-      onToggleLearningMode: _openInstructionInjectionPopover,
-      onOpenWorldBook: _openWorldBookPopover,
-      onOpenSkills: _openSkillsPopover,
-      onLongPressLearning: _showLearningPromptSheet,
-      onClearContext: _controller.clearContext,
-      onCompressContext: _handleDesktopCompressContext,
-      backgroundImageActive: _assistantBackgroundActive(context),
-      multiAIModelCount:
-          _controller.multiAIEngine.isActive &&
-              _controller.multiAIEngine.mode == MultiAIMode.continue_
-          ? _controller.multiAIEngine.models.length
-          : null,
-      onMultiSelectModel: () {
-        final engine = _controller.multiAIEngine;
-        if (engine.roundCount == 0) {
-          _controller.editMultiAIModels();
-        }
-      },
+            ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
+          },
+          onOpenMcp: () {
+            final a = context.read<AssistantProvider>().currentAssistant;
+            if (a != null) {
+              if (PlatformUtils.isDesktop) {
+                showDesktopMcpServersPopover(
+                  context,
+                  anchorKey: _inputBarKey,
+                  assistantId: a.id,
+                );
+              } else {
+                showAssistantMcpSheet(context, assistantId: a.id);
+              }
+            }
+          },
+          onLongPressMcp: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+          },
+          onOpenSearch: _openSearchSettings,
+          onConfigureReasoning: () async {
+            final assistantProvider = context.read<AssistantProvider>();
+            final settingsProvider = context.read<SettingsProvider>();
+            final assistant = assistantProvider.currentAssistant;
+            if (assistant != null) {
+              if (assistant.thinkingBudget != null) {
+                settingsProvider.setThinkingBudget(assistant.thinkingBudget);
+              }
+              await _openReasoningSettings();
+              if (!mounted) return;
+              final chosen = settingsProvider.thinkingBudget;
+              await assistantProvider.updateAssistant(
+                assistant.copyWith(thinkingBudget: chosen),
+              );
+            }
+          },
+          onSend: (text) async {
+            final result = await _controller.sendMessage(text);
+            if (!mounted) return result;
+            if (PlatformUtils.isMobile &&
+                result == ChatInputSubmissionResult.sent) {
+              _controller.dismissKeyboard();
+            }
+            return result;
+          },
+          onStop: _controller.cancelStreaming,
+          hasQueuedInput: _controller.currentQueuedInput != null,
+          queuedPreviewText: _controller.currentQueuedInput?.input.text,
+          onCancelQueuedInput: _controller.cancelQueuedMessage,
+          onQuickPhrase: _showQuickPhraseMenu,
+          onLongPressQuickPhrase: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
+          },
+          onDocumentProcessing: () => _openDocumentProcessingPopover(),
+          onOpenMiniMap: _openMiniMap,
+          onPickCamera: _controller.onPickCamera,
+          onPickPhotos: _controller.onPickPhotos,
+          onUploadFiles: _controller.onPickFiles,
+          onToggleLearningMode: _openInstructionInjectionPopover,
+          onOpenWorldBook: _openWorldBookPopover,
+          onOpenSkills: _openSkillsPopover,
+          onLongPressLearning: _showLearningPromptSheet,
+          onClearContext: _controller.clearContext,
+          onCompressContext: _handleDesktopCompressContext,
+          backgroundImageActive: _assistantBackgroundActive(context),
+          multiAIModelCount:
+              _controller.multiAIEngine.isActive &&
+                  _controller.multiAIEngine.mode == MultiAIMode.continue_
+              ? _controller.multiAIEngine.models.length
+              : null,
+          onMultiSelectModel: () {
+            final engine = _controller.multiAIEngine;
+            if (engine.roundCount == 0) {
+              _controller.editMultiAIModels();
+            }
+          },
+        ),
+      ],
     );
   }
 

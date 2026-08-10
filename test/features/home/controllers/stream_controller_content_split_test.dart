@@ -107,7 +107,7 @@ void main() {
       ..expanded = false
       ..toolStartIndex = 0;
 
-    final json = controller.serializeReasoningSegmentsWithSplits(
+    final json = serializeReasoningSegmentsWithSplits(
       [segment],
       contentSplitOffsets: const [12],
       reasoningCountAtSplit: const [1],
@@ -241,7 +241,7 @@ void main() {
         role: 'assistant',
         content: '让我帮你搜索一下',
         conversationId: 'conversation-1',
-        reasoningSegmentsJson: controller.serializeReasoningSegmentsWithSplits(
+        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(
           const [],
           contentSplitOffsets: const [],
           reasoningCountAtSplit: const [],

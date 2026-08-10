@@ -327,52 +327,6 @@ class StreamController {
     return _encodeJson(list);
   }
 
-  String serializeReasoningSegmentsWithSplits(
-    List<ReasoningSegmentData> segments, {
-    List<int>? contentSplitOffsets,
-    List<int>? reasoningCountAtSplit,
-    List<int>? toolCountAtSplit,
-    dynamic reasoningDetails,
-  }) {
-    final list = segments
-        .map(
-          (s) => {
-            'text': s.text,
-            'startAt': s.startAt?.toIso8601String(),
-            'finishedAt': s.finishedAt?.toIso8601String(),
-            'expanded': s.expanded,
-            'toolStartIndex': s.toolStartIndex,
-          },
-        )
-        .toList();
-
-    if (contentSplitOffsets == null &&
-        reasoningCountAtSplit == null &&
-        toolCountAtSplit == null &&
-        reasoningDetails == null) {
-      return _encodeJson(list);
-    }
-
-    final normalized = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(contentSplitOffsets ?? const <int>[]),
-        reasoningCounts: List<int>.of(reasoningCountAtSplit ?? const <int>[]),
-        toolCounts: List<int>.of(toolCountAtSplit ?? const <int>[]),
-      ),
-    );
-
-    return _encodeJson({
-      'v': 2,
-      'segments': list,
-      'contentSplits': {
-        'offsets': normalized.offsets,
-        'reasoningCounts': normalized.reasoningCounts,
-        'toolCounts': normalized.toolCounts,
-      },
-      if (reasoningDetails != null) 'reasoningDetails': reasoningDetails,
-    });
-  }
-
   /// Extract persisted vendor reasoning details (if any) from a serialized
   /// reasoningSegmentsJson payload.
   dynamic deserializeReasoningDetails(String? json) {
@@ -1656,6 +1610,64 @@ String _jsonEncode(dynamic obj) {
 
 dynamic _jsonDecode(String json) {
   return _JsonDecoder.decode(json);
+}
+
+/// Top-level serializer shared by the page streaming pipeline AND headless
+/// sub-generations: persists reasoning segments + content-split boundaries
+/// (v2 payload) so `restoreMessageState` can rebuild interleaved
+/// thinking→content→tool rendering, collapse state, duration and the
+/// loading/finished animation flags.
+String serializeReasoningSegmentsWithSplits(
+  List<ReasoningSegmentData> segments, {
+  List<int>? contentSplitOffsets,
+  List<int>? reasoningCountAtSplit,
+  List<int>? toolCountAtSplit,
+  dynamic reasoningDetails,
+}) {
+  final list = segments
+      .map(
+        (s) => {
+          'text': s.text,
+          'startAt': s.startAt?.toIso8601String(),
+          'finishedAt': s.finishedAt?.toIso8601String(),
+          'expanded': s.expanded,
+          'toolStartIndex': s.toolStartIndex,
+        },
+      )
+      .toList();
+
+  if (contentSplitOffsets == null &&
+      reasoningCountAtSplit == null &&
+      toolCountAtSplit == null &&
+      reasoningDetails == null) {
+    return _jsonEncode(list);
+  }
+
+  final length = math.min(
+    (contentSplitOffsets ?? const <int>[]).length,
+    math.min(
+      (reasoningCountAtSplit ?? const <int>[]).length,
+      (toolCountAtSplit ?? const <int>[]).length,
+    ),
+  );
+  final normalized = ContentSplitData(
+    offsets: List<int>.of((contentSplitOffsets ?? const <int>[]).take(length)),
+    reasoningCounts: List<int>.of(
+      (reasoningCountAtSplit ?? const <int>[]).take(length),
+    ),
+    toolCounts: List<int>.of((toolCountAtSplit ?? const <int>[]).take(length)),
+  );
+
+  return _jsonEncode({
+    'v': 2,
+    'segments': list,
+    'contentSplits': {
+      'offsets': normalized.offsets,
+      'reasoningCounts': normalized.reasoningCounts,
+      'toolCounts': normalized.toolCounts,
+    },
+    if (reasoningDetails != null) 'reasoningDetails': reasoningDetails,
+  });
 }
 
 class _JsonEncoder {

@@ -152,6 +152,7 @@ class HomePageController extends ChangeNotifier {
 
   McpProvider? _mcpProvider;
   HeadlessGenerationService? _headlessGen;
+  String? _headlessChunkMessageId;
   bool _wasCurrentHeadlessActive = false;
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<MessageLocateTarget>? _locateSub;
@@ -1132,6 +1133,7 @@ class HomePageController extends ChangeNotifier {
     await _viewModel.switchConversation(id);
     _scrollCtrl.clearObserverCache();
     recoverMultiAIState();
+    _syncHeadlessChunks();
     notifyListeners();
     try {
       await WidgetsBinding.instance.endOfFrame;
@@ -2664,7 +2666,72 @@ class HomePageController extends ChangeNotifier {
       _chatController.setCurrentConversation(currentConversation);
     }
     _wasCurrentHeadlessActive = isNowActive;
+    _syncHeadlessChunks();
     notifyListeners();
+  }
+
+  /// Drives live rendering of a headless sub-generation (子代理/child
+  /// conversation): the page REGISTERS its `StreamingContentNotifier` on the
+  /// job and seeds it with the accumulated text/reasoning. The job's `_run`
+  /// updates the notifier per chunk — there is no page-side chunk buffer
+  /// (single state source, see ADR-0024 方向 C).
+  void _syncHeadlessChunks() {
+    final cid = currentConversation?.id;
+    if (cid == null) {
+      _cancelHeadlessChunkSub();
+      return;
+    }
+    final active = _headlessGen?.isActive(cid) ?? false;
+    if (!active) {
+      _cancelHeadlessChunkSub();
+      return;
+    }
+    final job = _headlessGen?.jobFor(cid);
+    final mid = job?.assistantMessageId;
+    if (mid == null || mid.isEmpty) {
+      // Placeholder not created yet (addMessage still in flight); the
+      // service notifies again once it lands.
+      return;
+    }
+    if (!_chatController.messages.any((m) => m.id == mid)) {
+      // Full reload: the placeholder message may not be in the loaded list
+      // yet (the headless addMessage runs after engine-side message
+      // building), and refreshLoadedMessageCount only updates the count.
+      _chatController.reloadMessages();
+    }
+    if (_headlessChunkMessageId != null && _headlessChunkMessageId != mid) {
+      _cancelHeadlessChunkSub();
+    }
+    if (job?.uiNotifier != streamingContentNotifier) {
+      job?.uiNotifier = streamingContentNotifier;
+      _headlessChunkMessageId = mid;
+      // Seed: the broadcast chunk stream does not replay, so a mid-stream
+      // (re)subscription must start from the accumulated state. Create the
+      // notifier UNCONDITIONALLY — when the child is still thinking the
+      // first chunk must find it registered, or updateContent is a no-op.
+      streamingContentNotifier.getNotifier(mid);
+      final text = job?.streamedText.toString() ?? '';
+      if (text.isNotEmpty) {
+        streamingContentNotifier.updateContent(mid, text, 0);
+      }
+    }
+  }
+
+  void _cancelHeadlessChunkSub() {
+    final mid = _headlessChunkMessageId;
+    _headlessChunkMessageId = null;
+    if (mid != null) {
+      streamingContentNotifier.removeNotifier(mid);
+    }
+    // Detach the page notifier from any headless job of the current
+    // conversation (generation continues; the DB write stays one-shot).
+    final cid = currentConversation?.id;
+    if (cid != null) {
+      final job = _headlessGen?.jobFor(cid);
+      if (job?.uiNotifier == streamingContentNotifier) {
+        job?.uiNotifier = null;
+      }
+    }
   }
 
   // ============================================================================
@@ -2678,6 +2745,7 @@ class HomePageController extends ChangeNotifier {
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _headlessGen?.removeListener(_onHeadlessGenChanged);
+    _cancelHeadlessChunkSub();
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

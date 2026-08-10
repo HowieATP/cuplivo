@@ -2893,10 +2893,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           ),
                         ],
                         if (widget.showTokenStats &&
-                            widget.message.totalTokens != null) ...[
+                            (widget.message.contextTokens != null ||
+                                widget.message.totalTokens != null)) ...[
                           const Spacer(),
                           TokenDisplayWidget(
-                            totalTokens: widget.message.totalTokens!,
+                            totalTokens:
+                                widget.message.contextTokens ??
+                                widget.message.totalTokens!,
                             promptTokens: widget.message.promptTokens,
                             completionTokens: widget.message.completionTokens,
                             cachedTokens: widget.message.cachedTokens,

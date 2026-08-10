@@ -1809,16 +1809,21 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           isDone: true,
           totalTokens: usage?.totalTokens ?? 0,
           usage: usage,
+          consumedUsage: usage,
         );
         return;
       }
 
       // Chat Completions non-stream with tool-calls follow-ups
-      TokenUsage? aggUsage;
+      TokenUsage? roundUsage;
+      TokenUsage? consumedUsage;
       Map<String, dynamic> lastObj = obj is Map
           ? Map<String, dynamic>.from(obj)
           : <String, dynamic>{};
       while (true) {
+        // Round-local usage: never carry a stale value into a round whose
+        // response omits usage (would double-count on the boundary fold).
+        roundUsage = null;
         Map<String, dynamic>? c0;
         try {
           final choices = lastObj['choices'] as List?;
@@ -1831,12 +1836,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           yield ChatStreamChunk(
             content: s,
             isDone: true,
-            totalTokens: aggUsage?.totalTokens ?? 0,
-            usage: aggUsage,
+            totalTokens: roundUsage?.totalTokens ?? 0,
+            usage: roundUsage,
+            consumedUsage: consumedUsage,
           );
           return;
         }
-        // usage
+        // usage (per request round — context semantics on the round's own
+        // value; consumed semantics accumulate across rounds)
         try {
           final u = lastObj['usage'];
           if (u is Map) {
@@ -1845,13 +1852,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final cached =
                 (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
                 0;
-            final round = TokenUsage(
+            roundUsage = TokenUsage(
               promptTokens: prompt,
               completionTokens: completion,
               cachedTokens: cached,
               totalTokens: prompt + completion,
             );
-            aggUsage = (aggUsage ?? const TokenUsage()).merge(round);
           }
         } catch (_) {}
 
@@ -1890,8 +1896,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             yield ChatStreamChunk(
               content: '',
               isDone: false,
-              totalTokens: aggUsage?.totalTokens ?? 0,
-              usage: aggUsage,
+              totalTokens: roundUsage?.totalTokens ?? 0,
+              usage: roundUsage,
+              consumedUsage: consumedUsage,
               toolCalls: callInfos,
             );
           }
@@ -1922,8 +1929,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             yield ChatStreamChunk(
               content: '',
               isDone: false,
-              totalTokens: aggUsage?.totalTokens ?? 0,
-              usage: aggUsage,
+              totalTokens: roundUsage?.totalTokens ?? 0,
+              usage: roundUsage,
+              consumedUsage: consumedUsage,
               toolResults: resultsInfo,
             );
           }
@@ -1994,6 +2002,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final txt2 = await resp2.stream.bytesToString();
           lastObj = jsonDecode(txt2) as Map<String, dynamic>;
           messages = next; // update transcript for next round
+          // Round boundary: fold this round's usage into the consumed
+          // accumulator before the next round's parse replaces roundUsage.
+          consumedUsage = TokenUsage.accumulate(consumedUsage, roundUsage);
           continue;
         }
 
@@ -2032,8 +2043,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           content: content,
           reasoningDetails: cmsg?['reasoning_details'],
           isDone: true,
-          totalTokens: aggUsage?.totalTokens ?? 0,
-          usage: aggUsage,
+          totalTokens: roundUsage?.totalTokens ?? 0,
+          usage: roundUsage,
+          consumedUsage: TokenUsage.accumulate(consumedUsage, roundUsage),
           truncationReason: (c0['finish_reason'] as String?) == 'length'
               ? 'max_tokens'
               : null,
@@ -2050,6 +2062,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   String buffer = '';
   int totalTokens = 0;
   TokenUsage? usage;
+  // Sum of usage across completed request rounds (consumed semantics).
+  TokenUsage? consumedUsage;
   // Fallback approx token calculation when provider doesn't include usage
   int approxTokensFromChars(int chars) => (chars / 4).round();
   final int approxPromptChars = messages.fold<int>(
@@ -2195,6 +2209,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Follow-up request(s) with multi-round tool calls
           var currentMessages = mm2;
           while (true) {
+            // Round boundary: fold the previous round's usage into the
+            // consumed accumulator and reset so this round is counted on its
+            // own cumulative values.
+            consumedUsage = TokenUsage.accumulate(consumedUsage, usage);
+            usage = null;
             final Map<String, dynamic> body2 = useLongCatOmniPayload
                 ? {
                     'model': upstreamModelId,
@@ -2528,6 +2547,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isDone: false,
                   totalTokens: usage?.totalTokens ?? 0,
                   usage: usage,
+                  consumedUsage: consumedUsage,
                   toolCalls: callInfos2,
                 );
               }
@@ -2559,6 +2579,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isDone: false,
                   totalTokens: usage?.totalTokens ?? 0,
                   usage: usage,
+                  consumedUsage: consumedUsage,
                   toolResults: resultsInfo2,
                 );
               }
@@ -2599,6 +2620,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 isDone: true,
                 totalTokens: usage?.totalTokens ?? approxTotal,
                 usage: usage,
+                consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
               );
               return;
             }
@@ -2613,6 +2635,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           isDone: true,
           totalTokens: usage?.totalTokens ?? approxTotal,
           usage: usage,
+          consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
         );
         return;
       }
@@ -2984,6 +3007,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               String? lastToolSignature;
               int consecutiveDupeCount = 0;
               while (true) {
+                // Round boundary: fold the previous round's usage into the
+                // consumed accumulator and reset for this round.
+                consumedUsage = TokenUsage.accumulate(consumedUsage, usage);
+                usage = null;
                 final body2 = <String, dynamic>{
                   'model': upstreamModelId,
                   'input': currentInput,
@@ -3175,6 +3202,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     isDone: true,
                     totalTokens: usage?.totalTokens ?? approxTotal2,
                     usage: usage,
+                    consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
                     truncationReason: incompleteReason == 'max_tokens'
                         ? 'max_tokens'
                         : null,
@@ -3230,6 +3258,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     isDone: false,
                     totalTokens: usage?.totalTokens ?? approxTotal,
                     usage: usage,
+                    consumedUsage: consumedUsage,
                     toolCalls: callInfos2,
                   );
                 }
@@ -3272,6 +3301,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     isDone: false,
                     totalTokens: usage?.totalTokens ?? 0,
                     usage: usage,
+                    consumedUsage: consumedUsage,
                     toolResults: resultsInfo2,
                   );
                 }
@@ -3292,6 +3322,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 isDone: true,
                 totalTokens: usage?.totalTokens ?? approxTotal,
                 usage: usage,
+                consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
                 truncationReason: incompleteReason == 'max_tokens'
                     ? 'max_tokens'
                     : null,
@@ -3308,6 +3339,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               isDone: true,
               totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
+              consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
               truncationReason: incompleteReason == 'max_tokens'
                   ? 'max_tokens'
                   : null,
@@ -3734,6 +3766,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Continue streaming with follow-up request
           var currentMessages = mm2;
           while (true) {
+            // Round boundary: fold the previous round's usage into the
+            // consumed accumulator and reset for this round.
+            consumedUsage = TokenUsage.accumulate(consumedUsage, usage);
+            usage = null;
             final Map<String, dynamic> body2 = useLongCatOmniPayload
                 ? {
                     'model': upstreamModelId,
@@ -4081,6 +4117,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isDone: false,
                   totalTokens: usage?.totalTokens ?? 0,
                   usage: usage,
+                  consumedUsage: consumedUsage,
                   toolCalls: callInfos2,
                 );
               }
@@ -4112,6 +4149,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isDone: false,
                   totalTokens: usage?.totalTokens ?? 0,
                   usage: usage,
+                  consumedUsage: consumedUsage,
                   toolResults: resultsInfo2,
                 );
               }
@@ -4149,6 +4187,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 isDone: true,
                 totalTokens: usage?.totalTokens ?? approxTotal,
                 usage: usage,
+                consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
                 truncationReason: finishReason == 'length'
                     ? 'max_tokens'
                     : null,
@@ -4265,6 +4304,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               // Continue streaming with follow-up request - reuse existing multi-round logic from [DONE] handler
               var currentMessages = mm2;
               while (true) {
+                // Round boundary: fold the previous round's usage into the
+                // consumed accumulator and reset for this round.
+                consumedUsage = TokenUsage.accumulate(consumedUsage, usage);
+                usage = null;
                 final Map<String, dynamic> body2 = useLongCatOmniPayload
                     ? {
                         'model': upstreamModelId,
@@ -4589,6 +4632,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       isDone: false,
                       totalTokens: usage?.totalTokens ?? 0,
                       usage: usage,
+                      consumedUsage: consumedUsage,
                       toolCalls: callInfos2,
                     );
                   }
@@ -4620,6 +4664,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       isDone: false,
                       totalTokens: usage?.totalTokens ?? 0,
                       usage: usage,
+                      consumedUsage: consumedUsage,
                       toolResults: resultsInfo2,
                     );
                   }
@@ -4659,6 +4704,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     isDone: true,
                     totalTokens: usage?.totalTokens ?? approxTotal,
                     usage: usage,
+                    consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
                   );
                   return;
                 }
@@ -4692,6 +4738,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     isDone: true,
     totalTokens: approxTotal,
     usage: usage,
+    consumedUsage: TokenUsage.accumulate(consumedUsage, usage),
     truncationReason:
         finishReason == 'length' || incompleteReason == 'max_tokens'
         ? 'max_tokens'

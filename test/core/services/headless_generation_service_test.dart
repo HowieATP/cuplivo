@@ -59,6 +59,7 @@ class _FakeChatService extends ChatService {
     String messageId, {
     String? content,
     int? totalTokens,
+    int? contextTokens,
     bool? isStreaming,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -79,6 +80,7 @@ class _FakeChatService extends ChatService {
           list[i] = list[i].copyWith(
             content: content,
             totalTokens: totalTokens,
+            contextTokens: contextTokens,
             isStreaming: isStreaming,
             reasoningText: reasoningText,
             reasoningStartAt: reasoningStartAt,
@@ -303,14 +305,16 @@ void main() {
       expect(messages.last.reasoningText, 'thinking step 1 step 2');
       expect(messages.last.isStreaming, isFalse);
       // Timestamps: startAt set at first reasoning chunk, finishedAt at stream
-      // end (mirrors the page pipeline semantics).
+      // end (mirrors the page pipeline semantics). Same-millisecond
+      // start/finish is legal under concurrent test-file load, so only
+      // assert finishedAt never precedes startAt.
       expect(messages.last.reasoningStartAt, isNotNull);
       expect(messages.last.reasoningFinishedAt, isNotNull);
       expect(
-        messages.last.reasoningFinishedAt!.isAfter(
+        messages.last.reasoningFinishedAt!.isBefore(
           messages.last.reasoningStartAt!,
         ),
-        isTrue,
+        isFalse,
       );
       // v2 payload with one thinking→content split so rendering interleaves.
       final payload =

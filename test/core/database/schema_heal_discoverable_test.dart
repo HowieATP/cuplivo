@@ -160,16 +160,52 @@ void main() {
     },
   );
 
+  test(
+    'heal adds context_tokens before message insert (v17 column shape)',
+    () async {
+      _createLegacyDb(
+        dbFile,
+        userVersion: 17,
+        missingIsPreset: false,
+        missingHandoffColumns: false,
+        missingOcrMode: false,
+        missingContextTokens: true,
+      );
+
+      final repo = ChatDatabaseRepository.open(file: dbFile);
+      await repo.ensureReady();
+
+      // Must succeed: heal adds context_tokens before Drift INSERT, and the
+      // value round-trips through the repository.
+      final conv = Conversation(title: 'Conv', assistantId: 'a1');
+      await repo.putConversation(conv);
+      await repo.putMessage(
+        ChatMessage(
+          role: 'assistant',
+          content: 'with context',
+          conversationId: conv.id,
+          contextTokens: 4321,
+        ),
+      );
+
+      final rows = await repo.db.select(repo.db.messageRows).get();
+      expect(rows, hasLength(1));
+      expect(rows.first.contextTokens, 4321);
+
+      await repo.close();
+    },
+  );
+
   test('heal adds inject_group_members column on group_chat_rows '
-      '(v16 column shape)', () async {
+      '(v17 column shape)', () async {
     _createLegacyDb(
       dbFile,
-      userVersion: 16,
+      userVersion: 17,
       missingIsPreset: false,
       missingHandoffColumns: false,
     );
-    // A partial group_chat_rows table missing the v16 column, as if a
-    // silent migration failure left user_version at 16 without it.
+    // A partial group_chat_rows table missing the v17 column, as if a
+    // silent migration failure left user_version at 17 without it.
     final raw = sqlite.sqlite3.open(dbFile.path);
     raw.execute('''
 CREATE TABLE group_chat_rows (
@@ -226,6 +262,7 @@ void _createLegacyDb(
   required bool missingIsPreset,
   required bool missingHandoffColumns,
   bool missingOcrMode = false,
+  bool missingContextTokens = true,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -309,6 +346,11 @@ CREATE TABLE conversation_rows (
       : '''
   is_preset INTEGER NOT NULL DEFAULT 0,
 ''';
+  final contextTokensColumn = missingContextTokens
+      ? ''
+      : '''
+  context_tokens INTEGER NULL,
+''';
   raw.execute('''
 CREATE TABLE message_rows (
   id TEXT NOT NULL PRIMARY KEY,
@@ -333,6 +375,7 @@ CREATE TABLE message_rows (
   cached_tokens INTEGER NULL,
   duration_ms INTEGER NULL,
   message_order INTEGER NOT NULL,
+  $contextTokensColumn
   $isPresetColumn
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );

@@ -604,6 +604,23 @@
 
 - "显示公式" / "display formula" was used in issue #218 to mean block-level math as opposed to inline — resolved: the domain term is **Display math** (block-level TeX forms `$$...$$` and `\[...\]`); "inline math" is the flow-level counterpart.
 
+## Token Accounting (Token 统计)
+
+- **Tool-call round (工具调用轮次)**: One independent API request within a single assistant turn. A multi-round turn = model calls tools → tool results appended → follow-up request, repeated. Each round is separately billed, and its `usage` snapshot resets per request (except Gemini-style within-stream cumulative `usageMetadata`).
+- **Consumed semantics (消耗语义)**: Per-round usage **summed** across all rounds of a turn — what was actually billed. Stored in `ChatMessage.promptTokens/completionTokens/cachedTokens/totalTokens` (schema v17+). Consumed by the Stats page aggregation and the token-detail popup. Legacy rows (pre-v16) hold context-ish max-merged values and are summed as-is (approximation, single-round turns are exact).
+- **Context semantics (上下文语义)**: The **last round's** usage — the context the model actually had at the end of the turn. Stored in `ChatMessage.contextTokens` (schema v17, `message_rows.context_tokens`), shown by the bottom-right token display (`contextTokens ?? totalTokens` fallback for legacy messages). Streaming is naturally continuous: the live value IS the current round's cumulative.
+- **`TokenUsage.merge` = max (within-round)**: Correct for streaming snapshots that are cumulative within one request. Never use it across rounds — that was bug #235 (per-round values max-merged → prompt = last round, completion = max single round, multi-round consumption invisible).
+- **`TokenUsage.sum` / `TokenUsage.accumulate` (across-round)**: Providers fold each completed round into a `consumedUsage` accumulator at round boundaries and reset the round-local `usage`; the consumer (`chat_actions.dart`) takes last-wins (replace) on both `chunk.usage` and `chunk.consumedUsage`. See `docs/adr/0025-token-accounting-context-vs-consumed.md`.
+
+### Example Dialogue
+
+> **Dev:** "A user's message right-corner shows 15k tokens, but the popup says prompt 38k + completion 3k. Which is right?"
+> **Domain expert:** "Both are. The corner number is **context** — the last request's total, what you can budget against. The popup is **consumed** — the sum across the three tool-call rounds that turn actually billed. Stats sums consumed too. For a single-round message the two are identical."
+
+### Flagged Ambiguities
+
+- "token 数" on the message corner was read as both consumption and context — resolved: the corner number is **context** (`contextTokens`); consumption lives in the detail popup and the Stats page (both consumed semantics).
+
 ## Default Behavior (Out-of-the-Box Defaults)
 
 - **DeepSeek default**: DeepSeek is the first base provider (position 1) and enabled in the built-in provider list, and the global default chat model is seeded to `DeepSeek` / `deepseek-v4-flash` **once** — on the first load where no model was ever persisted (fresh installs and legacy installs that never chose a model). A sentinel (`default_model_seeded_v1`) is armed whenever a selection is persisted or the seed runs, so explicit user actions (`resetCurrentModel`, provider/model disable or delete) are never undone by a later launch. Persisted `providersOrder` / `currentModel` win on existing installs. The default assistant is NOT bound to DeepSeek explicitly (`chatModelProvider` stays null) — it resolves through the global default model, keeping a single source of truth.

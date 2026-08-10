@@ -13,6 +13,13 @@ McpServerConfig _server(String id, String name) => McpServerConfig(
   url: 'http://127.0.0.1:1/$id',
 );
 
+McpServerConfig _retiredFetchServer() => McpServerConfig(
+  id: 'kelivo_fetch',
+  name: '@kelivo/fetch',
+  enabled: true,
+  transport: McpTransportType.inmemory,
+);
+
 Future<Set<String>> _persistedServerIds() async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString('mcp_servers_v1');
@@ -25,6 +32,146 @@ Future<Set<String>> _persistedServerIds() async {
 }
 
 void main() {
+  test(
+    'startup removes the retired fetch server without touching others',
+    () async {
+      final untouched = _server('srv-a', 'Server A').copyWith(
+        toolPrefix: 'safe_',
+        tools: [McpToolConfig(enabled: false, name: 'remote_tool')],
+      );
+      SharedPreferences.setMockInitialValues({
+        'mcp_servers_v1': jsonEncode([
+          _retiredFetchServer().toJson(),
+          untouched.toJson(),
+        ]),
+      });
+
+      final provider = McpProvider(
+        contextProvider: () => throw UnimplementedError(),
+      );
+      await pumpEventQueue();
+
+      expect(provider.servers.map((server) => server.id), contains('srv-a'));
+      expect(
+        provider.servers.map((server) => server.id),
+        isNot(contains('kelivo_fetch')),
+      );
+      expect(
+        provider.servers.map((server) => server.id),
+        contains('kelivo_filesystem'),
+      );
+      final preserved = provider.getById('srv-a')!;
+      expect(preserved.toolPrefix, 'safe_');
+      expect(preserved.tools.single.name, 'remote_tool');
+      expect(preserved.tools.single.enabled, isFalse);
+      expect(await _persistedServerIds(), contains('srv-a'));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_fetch')));
+    },
+  );
+
+  test('backup reload removes and persists the retired fetch server', () async {
+    SharedPreferences.setMockInitialValues({
+      'mcp_servers_v1': jsonEncode([_server('before', 'Before').toJson()]),
+    });
+    final provider = McpProvider(
+      contextProvider: () => throw UnimplementedError(),
+    );
+    await pumpEventQueue();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'mcp_servers_v1',
+      jsonEncode([
+        _retiredFetchServer().toJson(),
+        _server('restored', 'Restored').toJson(),
+      ]),
+    );
+    await provider.reloadFromPrefs();
+
+    final ids = provider.servers.map((server) => server.id).toSet();
+    expect(ids, contains('restored'));
+    expect(ids, isNot(contains('before')));
+    expect(ids, isNot(contains('kelivo_fetch')));
+    expect(await _persistedServerIds(), contains('restored'));
+    expect(await _persistedServerIds(), isNot(contains('kelivo_fetch')));
+  });
+
+  test('all supported MCP JSON shapes discard only retired fetch', () async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = McpProvider(
+      contextProvider: () => throw UnimplementedError(),
+    );
+    await pumpEventQueue();
+
+    final remote = _server('remote', 'Remote').toJson();
+    final retired = _retiredFetchServer().toJson();
+    final inputs = <String>[
+      jsonEncode({
+        'mcpServers': {
+          'kelivo_fetch': {
+            'name': '@kelivo/fetch',
+            'type': 'inmemory',
+            'isActive': true,
+          },
+          'remote': {
+            'name': 'Remote',
+            'type': 'streamableHttp',
+            'baseUrl': 'http://127.0.0.1:1/remote',
+            'isActive': false,
+          },
+        },
+      }),
+      jsonEncode([retired, remote]),
+      jsonEncode({
+        'servers': [retired, remote],
+      }),
+    ];
+
+    for (final input in inputs) {
+      await provider.replaceAllFromJson(input);
+      final ids = provider.servers.map((server) => server.id).toSet();
+      expect(ids, contains('remote'));
+      expect(ids, contains('kelivo_filesystem'));
+      expect(ids, isNot(contains('kelivo_fetch')));
+      expect(
+        provider.exportServersAsUiJson(),
+        isNot(contains('@kelivo/fetch')),
+      );
+    }
+  });
+
+  test('unknown in-memory JSON does not become a fetch server', () async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = McpProvider(
+      contextProvider: () => throw UnimplementedError(),
+    );
+    await pumpEventQueue();
+
+    await provider.replaceAllFromJson(
+      jsonEncode({
+        'mcpServers': {
+          'unknown': {'name': '@example/unknown', 'type': 'inmemory'},
+          'remote': {
+            'name': 'Remote',
+            'type': 'streamableHttp',
+            'baseUrl': 'http://127.0.0.1:1/remote',
+            'isActive': false,
+          },
+        },
+      }),
+    );
+
+    expect(provider.servers.map((server) => server.id), contains('remote'));
+    expect(
+      provider.servers.map((server) => server.id),
+      isNot(contains('unknown')),
+    );
+    expect(
+      provider.servers.map((server) => server.id),
+      isNot(contains('kelivo_fetch')),
+    );
+  });
+
   test(
     'reloadFromPrefs rebuilds the server list and timeout from SharedPreferences',
     () async {

@@ -1,5 +1,7 @@
 import 'dart:math';
 
+const Object _apiKeyCopyUnset = Object();
+
 enum ApiKeyStatus { active, disabled, error, rateLimited }
 
 class ApiKeyUsage {
@@ -81,25 +83,29 @@ class ApiKeyConfig {
   ApiKeyConfig copyWith({
     String? id,
     String? key,
-    String? name,
+    Object? name = _apiKeyCopyUnset,
     bool? isEnabled,
     int? priority,
-    int? maxRequestsPerMinute,
+    Object? maxRequestsPerMinute = _apiKeyCopyUnset,
     ApiKeyUsage? usage,
     ApiKeyStatus? status,
-    String? lastError,
+    Object? lastError = _apiKeyCopyUnset,
     int? createdAt,
     int? updatedAt,
   }) => ApiKeyConfig(
     id: id ?? this.id,
     key: key ?? this.key,
-    name: name ?? this.name,
+    name: identical(name, _apiKeyCopyUnset) ? this.name : name as String?,
     isEnabled: isEnabled ?? this.isEnabled,
     priority: priority ?? this.priority,
-    maxRequestsPerMinute: maxRequestsPerMinute ?? this.maxRequestsPerMinute,
+    maxRequestsPerMinute: identical(maxRequestsPerMinute, _apiKeyCopyUnset)
+        ? this.maxRequestsPerMinute
+        : maxRequestsPerMinute as int?,
     usage: usage ?? this.usage,
     status: status ?? this.status,
-    lastError: lastError ?? this.lastError,
+    lastError: identical(lastError, _apiKeyCopyUnset)
+        ? this.lastError
+        : lastError as String?,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );

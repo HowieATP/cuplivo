@@ -8042,6 +8042,12 @@ abstract class AppLocalizations {
   /// **'General Options'**
   String get searchServicesPageGeneralOptions;
 
+  /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fetch for providers without native fetch'**
+  String get searchServicesPageEnableFallbackFetchTitle;
+
   /// No description provided for @searchServicesPageAutoTestTitle.
   ///
   /// In en, this message translates to:

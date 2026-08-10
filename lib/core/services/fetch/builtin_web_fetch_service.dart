@@ -1,23 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart' show IOClient;
-import 'package:html/parser.dart' as html_parser;
-import 'package:html/dom.dart' as dom;
-import 'package:html2md/html2md.dart' as html2md;
-import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 
-import '../../../../utils/app_directories.dart';
-import '../kelivo_filesystem/kelivo_filesystem_server.dart'
+import '../../../utils/app_directories.dart';
+import 'readable_web_fetch_service.dart';
+import 'web_fetch_content.dart';
+import 'web_fetch_target_guard.dart' as guard;
+import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment, KelivoFilesystemMcpServerEngine;
 
-/// @kelivo/fetch — In-memory MCP server engine and transport (Flutter/Dart)
+/// Cuplivo's transport-independent built-in web fetch engine.
 ///
 /// Provides one token-conscious `fetch` tool. HTML is simplified to Markdown
 /// by default, while raw content requires an explicit opt-in. Responses are
@@ -25,17 +23,11 @@ import '../kelivo_filesystem/kelivo_filesystem_server.dart'
 ///
 /// `download_path` saves fetched bytes as-is into `@workspaces` (binary
 /// allowed); without it, over-length content is stored in
-/// `@workspaces/.fetch_cache/` and the path is returned. See CONTEXT.md
-/// "@kelivo/fetch (Built-in Fetch Tool)".
-///
-/// The server implements a minimal subset of MCP over JSON-RPC 2.0:
-/// initialize, tools/list, tools/call. It is intended to run in the same
-/// isolate as the Flutter app and connect to a standard mcp.Client via an
-/// in-memory ClientTransport.
+/// `@workspaces/.fetch_cache/` and the path is returned.
 
-class KelivoFetchRequestPayload {
-  static const defaultMaxLength = 5000;
-  static const maximumMaxLength = 20000;
+class BuiltInWebFetchRequest {
+  static const defaultMaxLength = WebFetchContentWindow.defaultMaxLength;
+  static const maximumMaxLength = WebFetchContentWindow.maximumMaxLength;
 
   final Uri url;
   final Map<String, String> headers;
@@ -46,7 +38,7 @@ class KelivoFetchRequestPayload {
   /// Full wire path under `@workspaces/` (validated), or null for text mode.
   final String? downloadPath;
 
-  KelivoFetchRequestPayload({
+  BuiltInWebFetchRequest({
     required this.url,
     Map<String, String>? headers,
     this.maxLength = defaultMaxLength,
@@ -55,7 +47,7 @@ class KelivoFetchRequestPayload {
     this.downloadPath,
   }) : headers = headers ?? const {};
 
-  static KelivoFetchRequestPayload parse(Object? args) {
+  static BuiltInWebFetchRequest parse(Object? args) {
     if (args is! Map) {
       throw ArgumentError(
         'Invalid arguments: expected an object containing url',
@@ -64,11 +56,21 @@ class KelivoFetchRequestPayload {
     final map = args.cast<String, dynamic>();
     final urlRaw = (map['url'] ?? '').toString().trim();
     final uri = Uri.tryParse(urlRaw);
-    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+    if (uri == null ||
+        !uri.hasAuthority ||
+        uri.host.isEmpty ||
+        !(uri.isScheme('http') || uri.isScheme('https'))) {
       throw ArgumentError('Invalid url: $urlRaw');
+    }
+    final blockReason = guard.WebFetchTargetGuard.literalBlockReason(uri);
+    if (blockReason != null) {
+      throw ArgumentError('Invalid url: $blockReason');
     }
     final headersAny = map['headers'];
     final headers = <String, String>{};
+    if (headersAny != null && headersAny is! Map) {
+      throw ArgumentError('Invalid headers: expected an object');
+    }
     if (headersAny is Map) {
       headersAny.forEach((k, v) {
         if (k == null || v == null) return;
@@ -82,7 +84,7 @@ class KelivoFetchRequestPayload {
     if (downloadPath != null) {
       // Download mode: bytes are saved as-is; max_length, start_index and
       // raw are ignored entirely (not even type-validated).
-      return KelivoFetchRequestPayload(
+      return BuiltInWebFetchRequest(
         url: uri,
         headers: headers,
         downloadPath: downloadPath,
@@ -111,7 +113,7 @@ class KelivoFetchRequestPayload {
       throw ArgumentError('Invalid raw: expected a boolean');
     }
 
-    return KelivoFetchRequestPayload(
+    return BuiltInWebFetchRequest(
       url: uri,
       headers: headers,
       maxLength: maxLength,
@@ -188,7 +190,40 @@ class KelivoFetchRequestPayload {
   }
 }
 
-class KelivoFetcher {
+class BuiltInWebFetchResult {
+  final String url;
+  final String? title;
+  final String? content;
+  final bool raw;
+  final String? cachePath;
+  final String? downloadPath;
+  final int? downloadedBytes;
+  final String? note;
+
+  const BuiltInWebFetchResult({
+    required this.url,
+    this.title,
+    this.content,
+    this.raw = false,
+    this.cachePath,
+    this.downloadPath,
+    this.downloadedBytes,
+    this.note,
+  });
+
+  bool get isDownload => downloadPath != null;
+}
+
+class BuiltInWebFetchException implements Exception {
+  final String message;
+
+  const BuiltInWebFetchException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class BuiltInWebFetchService {
   static const _defaultUA =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -234,43 +269,18 @@ class KelivoFetcher {
 
   /// Total-duration timeout for TEXT mode (`http.get` covers connect,
   /// headers and body in one unbounded future). Bounds what would otherwise
-  /// hang until the client-side cap (10 min) — a blackholed page must fail
-  /// fast for the model. Mutable only so tests can shrink it.
+  /// hang indefinitely — a blackholed page must fail fast for the model.
+  /// Mutable only so tests can shrink it.
   @visibleForTesting
   static Duration textFetchTimeout = const Duration(seconds: 60);
 
-  static const _binarySniffBytes = 1024;
+  static Map<String, String> _mergedHeaders(BuiltInWebFetchRequest payload) =>
+      <String, String>{'User-Agent': _defaultUA, ...payload.headers};
 
-  static Future<http.Response> _fetch(KelivoFetchRequestPayload payload) async {
-    // Explicit client so a timeout can force-close the socket: the default
-    // `http.get` client only closes IDLE connections, leaving blackholed
-    // sockets alive until the OS TCP timeout.
-    final raw = HttpClient();
-    final client = IOClient(raw);
-    try {
-      final resp = await client
-          .get(payload.url, headers: _mergedHeaders(payload))
-          .timeout(textFetchTimeout);
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        throw Exception('HTTP ${resp.statusCode}');
-      }
-      return resp;
-    } catch (e) {
-      throw Exception(
-        'Failed to fetch ${payload.url}: ${e is Exception ? e.toString() : 'Unknown error'}',
-      );
-    } finally {
-      raw.close(force: true);
-    }
-  }
-
-  static Map<String, String> _mergedHeaders(
-    KelivoFetchRequestPayload payload,
-  ) => <String, String>{'User-Agent': _defaultUA, ...payload.headers};
-
-  static Future<Map<String, dynamic>> fetch(
-    KelivoFetchRequestPayload payload, {
+  static Future<BuiltInWebFetchResult> fetch(
+    BuiltInWebFetchRequest payload, {
     Future<Directory> Function()? workspacesDirProvider,
+    Duration? timeout,
   }) async {
     final downloadPath = payload.downloadPath;
     if (downloadPath != null) {
@@ -278,103 +288,54 @@ class KelivoFetcher {
       return _download(payload, downloadPath, workspacesDirProvider);
     }
     try {
-      final resp = await _fetch(payload);
-      final contentType = (resp.headers['content-type'] ?? '').toLowerCase();
-      final bytes = resp.bodyBytes;
-      if (_looksBinary(bytes, contentType: contentType)) {
-        return _err(
-          'Possible binary content detected (binary content-type, or a null '
-          'byte in the first $_binarySniffBytes bytes). If the payload is a '
-          'file (image, PDF, archive, ...), re-call kelivo_fetch with '
-          'download_path set (e.g. download_path: '
-          '"@workspaces/download.bin") to save it as-is.',
-        );
-      }
-      final body = _decodeBody(resp, bytes);
-      final text = payload.raw
-          ? body
-          : _contentForModel(body, contentType: contentType);
-      var result = _bounded(text, payload);
+      final readable = await ReadableWebFetchService.fetch(
+        url: payload.url,
+        headers: _mergedHeaders(payload),
+        raw: payload.raw,
+        timeout: timeout ?? textFetchTimeout,
+      );
+      final text = readable.content;
+      String? cachePath;
+      String? note;
       if (payload.startIndex == 0 && text.length > payload.maxLength) {
         // Over-length on the first call: store the FULL converted content so
         // the model can read it in one kelivo_read call. Deterministic name,
         // no reuse — every call re-fetches and overwrites (CONTEXT.md).
         final byteLen = utf8.encode(text).length;
         if (byteLen > maxReadableTextBytes) {
-          result =
-              '$result\n\n[Content too large to save as text '
-              '($byteLen bytes exceeds kelivo_read\'s '
-              '${maxReadableTextBytes ~/ (1024 * 1024)} MB window). '
-              'Re-call kelivo_fetch with download_path set to save it '
-              'as-is.]';
+          note =
+              'Content too large to save as text ($byteLen bytes exceeds '
+              'kelivo_read\'s ${maxReadableTextBytes ~/ (1024 * 1024)} MB '
+              'window). Re-call web_fetch with download_path set to save it '
+              'as-is.';
         } else {
-          final hint = await _saveOverflowText(
+          cachePath = await _saveOverflowText(
             payload,
             text,
-            isMarkdown: !payload.raw && _isHtml(body, contentType: contentType),
+            isMarkdown: !payload.raw && readable.isMarkdown,
             workspacesDirProvider: workspacesDirProvider,
           );
-          if (hint != null) {
-            result =
-                '$result\n\nFull content (${text.length} characters) '
-                'saved to $hint. Read it with kelivo_read to get the complete '
-                'content.';
-          }
         }
       }
-      return _ok(result);
+      return BuiltInWebFetchResult(
+        url: readable.url,
+        title: readable.title,
+        content: text,
+        raw: payload.raw,
+        cachePath: cachePath,
+        note: note,
+      );
+    } on UnsupportedReadableContentException catch (e) {
+      throw BuiltInWebFetchException(
+        'Possible binary content detected. $e If the payload is a file '
+        '(image, PDF, archive, ...), re-call '
+        'web_fetch with download_path set (e.g. download_path: '
+        '"@workspaces/download.bin") to save it as-is.',
+      );
     } catch (e) {
-      return _err(e.toString());
+      if (e is BuiltInWebFetchException) rethrow;
+      throw BuiltInWebFetchException(e.toString());
     }
-  }
-
-  /// Decodes the response body. When the content-type declares a charset,
-  /// [resp.body]'s decoding is authoritative. Without a charset, HTTP defaults
-  /// to latin-1, which mangles UTF-8 payloads (common on legacy CJK servers);
-  /// prefer strict UTF-8 and fall back to [resp.body] only when the bytes are
-  /// not valid UTF-8.
-  static String _decodeBody(http.Response resp, List<int> bytes) {
-    final ct = (resp.headers['content-type'] ?? '').toLowerCase();
-    if (RegExp(r'charset\s*=').hasMatch(ct)) {
-      return resp.body;
-    }
-    try {
-      return utf8.decode(bytes);
-    } on FormatException {
-      return resp.body;
-    }
-  }
-
-  /// True when the payload is likely binary: a NUL byte in the first
-  /// [bytes] (reliable for UTF-16 text and NUL-heavy formats; note UTF-16
-  /// text pages are deliberately rejected — `download_path` is the escape
-  /// hatch, see CONTEXT.md), OR a binary content-type family. The content-type
-  /// signal is advisory (some sites serve text as application/octet-stream —
-  /// the model then uses `download_path` and reads the file back as text;
-  /// false positives are recoverable, mojibake is not).
-  static bool _looksBinary(List<int> bytes, {required String contentType}) {
-    if (_isBinaryContentType(contentType)) return true;
-    final n = math.min(bytes.length, _binarySniffBytes);
-    for (var i = 0; i < n; i++) {
-      if (bytes[i] == 0) return true;
-    }
-    return false;
-  }
-
-  static bool _isBinaryContentType(String contentType) {
-    const binaryPrefixes = [
-      'image/',
-      'audio/',
-      'video/',
-      'application/pdf',
-      'application/zip',
-      'application/gzip',
-      'application/x-tar',
-      'application/x-7z-compressed',
-      'application/x-rar-compressed',
-      'application/octet-stream',
-    ];
-    return binaryPrefixes.any(contentType.startsWith);
   }
 
   /// Downloads [payload] to [downloadPath] (a validated `@workspaces/...`
@@ -383,8 +344,8 @@ class KelivoFetcher {
   /// replaced atomically via a backup name with rollback (a failed rename
   /// restores the previous file). A crash leaves only a `.part` inside the
   /// cache dir, aged out by the TTL pass. Never buffers the body in memory.
-  static Future<Map<String, dynamic>> _download(
-    KelivoFetchRequestPayload payload,
+  static Future<BuiltInWebFetchResult> _download(
+    BuiltInWebFetchRequest payload,
     String downloadPath,
     Future<Directory> Function()? workspacesDirProvider,
   ) async {
@@ -392,8 +353,8 @@ class KelivoFetcher {
     try {
       ws = await _resolveWorkspaces(workspacesDirProvider);
     } catch (e) {
-      debugPrint('[kelivo_fetch] @workspaces sandbox unavailable: $e');
-      return _err(
+      debugPrint('[web_fetch] @workspaces sandbox unavailable: $e');
+      throw BuiltInWebFetchException(
         'Failed to resolve the @workspaces sandbox: '
         '${e is Exception ? e.toString() : 'Unknown error'}',
       );
@@ -404,7 +365,7 @@ class KelivoFetcher {
     // Fail fast: a directory at the target path must never be replaced by a
     // file (schema: download_path is a full file path, not a directory).
     if (await Directory(target.path).exists()) {
-      return _err(
+      throw BuiltInWebFetchException(
         'Invalid download_path: a directory already exists at $downloadPath. '
         'download_path must be a full file path, not a directory.',
       );
@@ -420,15 +381,17 @@ class KelivoFetcher {
     // the reported size. Download mode saves the wire bytes as-is. The raw
     // client is held so timeouts can force-close the socket (a non-force
     // close leaves blackholed connections alive until the OS TCP timeout).
+    // Redirects are followed manually so every hop is SSRF-revalidated.
     final rawClient = HttpClient()..autoUncompress = false;
     final client = IOClient(rawClient);
     var size = 0;
     try {
       await cacheDir.create(recursive: true);
-      final req = http.Request('GET', payload.url)
-        ..headers.addAll(_mergedHeaders(payload))
-        ..headers['Accept-Encoding'] = 'identity';
-      final resp = await client.send(req).timeout(downloadResponseTimeout);
+      final resp = await _sendWithRedirectGuard(
+        client,
+        payload,
+        downloadResponseTimeout,
+      );
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         throw Exception('HTTP ${resp.statusCode}');
       }
@@ -449,7 +412,7 @@ class KelivoFetcher {
             await sink.close();
           } catch (e) {
             sinkFailed = true;
-            debugPrint('[kelivo_fetch] closing download sink failed: $e');
+            debugPrint('[web_fetch] closing download sink failed: $e');
           }
         }
       } catch (e) {
@@ -461,11 +424,10 @@ class KelivoFetcher {
       }
       await target.parent.create(recursive: true);
       await _install(target, tmp, cacheDir);
-      return _ok(
-        'Downloaded $size bytes to $downloadPath. '
-        'Read it with kelivo_read (text files) or browse it with '
-        'kelivo_glob/kelivo_list_directory. Note: max_length, start_index '
-        'and raw are ignored when download_path is set.',
+      return BuiltInWebFetchResult(
+        url: payload.url.toString(),
+        downloadPath: downloadPath,
+        downloadedBytes: size,
       );
     } catch (e) {
       try {
@@ -473,9 +435,9 @@ class KelivoFetcher {
           await tmp.delete();
         }
       } catch (cleanupErr) {
-        debugPrint('[kelivo_fetch] failed to clean up $tmp: $cleanupErr');
+        debugPrint('[web_fetch] failed to clean up $tmp: $cleanupErr');
       }
-      return _err(
+      throw BuiltInWebFetchException(
         'Failed to download ${payload.url}: '
         '${e is Exception ? e.toString() : 'Unknown error'}',
       );
@@ -486,6 +448,41 @@ class KelivoFetcher {
       rawClient.close(force: true);
     }
   }
+
+  /// Sends the download request, following redirects manually so each hop is
+  /// re-validated by the SSRF guard before a socket opens. The streamed
+  /// response body is drained on redirect hops (the download mode never
+  /// buffers non-final bodies). Redirects are capped at
+  /// [guard.WebFetchTargetGuard.maxRedirectHops].
+  static Future<http.StreamedResponse> _sendWithRedirectGuard(
+    http.Client client,
+    BuiltInWebFetchRequest payload,
+    Duration timeout,
+  ) async {
+    var current = payload.url;
+    for (var hop = 0; hop <= guard.WebFetchTargetGuard.maxRedirectHops; hop++) {
+      final reason = await guard.webFetchTargetBlockReason(current);
+      if (reason != null) {
+        throw Exception(reason);
+      }
+      final req = http.Request('GET', current)
+        ..headers.addAll(_mergedHeaders(payload))
+        ..headers['Accept-Encoding'] = 'identity'
+        ..followRedirects = false;
+      final response = await client.send(req).timeout(timeout);
+      if (!_isRedirect(response.statusCode)) return response;
+      final location = response.headers['location'];
+      await response.stream.drain<void>();
+      if (location == null || location.isEmpty) {
+        throw Exception('Redirect without a Location header');
+      }
+      current = current.resolve(location);
+    }
+    throw Exception('Too many redirects');
+  }
+
+  static bool _isRedirect(int statusCode) =>
+      statusCode >= 300 && statusCode < 400;
 
   /// Replaces [target] with the completed [tmp] file. Windows cannot rename
   /// onto an existing path, so the old file is staged to a unique backup
@@ -528,7 +525,7 @@ class KelivoFetcher {
         await backup.rename(target.path);
       } catch (restoreErr) {
         debugPrint(
-          '[kelivo_fetch] failed to restore $target from $backup: $restoreErr',
+          '[web_fetch] failed to restore $target from $backup: $restoreErr',
         );
       }
       rethrow;
@@ -538,7 +535,7 @@ class KelivoFetcher {
         await backup.delete();
       }
     } catch (e) {
-      debugPrint('[kelivo_fetch] failed to delete backup $backup: $e');
+      debugPrint('[web_fetch] failed to delete backup $backup: $e');
     }
   }
 
@@ -556,7 +553,7 @@ class KelivoFetcher {
 
   /// Deterministic cache key: sha256 over url + raw flag + sorted headers.
   /// Stable identity per fetch configuration (naming only — no reuse).
-  static String _cacheKey(KelivoFetchRequestPayload payload) {
+  static String _cacheKey(BuiltInWebFetchRequest payload) {
     final headerKeys = payload.headers.keys.toList()..sort();
     final canonical = [
       payload.url.toString(),
@@ -574,7 +571,7 @@ class KelivoFetcher {
   /// Returns the wire path, or null when the sandbox is unavailable (logged;
   /// the bounded text response still stands — recoverable environment issue).
   static Future<String?> _saveOverflowText(
-    KelivoFetchRequestPayload payload,
+    BuiltInWebFetchRequest payload,
     String text, {
     required bool isMarkdown,
     required Future<Directory> Function()? workspacesDirProvider,
@@ -584,7 +581,7 @@ class KelivoFetcher {
       ws = await _resolveWorkspaces(workspacesDirProvider);
     } catch (e) {
       debugPrint(
-        '[kelivo_fetch] @workspaces sandbox unavailable, '
+        '[web_fetch] @workspaces sandbox unavailable, '
         'skipping overflow save: $e',
       );
       return null;
@@ -598,7 +595,7 @@ class KelivoFetcher {
       await _evictCache(dir, justWritten: file);
       return '@workspaces/.fetch_cache/$name';
     } catch (e) {
-      debugPrint('[kelivo_fetch] overflow save failed: $e');
+      debugPrint('[web_fetch] overflow save failed: $e');
       return null;
     }
   }
@@ -630,9 +627,7 @@ class KelivoFetcher {
             await ent.delete();
           }
         } catch (e) {
-          debugPrint(
-            '[kelivo_fetch] eviction (ttl) failed for ${ent.path}: $e',
-          );
+          debugPrint('[web_fetch] eviction (ttl) failed for ${ent.path}: $e');
         }
       }
       // Precompute (path, mtime, size) per entry: a file that vanishes
@@ -651,7 +646,7 @@ class KelivoFetcher {
             size: stat.size,
           ));
         } catch (e) {
-          debugPrint('[kelivo_fetch] eviction (stat) skipped ${ent.path}: $e');
+          debugPrint('[web_fetch] eviction (stat) skipped ${ent.path}: $e');
         }
       }
       entries.sort((a, b) => a.modified.compareTo(b.modified));
@@ -666,323 +661,12 @@ class KelivoFetcher {
           total -= e.size;
         } catch (err) {
           debugPrint(
-            '[kelivo_fetch] eviction (budget) failed for ${e.path}: $err',
+            '[web_fetch] eviction (budget) failed for ${e.path}: $err',
           );
         }
       }
     } catch (e) {
-      debugPrint('[kelivo_fetch] eviction pass failed: $e');
+      debugPrint('[web_fetch] eviction pass failed: $e');
     }
-  }
-
-  static String _contentForModel(String body, {required String contentType}) {
-    if (_isHtml(body, contentType: contentType)) {
-      return _htmlToMarkdown(body);
-    }
-    if (contentType.contains('application/json') ||
-        contentType.contains('+json')) {
-      try {
-        return jsonEncode(jsonDecode(body));
-      } catch (_) {}
-    }
-    return body.trim();
-  }
-
-  static bool _isHtml(String body, {required String contentType}) {
-    if (contentType.contains('text/html') ||
-        contentType.contains('application/xhtml+xml')) {
-      return true;
-    }
-    if (contentType.isNotEmpty) return false;
-    final prefix = body.length > 256 ? body.substring(0, 256) : body;
-    return RegExp(
-      r'<\s*(?:!doctype\s+html|html)\b',
-      caseSensitive: false,
-    ).hasMatch(prefix);
-  }
-
-  static String _htmlToMarkdown(String html) {
-    final dom.Document document = html_parser.parse(html);
-    document
-        .querySelectorAll(
-          'script,style,noscript,template,svg,iframe,nav,aside,footer,form',
-        )
-        .forEach((element) => element.remove());
-
-    final mainContent = document.querySelector('main,article,[role="main"]');
-    final source = mainContent?.outerHtml ?? document.body?.innerHtml ?? html;
-    final markdown = html2md.convert(source).trim();
-    if (markdown.isNotEmpty) {
-      return markdown.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    }
-    return (mainContent?.text ?? document.body?.text ?? '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-  }
-
-  static String _bounded(String text, KelivoFetchRequestPayload payload) {
-    if (payload.startIndex >= text.length) {
-      return 'No more content available.';
-    }
-
-    var start = payload.startIndex;
-    if (start > 0 && _isLowSurrogate(text.codeUnitAt(start))) {
-      start -= 1;
-    }
-    var end = math.min(start + payload.maxLength, text.length);
-    if (end < text.length &&
-        end > start &&
-        _isHighSurrogate(text.codeUnitAt(end - 1)) &&
-        _isLowSurrogate(text.codeUnitAt(end))) {
-      end = end - start == 1 ? end + 1 : end - 1;
-    }
-
-    final content = text.substring(start, end);
-    if (end >= text.length) return content;
-    return '$content\n\n[Content truncated: showing characters $start-${end - 1} '
-        'of ${text.length}. Call kelivo_fetch with start_index=$end to continue.]';
-  }
-
-  static bool _isHighSurrogate(int codeUnit) =>
-      codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
-
-  static bool _isLowSurrogate(int codeUnit) =>
-      codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
-
-  static Map<String, dynamic> _ok(String text) => {
-    'content': [
-      {'type': 'text', 'text': text},
-    ],
-    'isStreaming': false,
-    'isError': false,
-  };
-
-  static Map<String, dynamic> _err(String message) => {
-    'content': [
-      {'type': 'text', 'text': message},
-    ],
-    'isStreaming': false,
-    'isError': true,
-  };
-}
-
-/// Minimal JSON-RPC server for MCP that serves @kelivo/fetch tools.
-class KelivoFetchMcpServerEngine {
-  bool _closed = false;
-
-  /// Resolves the `@workspaces` sandbox for download/overflow saves.
-  /// Defaults to `AppDirectories.getWorkspacesDirectory()`; injectable for
-  /// tests. Resolved lazily per call — no I/O at construction time.
-  final Future<Directory> Function()? workspacesDirProvider;
-
-  KelivoFetchMcpServerEngine({this.workspacesDirProvider});
-
-  Future<dynamic> handleMessage(dynamic message) async {
-    if (_closed) return null;
-
-    // Support batch arrays defensively (return array of responses)
-    if (message is List) {
-      final out = <dynamic>[];
-      for (final m in message) {
-        out.add(await _handleSingle(m));
-      }
-      return out;
-    }
-    return await _handleSingle(message);
-  }
-
-  Future<Map<String, dynamic>> _handleSingle(dynamic raw) async {
-    try {
-      if (raw is! Map) {
-        return _error(null, code: -32600, message: 'Invalid Request');
-      }
-      final req = raw.cast<String, dynamic>();
-      final id = req['id'];
-      final method = (req['method'] ?? '').toString();
-      final params = (req['params'] is Map)
-          ? (req['params'] as Map).cast<String, dynamic>()
-          : <String, dynamic>{};
-
-      switch (method) {
-        case mcp.McpProtocol.methodInitialize:
-          return _ok(
-            id,
-            result: {
-              'serverInfo': {'name': '@kelivo/fetch', 'version': '1.2.0'},
-              'protocolVersion': mcp.McpProtocol.defaultVersion,
-              // Only tools capability is advertised for this minimal server
-              'capabilities': {
-                'tools': {'listChanged': false},
-              },
-            },
-          );
-
-        case mcp.McpProtocol.methodListTools:
-          return _ok(id, result: {'tools': _toolDefinitions()});
-
-        case mcp.McpProtocol.methodCallTool:
-          final name = (params['name'] ?? '').toString();
-          final arguments = (params['arguments'] is Map)
-              ? (params['arguments'] as Map).cast<String, dynamic>()
-              : <String, dynamic>{};
-
-          KelivoFetchRequestPayload payload;
-          try {
-            payload = KelivoFetchRequestPayload.parse(arguments);
-          } catch (e) {
-            return _ok(id, result: KelivoFetcher._err(e.toString()));
-          }
-
-          if (name == 'kelivo_fetch') {
-            return _ok(
-              id,
-              result: await KelivoFetcher.fetch(
-                payload,
-                workspacesDirProvider: workspacesDirProvider,
-              ),
-            );
-          }
-          return _error(id, code: -32101, message: 'Tool not found: $name');
-
-        default:
-          // Ignore common notifications; respond error for unknown requests
-          if (id == null) {
-            return _noop();
-          }
-          return _error(id, code: -32601, message: 'Method not found: $method');
-      }
-    } catch (e) {
-      return _error(null, code: -32603, message: 'Internal error: $e');
-    }
-  }
-
-  void close() {
-    _closed = true;
-  }
-
-  Map<String, dynamic> _ok(dynamic id, {required Map<String, dynamic> result}) {
-    return {'jsonrpc': '2.0', if (id != null) 'id': id, 'result': result};
-  }
-
-  Map<String, dynamic> _error(
-    dynamic id, {
-    required int code,
-    required String message,
-  }) {
-    return {
-      'jsonrpc': '2.0',
-      if (id != null) 'id': id,
-      'error': {'code': code, 'message': message},
-    };
-  }
-
-  Map<String, dynamic> _noop() => {'jsonrpc': '2.0'};
-
-  List<Map<String, dynamic>> _toolDefinitions() {
-    Map<String, dynamic> schema() => {
-      'type': 'object',
-      'properties': {
-        'url': {
-          'type': 'string',
-          'description':
-              'Use the URL exactly as given; do not add www. It must include '
-              'http:// or https://: https://example.com is valid, while '
-              'example.com is invalid.',
-        },
-        'headers': {
-          'type': 'object',
-          'description': 'Optional headers to include in the request',
-        },
-        'max_length': {
-          'type': 'integer',
-          'description': 'Maximum content characters to return',
-          'default': KelivoFetchRequestPayload.defaultMaxLength,
-          'minimum': 1,
-          'maximum': KelivoFetchRequestPayload.maximumMaxLength,
-        },
-        'start_index': {
-          'type': 'integer',
-          'description': 'Character index used to continue truncated content',
-          'default': 0,
-          'minimum': 0,
-        },
-        'raw': {
-          'type': 'boolean',
-          'description':
-              'Return raw source instead of compact, readable Markdown',
-          'default': false,
-        },
-        'download_path': {
-          'type': 'string',
-          'description':
-              'Optional full file path under @workspaces/ (e.g. '
-              '@workspaces/reports/q3.pdf) that saves the fetched bytes '
-              'as-is — binary content included. Must be a complete file '
-              'path, not a directory; existing files are silently '
-              'overwritten. When set, the response is a save confirmation '
-              '(path + byte size) and max_length, start_index and raw are '
-              'ignored.',
-        },
-      },
-      'required': ['url'],
-    };
-
-    return [
-      {
-        'name': 'kelivo_fetch',
-        'description':
-            'Fetch the public contents of a web page. Only fetch a URL that '
-            'already appears in the conversation: one provided by the user or '
-            'returned by a prior web_search, kelivo_fetch, or other tool. '
-            'Cannot access content that requires authentication, including private '
-            'documents or pages behind login walls. HTML is simplified to compact '
-            'Markdown with bounded output by default. Continue truncated content with '
-            'start_index; use raw=true only when exact source is required. '
-            'When content exceeds max_length, the full content is saved to '
-            '@workspaces/.fetch_cache/ and the path is returned. Use '
-            'download_path to save any content as-is (binary included).',
-        'inputSchema': schema(),
-      },
-    ];
-  }
-}
-
-/// In-memory ClientTransport that directly invokes the local server engine.
-class KelivoInMemoryClientTransport implements mcp.ClientTransport {
-  final KelivoFetchMcpServerEngine _server;
-  final _messageController = StreamController<dynamic>.broadcast();
-  final _closeCompleter = Completer<void>();
-  bool _closed = false;
-
-  KelivoInMemoryClientTransport(this._server);
-
-  @override
-  Stream<dynamic> get onMessage => _messageController.stream;
-
-  @override
-  Future<void> get onClose => _closeCompleter.future;
-
-  @override
-  void send(dynamic message) {
-    if (_closed) return;
-    // Process asynchronously to mimic real transport
-    Future.microtask(() async {
-      final resp = await _server.handleMessage(message);
-      if (_closed) return;
-      if (resp != null) {
-        _messageController.add(resp);
-      }
-    });
-  }
-
-  @override
-  void close() {
-    if (_closed) return;
-    _closed = true;
-    try {
-      _server.close();
-    } catch (_) {}
-    if (!_messageController.isClosed) _messageController.close();
-    if (!_closeCompleter.isCompleted) _closeCompleter.complete();
   }
 }

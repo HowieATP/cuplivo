@@ -1850,6 +1850,7 @@
   "searchServicesPageAddProvider": "Add Provider",
   "searchServicesPageSearchProviders": "Search Providers",
   "searchServicesPageGeneralOptions": "General Options",
+  "searchServicesPageEnableFallbackFetchTitle": "Enable fetch for providers without native fetch",
   "searchServicesPageAutoTestTitle": "Auto-test connections on launch",
   "searchServicesPageMaxResults": "Max Results",
   "searchServicesPageTimeoutSeconds": "Timeout (seconds)",

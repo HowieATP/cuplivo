@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
 
@@ -14,6 +15,47 @@ class OllamaSearchService extends SearchService<OllamaOptions> {
       l10n.searchProviderOllamaDescription,
       style: const TextStyle(fontSize: 12),
     );
+  }
+
+  @override
+  bool get supportsNativeFetch => true;
+
+  @override
+  Future<WebFetchResult> fetch({
+    required Uri url,
+    required SearchCommonOptions commonOptions,
+    required OllamaOptions serviceOptions,
+    required http.Client fetchClient,
+    String? apiKeyOverride,
+  }) async {
+    try {
+      final response = await fetchClient
+          .post(
+            Uri.parse('https://ollama.com/api/web_fetch'),
+            headers: {
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'url': url.toString()}),
+          )
+          .timeout(Duration(milliseconds: commonOptions.timeout));
+      if (response.statusCode != 200) {
+        throw Exception('API request failed: ${response.statusCode}');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final content = (data['content'] ?? '').toString();
+      if (content.trim().isEmpty) {
+        throw Exception('Web fetch response contained empty page content');
+      }
+      return WebFetchResult(
+        url: url.toString(),
+        title: data['title']?.toString(),
+        content: content,
+      );
+    } catch (e) {
+      throw Exception('Ollama fetch failed: $e');
+    }
   }
 
   @override

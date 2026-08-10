@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
-import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import '../services/network/mcp_log_bridge.dart';
@@ -450,11 +449,6 @@ class McpProvider extends ChangeNotifier {
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
 
-  /// Client-side request cap for the built-in in-memory `@kelivo/fetch`
-  /// server — see the clientConfig comment at connect time. The engine's own
-  /// timeouts (30 s header, 60 s per-chunk) bound every call; this cap only
-  /// exists so the client-side guard does not undercut long downloads.
-  static const Duration _builtinFetchRequestTimeout = Duration(minutes: 10);
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
@@ -487,6 +481,7 @@ class McpProvider extends ChangeNotifier {
   /// here — callers own it.
   Future<void> _reloadServersFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    var removedRetiredFetch = false;
     final timeoutMs = prefs.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
       _requestTimeout = Duration(milliseconds: timeoutMs);
@@ -500,13 +495,20 @@ class McpProvider extends ChangeNotifier {
                   McpServerConfig.fromJson((e as Map).cast<String, dynamic>()),
             )
             .toList();
-        _servers = list;
-      } catch (_) {}
+        removedRetiredFetch = list.any(_isRetiredFetchServer);
+        _servers = list
+            .where((server) => !_isRetiredFetchServer(server))
+            .toList();
+      } catch (e) {
+        debugPrint('[MCP/Load] failed to parse persisted servers: $e');
+      }
     }
-    // Ensure built-in MCP servers are present by default
-    _ensureBuiltinFetchServerPresent();
+    // Ensure the remaining built-in MCP servers are present by default.
     _ensureBuiltinSubagentServerPresent();
     _ensureBuiltinFilesystemServerPresent();
+    if (removedRetiredFetch) {
+      await _persist();
+    }
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -550,6 +552,11 @@ class McpProvider extends ChangeNotifier {
     unawaited(refreshTools('kelivo_subagent'));
   }
 
+  static bool _isRetiredFetchServer(McpServerConfig server) =>
+      server.id == 'kelivo_fetch' ||
+      (server.transport == McpTransportType.inmemory &&
+          server.name == '@kelivo/fetch');
+
   void _ensureBuiltinSubagentServerPresent() {
     if (assistantProvider == null ||
         chatService == null ||
@@ -570,21 +577,6 @@ class McpProvider extends ChangeNotifier {
         tools: const <McpToolConfig>[],
       ),
     ];
-  }
-
-  void _ensureBuiltinFetchServerPresent() {
-    final exists = _servers.any(
-      (s) => s.name == '@kelivo/fetch' || s.id == 'kelivo_fetch',
-    );
-    if (exists) return;
-    final cfg = McpServerConfig(
-      id: 'kelivo_fetch',
-      enabled: true,
-      name: '@kelivo/fetch',
-      transport: McpTransportType.inmemory,
-      tools: const <McpToolConfig>[], // will refresh on connect
-    );
-    _servers = [..._servers, cfg];
   }
 
   /// @kelivo/filesystem — present but DISABLED by default (unbound by
@@ -695,6 +687,7 @@ class McpProvider extends ChangeNotifier {
     }
 
     List<McpServerConfig> next = [];
+    var retiredFetchSeen = false;
     try {
       Map<String, dynamic>? serversFromMap;
       if (data is Map && data.containsKey('mcpServers')) {
@@ -708,16 +701,46 @@ class McpProvider extends ChangeNotifier {
 
       if (serversFromMap != null) {
         final isDesktop = _isDesktopPlatform();
-        bool builtinSeen = false;
-        bool builtinEnabled = true;
         serversFromMap.forEach((id, cfgAny) {
           if (cfgAny is! Map) return;
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
-            // Built-in @kelivo/fetch control via isActive; ignore name mismatches silently
-            builtinSeen = true;
-            builtinEnabled = (cfg['isActive'] as bool?) ?? true;
+            final name = (cfg['name'] ?? '').toString().trim();
+            if (id == 'kelivo_fetch' || name == '@kelivo/fetch') {
+              retiredFetchSeen = true;
+              return;
+            }
+            final enabled = (cfg['isActive'] as bool?) ?? true;
+            if (id == 'kelivo_subagent' || name == '@kelivo/subagent') {
+              if (!next.any((server) => server.id == 'kelivo_subagent')) {
+                next.add(
+                  McpServerConfig(
+                    id: 'kelivo_subagent',
+                    enabled: enabled,
+                    name: '@kelivo/subagent',
+                    transport: McpTransportType.inmemory,
+                  ),
+                );
+              }
+              return;
+            }
+            if (id == 'kelivo_filesystem' || name == '@kelivo/filesystem') {
+              if (!next.any((server) => server.id == 'kelivo_filesystem')) {
+                next.add(
+                  McpServerConfig(
+                    id: 'kelivo_filesystem',
+                    enabled: enabled,
+                    name: '@kelivo/filesystem',
+                    transport: McpTransportType.inmemory,
+                  ),
+                );
+              }
+              return;
+            }
+            debugPrint(
+              '[MCP/Import] skipping unsupported in-memory server $id ($name)',
+            );
             return;
           }
           final hasStdioShape =
@@ -797,17 +820,6 @@ class McpProvider extends ChangeNotifier {
             ),
           );
         });
-        if (builtinSeen) {
-          // Append single built-in server with fixed id/name
-          next.add(
-            McpServerConfig(
-              id: 'kelivo_fetch',
-              enabled: builtinEnabled,
-              name: '@kelivo/fetch',
-              transport: McpTransportType.inmemory,
-            ),
-          );
-        }
       } else if (data is List) {
         // Attempt to parse internal list format. Be tolerant to transport string variants.
         for (final item in data) {
@@ -823,13 +835,19 @@ class McpProvider extends ChangeNotifier {
           }
           try {
             final s = McpServerConfig.fromJson(m);
+            if (_isRetiredFetchServer(s)) {
+              retiredFetchSeen = true;
+              continue;
+            }
             if (s.transport != McpTransportType.stdio &&
                 s.transport != McpTransportType.inmemory &&
                 s.url.trim().isEmpty) {
               continue;
             }
             next.add(s);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('[MCP/Import] skipping invalid list entry: $e');
+          }
         }
       } else if (data is Map && data.containsKey('servers')) {
         final list = data['servers'];
@@ -847,13 +865,19 @@ class McpProvider extends ChangeNotifier {
             }
             try {
               final s = McpServerConfig.fromJson(m);
+              if (_isRetiredFetchServer(s)) {
+                retiredFetchSeen = true;
+                continue;
+              }
               if (s.transport != McpTransportType.stdio &&
                   s.transport != McpTransportType.inmemory &&
                   s.url.trim().isEmpty) {
                 continue;
               }
               next.add(s);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('[MCP/Import] skipping invalid servers entry: $e');
+            }
           }
         }
       }
@@ -861,7 +885,7 @@ class McpProvider extends ChangeNotifier {
       throw FormatException('Unrecognized or invalid MCP JSON');
     }
 
-    if (next.isEmpty) {
+    if (next.isEmpty && !retiredFetchSeen) {
       throw FormatException('No valid MCP servers found in JSON');
     }
 
@@ -869,11 +893,15 @@ class McpProvider extends ChangeNotifier {
     for (final s in _servers) {
       try {
         await disconnect(s.id);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MCP/Import] disconnect ${s.id} failed: $e');
+      }
     }
 
     // Replace and reset statuses
     _servers = next;
+    _ensureBuiltinSubagentServerPresent();
+    _ensureBuiltinFilesystemServerPresent();
     _status.clear();
     _errors.clear();
     for (final s in _servers) {
@@ -1218,17 +1246,7 @@ class McpProvider extends ChangeNotifier {
         version: '1.0.0',
         // Turn on library-internal verbose logs
         enableDebugLogging: false,
-        // The global MCP timeout (30 s default) targets network MCP servers.
-        // The built-in in-memory @kelivo/fetch server must NOT be capped by
-        // it: the engine bounds its own work in both modes (text mode: 60 s
-        // total; download mode: 30 s header + 60 s per-chunk timeouts), so
-        // this client-side cap is only a safety net. A tighter cap would
-        // report "Request timed out" while the fetch still completes
-        // in-isolate, leaving a silently-written file the model believes
-        // failed.
-        requestTimeout: server.id == 'kelivo_fetch'
-            ? _builtinFetchRequestTimeout
-            : _requestTimeout,
+        requestTimeout: _requestTimeout,
         logListener: McpLogBridge.onEvent,
         logServerLabel: server.name,
       );
@@ -1238,14 +1256,19 @@ class McpProvider extends ChangeNotifier {
         // Ensure the @workspaces sandbox + external mounts are resolved
         // before building any in-memory engine (idempotent).
         await filesystemMounts?.init();
-        final engine = switch (server.id) {
-          'kelivo_subagent' => KelivoSubagentMcpServerEngine(
+        if (server.id == 'kelivo_subagent') {
+          final engine = KelivoSubagentMcpServerEngine(
             assistants: assistantProvider!,
             chatService: chatService!,
             headlessGen: headlessGen!,
             contextProvider: contextProvider,
-          ),
-          'kelivo_filesystem' => KelivoFilesystemMcpServerEngine(
+          );
+          final transport = KelivoSubagentInMemoryClientTransport(engine);
+          final client = mcp.McpClient.createClient(clientConfig);
+          await client.connect(transport);
+          _clients[id] = client;
+        } else if (server.id == 'kelivo_filesystem') {
+          final engine = KelivoFilesystemMcpServerEngine(
             mountsProvider: () =>
                 filesystemMounts?.allMounts ?? const <FilesystemMount>[],
             onWorkspaceFileDeleted: (wirePath) {
@@ -1258,21 +1281,14 @@ class McpProvider extends ChangeNotifier {
                 deletedAt: DateTime.now(),
               );
             },
-          ),
-          _ => KelivoFetchMcpServerEngine(),
-        };
-        final transport = switch (engine) {
-          KelivoSubagentMcpServerEngine e =>
-            KelivoSubagentInMemoryClientTransport(e),
-          KelivoFilesystemMcpServerEngine e =>
-            KelivoFilesystemInMemoryClientTransport(e),
-          _ => KelivoInMemoryClientTransport(
-            engine as KelivoFetchMcpServerEngine,
-          ),
-        };
-        final client = mcp.McpClient.createClient(clientConfig);
-        await client.connect(transport);
-        _clients[id] = client;
+          );
+          final transport = KelivoFilesystemInMemoryClientTransport(engine);
+          final client = mcp.McpClient.createClient(clientConfig);
+          await client.connect(transport);
+          _clients[id] = client;
+        } else {
+          throw StateError('Unsupported in-memory MCP server: ${server.id}');
+        }
         _status[id] = McpStatus.connected;
         _errors.remove(id);
         notifyListeners();

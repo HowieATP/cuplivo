@@ -20,7 +20,7 @@ sub-generation that may run for minutes. Two obstacles:
    `requestTimeout` (global default 30 s, `mcp_request_timeout_ms_v1`), including
    the in-memory subagent client. Blocking inside the MCP response would fail at
    30 s — or require a per-server long timeout, which reproduces the anti-pattern
-   `@kelivo/fetch`'s own CLIENT-SIDE cap comment warns about: "Request timed out"
+   the now-retired `@kelivo/fetch` CLIENT-SIDE cap warned about: "Request timed out"
    while the engine still completes in-isolate, leaving silently-written output the
    model believes failed (and would retry → duplicate output).
 2. **No live progress surface**: `HeadlessGenerationService.chunkStream()` had zero
@@ -50,13 +50,13 @@ non-existent jobs.
 
 ## Rejected alternatives
 
-1. **Engine blocks + per-server timeout override** (mirroring `@kelivo/fetch`'s
+1. **Engine blocks + per-server timeout override** (mirroring the retired `@kelivo/fetch`'s
    10-minute override). Rejected: the fetch override is safe only because the fetch
    engine bounds its own work; a sub-agent is unbounded (bounded only by the
    child's `maxTokens`), so any fixed timeout is arbitrary. A timeout would report
    failure while the sub-agent keeps running and persisting — the silent-completion
    anti-pattern. Also couples an unbounded wait to the MCP request lifecycle.
-2. **Truncated result return** (mirroring `kelivo_fetch`'s 5000/20000-char cap with
+2. **Truncated result return** (mirroring `web_fetch`'s 5000/20000-char cap with
    `start_index`). Rejected: fetch truncates because its input is unbounded; a
    sub-agent's output is bounded by its `maxTokens`. Every output token is already
    paid for; truncation forces lossy synthesis (or an expensive retry). The existing

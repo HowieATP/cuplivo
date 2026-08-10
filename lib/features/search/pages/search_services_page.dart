@@ -243,6 +243,56 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     return _iosSectionCard(
       children: [
         _TactileRow(
+          onTap: () => context.read<SettingsProvider>().setSearchCommonOptions(
+            common.copyWith(
+              enableFetchForUnsupportedProviders:
+                  !common.enableFetchForUnsupportedProviders,
+            ),
+          ),
+          pressedScale: 0.995,
+          builder: (pressed) {
+            final baseColor = cs.onSurface.withValues(alpha: 0.9);
+            return _AnimatedPressColor(
+              pressed: pressed,
+              base: baseColor,
+              builder: (c) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 36,
+                        child: Icon(Lucide.Download, size: 18, color: c),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          l10n.searchServicesPageEnableFallbackFetchTitle,
+                          style: TextStyle(fontSize: 15, color: c),
+                        ),
+                      ),
+                      IosSwitch(
+                        value: common.enableFetchForUnsupportedProviders,
+                        onChanged: (v) => context
+                            .read<SettingsProvider>()
+                            .setSearchCommonOptions(
+                              common.copyWith(
+                                enableFetchForUnsupportedProviders: v,
+                              ),
+                            ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+        _iosDivider(context),
+        _TactileRow(
           onTap: () => context
               .read<SettingsProvider>()
               .setSearchAutoTestOnLaunch(!autoTestOnLaunch),
@@ -325,9 +375,8 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                                   .read<SettingsProvider>()
                                   .updateSettings(
                                     settings.copyWith(
-                                      searchCommonOptions: SearchCommonOptions(
+                                      searchCommonOptions: common.copyWith(
                                         resultSize: common.resultSize - 1,
-                                        timeout: common.timeout,
                                       ),
                                     ),
                                   )
@@ -337,9 +386,8 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                                   .read<SettingsProvider>()
                                   .updateSettings(
                                     settings.copyWith(
-                                      searchCommonOptions: SearchCommonOptions(
+                                      searchCommonOptions: common.copyWith(
                                         resultSize: common.resultSize + 1,
-                                        timeout: common.timeout,
                                       ),
                                     ),
                                   )
@@ -388,8 +436,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                                   .read<SettingsProvider>()
                                   .updateSettings(
                                     settings.copyWith(
-                                      searchCommonOptions: SearchCommonOptions(
-                                        resultSize: common.resultSize,
+                                      searchCommonOptions: common.copyWith(
                                         timeout: common.timeout - 1000,
                                       ),
                                     ),
@@ -400,8 +447,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                                   .read<SettingsProvider>()
                                   .updateSettings(
                                     settings.copyWith(
-                                      searchCommonOptions: SearchCommonOptions(
-                                        resultSize: common.resultSize,
+                                      searchCommonOptions: common.copyWith(
                                         timeout: common.timeout + 1000,
                                       ),
                                     ),

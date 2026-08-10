@@ -40,6 +40,23 @@ abstract class SearchService<T extends SearchServiceOptions> {
     String? apiKeyOverride,
   });
 
+  /// Whether this provider exposes an official API for reading a known URL.
+  bool get supportsNativeFetch => false;
+
+  /// Fetches a known URL through the provider's official API.
+  ///
+  /// [fetchClient] is owned by the caller so one client can be reused while
+  /// rotating API keys and then closed deterministically.
+  Future<WebFetchResult> fetch({
+    required Uri url,
+    required SearchCommonOptions commonOptions,
+    required T serviceOptions,
+    required http.Client fetchClient,
+    String? apiKeyOverride,
+  }) {
+    throw UnsupportedError('$name does not provide native web fetch');
+  }
+
   // Factory method to get service instance based on options type
   static SearchService getService(SearchServiceOptions options) {
     switch (options) {
@@ -86,6 +103,14 @@ abstract class SearchService<T extends SearchServiceOptions> {
         options is! DuckDuckGoOptions &&
         options is! SearXNGOptions;
   }
+}
+
+class WebFetchResult {
+  final String url;
+  final String? title;
+  final String content;
+
+  const WebFetchResult({required this.url, this.title, required this.content});
 }
 
 // Search result data structure
@@ -145,19 +170,39 @@ class SearchResultItem {
 class SearchCommonOptions {
   final int resultSize;
   final int timeout;
+  final bool enableFetchForUnsupportedProviders;
 
-  const SearchCommonOptions({this.resultSize = 10, this.timeout = 5000});
+  const SearchCommonOptions({
+    this.resultSize = 10,
+    this.timeout = 5000,
+    this.enableFetchForUnsupportedProviders = true,
+  });
 
   Map<String, dynamic> toJson() => {
     'resultSize': resultSize,
     'timeout': timeout,
+    'enableFetchForUnsupportedProviders': enableFetchForUnsupportedProviders,
   };
 
   factory SearchCommonOptions.fromJson(Map<String, dynamic> json) =>
       SearchCommonOptions(
         resultSize: json['resultSize'] ?? 10,
         timeout: json['timeout'] ?? 5000,
+        enableFetchForUnsupportedProviders:
+            json['enableFetchForUnsupportedProviders'] ?? true,
       );
+
+  SearchCommonOptions copyWith({
+    int? resultSize,
+    int? timeout,
+    bool? enableFetchForUnsupportedProviders,
+  }) => SearchCommonOptions(
+    resultSize: resultSize ?? this.resultSize,
+    timeout: timeout ?? this.timeout,
+    enableFetchForUnsupportedProviders:
+        enableFetchForUnsupportedProviders ??
+        this.enableFetchForUnsupportedProviders,
+  );
 }
 
 // Base class for service-specific options

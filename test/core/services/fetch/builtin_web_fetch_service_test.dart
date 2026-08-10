@@ -2,25 +2,24 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:path/path.dart' as p;
 
-import 'package:Cuplivo/core/services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
+import 'package:Cuplivo/core/services/fetch/builtin_web_fetch_service.dart';
+import 'package:Cuplivo/core/services/fetch/web_fetch_content.dart';
+import 'package:Cuplivo/core/services/fetch/web_fetch_target_guard.dart';
 
 void main() {
-  group('Kelivo fetch MCP', () {
+  group('Built-in web fetch service', () {
     late HttpServer httpServer;
-    late KelivoFetchMcpServerEngine engine;
     late Uri baseUri;
     late Directory wsDir;
 
     setUp(() async {
+      WebFetchTargetGuard.blockPrivateTargets = false;
+      addTearDown(() => WebFetchTargetGuard.blockPrivateTargets = true);
       httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       baseUri = Uri.parse('http://127.0.0.1:${httpServer.port}');
-      wsDir = await Directory.systemTemp.createTemp('kelivo_fetch_test');
-      engine = KelivoFetchMcpServerEngine(
-        workspacesDirProvider: () async => wsDir,
-      );
+      wsDir = await Directory.systemTemp.createTemp('web_fetch_test');
       httpServer.listen((request) async {
         if (request.uri.path == '/json') {
           request.response.headers.contentType = ContentType.json;
@@ -66,6 +65,17 @@ void main() {
           // (A handler that returns immediately would get an auto-completed
           // empty 200 from dart:io, which the client would accept.)
           await Future<void>.delayed(const Duration(seconds: 1));
+        } else if (request.uri.path == '/trickle') {
+          // Slow-loris: each chunk arrives well inside the per-chunk window,
+          // so only an OVERALL deadline (not per-chunk inactivity) can bound
+          // the total duration of a text-mode fetch.
+          request.response.headers.contentType = ContentType.text;
+          for (var i = 0; i < 20; i++) {
+            request.response.write('trickle-');
+            await request.response.flush();
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+          await request.response.close();
         } else if (request.uri.path == '/plain.txt') {
           request.response.headers.contentType = ContentType.text;
           request.response.write(List.filled(7000, 'z').join());
@@ -88,73 +98,25 @@ void main() {
     });
 
     tearDown(() async {
-      engine.close();
       await httpServer.close(force: true);
       if (await wsDir.exists()) {
         await wsDir.delete(recursive: true);
       }
-      KelivoFetcher.cacheBudgetBytes = 512 * 1024 * 1024;
-      KelivoFetcher.cacheTtl = const Duration(days: 7);
-      KelivoFetcher.maxReadableTextBytes = 32 * 1024 * 1024;
-      KelivoFetcher.downloadChunkTimeout = const Duration(minutes: 1);
-      KelivoFetcher.downloadResponseTimeout = const Duration(seconds: 30);
-      KelivoFetcher.textFetchTimeout = const Duration(seconds: 60);
-      KelivoFetcher.partGracePeriod = const Duration(hours: 1);
-    });
-
-    test('advertises one compact, bounded fetch tool', () async {
-      final response =
-          await engine.handleMessage({
-                'jsonrpc': '2.0',
-                'id': 1,
-                'method': 'tools/list',
-              })
-              as Map<String, dynamic>;
-
-      final tools =
-          (response['result'] as Map<String, dynamic>)['tools'] as List;
-      expect(tools, hasLength(1));
-      final tool = (tools.single as Map).cast<String, dynamic>();
-      expect(tool['name'], 'kelivo_fetch');
-      expect(tool['description'], contains('HTML is simplified'));
-      expect(
-        tool['description'],
-        contains('already appears in the conversation'),
+      BuiltInWebFetchService.cacheBudgetBytes = 512 * 1024 * 1024;
+      BuiltInWebFetchService.cacheTtl = const Duration(days: 7);
+      BuiltInWebFetchService.maxReadableTextBytes = 32 * 1024 * 1024;
+      BuiltInWebFetchService.downloadChunkTimeout = const Duration(minutes: 1);
+      BuiltInWebFetchService.downloadResponseTimeout = const Duration(
+        seconds: 30,
       );
-      expect(tool['description'], contains('requires authentication'));
-      expect(tool['description'], contains('download_path'));
-      expect(tool['description'], contains('@workspaces/.fetch_cache/'));
-
-      final schema = (tool['inputSchema'] as Map).cast<String, dynamic>();
-      final properties = (schema['properties'] as Map).cast<String, dynamic>();
-      expect(properties['url']['description'], contains('do not add www'));
-      expect(
-        properties['url']['description'],
-        contains('https://example.com is valid'),
-      );
-      expect(properties['max_length'], {
-        'type': 'integer',
-        'description': 'Maximum content characters to return',
-        'default': 5000,
-        'minimum': 1,
-        'maximum': 20000,
-      });
-      expect(properties['start_index'], containsPair('default', 0));
-      expect(properties['raw'], containsPair('default', false));
-      expect(
-        properties['download_path']['description'],
-        contains('full file path under @workspaces/'),
-      );
-      expect(
-        properties['download_path']['description'],
-        contains('not a directory'),
-      );
+      BuiltInWebFetchService.textFetchTimeout = const Duration(seconds: 60);
+      BuiltInWebFetchService.partGracePeriod = const Duration(hours: 1);
     });
 
     test(
       'simplifies HTML and limits default output to 5000 characters',
       () async {
-        final result = await _callFetch(engine, baseUri.resolve('/html'));
+        final result = await _callFetch(wsDir, baseUri.resolve('/html'));
         final text = _resultText(result);
 
         expect(text, contains('Useful title'));
@@ -168,7 +130,7 @@ void main() {
 
     test('continues a truncated response from start_index', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/html'),
         arguments: const {'start_index': 5000},
       );
@@ -181,7 +143,7 @@ void main() {
 
     test('requires raw opt-in and still bounds raw HTML', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/html'),
         arguments: const {'raw': true, 'max_length': 200},
       );
@@ -193,19 +155,19 @@ void main() {
     });
 
     test('compacts JSON before returning it', () async {
-      final result = await _callFetch(engine, baseUri.resolve('/json'));
+      final result = await _callFetch(wsDir, baseUri.resolve('/json'));
 
       expect(_resultText(result), '{"items":[1,2]}');
     });
 
     test('does not split Unicode surrogate pairs at a boundary', () async {
       final first = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/unicode'),
         arguments: const {'max_length': 1},
       );
       final continued = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/unicode'),
         arguments: const {'max_length': 3, 'start_index': 2},
       );
@@ -217,7 +179,7 @@ void main() {
 
     test('rejects attempts to exceed the hard output limit', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/html'),
         arguments: const {'max_length': 20001},
       );
@@ -230,7 +192,7 @@ void main() {
       'download_path saves text bytes as-is and returns a confirmation',
       () async {
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {'download_path': '@workspaces/notes/sample.txt'},
         );
@@ -249,7 +211,7 @@ void main() {
 
     test('download_path saves binary bytes as-is', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/download.bin'),
         arguments: const {'download_path': '@workspaces/payload.bin'},
       );
@@ -266,7 +228,7 @@ void main() {
       await target.writeAsString('old');
 
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/download.txt'),
         arguments: const {'download_path': '@workspaces/overwrite.txt'},
       );
@@ -279,7 +241,7 @@ void main() {
       'download_path ignores max_length/start_index/raw and notes it',
       () async {
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {
             'download_path': '@workspaces/notes/sample.txt',
@@ -313,7 +275,7 @@ void main() {
         '@workspaces/reports/.git/notes.md', // dot-prefixed segment (nested)
       ]) {
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: {'download_path': bad},
         );
@@ -323,7 +285,7 @@ void main() {
     });
 
     test('binary content without download_path errors with guidance', () async {
-      final result = await _callFetch(engine, baseUri.resolve('/download.bin'));
+      final result = await _callFetch(wsDir, baseUri.resolve('/download.bin'));
 
       expect(result['isError'], isTrue);
       expect(_resultText(result), contains('Possible binary content detected'));
@@ -334,7 +296,7 @@ void main() {
     test(
       'over-length content is saved to .fetch_cache with a path hint',
       () async {
-        final result = await _callFetch(engine, baseUri.resolve('/html'));
+        final result = await _callFetch(wsDir, baseUri.resolve('/html'));
         final text = _resultText(result);
 
         expect(text, contains('start_index=5000'));
@@ -361,7 +323,7 @@ void main() {
 
     test('over-length raw content is saved as .txt', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/plain.txt'),
         arguments: const {'max_length': 100},
       );
@@ -383,7 +345,7 @@ void main() {
 
     test('content within max_length is never saved', () async {
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/json'),
         arguments: const {'max_length': 5000},
       );
@@ -394,11 +356,11 @@ void main() {
     });
 
     test('continuation calls do not rewrite the cache entry', () async {
-      await _callFetch(engine, baseUri.resolve('/html'));
+      await _callFetch(wsDir, baseUri.resolve('/html'));
       expect(_fetchCacheFiles(wsDir), hasLength(1));
 
       final continued = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/html'),
         arguments: const {'start_index': 5000},
       );
@@ -409,8 +371,8 @@ void main() {
     test(
       'cache entries are deterministic and overwritten, not reused',
       () async {
-        final first = await _callFetch(engine, baseUri.resolve('/html'));
-        final second = await _callFetch(engine, baseUri.resolve('/html'));
+        final first = await _callFetch(wsDir, baseUri.resolve('/html'));
+        final second = await _callFetch(wsDir, baseUri.resolve('/html'));
         final firstPath = RegExp(
           r'(@workspaces/\.fetch_cache/\w+\.md)',
         ).firstMatch(_resultText(first))!.group(1)!;
@@ -432,7 +394,7 @@ void main() {
         DateTime.now().subtract(const Duration(days: 8)),
       );
 
-      await _callFetch(engine, baseUri.resolve('/html'));
+      await _callFetch(wsDir, baseUri.resolve('/html'));
 
       expect(await stale.exists(), isFalse);
       expect(_fetchCacheFiles(wsDir), hasLength(1));
@@ -454,9 +416,9 @@ void main() {
           DateTime.now().subtract(const Duration(days: 2)),
         );
 
-        KelivoFetcher.cacheBudgetBytes = 50;
+        BuiltInWebFetchService.cacheBudgetBytes = 50;
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/unicode'),
           arguments: const {'max_length': 1},
         );
@@ -472,36 +434,30 @@ void main() {
     test(
       'sandbox resolution failure degrades to text without a hint',
       () async {
-        final failingEngine = KelivoFetchMcpServerEngine(
+        final result = await _callFetch(
+          wsDir,
+          baseUri.resolve('/html'),
           workspacesDirProvider: () async =>
               throw const FileSystemException('sandbox unavailable'),
-        );
-        final result = await _callFetch(
-          failingEngine,
-          baseUri.resolve('/html'),
         );
 
         expect(result['isError'], isFalse);
         expect(_resultText(result), contains('start_index=5000'));
         expect(_resultText(result), isNot(contains('.fetch_cache')));
-        failingEngine.close();
       },
     );
 
     test('download to an unavailable sandbox errors explicitly', () async {
-      final failingEngine = KelivoFetchMcpServerEngine(
-        workspacesDirProvider: () async =>
-            throw const FileSystemException('sandbox unavailable'),
-      );
       final result = await _callFetch(
-        failingEngine,
+        wsDir,
         baseUri.resolve('/download.txt'),
         arguments: const {'download_path': '@workspaces/sample.txt'},
+        workspacesDirProvider: () async =>
+            throw const FileSystemException('sandbox unavailable'),
       );
 
       expect(result['isError'], isTrue);
       expect(_resultText(result), contains('sandbox'));
-      failingEngine.close();
     });
 
     test(
@@ -509,7 +465,7 @@ void main() {
       () async {
         final expected = gzip.encode(utf8.encode('gzipped payload'));
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/gzipped.txt'),
           arguments: const {'download_path': '@workspaces/gz.txt'},
         );
@@ -525,7 +481,7 @@ void main() {
       'charset-less UTF-8 pages decode correctly instead of latin-1',
       () async {
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/no-charset.txt'),
         );
 
@@ -538,7 +494,7 @@ void main() {
       'download mode ignores invalid max_length instead of erroring',
       () async {
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {
             'download_path': '@workspaces/sample.txt',
@@ -557,8 +513,8 @@ void main() {
     test(
       'content beyond kelivo_read window is not saved; download_path hinted',
       () async {
-        KelivoFetcher.maxReadableTextBytes = 50;
-        final result = await _callFetch(engine, baseUri.resolve('/html'));
+        BuiltInWebFetchService.maxReadableTextBytes = 50;
+        final result = await _callFetch(wsDir, baseUri.resolve('/html'));
         final text = _resultText(result);
 
         expect(text, contains('Content too large to save as text'));
@@ -578,7 +534,7 @@ void main() {
       );
 
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/download.txt'),
         arguments: const {'download_path': '@workspaces/sample.txt'},
       );
@@ -598,9 +554,9 @@ void main() {
       final inFlight = File(p.join(cacheDir.path, 'inflight.part'));
       await inFlight.writeAsString(List.filled(30, 'b').join());
 
-      KelivoFetcher.cacheBudgetBytes = 50;
+      BuiltInWebFetchService.cacheBudgetBytes = 50;
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/download.txt'),
         arguments: const {'download_path': '@workspaces/sample.txt'},
       );
@@ -621,9 +577,9 @@ void main() {
           DateTime.now().subtract(const Duration(days: 1)),
         );
 
-        KelivoFetcher.cacheBudgetBytes = 10;
+        BuiltInWebFetchService.cacheBudgetBytes = 10;
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {'download_path': '@workspaces/sample.txt'},
         );
@@ -640,7 +596,7 @@ void main() {
         await dir.create(recursive: true);
 
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {'download_path': '@workspaces/notes'},
         );
@@ -660,9 +616,11 @@ void main() {
     );
 
     test('a stalled download stream times out instead of hanging', () async {
-      KelivoFetcher.downloadChunkTimeout = const Duration(milliseconds: 200);
+      BuiltInWebFetchService.downloadChunkTimeout = const Duration(
+        milliseconds: 200,
+      );
       final result = await _callFetch(
-        engine,
+        wsDir,
         baseUri.resolve('/stall'),
         arguments: const {'download_path': '@workspaces/stall.bin'},
       );
@@ -672,21 +630,38 @@ void main() {
     });
 
     test('a stalled text-mode fetch times out instead of hanging', () async {
-      KelivoFetcher.textFetchTimeout = const Duration(milliseconds: 200);
-      final result = await _callFetch(engine, baseUri.resolve('/stall'));
+      BuiltInWebFetchService.textFetchTimeout = const Duration(
+        milliseconds: 200,
+      );
+      final result = await _callFetch(wsDir, baseUri.resolve('/stall'));
 
       expect(result['isError'], isTrue);
       expect(_resultText(result), contains('TimeoutException'));
     });
 
     test(
+      'a trickling text-mode fetch is bounded by the overall deadline',
+      () async {
+        BuiltInWebFetchService.textFetchTimeout = const Duration(
+          milliseconds: 250,
+        );
+        final result = await _callFetch(wsDir, baseUri.resolve('/trickle'));
+
+        // Each chunk arrives within the window, so the fetch must be cut off
+        // by the overall deadline rather than completing the full body.
+        expect(result['isError'], isTrue);
+        expect(_resultText(result), contains('TimeoutException'));
+      },
+    );
+
+    test(
       'a server that never sends headers cannot hang the download',
       () async {
-        KelivoFetcher.downloadResponseTimeout = const Duration(
+        BuiltInWebFetchService.downloadResponseTimeout = const Duration(
           milliseconds: 200,
         );
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/no-headers'),
           arguments: const {'download_path': '@workspaces/nohead.bin'},
         );
@@ -698,7 +673,7 @@ void main() {
     test(
       'binary content-type is flagged even without early null bytes',
       () async {
-        final result = await _callFetch(engine, baseUri.resolve('/image.png'));
+        final result = await _callFetch(wsDir, baseUri.resolve('/image.png'));
 
         expect(result['isError'], isTrue);
         expect(_resultText(result).toLowerCase(), contains('binary'));
@@ -719,9 +694,9 @@ void main() {
         final freshBackup = File(p.join(cacheDir.path, 'notes.bak'));
         await freshBackup.writeAsString(List.filled(30, 'b').join());
 
-        KelivoFetcher.cacheBudgetBytes = 50;
+        BuiltInWebFetchService.cacheBudgetBytes = 50;
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/download.txt'),
           arguments: const {'download_path': '@workspaces/sample.txt'},
         );
@@ -745,9 +720,9 @@ void main() {
         final freshOverflow = File(p.join(cacheDir.path, 'fresh.md'));
         await freshOverflow.writeAsString(List.filled(30, 'b').join());
 
-        KelivoFetcher.cacheBudgetBytes = 50;
+        BuiltInWebFetchService.cacheBudgetBytes = 50;
         final result = await _callFetch(
-          engine,
+          wsDir,
           baseUri.resolve('/unicode'),
           arguments: const {'max_length': 1},
         );
@@ -755,44 +730,6 @@ void main() {
         expect(result['isError'], isFalse);
         expect(await oldFile.exists(), isFalse); // old overflow trimmed
         expect(await freshOverflow.exists(), isTrue); // fresh one protected
-      },
-    );
-
-    test(
-      'client-side request timeout does not cancel the in-flight download',
-      () async {
-        final server = KelivoFetchMcpServerEngine(
-          workspacesDirProvider: () async => wsDir,
-        );
-        final transport = KelivoInMemoryClientTransport(server);
-        final client = mcp.McpClient.createClient(
-          mcp.McpClient.simpleConfig(
-            name: 'test',
-            version: '1.0.0',
-            requestTimeout: const Duration(milliseconds: 200),
-          ),
-        );
-        await client.connect(transport);
-        try {
-          await client.callTool('kelivo_fetch', {
-            'url': baseUri.resolve('/stall').toString(),
-            'download_path': '@workspaces/sample.txt',
-          });
-          fail('expected the client-side request timeout to fire');
-        } on mcp.McpError catch (e) {
-          expect(e.message, contains('Request timed out'));
-        }
-        client.disconnect();
-        transport.close();
-        server.close();
-
-        // The server-side download runs to completion in the same isolate
-        // regardless of the client timeout: the file exists once the stalled
-        // body finishes (1 s park), and the result is simply discarded.
-        await Future<void>.delayed(const Duration(seconds: 2));
-        final file = File(p.join(wsDir.path, 'sample.txt'));
-        expect(await file.exists(), isTrue);
-        expect(await file.readAsString(), 'first-chunk');
       },
     );
   });
@@ -805,23 +742,66 @@ List<File> _fetchCacheFiles(Directory wsDir) {
 }
 
 Future<Map<String, dynamic>> _callFetch(
-  KelivoFetchMcpServerEngine engine,
+  Directory wsDir,
   Uri url, {
   Map<String, dynamic> arguments = const {},
+  Future<Directory> Function()? workspacesDirProvider,
 }) async {
-  final response =
-      await engine.handleMessage({
-            'jsonrpc': '2.0',
-            'id': 1,
-            'method': 'tools/call',
-            'params': {
-              'name': 'kelivo_fetch',
-              'arguments': {'url': url.toString(), ...arguments},
-            },
-          })
-          as Map<String, dynamic>;
-  return ((response['result'] as Map).cast<String, dynamic>());
+  try {
+    final request = BuiltInWebFetchRequest.parse({
+      'url': url.toString(),
+      ...arguments,
+    });
+    final result = await BuiltInWebFetchService.fetch(
+      request,
+      workspacesDirProvider: workspacesDirProvider ?? () async => wsDir,
+    );
+    if (result.isDownload) {
+      return _ok(
+        'Downloaded ${result.downloadedBytes} bytes to '
+        '${result.downloadPath}. Note: max_length, start_index and raw are '
+        'ignored when download_path is set.',
+      );
+    }
+    final window = WebFetchContentWindow.fromText(
+      result.content!,
+      startIndex: request.startIndex,
+      maxLength: request.maxLength,
+    );
+    var text = window.content;
+    if (window.truncated) {
+      text =
+          '$text\n\n[Content truncated: showing characters '
+          '${window.startIndex}-${window.endIndex - 1} of '
+          '${window.totalLength}. Call web_fetch with '
+          'start_index=${window.endIndex} to continue.]';
+    }
+    if (result.cachePath != null) {
+      text =
+          '$text\n\nFull content (${result.content!.length} characters) '
+          'saved to ${result.cachePath}. Read it with kelivo_read to get the '
+          'complete content.';
+    }
+    if (result.note != null) text = '$text\n\n${result.note}';
+    return _ok(text);
+  } catch (e) {
+    return _error(e.toString());
+  }
 }
+
+Map<String, dynamic> _ok(String text) => {
+  'content': [
+    {'type': 'text', 'text': text},
+  ],
+  'isError': false,
+};
+
+Map<String, dynamic> _error(String text) => {
+  'content': [
+    {'type': 'text', 'text': text},
+  ],
+  'isError': true,
+};
 
 String _resultText(Map<String, dynamic> result) {
   final content = result['content'] as List;

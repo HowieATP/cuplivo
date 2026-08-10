@@ -13,11 +13,8 @@ import 'package:uuid/uuid.dart';
 
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
-import '../services/headless_generation_service.dart';
 import '../services/oauth/oauth_flow_service.dart';
-import 'assistant_provider.dart';
 import 'filesystem_mounts_provider.dart';
-import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
 enum McpTransportType { sse, http, stdio, inmemory }
@@ -419,8 +416,6 @@ class McpProvider extends ChangeNotifier {
 
   McpProvider({
     this.chatService,
-    this.assistantProvider,
-    this.headlessGen,
     this.filesystemMounts,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
@@ -432,8 +427,6 @@ class McpProvider extends ChangeNotifier {
   }
 
   final ChatService? chatService;
-  final AssistantProvider? assistantProvider;
-  final HeadlessGenerationService? headlessGen;
   final FilesystemMountsProvider? filesystemMounts;
   final BuildContext Function() contextProvider;
 
@@ -472,9 +465,6 @@ class McpProvider extends ChangeNotifier {
 
   Future<void> _load() async {
     await _reloadServersFromPrefs();
-
-    // Refresh @kelivo/subagent tool definitions when assistants change
-    assistantProvider?.addListener(_onAssistantsChanged);
   }
 
   /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
@@ -483,8 +473,7 @@ class McpProvider extends ChangeNotifier {
   ///
   /// Used by the constructor and by [reloadFromPrefs] after a backup/import
   /// restore rewrote the prefs, so the in-memory state never diverges from
-  /// disk. Listener registration (e.g. assistant changes) is NOT repeated
-  /// here — callers own it.
+  /// disk.
   Future<void> _reloadServersFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final timeoutMs = prefs.getInt(_prefsTimeoutKey);
@@ -500,12 +489,13 @@ class McpProvider extends ChangeNotifier {
                   McpServerConfig.fromJson((e as Map).cast<String, dynamic>()),
             )
             .toList();
-        _servers = list;
+        _servers = list
+            .where((s) => !_isLegacySubagentServer(s))
+            .toList(growable: false);
       } catch (_) {}
     }
     // Ensure built-in MCP servers are present by default
     _ensureBuiltinFetchServerPresent();
-    _ensureBuiltinSubagentServerPresent();
     _ensureBuiltinFilesystemServerPresent();
     // initialize statuses
     for (final s in _servers) {
@@ -524,6 +514,13 @@ class McpProvider extends ChangeNotifier {
       unawaited(connect(s.id));
     }
   }
+
+  /// True for a persisted `@kelivo/subagent` entry left over from versions
+  /// where handoff was a built-in in-memory MCP server. Handoff is a local
+  /// tool now; the entry must never be loaded (its in-memory engine no
+  /// longer exists).
+  static bool _isLegacySubagentServer(McpServerConfig s) =>
+      s.id == 'kelivo_subagent' || s.name == '@kelivo/subagent';
 
   /// Reloads the server list and connections from SharedPreferences.
   ///
@@ -544,32 +541,6 @@ class McpProvider extends ChangeNotifier {
     _errors.clear();
     _reconnecting.clear();
     await _reloadServersFromPrefs();
-  }
-
-  void _onAssistantsChanged() {
-    unawaited(refreshTools('kelivo_subagent'));
-  }
-
-  void _ensureBuiltinSubagentServerPresent() {
-    if (assistantProvider == null ||
-        chatService == null ||
-        headlessGen == null) {
-      return;
-    }
-    final exists = _servers.any(
-      (s) => s.id == 'kelivo_subagent' || s.name == '@kelivo/subagent',
-    );
-    if (exists) return;
-    _servers = [
-      ..._servers,
-      McpServerConfig(
-        id: 'kelivo_subagent',
-        enabled: true,
-        name: '@kelivo/subagent',
-        transport: McpTransportType.inmemory,
-        tools: const <McpToolConfig>[],
-      ),
-    ];
   }
 
   void _ensureBuiltinFetchServerPresent() {
@@ -695,6 +666,7 @@ class McpProvider extends ChangeNotifier {
     }
 
     List<McpServerConfig> next = [];
+    var sawLegacySubagent = false;
     try {
       Map<String, dynamic>? serversFromMap;
       if (data is Map && data.containsKey('mcpServers')) {
@@ -712,6 +684,12 @@ class McpProvider extends ChangeNotifier {
         bool builtinEnabled = true;
         serversFromMap.forEach((id, cfgAny) {
           if (cfgAny is! Map) return;
+          // @kelivo/subagent was a built-in in-memory server in older
+          // versions; handoff is a local tool now — never import it.
+          if (id == 'kelivo_subagent' || id == '@kelivo/subagent') {
+            sawLegacySubagent = true;
+            return;
+          }
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
@@ -861,7 +839,25 @@ class McpProvider extends ChangeNotifier {
       throw FormatException('Unrecognized or invalid MCP JSON');
     }
 
+    // Legacy @kelivo/subagent entries (internal list format) are dropped:
+    // the in-memory engine no longer exists.
+    var droppedLegacy = 0;
+    next = next.where((s) {
+      if (_isLegacySubagentServer(s)) {
+        droppedLegacy++;
+        return false;
+      }
+      return true;
+    }).toList();
+
     if (next.isEmpty) {
+      if (sawLegacySubagent || droppedLegacy > 0) {
+        throw const FormatException(
+          'Only legacy @kelivo/subagent servers were found. Handoff is a '
+          'local tool now — enable it in the assistant\'s Local Tools '
+          'settings.',
+        );
+      }
       throw FormatException('No valid MCP servers found in JSON');
     }
 
@@ -1239,12 +1235,6 @@ class McpProvider extends ChangeNotifier {
         // before building any in-memory engine (idempotent).
         await filesystemMounts?.init();
         final engine = switch (server.id) {
-          'kelivo_subagent' => KelivoSubagentMcpServerEngine(
-            assistants: assistantProvider!,
-            chatService: chatService!,
-            headlessGen: headlessGen!,
-            contextProvider: contextProvider,
-          ),
           'kelivo_filesystem' => KelivoFilesystemMcpServerEngine(
             mountsProvider: () =>
                 filesystemMounts?.allMounts ?? const <FilesystemMount>[],
@@ -1262,8 +1252,6 @@ class McpProvider extends ChangeNotifier {
           _ => KelivoFetchMcpServerEngine(),
         };
         final transport = switch (engine) {
-          KelivoSubagentMcpServerEngine e =>
-            KelivoSubagentInMemoryClientTransport(e),
           KelivoFilesystemMcpServerEngine e =>
             KelivoFilesystemInMemoryClientTransport(e),
           _ => KelivoInMemoryClientTransport(
@@ -1935,7 +1923,6 @@ class McpProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    assistantProvider?.removeListener(_onAssistantsChanged);
     // Clean up timers
     for (final t in _heartbeats.values) {
       t.cancel();

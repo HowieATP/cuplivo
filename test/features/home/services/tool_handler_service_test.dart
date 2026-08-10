@@ -96,6 +96,37 @@ void main() {
       expect(payload['message'], contains('410'));
     });
 
+    testWidgets('handoff tool is rejected when not enabled for the assistant', (
+      tester,
+    ) async {
+      final assistant = Assistant(id: 'assistant-a', name: 'Assistant');
+
+      await tester.pumpWidget(
+        _ToolHandlerTestScope(
+          child: Builder(
+            builder: (context) {
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final context = tester.element(find.byType(SizedBox));
+      final handler = ToolHandlerService(
+        contextProvider: context,
+      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+
+      final result = await handler('kelivo_handoff', {
+        'assistant': 'research-bot',
+        'task': 'do the thing',
+      });
+
+      final payload = jsonDecode(result) as Map<String, dynamic>;
+      expect(payload['type'], 'tool_error');
+      expect(payload['error'], 'handoff_disabled');
+      expect(payload['tool'], 'kelivo_handoff');
+    });
+
     testWidgets('edit_memory returns tool error when update throws', (
       tester,
     ) async {

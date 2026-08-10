@@ -82,8 +82,8 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'mcp_servers_v1': jsonEncode([_server('srv-b', 'Server B').toJson()]),
       });
-      await provider.disconnect('kelivo_subagent');
-      await provider.refreshTools('kelivo_subagent');
+      await provider.disconnect('ghost-server');
+      await provider.refreshTools('ghost-server');
 
       expect(await _persistedServerIds(), contains('srv-b'));
       expect(await _persistedServerIds(), isNot(contains('srv-a')));
@@ -112,7 +112,7 @@ void main() {
 
     // A refresh triggered after the reload runs against the new client (or
     // none) and must not resurrect the pre-restore servers on disk.
-    await provider.refreshTools('kelivo_subagent');
+    await provider.refreshTools('ghost-server');
     await pumpEventQueue();
 
     expect(await _persistedServerIds(), contains('srv-b'));

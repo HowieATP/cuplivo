@@ -25,12 +25,12 @@ Future<void> refreshProvidersAfterRestore(BuildContext context) async {
     debugPrint('refreshProvidersAfterRestore: ChatService: $e');
   }
   try {
-    // Reload MCP BEFORE assistants: reloading assistants fires
-    // McpProvider._onAssistantsChanged -> refreshTools('kelivo_subagent'),
-    // which persists the whole server list. If the old client were still
-    // live at that point it would write the pre-restore list over the
-    // restored mcp_servers_v1; reloading MCP first means any such refresh
-    // runs against the new client (or no client) and stays harmless.
+    // Reload MCP BEFORE assistants: reloading assistants can fire provider
+    // change notifications that read the server list. If the old client
+    // were still live at that point it would write the pre-restore list
+    // over the restored mcp_servers_v1; reloading MCP first means any such
+    // refresh runs against the new client (or no client) and stays
+    // harmless.
     await mcpProvider.reloadFromPrefs();
   } catch (e) {
     debugPrint('refreshProvidersAfterRestore: McpProvider: $e');

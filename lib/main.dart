@@ -228,8 +228,6 @@ class MyApp extends StatelessWidget {
             final sp = ctx.read<SettingsProvider>();
             return McpProvider(
               chatService: ctx.read<ChatService>(),
-              assistantProvider: ctx.read<AssistantProvider>(),
-              headlessGen: ctx.read<HeadlessGenerationService>(),
               filesystemMounts: ctx.read<FilesystemMountsProvider>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),

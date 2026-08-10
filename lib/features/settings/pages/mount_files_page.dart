@@ -519,52 +519,59 @@ class _MountFilesPageState extends State<MountFilesPage> {
 
     final content = _loading
         ? const Center(child: CircularProgressIndicator())
-        : _entries.isEmpty
-        ? Center(
-            child: Text(
-              l10n.mountFilesEmptyDir,
-              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
-            ),
-          )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // The breadcrumb stays visible even for empty directories —
+              // without it the user could only leave via the page back
+              // button, with no way to step up one level at a time.
               _breadcrumb(context),
               Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: _entries.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: cs.onSurface.withValues(alpha: 0.06),
-                  ),
-                  itemBuilder: (context, i) {
-                    final e = _entries[i];
-                    final isDesktop = PlatformUtils.isDesktopTarget;
-                    return _EntryRow(
-                      entry: e,
-                      isDesktop: isDesktop,
-                      onOpen: () {
-                        if (e.isDir) {
-                          _openDir(e.name);
-                        } else {
-                          _preview(e);
-                        }
-                      },
-                      onDownload: e.isDir ? null : () => _download(e),
-                      onDelete: e.isDir || readOnly
-                          ? null
-                          : () => _confirmDelete(e),
-                      onOpenExternal: e.isDir || !isDesktop
-                          ? null
-                          : () => _openExternal(e),
-                      onShare: e.isDir || !isDesktop ? null : () => _share(e),
-                      showMore: e.isDir || isDesktop
-                          ? null
-                          : () => _showMoreSheet(e),
-                    );
-                  },
-                ),
+                child: _entries.isEmpty
+                    ? Center(
+                        child: Text(
+                          l10n.mountFilesEmptyDir,
+                          style: TextStyle(
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: _entries.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: cs.onSurface.withValues(alpha: 0.06),
+                        ),
+                        itemBuilder: (context, i) {
+                          final e = _entries[i];
+                          final isDesktop = PlatformUtils.isDesktopTarget;
+                          return _EntryRow(
+                            entry: e,
+                            isDesktop: isDesktop,
+                            onOpen: () {
+                              if (e.isDir) {
+                                _openDir(e.name);
+                              } else {
+                                _preview(e);
+                              }
+                            },
+                            onDownload: e.isDir ? null : () => _download(e),
+                            onDelete: e.isDir || readOnly
+                                ? null
+                                : () => _confirmDelete(e),
+                            onOpenExternal: e.isDir || !isDesktop
+                                ? null
+                                : () => _openExternal(e),
+                            onShare: e.isDir || !isDesktop
+                                ? null
+                                : () => _share(e),
+                            showMore: e.isDir || isDesktop
+                                ? null
+                                : () => _showMoreSheet(e),
+                          );
+                        },
+                      ),
               ),
             ],
           );

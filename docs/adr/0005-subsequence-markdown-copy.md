@@ -1,4 +1,4 @@
-# ADR-0004: Subsequence Matching for "Copy as Markdown"
+# ADR-0005: Subsequence Matching for "Copy as Markdown"
 
 **Status:** Accepted (2026-07-26)
 

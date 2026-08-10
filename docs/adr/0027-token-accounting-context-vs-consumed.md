@@ -1,4 +1,4 @@
-# Token accounting: dual context-vs-consumed semantics
+# ADR-0027: Token accounting: dual context-vs-consumed semantics
 
 Multi-round tool-call turns undercounted token usage: every provider max-merged per-round `usage` across rounds (correct only for within-stream cumulative snapshots), so the stored message fields reflected the last request instead of the turn's billed total — multi-round consumption was invisible in the message token display and the Stats page (issue #235).
 

@@ -1,4 +1,4 @@
-# Wait-Mode Handoff: Live Panel + Result Return via Handler-Layer Await
+# ADR-0026: Wait-Mode Handoff: Live Panel + Result Return via Handler-Layer Await
 
 Wait-mode handoff (`kelivo_handoff_sync`) lets an orchestrator delegate a task to a
 sub-agent and BLOCK until the sub-agent finishes, returning the child's full output

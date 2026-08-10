@@ -2,7 +2,7 @@
 
 The `@kelivo/filesystem` MCP server addresses files exclusively as mount-relative wire paths (`@alias/rel/path`). Absolute host paths — and `..` segments, backslashes, empty segments, trailing slashes, and unknown mount aliases — are rejected with errors. Most filesystem tools accept both; we deliberately accept only the relative form.
 
-Rationale: wire paths double as identity (workspaceFile marker ids in `deleted.json`, tool-call records in conversations), and host-absolute paths are unstable across devices and app updates — the same container path-drift failure mode that forced `canon()` normalization in the storage refcount scan (ADR-0006/0007). Mount-relative paths also keep host layout out of the model context and the MCP request logs.
+Rationale: wire paths double as identity (workspaceFile marker ids in `deleted.json`, tool-call records in conversations), and host-absolute paths are unstable across devices and app updates — the same container path-drift failure mode that forced `canon()` normalization in the storage refcount scan (ADR-0007). Mount-relative paths also keep host layout out of the model context and the MCP request logs.
 
 ## Considered Options
 

@@ -1,4 +1,4 @@
-# ADR-0001: Fork Rename Kelivo → Cuplivo
+# ADR-0003: Fork Rename Kelivo → Cuplivo
 
 **Status:** Accepted (2026-07-01)
 **Deciders:** cup113

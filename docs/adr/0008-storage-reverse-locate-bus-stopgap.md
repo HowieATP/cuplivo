@@ -1,4 +1,4 @@
-# ADR-0005: 反向定位采用 MessageLocateBus 作为过渡方案
+# ADR-0008: 反向定位采用 MessageLocateBus 作为过渡方案
 
 ## Context
 

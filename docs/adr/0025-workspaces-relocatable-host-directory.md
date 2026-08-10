@@ -1,4 +1,4 @@
-# ADR-0024: User-relocatable @workspaces host directory, wire format unchanged
+# ADR-0025: User-relocatable @workspaces host directory, wire format unchanged
 
 The built-in `@workspaces` sandbox lives at `<appData>/workspaces/`, which pins it to the OS system drive (Windows: `C:\Users\<user>\AppData\...`) and to the app container on mobile. Desktop users want it elsewhere (a secondary drive, a synced folder); the wire format (ADR-0022) deliberately keeps host paths out of the model context, so relocation can be purely a host-side setting.
 

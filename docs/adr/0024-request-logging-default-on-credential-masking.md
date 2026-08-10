@@ -1,4 +1,4 @@
-# Request Logging Default-On with Credential Masking
+# ADR-0024: Request Logging Default-On with Credential Masking
 
 Default-on LLM request logging with a 50 MB cap and credential masking was chosen over opt-in logging: the log category `llm` defaults to ON for missing-key installs (new and existing alike), the log total is capped at 50 MB with oldest-first eviction, and credential-bearing headers (`authorization`, `proxy-authorization`, `x-api-key`, `x-goog-api-key`, `api-key`) are masked in log output to the first 7 characters plus the remaining length (`Bearer [45 more]`) so the logs stay fully debuggable without credentials at rest. Issue #196.
 

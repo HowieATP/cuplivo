@@ -615,6 +615,18 @@
 
 - "显示公式" / "display formula" was used in issue #218 to mean block-level math as opposed to inline — resolved: the domain term is **Display math** (block-level TeX forms `$$...$$` and `\[...\]`); "inline math" is the flow-level counterpart.
 
+## Mini Map Search (迷你地图搜索)
+
+- **Model**: filter-navigation (过滤导航) — 搜索是地图的定位工具，不是结果列表。输入关键词 → 消息级命中行（单消息一行，hit-centered 片段 + 高亮），点击跳转原消息；清空 → 恢复 Q/A 对鸟瞰图。
+- **Match source**: raw content（原始文本）— 与显示剥离逻辑解耦；`<think>/<thought>/<reasoning>`、`[image:]/[file:]` 内的文字可被命中。已知边缘：命中词恰好是标记/标签名本身（如搜 `think` 匹配 `<think>`）时，压平后的 snippet 不含该词 → 命中行无高亮（匹配源与显示源分裂的固有结果，接受）。
+- **Snippet source**: raw text with tag-flattening — 从原始文本以命中为中心截取，标签字符删除、内部文字保留；markdown 语法符号不动。窗口截断产生的残留裸标签/裸 `[image:`/`[file:` 前缀会再清洗一遍。
+- **Token semantics**: whitespace 分词 AND（与全局搜索 `_tokensOf` 一致）。
+- **Highlight**: 与全局搜索同色（暗 0xFFB8860B@55% / 亮 0xFFFFD700@55%），"黄色=命中"为 app 级心智模型。
+- **Entry divergence**: 手机图标切换式（屏幕窄）+ autofocus；桌面常驻搜索框 + 打开即 autofocus + Esc 两级退（先清空、再关闭）。共享的是逻辑（`lib/shared/widgets/mini_map/`），不是入口 UI。
+- **Debounce**: 150-200ms 各壳私有 Timer（dispose 取消）；shared 保持无状态纯函数。
+- **Performance note**: 单对话内消息级过滤；跨对话的 200 条限制属于全局搜索（issue #243 的另一半，未在本任务处理）。
+- **Selection mode**: 命中行点击 = 切换勾选（`onToggleSelection`），与跳转互斥。
+
 ## Token Accounting (Token 统计)
 
 - **Tool-call round (工具调用轮次)**: One independent API request within a single assistant turn. A multi-round turn = model calls tools → tool results appended → follow-up request, repeated. Each round is separately billed, and its `usage` snapshot resets per request (except Gemini-style within-stream cumulative `usageMetadata`).

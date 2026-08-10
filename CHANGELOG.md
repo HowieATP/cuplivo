@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.7.0] - 2026-08-10
+
+### Added
+
+- Full subagent experience: new wait mode lets a subagent return its result to the main agent for further processing, with a live progress panel in the parent conversation; parallel calls supported (#251)
+- Workspace enhancements: the built-in workspace directory is now user-configurable on desktop; added "open externally" and share buttons; improved file preview line numbers; fixed empty-folder display (#250)
+- HTML rendering enhancement: HTML code blocks now render inline in the chat list — just have the assistant output an HTML code block — enhancing role-play and other chat experiences (#203)
+- Input drafts: your typed input is saved as a draft and restored when the app restarts, recovering your last unsent content (#246)
+- Default behavior changes: DeepSeek provider enabled by default; assistant temperature / top_p and similar parameters disabled by default; request logging on by default with a 50 MB cap; users with existing configurations are unaffected (#240)
+- Slightly smaller install package size (#241)
+
+### Fixed
+
+- Long-message streaming performance: smart throttling added for rendering and database writes (#232)
+- Multi-assistant group chat: assistants are now aware of the members in a group chat; fixed the settings UI; group avatars can now be set (#219)
+- Kaomoji rendering: bundled a fallback font for rare characters so kaomoji are no longer rendered incorrectly (#249)
+- Token statistics: assistant messages with multi-round tool calls now count their tokens as a sum — in-app statistics no longer undercount token consumption (#247)
+
 ## [2.6.3] - 2026-08-08
 
 > ℹ️ Android users please note: the in-app auto-update previously always downloaded the x86_64 build; this has been fixed, but to obtain this version you still need to grab the arm64-v8a APK from the GitHub Release page.

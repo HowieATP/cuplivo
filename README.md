@@ -45,7 +45,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 2. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context (#150).
 
-3. **Built-in filesystem MCP server** — Read, write, and regex-search local files through an in-memory MCP server; mount local directories without a command line, security-first. Browse mounted directories in an in-app file browser, with paginated grep results and context, code structure outlines (`kelivo_outline`), downloading internet resources into the workspace, and long-webpage workspace cache continuation (#173, #221, #222).
+3. **Built-in filesystem MCP server** — Read, write, and regex-search local files through an in-memory MCP server; mount local directories without a command line, security-first. Browse mounted directories in an in-app file browser, with paginated grep results and context, code structure outlines (`kelivo_outline`), downloading internet resources into the workspace, and long-webpage workspace cache continuation (#173, #221, #222). On desktop, the built-in workspace directory location is user-configurable, with open-externally and share actions for workspace files, an enhanced file preview, and correct display of empty folders (#242, #250).
 
 4. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
    - Desktop now shows 2 model responses per page in a two-column layout.
@@ -56,7 +56,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ### Agent Capabilities
 
-1. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via an MCP tool (fire-and-forget). True result-returning subagents are planned for a future release (#140).
+1. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via MCP tools: fire-and-forget for background work, or **wait mode** that blocks until the subagent finishes and returns its result to the main agent for further processing, with a live progress panel in the parent conversation and same-turn parallel calls (#140, #251).
 
 2. **Skills** — Import skills from public GitHub repositories, plus auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups. v3 adds categories, a master toggle, and chat-level skill entry (#161).
 
@@ -86,29 +86,37 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 3. **Storage space manager** — Sort stored files by time or size, find unreferenced images/files (orphans), and reverse-locate which chat record a stored file belongs to (#128).
 
-4. **TTS audio: save locally + speak selection** — Save cloud-generated TTS audio to a local file from the floating player (#131); right-click / long-press selected assistant message text to speak it (#130).
+4. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch (#246).
 
-5. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
+5. **TTS audio: save locally + speak selection** — Save cloud-generated TTS audio to a local file from the floating player (#131); right-click / long-press selected assistant message text to speak it (#130).
 
-6. **Multi-category request logging** — Request logs now cover MCP, TTS, and search services, each in its own category with independent toggles and history (#162).
+6. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
+
+7. **Multi-category request logging** — Request logs now cover MCP, TTS, and search services, each in its own category with independent toggles and history (#162).
+
+8. **Sane defaults for new installs** — New installs start with the DeepSeek provider enabled, assistant temperature / top_p parameters disabled, and request logging on with a 50 MB cap; users with existing configuration are unaffected (#240).
 
 ### UI & Rendering
 
-1. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
+1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
 
-2. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
 
-3. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
+3. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-4. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
+4. **Custom dynamic color (seed)** — Pick a custom seed color for the dynamic color scheme, giving you full control over the app's accent color with a hue picker (#107).
 
-5. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+5. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
 
-6. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+6. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
+
+7. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
 
 ### Additional Fixes
 
 - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
+- **Long-message streaming performance** — Smart throttling for rendering and database writes keeps long streams smooth (#232)
+- **Token statistics** — Assistant messages with multi-round tool calls now count their tokens as a sum; in-app statistics no longer undercount consumption (#247)
 - **Cross-MCP same-name tool conflicts** — Fixed: when multiple MCP servers expose tools with the same name, the collision is now detected and resolved (disable or rename) instead of causing ambiguous tool calls
 - Accurate Gemini cached-token reporting
 - Optimized title generation logic (auto-retry on first failure)
@@ -117,6 +125,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 - Win+V clipboard history paste fix for Flutter engine bug on Windows
 - iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16 (#193)
 - iOS: storage space manager now counts and clears the real iOS tmp directory (#223)
+- Kaomoji rendering — A bundled fallback font covers rare characters so kaomoji are no longer rendered incorrectly (#249)
 - Various other stability improvements
 
 ## ⚠️ Note

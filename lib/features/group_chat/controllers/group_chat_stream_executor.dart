@@ -5,7 +5,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -271,12 +270,14 @@ class GroupChatStreamExecutor {
             (
               String mid, {
               String? reasoningText,
+              DateTime? reasoningStartAt,
               DateTime? reasoningFinishedAt,
               String? reasoningSegmentsJson,
             }) async {
               await chatService.updateMessageSilent(
                 mid,
                 reasoningText: reasoningText,
+                reasoningStartAt: reasoningStartAt,
                 reasoningFinishedAt: reasoningFinishedAt,
                 reasoningSegmentsJson: reasoningSegmentsJson,
               );
@@ -288,9 +289,14 @@ class GroupChatStreamExecutor {
       if (chunk.totalTokens > 0) {
         state.totalTokens = chunk.totalTokens;
       }
+      // Last-wins (replace): providers emit the CURRENT round's cumulative
+      // usage (mirror chat_actions._handleContentChunk).
       if (chunk.usage != null) {
-        state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
+        state.usage = chunk.usage;
         state.totalTokens = state.usage!.totalTokens;
+      }
+      if (chunk.consumedUsage != null) {
+        state.consumedUsage = chunk.consumedUsage;
       }
       await chatService.updateMessageSilent(
         messageId,
@@ -319,12 +325,14 @@ class GroupChatStreamExecutor {
           (
             String mid, {
             String? reasoningText,
+            DateTime? reasoningStartAt,
             DateTime? reasoningFinishedAt,
             String? reasoningSegmentsJson,
           }) async {
             await chatService.updateMessageSilent(
               mid,
               reasoningText: reasoningText,
+              reasoningStartAt: reasoningStartAt,
               reasoningFinishedAt: reasoningFinishedAt,
               reasoningSegmentsJson: reasoningSegmentsJson,
             );
@@ -338,18 +346,24 @@ class GroupChatStreamExecutor {
   ) async {
     if (state.finishHandled) return;
     state.finishHandled = true;
+    // Last-wins (replace): see _handleContentChunk.
     if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
+      state.usage = chunk.usage;
       state.totalTokens = state.usage!.totalTokens;
+    }
+    if (chunk.consumedUsage != null) {
+      state.consumedUsage = chunk.consumedUsage;
     }
     await _finishReasoningState(state.messageId);
     await chatService.updateMessage(
       state.messageId,
       content: state.fullContentRaw,
       isStreaming: false,
-      totalTokens: state.totalTokens,
-      promptTokens: state.usage?.promptTokens,
-      completionTokens: state.usage?.completionTokens,
+      totalTokens: state.consumedUsage?.totalTokens ?? state.totalTokens,
+      contextTokens: state.usage?.totalTokens ?? state.totalTokens,
+      promptTokens: state.consumedUsage?.promptTokens,
+      completionTokens: state.consumedUsage?.completionTokens,
+      cachedTokens: state.consumedUsage?.cachedTokens,
     );
     streamController.markStreamingEnded(state.messageId);
     streamController.cleanupTimers(state.messageId);

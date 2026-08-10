@@ -1269,6 +1269,7 @@ class ChatService extends ChangeNotifier {
     String messageId, {
     String? content,
     int? totalTokens,
+    int? contextTokens,
     bool? isStreaming,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -1294,6 +1295,7 @@ class ChatService extends ChangeNotifier {
     final updatedMessage = message.copyWith(
       content: content ?? message.content,
       totalTokens: totalTokens ?? message.totalTokens,
+      contextTokens: contextTokens ?? message.contextTokens,
       isStreaming: isStreaming ?? message.isStreaming,
       reasoningText: reasoningText ?? message.reasoningText,
       reasoningStartAt: reasoningStartAt ?? message.reasoningStartAt,
@@ -1349,6 +1351,7 @@ class ChatService extends ChangeNotifier {
     String messageId, {
     String? content,
     int? totalTokens,
+    int? contextTokens,
     bool? isStreaming,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -1369,6 +1372,7 @@ class ChatService extends ChangeNotifier {
     final updatedMessage = message.copyWith(
       content: content ?? message.content,
       totalTokens: totalTokens ?? message.totalTokens,
+      contextTokens: contextTokens ?? message.contextTokens,
       isStreaming: isStreaming ?? message.isStreaming,
       reasoningText: reasoningText ?? message.reasoningText,
       reasoningStartAt: reasoningStartAt ?? message.reasoningStartAt,
@@ -1575,7 +1579,8 @@ class ChatService extends ChangeNotifier {
     required String content,
   }) async {
     if (!_initialized) await init();
-    final original = _repo.getMessageSync(messageId);
+    final original =
+        _repo.getMessageSync(messageId) ?? _cachedTemporaryMessage(messageId);
     if (original == null) return null;
 
     final cid = original.conversationId;
@@ -1853,6 +1858,14 @@ class ChatService extends ChangeNotifier {
       final uploadDir = await AppDirectories.getUploadDirectory();
       if (await uploadDir.exists()) {
         await uploadDir.delete(recursive: true);
+      }
+    } catch (_) {}
+    // Remove the @workspaces sandbox physically — peer-blind (no deletion
+    // markers, mirroring the entity clearAllData policy; ADR-0012/0021).
+    try {
+      final wsDir = await AppDirectories.getWorkspacesDirectory();
+      if (await wsDir.exists()) {
+        await wsDir.delete(recursive: true);
       }
     } catch (_) {}
     notifyListeners();

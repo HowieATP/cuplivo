@@ -436,6 +436,36 @@ abstract class AppLocalizations {
   /// **'System cache'**
   String get storageSpaceSubCacheSystem;
 
+  /// No description provided for @storageSpaceSubCacheTmp.
+  ///
+  /// In en, this message translates to:
+  /// **'Temp files'**
+  String get storageSpaceSubCacheTmp;
+
+  /// No description provided for @storageSpaceSubDescAvatarCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded avatar images; they are re-downloaded automatically when needed.'**
+  String get storageSpaceSubDescAvatarCache;
+
+  /// No description provided for @storageSpaceSubDescOtherCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary data such as notification icons; regenerated automatically when needed.'**
+  String get storageSpaceSubDescOtherCache;
+
+  /// No description provided for @storageSpaceSubDescSystemCache.
+  ///
+  /// In en, this message translates to:
+  /// **'System-level cache (image decoding, web content, etc.); regenerated as needed.'**
+  String get storageSpaceSubDescSystemCache;
+
+  /// No description provided for @storageSpaceSubDescTmpCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.'**
+  String get storageSpaceSubDescTmpCache;
+
   /// No description provided for @storageSpaceSubLogsFlutter.
   ///
   /// In en, this message translates to:
@@ -574,6 +604,360 @@ abstract class AppLocalizations {
   /// **'By date'**
   String get storageSpaceSortByTime;
 
+  /// No description provided for @storageWorkspaceEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get storageWorkspaceEntryTitle;
+
+  /// No description provided for @storageMountsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filesystem Mounts'**
+  String get storageMountsTitle;
+
+  /// No description provided for @storageMountsAddButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mount'**
+  String get storageMountsAddButton;
+
+  /// No description provided for @storageMountsAliasLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias'**
+  String get storageMountsAliasLabel;
+
+  /// No description provided for @storageMountsPathLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get storageMountsPathLabel;
+
+  /// No description provided for @storageMountsReadOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get storageMountsReadOnlyLabel;
+
+  /// No description provided for @storageMountsPickButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get storageMountsPickButton;
+
+  /// No description provided for @storageMountsAddDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add External Mount'**
+  String get storageMountsAddDialogTitle;
+
+  /// No description provided for @storageMountsEditDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Mount'**
+  String get storageMountsEditDialogTitle;
+
+  /// No description provided for @storageMountsRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Mount'**
+  String get storageMountsRemoveConfirmTitle;
+
+  /// No description provided for @storageMountsRemoveConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove mount {alias}? The directory itself will not be deleted.'**
+  String storageMountsRemoveConfirmMessage(Object alias);
+
+  /// No description provided for @storageMountsWorkspacesNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in read-write sandbox. Workspace files sync with backups.'**
+  String get storageMountsWorkspacesNote;
+
+  /// No description provided for @storageMountsErrorAliasInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid alias (lowercase letters, digits, underscores, hyphens; max 32 chars)'**
+  String get storageMountsErrorAliasInvalid;
+
+  /// No description provided for @storageMountsErrorAliasReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'\"workspaces\" is a reserved alias'**
+  String get storageMountsErrorAliasReserved;
+
+  /// No description provided for @storageMountsErrorAliasDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This alias already exists'**
+  String get storageMountsErrorAliasDuplicate;
+
+  /// No description provided for @storageMountsErrorPathInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid path (must be an absolute directory path)'**
+  String get storageMountsErrorPathInvalid;
+
+  /// No description provided for @storageMountsErrorPathNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Path does not exist or is not a directory'**
+  String get storageMountsErrorPathNotFound;
+
+  /// No description provided for @storageMountsErrorSyncOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder overlaps the sync scope (backup/sync folders)'**
+  String get storageMountsErrorSyncOverlap;
+
+  /// No description provided for @storageMountsErrorInsideWorkspaces.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is inside the current workspace folder'**
+  String get storageMountsErrorInsideWorkspaces;
+
+  /// No description provided for @storageMountsErrorDestinationNotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is not empty — choose an empty folder when moving workspace files'**
+  String get storageMountsErrorDestinationNotEmpty;
+
+  /// No description provided for @storageMountsWorkspacesLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace Location'**
+  String get storageMountsWorkspacesLocationTitle;
+
+  /// No description provided for @storageMountsWorkspacesLocationDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Workspace Location'**
+  String get storageMountsWorkspacesLocationDialogTitle;
+
+  /// No description provided for @storageMountsWorkspacesMoveFilesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move existing files to the new location'**
+  String get storageMountsWorkspacesMoveFilesLabel;
+
+  /// No description provided for @storageMountsWorkspacesLocationChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace location changed'**
+  String get storageMountsWorkspacesLocationChanged;
+
+  /// No description provided for @storageMountsWorkspacesMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved workspace files to {path}'**
+  String storageMountsWorkspacesMoved(Object path);
+
+  /// No description provided for @storageMountsWorkspacesMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to move workspace files: {error}'**
+  String storageMountsWorkspacesMoveFailed(Object error);
+
+  /// No description provided for @mountFilesPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Files · {alias}'**
+  String mountFilesPageTitle(Object alias);
+
+  /// No description provided for @mountFilesEmptyDir.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty directory'**
+  String get mountFilesEmptyDir;
+
+  /// No description provided for @mountFilesUploadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get mountFilesUploadButton;
+
+  /// No description provided for @mountFilesUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded {count} files'**
+  String mountFilesUploaded(Object count);
+
+  /// No description provided for @mountFilesUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload {name}: {error}'**
+  String mountFilesUploadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesUploadNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: the file name is not allowed'**
+  String mountFilesUploadNameInvalid(Object name);
+
+  /// No description provided for @mountFilesUploadConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped {name}: a file with this name already exists'**
+  String mountFilesUploadConflict(Object name);
+
+  /// No description provided for @mountFilesDownloadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get mountFilesDownloadButton;
+
+  /// No description provided for @mountFilesDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name}'**
+  String mountFilesDownloaded(Object name);
+
+  /// No description provided for @mountFilesDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download {name}: {error}'**
+  String mountFilesDownloadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesDownloadTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to download on this device'**
+  String mountFilesDownloadTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewBinary.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is a binary file — cannot preview'**
+  String mountFilesPreviewBinary(Object name);
+
+  /// No description provided for @mountFilesPreviewTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is too large to preview'**
+  String mountFilesPreviewTooLarge(Object name);
+
+  /// No description provided for @mountFilesPreviewReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to read {name}: {error}'**
+  String mountFilesPreviewReadFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesPreviewTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview truncated: showing the first lines of {total}'**
+  String mountFilesPreviewTruncated(Object total);
+
+  /// No description provided for @mountFilesMoreButton.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get mountFilesMoreButton;
+
+  /// No description provided for @mountFilesOpenButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get mountFilesOpenButton;
+
+  /// No description provided for @mountFilesShareButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get mountFilesShareButton;
+
+  /// No description provided for @mountFilesOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open {name}: {error}'**
+  String mountFilesOpenFailed(Object error, Object name);
+
+  /// No description provided for @mountFilesShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to share {name}: {error}'**
+  String mountFilesShareFailed(Object error, Object name);
+
+  /// No description provided for @workspaceFilesDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete File'**
+  String get workspaceFilesDeleteConfirmTitle;
+
+  /// No description provided for @workspaceFilesDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {path}? This cannot be undone.'**
+  String workspaceFilesDeleteConfirmMessage(Object path);
+
+  /// No description provided for @workspaceFilesDeleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get workspaceFilesDeleteButton;
+
+  /// No description provided for @workspaceFilesDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {path}'**
+  String workspaceFilesDeleted(Object path);
+
+  /// No description provided for @workspaceFilesDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String workspaceFilesDeleteFailed(Object error);
+
+  /// No description provided for @workspaceFilesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load workspace files: {error}'**
+  String workspaceFilesLoadFailed(Object error);
+
+  /// No description provided for @trashWorkspaceMarksTab.
+  ///
+  /// In en, this message translates to:
+  /// **'File Marks'**
+  String get trashWorkspaceMarksTab;
+
+  /// No description provided for @trashWorkspaceMarksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace file deletion marks'**
+  String get trashWorkspaceMarksEmpty;
+
+  /// No description provided for @trashWorkspaceMarksNotRecoverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace files cannot be restored. Marks are deletion records only.'**
+  String get trashWorkspaceMarksNotRecoverable;
+
+  /// No description provided for @trashWorkspaceMarksDeleteLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete on this device'**
+  String get trashWorkspaceMarksDeleteLocal;
+
+  /// No description provided for @trashWorkspaceMarksClearRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear record'**
+  String get trashWorkspaceMarksClearRecord;
+
+  /// No description provided for @trashWorkspaceMarksDeleteDirConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete directory {path} on this device? {count} files inside will also be deleted.'**
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path);
+
+  /// No description provided for @storageMountsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount saved: {alias}'**
+  String storageMountsSaved(Object alias);
+
   /// No description provided for @storageSpaceRefCount.
   ///
   /// In en, this message translates to:
@@ -609,6 +993,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} files are referenced by messages — deleting will break their display'**
   String storageSpaceDeleteRefWarning(int count);
+
+  /// Storage delete guardrail: selected files are still referenced by the unsent input draft
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files are still referenced by your unsaved draft'**
+  String storageSpaceDeleteDraftWarning(int count);
 
   /// No description provided for @storageSpaceAiGenerated.
   ///
@@ -1041,6 +1431,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save SVG'**
   String get svgSaveDialogTitle;
+
+  /// No description provided for @htmlPreviewTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get htmlPreviewTab;
+
+  /// No description provided for @htmlSaveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Download HTML'**
+  String get htmlSaveFile;
+
+  /// No description provided for @htmlSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML saved'**
+  String get htmlSaveSuccess;
+
+  /// No description provided for @htmlSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed'**
+  String get htmlSaveFailed;
+
+  /// No description provided for @htmlSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save HTML'**
+  String get htmlSaveDialogTitle;
+
+  /// No description provided for @htmlOpenFullScreenPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-screen preview'**
+  String get htmlOpenFullScreenPreview;
 
   /// No description provided for @mermaidExportPng.
   ///
@@ -2723,12 +3149,6 @@ abstract class AppLocalizations {
   /// **'Preview'**
   String get assistantEditPreviewTitle;
 
-  /// No description provided for @codeBlockPreviewButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Preview'**
-  String get codeBlockPreviewButton;
-
   /// No description provided for @codeBlockSaveAsButton.
   ///
   /// In en, this message translates to:
@@ -3275,6 +3695,54 @@ abstract class AppLocalizations {
   /// **'Import from RikkaHub'**
   String get backupPageImportFromRikkaHub;
 
+  /// No description provided for @backupPageRikkaHubMigrateUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/migrate'**
+  String get backupPageRikkaHubMigrateUrl;
+
+  /// No description provided for @backupPageRikkaHubMigrateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:'**
+  String get backupPageRikkaHubMigrateHint;
+
+  /// No description provided for @backupPageRikkaHubTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageRikkaHubTutorialTitle;
+
+  /// No description provided for @backupPageRikkaHubStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'After opening the website, tap “Click to Select”.'**
+  String get backupPageRikkaHubStep1;
+
+  /// No description provided for @backupPageRikkaHubStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your RikkaHub backup and tap Confirm.'**
+  String get backupPageRikkaHubStep2;
+
+  /// No description provided for @backupPageRikkaHubStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.'**
+  String get backupPageRikkaHubStep3;
+
+  /// No description provided for @backupPageRikkaHubStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.'**
+  String get backupPageRikkaHubStep4;
+
+  /// No description provided for @backupPageRikkaHubStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'If you have any issues, join the Cuplivo QQ group to give feedback.'**
+  String get backupPageRikkaHubStep5;
+
   /// No description provided for @backupPageNotSupportedYet.
   ///
   /// In en, this message translates to:
@@ -3713,6 +4181,12 @@ abstract class AppLocalizations {
   /// **'PIN'**
   String get lanSyncServerPin;
 
+  /// No description provided for @lanSyncNoLanAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No LAN address detected (device offline or not connected to a network).'**
+  String get lanSyncNoLanAddress;
+
   /// No description provided for @lanSyncServerStop.
   ///
   /// In en, this message translates to:
@@ -3731,11 +4205,11 @@ abstract class AppLocalizations {
   /// **'Sync plan sent. Waiting for zip...'**
   String get lanSyncServerPlanSent;
 
-  /// No description provided for @lanSyncServerReceived.
+  /// No description provided for @lanSyncServerExchanging.
   ///
   /// In en, this message translates to:
-  /// **'Received zip. Preparing response...'**
-  String get lanSyncServerReceived;
+  /// **'Exchanging data...'**
+  String get lanSyncServerExchanging;
 
   /// No description provided for @lanSyncServerDone.
   ///
@@ -3850,6 +4324,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection failed: {error}'**
   String lanSyncErrorConnection(Object error);
+
+  /// No description provided for @lanSyncErrorFieldsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Host, port and PIN are required.'**
+  String get lanSyncErrorFieldsRequired;
+
+  /// No description provided for @lanSyncErrorInvalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port.'**
+  String get lanSyncErrorInvalidPort;
+
+  /// No description provided for @lanSyncFirewallAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in Firewall'**
+  String get lanSyncFirewallAllow;
+
+  /// No description provided for @lanSyncFirewallAdding.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding firewall rule...'**
+  String get lanSyncFirewallAdding;
+
+  /// No description provided for @lanSyncFirewallRuleAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Firewall rule added (inbound TCP port {port}).'**
+  String lanSyncFirewallRuleAdded(Object port);
+
+  /// No description provided for @lanSyncFirewallRuleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the firewall rule automatically. Click to add it now (requires administrator).'**
+  String get lanSyncFirewallRuleFailed;
 
   /// No description provided for @lanSyncApplyAndRestart.
   ///
@@ -4132,6 +4642,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compress'**
   String get compressContextStartButton;
+
+  /// No description provided for @compressContextKeepRecentMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep N'**
+  String get compressContextKeepRecentMessages;
+
+  /// No description provided for @compressContextKeepCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the most recent {count} user messages'**
+  String compressContextKeepCountLabel(Object count);
+
+  /// No description provided for @compressContextKeepAllMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeping that many covers all messages — nothing to compress'**
+  String get compressContextKeepAllMessages;
+
+  /// Keep-recent compression preview: summarized/kept char counts and the estimated result token band
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)'**
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  );
 
   /// No description provided for @bottomToolsSheetLearningMode.
   ///
@@ -4751,6 +5291,18 @@ abstract class AppLocalizations {
   /// **'Render reasoning (thinking) with Markdown'**
   String get displaySettingsPageEnableReasoningMarkdownTitle;
 
+  /// No description provided for @displaySettingsPageStreamingThinkingPreviewTruncateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit streaming thinking preview'**
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle;
+
+  /// No description provided for @displaySettingsPageStreamingThinkingPreviewTruncateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'While thinking streams, only the tail of the preview is rendered for speed. Turn off to restore the original full-length live preview.'**
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle;
+
   /// No description provided for @displaySettingsPageEnableAssistantMarkdownTitle.
   ///
   /// In en, this message translates to:
@@ -4762,6 +5314,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mobile Code Block Word Wrap'**
   String get displaySettingsPageMobileCodeBlockWrapTitle;
+
+  /// No description provided for @displaySettingsPageHtmlStreamingShowCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show code while HTML is generating'**
+  String get displaySettingsPageHtmlStreamingShowCodeTitle;
+
+  /// No description provided for @displaySettingsPageAutoOpenHtmlPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-open HTML preview when done'**
+  String get displaySettingsPageAutoOpenHtmlPreviewTitle;
 
   /// No description provided for @displaySettingsPageAutoCollapseCodeBlockTitle.
   ///
@@ -5620,6 +6184,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
   String get mcpServerEditSheetHeartbeatHint;
+
+  /// No description provided for @mcpServerEditSheetAdvancedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get mcpServerEditSheetAdvancedLabel;
 
   /// No description provided for @mcpServerEditSheetUrlLabel.
   ///
@@ -7922,17 +8492,11 @@ abstract class AppLocalizations {
   /// **'Join our QQ Group'**
   String get aboutPageJoinQQGroup;
 
-  /// No description provided for @aboutPageQQGroupOne.
+  /// No description provided for @aboutPageQQGroup.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo Group 1'**
-  String get aboutPageQQGroupOne;
-
-  /// No description provided for @aboutPageQQGroupTwo.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo Group 2'**
-  String get aboutPageQQGroupTwo;
+  /// **'Cuplivo Group'**
+  String get aboutPageQQGroup;
 
   /// No description provided for @aboutPageJoinDiscord.
   ///
@@ -11492,6 +12056,36 @@ abstract class AppLocalizations {
   /// **'Change or select a preset, then tap Save to apply'**
   String get titlePresetUnsavedHint;
 
+  /// No description provided for @compressPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get compressPresetStandard;
+
+  /// No description provided for @compressPresetDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed'**
+  String get compressPresetDetailed;
+
+  /// No description provided for @ocrPresetStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get ocrPresetStandard;
+
+  /// No description provided for @ocrPresetCoordinate.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinate-precise'**
+  String get ocrPresetCoordinate;
+
+  /// No description provided for @promptPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get promptPresetCustom;
+
   /// Title for the image compression dialog
   ///
   /// In en, this message translates to:
@@ -11636,17 +12230,29 @@ abstract class AppLocalizations {
   /// **'Image & Document Processing'**
   String get documentProcessingTitle;
 
-  /// Section label for image handling when the chat model lacks vision capability
+  /// Section label for the per-assistant image OCR mode
   ///
   /// In en, this message translates to:
-  /// **'Images without vision model'**
-  String get documentProcessingImageWithoutVision;
+  /// **'Image OCR'**
+  String get documentProcessingImageOcr;
 
-  /// Option to OCR-extract text from images
+  /// Option to OCR images only when the model lacks vision capability
   ///
   /// In en, this message translates to:
-  /// **'OCR'**
-  String get documentProcessingModeOcr;
+  /// **'Auto'**
+  String get documentProcessingModeAuto;
+
+  /// Option to always OCR images regardless of model capability
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get documentProcessingModeAlways;
+
+  /// Option to never OCR images
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get documentProcessingModeNever;
 
   /// Option to discard the attachment silently
   ///
@@ -11654,10 +12260,10 @@ abstract class AppLocalizations {
   /// **'Discard'**
   String get documentProcessingModeDiscard;
 
-  /// Hint shown when OCR model is not configured
+  /// Hint shown when the OCR model is not configured
   ///
   /// In en, this message translates to:
-  /// **'No OCR model configured. OCR option unavailable.'**
+  /// **'No OCR model configured. Always-OCR unavailable.'**
   String get documentProcessingOcrNotConfigured;
 
   /// Section label for DOCX document handling
@@ -12230,6 +12836,102 @@ abstract class AppLocalizations {
   /// **'Back to the parent conversation'**
   String get handoffBackwardChipTooltip;
 
+  /// No description provided for @subagentPanelThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get subagentPanelThinking;
+
+  /// No description provided for @subagentPanelStreaming.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming'**
+  String get subagentPanelStreaming;
+
+  /// No description provided for @subagentPanelWaitingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval'**
+  String get subagentPanelWaitingApproval;
+
+  /// No description provided for @subagentPanelLastStepCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Last step: calling {tool}'**
+  String subagentPanelLastStepCall(Object tool);
+
+  /// No description provided for @subagentPanelLastStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Last step: {tool} done'**
+  String subagentPanelLastStepDone(Object tool);
+
+  /// No description provided for @subagentPanelViewChild.
+  ///
+  /// In en, this message translates to:
+  /// **'Open sub-conversation'**
+  String get subagentPanelViewChild;
+
+  /// No description provided for @subagentPanelCancelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sub-agent'**
+  String get subagentPanelCancelTooltip;
+
+  /// No description provided for @subagentPanelCancelConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel sub-agent?'**
+  String get subagentPanelCancelConfirmTitle;
+
+  /// No description provided for @subagentPanelCancelConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The running sub-agent will be stopped. Content already generated is kept in the sub-conversation.'**
+  String get subagentPanelCancelConfirmBody;
+
+  /// No description provided for @subagentPanelCancelConfirmKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep running'**
+  String get subagentPanelCancelConfirmKeep;
+
+  /// No description provided for @subagentPanelCancelConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get subagentPanelCancelConfirmAction;
+
+  /// No description provided for @subagentPanelApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get subagentPanelApprove;
+
+  /// No description provided for @subagentPanelDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get subagentPanelDeny;
+
+  /// No description provided for @subagentPanelAskUserPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer is needed'**
+  String get subagentPanelAskUserPending;
+
+  /// No description provided for @subagentPanelAnswerNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer now'**
+  String get subagentPanelAnswerNow;
+
+  /// No description provided for @subagentPanelToolCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 tool calls} =1{1 tool call} other{{count} tool calls}}'**
+  String subagentPanelToolCalls(num count);
+
   /// No description provided for @groupChatMyGroupChats.
   ///
   /// In en, this message translates to:
@@ -12458,6 +13160,30 @@ abstract class AppLocalizations {
   /// **'Every N user and assistant messages'**
   String get groupChatInjectionEveryNUserAndAssistant;
 
+  /// No description provided for @groupChatInjectGroupMembersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inject group chat info into assistant system prompt'**
+  String get groupChatInjectGroupMembersTitle;
+
+  /// No description provided for @groupChatInjectGroupMembersDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, each member assistant is told at the end of its system prompt that it is in a group chat and who the other members are (user and assistant names only, never their system prompts).'**
+  String get groupChatInjectGroupMembersDesc;
+
+  /// No description provided for @groupChatAdvancedDirectorSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Director'**
+  String get groupChatAdvancedDirectorSection;
+
+  /// No description provided for @groupChatAdvancedAssistantSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant responses'**
+  String get groupChatAdvancedAssistantSection;
+
   /// No description provided for @groupChatDirectorLogsEmpty.
   ///
   /// In en, this message translates to:
@@ -12467,8 +13193,182 @@ abstract class AppLocalizations {
   /// No description provided for @groupChatDirectorLogsEphemeral.
   ///
   /// In en, this message translates to:
-  /// **'Director context is assembled live from the public conversation and is not stored separately.'**
+  /// **'Director context is rebuilt from the public conversation. Runtime details are kept only while this app is running.'**
   String get groupChatDirectorLogsEphemeral;
+
+  /// Title for one reconstructed director call.
+  ///
+  /// In en, this message translates to:
+  /// **'Director call {index}'**
+  String groupChatDirectorLogsEntryTitle(int index);
+
+  /// No description provided for @groupChatDirectorLogsTriggerUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by a user message'**
+  String get groupChatDirectorLogsTriggerUser;
+
+  /// No description provided for @groupChatDirectorLogsTriggerAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by an assistant message'**
+  String get groupChatDirectorLogsTriggerAssistant;
+
+  /// No description provided for @groupChatDirectorLogsTriggerCapMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggered by a round-cap merge'**
+  String get groupChatDirectorLogsTriggerCapMerge;
+
+  /// Observed assistant selected after a director context entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Observed next speaker: {name}'**
+  String groupChatDirectorLogsObservedSpeaker(String name);
+
+  /// No description provided for @groupChatDirectorLogsNoObservedFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'No subsequent public speaker observed.'**
+  String get groupChatDirectorLogsNoObservedFollowUp;
+
+  /// No description provided for @groupChatDirectorLogsRoundCapReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Round cap reached; the director was not called again.'**
+  String get groupChatDirectorLogsRoundCapReached;
+
+  /// No description provided for @groupChatDirectorLogsUnknownSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown assistant'**
+  String get groupChatDirectorLogsUnknownSpeaker;
+
+  /// No description provided for @groupChatDirectorLogsReconstructedContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconstructed director context'**
+  String get groupChatDirectorLogsReconstructedContext;
+
+  /// No description provided for @groupChatDirectorLogsNoContext.
+  ///
+  /// In en, this message translates to:
+  /// **'No reconstructed context is available for this marker.'**
+  String get groupChatDirectorLogsNoContext;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime details'**
+  String get groupChatDirectorLogsRuntimeDetails;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime details are unavailable for this call (for example, after an app restart).'**
+  String get groupChatDirectorLogsRuntimeUnavailable;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get groupChatDirectorLogsRuntimeModel;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempts'**
+  String get groupChatDirectorLogsRuntimeAttempts;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeRequestMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Request messages'**
+  String get groupChatDirectorLogsRuntimeRequestMessages;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision'**
+  String get groupChatDirectorLogsRuntimeDecision;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get groupChatDirectorLogsRuntimeReason;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback'**
+  String get groupChatDirectorLogsRuntimeFallback;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFallbackValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback decision was used'**
+  String get groupChatDirectorLogsRuntimeFallbackValue;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt error'**
+  String get groupChatDirectorLogsRuntimeError;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Failure'**
+  String get groupChatDirectorLogsRuntimeFailure;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeFreeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Model text'**
+  String get groupChatDirectorLogsRuntimeFreeText;
+
+  /// No description provided for @groupChatDirectorLogsRuntimeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No additional runtime details were captured.'**
+  String get groupChatDirectorLogsRuntimeEmpty;
+
+  /// No description provided for @groupChatDirectorLogsDecisionSelectSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Select speaker'**
+  String get groupChatDirectorLogsDecisionSelectSpeaker;
+
+  /// No description provided for @groupChatDirectorLogsDecisionEndTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'End turn'**
+  String get groupChatDirectorLogsDecisionEndTurn;
+
+  /// No description provided for @groupChatDirectorLogsRoleSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get groupChatDirectorLogsRoleSystem;
+
+  /// No description provided for @groupChatDirectorLogsRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get groupChatDirectorLogsRoleUser;
+
+  /// No description provided for @groupChatDirectorLogsRoleAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get groupChatDirectorLogsRoleAssistant;
+
+  /// No description provided for @groupChatDirectorLogsRoleTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool'**
+  String get groupChatDirectorLogsRoleTool;
 
   /// No description provided for @groupChatNoAssistantsToInvite.
   ///

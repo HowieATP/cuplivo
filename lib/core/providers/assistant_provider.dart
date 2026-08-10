@@ -21,6 +21,7 @@ class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
+  static const String _legacyOcrEnabledKey = 'ocr_enabled_v1';
 
   ChatDatabaseRepository? get _repo {
     if (chatService == null || !chatService!.initialized) return null;
@@ -124,6 +125,28 @@ class AssistantProvider extends ChangeNotifier {
         ..addAll(rows);
     } else {
       await _migrateFromPrefs(prefs, repo);
+    }
+
+    // One-time migration of the legacy global OCR toggle to per-assistant
+    // ocrMode, mirroring the assistants_v1 prefs -> SQLite migration pattern:
+    // write through the repo, and only then consume the key. On failure the
+    // key is retained so the mapping is retried on the next launch. The
+    // empty-list case is covered too (putAssistants([]) is a trivial delete).
+    final legacyOcrEnabled = prefs.getBool(_legacyOcrEnabledKey);
+    if (legacyOcrEnabled != null) {
+      try {
+        final migrated = [
+          for (final a in _assistants)
+            a.copyWith(ocrMode: legacyOcrEnabled ? 'auto' : 'never'),
+        ];
+        await repo.putAssistants(migrated);
+        _assistants
+          ..clear()
+          ..addAll(migrated);
+        await prefs.remove(_legacyOcrEnabledKey);
+      } catch (e) {
+        debugPrint('[AssistantProvider] legacy OCR mode migration failed: $e');
+      }
     }
 
     if (_assistants.isEmpty) return;
@@ -232,7 +255,6 @@ class AssistantProvider extends ChangeNotifier {
     name: l10n.assistantProviderDefaultAssistantName,
     systemPrompt: '',
     thinkingBudget: null,
-    temperature: 0.6,
     topP: null,
   );
 
@@ -256,7 +278,6 @@ class AssistantProvider extends ChangeNotifier {
           '{device_info}',
           '{system_version}',
         ),
-        temperature: 0.6,
         topP: null,
       ),
     );
@@ -477,7 +498,6 @@ class AssistantProvider extends ChangeNotifier {
           (context != null
               ? AppLocalizations.of(context)!.assistantProviderNewAssistantName
               : 'New Assistant')),
-      temperature: 0.6,
       topP: null,
     );
     _assistants.add(a);

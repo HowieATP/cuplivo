@@ -23,6 +23,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../features/skills/skill_manager.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -385,12 +386,16 @@ class MessageBuilderService {
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
-    Assistant? assistant,
-  ) async {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    Assistant? assistant, {
+    required String providerKey,
+    required String modelId,
+  }) async {
+    final bool ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     List<String>? lastUserImagePaths;
 

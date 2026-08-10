@@ -1,5 +1,61 @@
 # Changelog
 
+## [2.6.3] - 2026-08-08
+
+> ℹ️ Android users please note: the in-app auto-update previously always downloaded the x86_64 build; this has been fixed, but to obtain this version you still need to grab the arm64-v8a APK from the GitHub Release page.
+
+### Added
+
+- Migrate from RikkaHub: import backups converted to the Cuplivo-compatible format via the migration website (#165)
+- Built-in filesystem enhancements: browse mounted directories in an in-app file browser; grep results now return paginated matches with surrounding context; inspect code structure via `kelivo_outline`; download internet resources into the workspace; long webpages overflow to a workspace cache for continued reading (#221, #222)
+- Compression mode enhancement: manual "keep recent N messages" compression, improving role-play / novel-writing sessions and reducing style drift (#236)
+- Default compress/OCR prompt presets: more detailed built-in prompts with quick switching (#143)
+
+### Fixed
+
+- Markdown math rendering: multi-line formulas inside lists, plus `\tag` support (#227)
+- Android update download: the in-app update now picks the APK matching the device ABI instead of always grabbing x86_64 (#230)
+- LAN sync: proxy bypass, firewall auto-allow prompt, and mobile bottom-sheet fixes (#182)
+- MCP UI simplification: advanced settings folded behind a disclosure (#224)
+
+## [2.6.2] - 2026-08-07
+
+### Fixed
+
+- Temporary conversation: user messages can now be edited and resent (#215)
+- Storage: iOS can now clear its temp file directory, and the system frees finished temp files more promptly (#223)
+- Gemini API: parallel tool calls are now consolidated (#214)
+- MCP OAuth: expired tokens are automatically refreshed (#225)
+- Stability: uncaught errors are handled more gracefully — logged forcibly instead of crashing (#216)
+- Rebranding: replaced the remaining icons, moved the QQ group to a dedicated one, and updated iOS usage instructions
+
+## [2.6.1] - 2026-08-06
+
+> v2.6.0 was a preview release; highlights include the new app icon, built-in filesystem MCP server, and Smart OCR mode decisions.
+
+### Fixed
+
+- Multi-assistant group chat: fixed a crash on Windows when navigating back from a group conversation (#206)
+- Chat rendering: fixed a white screen on mobile when opening tool details while the AI is streaming (#208)
+- Image sharing: fixed abnormal table background colors in exported images on iOS since v1.1.16 (#193)
+- Backup restore: fixed skills failing to restore from backups and MCP servers being lost (#204, #207)
+- Skills: completed the assistant-level quick entry on mobile (#201)
+- Fixed several uncaught but non-crashing bugs (#191)
+
+## [2.6.0] - 2026-08-04
+
+### Added
+
+- New app icon: switched to Cuplivo's custom artwork (commissioned by @Pheobe-Southwood)
+- Built-in filesystem MCP server: read, write, and regex search, with local directory mounting — no command line, security-first (#173)
+- OCR mode extension: new "Smart" OCR mode that keeps OCR off for vision-capable models and turns it on for those without vision (#171)
+- Ta's letter (proactive care) decision mechanism: migrated from JSON output to more systematic tool calls
+
+### Fixed
+
+- Multi-assistant group chat: director logs are now displayed
+- LAN sync: fixed a mobile-side UI issue and added a firewall hint
+
 ## [2.5.0] - 2026-08-03
 
 ### Added

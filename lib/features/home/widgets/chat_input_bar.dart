@@ -26,7 +26,9 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../services/input_draft_persistence.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -58,6 +60,11 @@ class ChatInputBarController {
   ChatInputData snapshotInput(String text) =>
       _state?._snapshotInput(text) ?? ChatInputData(text: text.trim());
   void clearDraft() => _state?._clearDraft();
+
+  /// Re-syncs the persisted draft with programmatic text changes made
+  /// outside the bar (suggestion insert, quick phrase, quote, synthesize
+  /// prompt). Text set via the controller does not fire `onChanged`.
+  void syncDraft() => _state?._scheduleDraftSave();
 }
 
 class ChatInputBar extends StatefulWidget {
@@ -179,6 +186,7 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
   late TextEditingController _controller;
+  late InputDraftPersistence _draftPersistence;
   bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
   final Map<String, int> _imageSizes = <String, int>{}; // path -> bytes
@@ -351,17 +359,23 @@ class _ChatInputBarState extends State<ChatInputBar>
       return;
     }
     final settings = context.watch<SettingsProvider>();
-    // If OCR is enabled, images will be OCR-processed instead of being
-    // sent to the vision model — no "images will be ignored" warning needed.
-    if (settings.ocrEnabled) {
-      _imageWarningModelKey = null;
-      return;
-    }
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
     final modelId = a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || modelId == null) {
+      _imageWarningModelKey = null;
+      return;
+    }
+    // OCR-active sends never need the warning: images are OCR-processed
+    // instead of being sent to the vision model.
+    final ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: a,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    if (ocrActive) {
       _imageWarningModelKey = null;
       return;
     }
@@ -415,6 +429,54 @@ class _ChatInputBarState extends State<ChatInputBar>
     // flag no longer applies to unrelated later sends.
     _restoredUnsupportedImagesApiRouting = false;
     setState(() {});
+    _scheduleDraftSave();
+  }
+
+  /// Restores the cold-start draft into the input bar. Runs synchronously in
+  /// [initState], before any user input can be delivered. Fires once per
+  /// process — `takeDraftForRestore()` consumes the preloaded draft.
+  void _restoreDraft() {
+    if (widget.mode == ChatInputMode.groupChat) return;
+    final draft = _draftPersistence.takeDraftForRestore();
+    if (draft == null) return;
+    final images = <String>[];
+    for (final path in draft.imagePaths) {
+      if (path.startsWith('data:') || File(path).existsSync()) {
+        images.add(path);
+      }
+    }
+    final documents = <DocumentAttachment>[];
+    for (final doc in draft.documents) {
+      if (File(doc.path).existsSync()) documents.add(doc);
+    }
+    if (draft.text.trim().isEmpty && images.isEmpty && documents.isEmpty) {
+      // Everything was filtered out (whitespace-only text, media files
+      // deleted on disk) — drop the stale draft instead of leaving it to
+      // nag the storage guardrail forever.
+      _clearPersistedDraft();
+      return;
+    }
+    _controller.text = draft.text;
+    _images.addAll(images);
+    for (final p in images) {
+      _imageSizes[p] = _fileSize(p);
+    }
+    _docs.addAll(documents);
+    // Re-persist the filtered content so storage stays in sync with the bar.
+    _scheduleDraftSave();
+  }
+
+  /// Feeds the current bar content into the debounced draft writer. No-op for
+  /// group-chat bars (group composer stays draft-free).
+  void _scheduleDraftSave() {
+    if (widget.mode == ChatInputMode.groupChat) return;
+    _draftPersistence.save(
+      ChatInputData(
+        text: _controller.text,
+        imagePaths: List<String>.of(_images),
+        documents: List<DocumentAttachment>.of(_docs),
+      ),
+    );
   }
 
   void _addImages(List<String> paths) {
@@ -430,6 +492,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         _imageSizes[p] = _fileSize(p);
       }
     });
+    _scheduleDraftSave();
   }
 
   int _fileSize(String path) {
@@ -453,15 +516,18 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _clearImages() {
     setState(() => _resetMedia(images: true));
+    _scheduleDraftSave();
   }
 
   void _addFiles(List<DocumentAttachment> docs) {
     if (docs.isEmpty) return;
     setState(() => _docs.addAll(docs));
+    _scheduleDraftSave();
   }
 
   void _clearFiles() {
     setState(() => _resetMedia(docs: true));
+    _scheduleDraftSave();
   }
 
   void _restoreInput(ChatInputData input) {
@@ -493,6 +559,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       _imageGenController.restoreFromBody(input.extraBody);
     });
+    _scheduleDraftSave();
   }
 
   ChatInputData _snapshotInput(String text) {
@@ -510,6 +577,14 @@ class _ChatInputBarState extends State<ChatInputBar>
       _controller.clear();
       _resetMedia(images: true, docs: true);
     });
+    _clearPersistedDraft();
+  }
+
+  /// Immediate draft removal, gated so a group-chat bar never touches the
+  /// normal-chat draft.
+  void _clearPersistedDraft() {
+    if (widget.mode == ChatInputMode.groupChat) return;
+    _draftPersistence.clearNow();
   }
 
   void _removeImageAt(int index) {
@@ -518,10 +593,12 @@ class _ChatInputBarState extends State<ChatInputBar>
       _images.removeAt(index);
       _imageSizes.remove(path);
     });
+    _scheduleDraftSave();
   }
 
   void _removeDocumentAt(int index) {
     setState(() => _docs.removeAt(index));
+    _scheduleDraftSave();
   }
 
   Future<void> _openCompressionDialog(int idx) async {
@@ -594,6 +671,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _imageSizes[newPath] = size;
     _imageSizes.remove(oldPath);
     imageCache.evict(FileImage(File(oldPath)));
+    _scheduleDraftSave();
     return size;
   }
 
@@ -754,6 +832,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     _controller = widget.controller ?? TextEditingController();
     widget.mediaController?._bind(this);
     WidgetsBinding.instance.addObserver(this);
+    _draftPersistence = context.read<InputDraftPersistence>();
+    _restoreDraft();
   }
 
   @override
@@ -795,6 +875,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (widget.controller == null) {
       _controller.dispose();
     }
+    // Flush any pending debounced write so the draft survives the bar being
+    // torn down.
+    _draftPersistence.flushNow();
     super.dispose();
   }
 
@@ -847,6 +930,11 @@ class _ChatInputBarState extends State<ChatInputBar>
           // later sends on the same (non-image) model.
           _restoredUnsupportedImagesApiRouting = false;
         });
+        // The content has moved into the conversation or the queue — clear
+        // the draft immediately so a process death right after sending
+        // cannot resurrect it (best-effort: the underlying prefs write is
+        // itself async fire-and-forget).
+        _clearPersistedDraft();
         // Keep focus on desktop so user can continue typing
         try {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
@@ -902,6 +990,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       );
     }
     setState(() {});
+    _scheduleDraftSave();
     _ensureCaretVisible();
   }
 
@@ -957,6 +1046,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                     text: newText,
                     selection: TextSelection.collapsed(offset: start),
                   );
+                  _scheduleDraftSave();
                 } catch (_) {}
                 state.hideToolbar();
               },
@@ -1300,6 +1390,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                 );
               }
               setState(() {});
+              _scheduleDraftSave();
               return;
             }
           } catch (_) {}
@@ -1355,6 +1446,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
       }
       setState(() {});
+      _scheduleDraftSave();
     } catch (_) {}
   }
 

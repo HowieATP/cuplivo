@@ -185,6 +185,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubCacheSystem => '系统缓存';
 
   @override
+  String get storageSpaceSubCacheTmp => '临时文件';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下载的头像图片，删除后聊天中会自动重新下载。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知图标等运行产生的临时数据，删除后会自动重新生成。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系统级缓存（图片解码、网页等），删除后按需重新生成。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '粘贴的图片、选择的附件等临时副本，删除不影响聊天记录。';
+
+  @override
   String get storageSpaceSubLogsFlutter => '运行日志';
 
   @override
@@ -270,6 +285,231 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSortByTime => '按时间';
 
   @override
+  String get storageWorkspaceEntryTitle => '工作区';
+
+  @override
+  String get storageMountsTitle => '文件系统挂载';
+
+  @override
+  String get storageMountsAddButton => '添加挂载';
+
+  @override
+  String get storageMountsAliasLabel => '别名';
+
+  @override
+  String get storageMountsPathLabel => '路径';
+
+  @override
+  String get storageMountsReadOnlyLabel => '只读';
+
+  @override
+  String get storageMountsPickButton => '浏览';
+
+  @override
+  String get storageMountsAddDialogTitle => '添加外部挂载';
+
+  @override
+  String get storageMountsEditDialogTitle => '编辑挂载';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除挂载';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '确定移除挂载 $alias？目录本身不会被删除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '内置读写沙箱。工作区文件随备份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      '别名无效（小写字母、数字、下划线、连字符，不超过 32 字符）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '该别名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路径无效（必须是绝对目录路径）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
+
+  @override
+  String get storageMountsErrorSyncOverlap => '该文件夹与同步范围重叠（备份/同步目录）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '该文件夹位于当前工作区文件夹内部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '该文件夹不为空——移动工作区文件时请选择空文件夹';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作区位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作区位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '将现有文件移动到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作区位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已将工作区文件移动到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移动工作区文件失败：$error';
+  }
+
+  @override
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
+
+  @override
+  String get mountFilesEmptyDir => '空目录';
+
+  @override
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '打开';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '打开 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失败：$error';
+  }
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '删除文件';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '确定删除 $path？此操作不可恢复。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '删除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已删除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '加载工作区文件失败：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '文件标记';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暂无工作区文件删除标记';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作区文件不可恢复，标记仅为删除记录。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本机删除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除记录';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '确定在本机删除目录 $path？其中的 $count 个文件将一并删除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已保存挂载：$alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count 处引用';
   }
@@ -289,6 +529,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String storageSpaceDeleteRefWarning(int count) {
     return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 个文件仍被未发送的草稿引用';
   }
 
   @override
@@ -509,6 +754,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get svgSaveDialogTitle => '保存 SVG';
+
+  @override
+  String get htmlPreviewTab => '预览';
+
+  @override
+  String get htmlSaveFile => '下载 HTML';
+
+  @override
+  String get htmlSaveSuccess => 'HTML 已保存';
+
+  @override
+  String get htmlSaveFailed => '保存失败';
+
+  @override
+  String get htmlSaveDialogTitle => '保存 HTML';
+
+  @override
+  String get htmlOpenFullScreenPreview => '全屏预览';
 
   @override
   String get mermaidExportPng => '导出 PNG';
@@ -1377,9 +1640,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPreviewTitle => '预览';
 
   @override
-  String get codeBlockPreviewButton => '预览';
-
-  @override
   String get codeBlockSaveAsButton => '另存为文件';
 
   @override
@@ -1657,6 +1917,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 备份可通过迁移网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageRikkaHubStep1 => '进入这个网站后，点击“点击选择”';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 备份，并点击确认';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待 15 秒左右，会提示迁移完成，点击下载迁移包，会下载到一个与原文件名字相同、在后面加入了 kelivo 后缀的压缩包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，点击“备份文件导入”，导入刚刚下载的迁移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -1886,6 +2173,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -1895,7 +2185,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -1961,6 +2251,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -2103,6 +2413,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compressContextStartButton => '开始压缩';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 条用户消息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => '学习模式';
@@ -2450,11 +2782,25 @@ class AppLocalizationsZh extends AppLocalizations {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制流式思考预览长度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考过程中只渲染预览的尾部以提升流畅度。关闭可恢复原有的全量实时预览。';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
+
+  @override
+  String get displaySettingsPageHtmlStreamingShowCodeTitle => 'HTML 生成期间显示代码';
+
+  @override
+  String get displaySettingsPageAutoOpenHtmlPreviewTitle => '生成完成后自动打开 HTML 预览';
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockTitle => '自动折叠代码块';
@@ -2910,6 +3256,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
@@ -4110,10 +4459,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+  String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
   String get aboutPageJoinDiscord => '在 Discord 中加入我们';
@@ -6019,6 +6365,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -6103,16 +6464,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -6428,6 +6795,67 @@ class AppLocalizationsZh extends AppLocalizations {
   String get handoffBackwardChipTooltip => '返回上一级对话';
 
   @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '输出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最后一步:调用 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最后一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子对话';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在运行的子代理将被终止,已生成的内容会保留在子对话中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '继续运行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '终止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒绝';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -6542,10 +6970,116 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupChatInjectionEveryNUserAndAssistant => '每 N 条用户与助手消息，注入消息的结尾';
 
   @override
+  String get groupChatInjectGroupMembersTitle => '在助手系统提示词中注入群聊信息';
+
+  @override
+  String get groupChatInjectGroupMembersDesc =>
+      '开启后，每个成员助手会在其系统提示词的末尾被告知：当前处于一个群聊中，以及群聊的成员名单（仅包含用户与助手成员的名字，不包含其他成员的系统提示词）。';
+
+  @override
+  String get groupChatAdvancedDirectorSection => '导演';
+
+  @override
+  String get groupChatAdvancedAssistantSection => '助手回复';
+
+  @override
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
+  String get groupChatDirectorLogsEphemeral =>
+      '导演上下文从公共会话现场重建；运行时详情仅在本次应用运行期间保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次导演调用';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由用户消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合并触发';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '观察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共会话中未观察到后续发言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已达到回合上限，导演未再次调用。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的导演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此标记没有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '运行时详情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此调用的运行时详情不可用（例如应用重启后）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '尝试次数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '请求消息数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '尝试错误';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失败';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文本';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '没有捕获到额外的运行时详情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '选择助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '结束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系统';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '用户';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
@@ -6967,6 +7501,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSubCacheSystem => '系统缓存';
 
   @override
+  String get storageSpaceSubCacheTmp => '临时文件';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下载的头像图片，删除后聊天中会自动重新下载。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知图标等运行产生的临时数据，删除后会自动重新生成。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系统级缓存（图片解码、网页等），删除后按需重新生成。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '粘贴的图片、选择的附件等临时副本，删除不影响聊天记录。';
+
+  @override
   String get storageSpaceSubLogsFlutter => '运行日志';
 
   @override
@@ -7052,6 +7601,231 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSortByTime => '按时间';
 
   @override
+  String get storageWorkspaceEntryTitle => '工作区';
+
+  @override
+  String get storageMountsTitle => '文件系统挂载';
+
+  @override
+  String get storageMountsAddButton => '添加挂载';
+
+  @override
+  String get storageMountsAliasLabel => '别名';
+
+  @override
+  String get storageMountsPathLabel => '路径';
+
+  @override
+  String get storageMountsReadOnlyLabel => '只读';
+
+  @override
+  String get storageMountsPickButton => '浏览';
+
+  @override
+  String get storageMountsAddDialogTitle => '添加外部挂载';
+
+  @override
+  String get storageMountsEditDialogTitle => '编辑挂载';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除挂载';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '确定移除挂载 $alias？目录本身不会被删除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '内置读写沙箱。工作区文件随备份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      '别名无效（小写字母、数字、下划线、连字符，不超过 32 字符）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '该别名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路径无效（必须是绝对目录路径）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路径不存在或不是目录';
+
+  @override
+  String get storageMountsErrorSyncOverlap => '该文件夹与同步范围重叠（备份/同步目录）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '该文件夹位于当前工作区文件夹内部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '该文件夹不为空——移动工作区文件时请选择空文件夹';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作区位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作区位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '将现有文件移动到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作区位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已将工作区文件移动到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移动工作区文件失败：$error';
+  }
+
+  @override
+  String mountFilesPageTitle(Object alias) {
+    return '文件 · $alias';
+  }
+
+  @override
+  String get mountFilesEmptyDir => '空目录';
+
+  @override
+  String get mountFilesUploadButton => '上传';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上传 $count 个文件';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上传 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已跳过 $name：文件名不允许';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已跳过 $name：同名文件已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下载';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已保存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下载 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 过大，无法在此设备上下载';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二进制文件，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 过大，无法预览';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '读取 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '预览已截断：仅显示 $total 行中的开头部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '打开';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '打开 $name 失败：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失败：$error';
+  }
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '删除文件';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '确定删除 $path？此操作不可恢复。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '删除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已删除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '加载工作区文件失败：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '文件标记';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暂无工作区文件删除标记';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作区文件不可恢复，标记仅为删除记录。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本机删除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除记录';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '确定在本机删除目录 $path？其中的 $count 个文件将一并删除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已保存挂载：$alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count 处引用';
   }
@@ -7071,6 +7845,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String storageSpaceDeleteRefWarning(int count) {
     return '其中 $count 个文件被消息引用——删除后将无法显示';
+  }
+
+  @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 个文件仍被未发送的草稿引用';
   }
 
   @override
@@ -7291,6 +8070,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get svgSaveDialogTitle => '保存 SVG';
+
+  @override
+  String get htmlPreviewTab => '预览';
+
+  @override
+  String get htmlSaveFile => '下载 HTML';
+
+  @override
+  String get htmlSaveSuccess => 'HTML 已保存';
+
+  @override
+  String get htmlSaveFailed => '保存失败';
+
+  @override
+  String get htmlSaveDialogTitle => '保存 HTML';
+
+  @override
+  String get htmlOpenFullScreenPreview => '全屏预览';
 
   @override
   String get mermaidExportPng => '导出 PNG';
@@ -8159,9 +8956,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPreviewTitle => '预览';
 
   @override
-  String get codeBlockPreviewButton => '预览';
-
-  @override
   String get codeBlockSaveAsButton => '另存为文件';
 
   @override
@@ -8439,6 +9233,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 备份可通过迁移网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageRikkaHubStep1 => '进入这个网站后，点击“点击选择”';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 备份，并点击确认';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待 15 秒左右，会提示迁移完成，点击下载迁移包，会下载到一个与原文件名字相同、在后面加入了 kelivo 后缀的压缩包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，点击“备份文件导入”，导入刚刚下载的迁移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -8668,6 +9489,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未检测到局域网地址（设备可能离线或未连接网络）。';
+
+  @override
   String get lanSyncServerStop => '停止服务';
 
   @override
@@ -8677,7 +9501,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步计划已发送，等待接收数据...';
 
   @override
-  String get lanSyncServerReceived => '已接收数据，正在准备回传...';
+  String get lanSyncServerExchanging => '正在交换数据...';
 
   @override
   String get lanSyncServerDone => '交换完成，即将应用并重启。';
@@ -8743,6 +9567,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '连接失败：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '请填写主机、端口和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '端口无效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火墙放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在添加防火墙规则...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已添加防火墙规则（入站 TCP 端口 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '无法自动添加防火墙规则，点击立即放行（需要管理员权限）。';
 
   @override
   String get lanSyncApplyAndRestart => '应用并重启';
@@ -8885,6 +9729,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get compressContextStartButton => '开始压缩';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 条用户消息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => '学习模式';
@@ -9232,11 +10098,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制流式思考预览长度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考过程中只渲染预览的尾部以提升流畅度。关闭可恢复原有的全量实时预览。';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
+
+  @override
+  String get displaySettingsPageHtmlStreamingShowCodeTitle => 'HTML 生成期间显示代码';
+
+  @override
+  String get displaySettingsPageAutoOpenHtmlPreviewTitle => '生成完成后自动打开 HTML 预览';
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockTitle => '自动折叠代码块';
@@ -9692,6 +10572,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
@@ -10892,10 +11775,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+  String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
   String get aboutPageJoinDiscord => '在 Discord 中加入我们';
@@ -12801,6 +13681,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 
   @override
+  String get compressPresetStandard => '标准（默认）';
+
+  @override
+  String get compressPresetDetailed => '详细版';
+
+  @override
+  String get ocrPresetStandard => '标准（默认）';
+
+  @override
+  String get ocrPresetCoordinate => '坐标精确定位版';
+
+  @override
+  String get promptPresetCustom => '自定义';
+
+  @override
   String get imageCompressionDialogTitle => '压缩图片';
 
   @override
@@ -12885,16 +13780,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get documentProcessingTitle => '图片与文档解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '无视觉模型时的图片处理';
+  String get documentProcessingImageOcr => '图片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字识别';
+  String get documentProcessingModeAuto => '智能识别';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '丢弃';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 选项不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」选项不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 处理';
@@ -13210,6 +14111,67 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get handoffBackwardChipTooltip => '返回上一级对话';
 
   @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '输出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最后一步:调用 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最后一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子对话';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在运行的子代理将被终止,已生成的内容会保留在子对话中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '继续运行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '终止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒绝';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具调用',
+      one: '1 次工具调用',
+      zero: '0 次工具调用',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -13324,10 +14286,116 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get groupChatInjectionEveryNUserAndAssistant => '每 N 条用户与助手消息，注入消息的结尾';
 
   @override
+  String get groupChatInjectGroupMembersTitle => '在助手系统提示词中注入群聊信息';
+
+  @override
+  String get groupChatInjectGroupMembersDesc =>
+      '开启后，每个成员助手会在其系统提示词的末尾被告知：当前处于一个群聊中，以及群聊的成员名单（仅包含用户与助手成员的名字，不包含其他成员的系统提示词）。';
+
+  @override
+  String get groupChatAdvancedDirectorSection => '导演';
+
+  @override
+  String get groupChatAdvancedAssistantSection => '助手回复';
+
+  @override
   String get groupChatDirectorLogsEmpty => '暂无导演日志。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '导演上下文从公共会话现场拼装，不再单独落库。';
+  String get groupChatDirectorLogsEphemeral =>
+      '导演上下文从公共会话现场重建；运行时详情仅在本次应用运行期间保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次导演调用';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由用户消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手消息触发';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合并触发';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '观察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共会话中未观察到后续发言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已达到回合上限，导演未再次调用。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的导演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此标记没有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '运行时详情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此调用的运行时详情不可用（例如应用重启后）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '尝试次数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '请求消息数';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退决策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '尝试错误';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失败';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文本';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '没有捕获到额外的运行时详情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '选择助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '结束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系统';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '用户';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '没有可邀请的助手。';
@@ -13749,6 +14817,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSubCacheSystem => '系統快取';
 
   @override
+  String get storageSpaceSubCacheTmp => '暫存檔案';
+
+  @override
+  String get storageSpaceSubDescAvatarCache => '已下載的頭像圖片，刪除後聊天中會自動重新下載。';
+
+  @override
+  String get storageSpaceSubDescOtherCache => '通知圖示等運行產生的暫存資料，刪除後會自動重新產生。';
+
+  @override
+  String get storageSpaceSubDescSystemCache => '系統級快取（圖片解碼、網頁等），刪除後按需重新產生。';
+
+  @override
+  String get storageSpaceSubDescTmpCache => '貼上的圖片、選擇的附件等暫存副本，刪除不影響聊天記錄。';
+
+  @override
   String get storageSpaceSubLogsFlutter => '執行日誌';
 
   @override
@@ -13834,6 +14917,230 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSortByTime => '按時間';
 
   @override
+  String get storageWorkspaceEntryTitle => '工作區';
+
+  @override
+  String get storageMountsTitle => '檔案系統掛載';
+
+  @override
+  String get storageMountsAddButton => '新增掛載';
+
+  @override
+  String get storageMountsAliasLabel => '別名';
+
+  @override
+  String get storageMountsPathLabel => '路徑';
+
+  @override
+  String get storageMountsReadOnlyLabel => '唯讀';
+
+  @override
+  String get storageMountsPickButton => '瀏覽';
+
+  @override
+  String get storageMountsAddDialogTitle => '新增外部掛載';
+
+  @override
+  String get storageMountsEditDialogTitle => '編輯掛載';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => '移除掛載';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return '確定移除掛載 $alias？目錄本身不會被刪除。';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote => '內建讀寫沙箱。工作區檔案隨備份同步。';
+
+  @override
+  String get storageMountsErrorAliasInvalid => '別名無效（小寫字母、數字、底線、連字號，不超過 32 字元）';
+
+  @override
+  String get storageMountsErrorAliasReserved => '「workspaces」為保留別名';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => '該別名已存在';
+
+  @override
+  String get storageMountsErrorPathInvalid => '路徑無效（必須是絕對目錄路徑）';
+
+  @override
+  String get storageMountsErrorPathNotFound => '路徑不存在或不是目錄';
+
+  @override
+  String get storageMountsErrorSyncOverlap => '該資料夾與同步範圍重疊（備份/同步目錄）';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces => '該資料夾位於目前工作區資料夾內部';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      '該資料夾不是空的——移動工作區檔案時請選擇空資料夾';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => '工作區位置';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle => '更改工作區位置';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel => '將現有檔案移動到新位置';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged => '工作區位置已更改';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return '已將工作區檔案移動到 $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return '移動工作區檔案失敗：$error';
+  }
+
+  @override
+  String mountFilesPageTitle(Object alias) {
+    return '檔案 · $alias';
+  }
+
+  @override
+  String get mountFilesEmptyDir => '空目錄';
+
+  @override
+  String get mountFilesUploadButton => '上傳';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return '已上傳 $count 個檔案';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return '上傳 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return '已略過 $name：檔名不允許';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return '已略過 $name：同名檔案已存在';
+  }
+
+  @override
+  String get mountFilesDownloadButton => '下載';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return '已儲存 $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return '下載 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name 過大，無法在此裝置上下載';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name 是二進位檔案，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name 過大，無法預覽';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return '讀取 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return '預覽已截斷：僅顯示 $total 行中的開頭部分';
+  }
+
+  @override
+  String get mountFilesMoreButton => '更多';
+
+  @override
+  String get mountFilesOpenButton => '開啟';
+
+  @override
+  String get mountFilesShareButton => '分享';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return '開啟 $name 失敗：$error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return '分享 $name 失敗：$error';
+  }
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => '刪除檔案';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return '確定刪除 $path？此操作不可復原。';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => '刪除';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return '已刪除 $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return '刪除失敗：$error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return '載入工作區檔案失敗：$error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => '檔案標記';
+
+  @override
+  String get trashWorkspaceMarksEmpty => '暫無工作區檔案刪除標記';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable => '工作區檔案不可復原，標記僅為刪除記錄。';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => '在本機刪除';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => '清除記錄';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return '確定在本機刪除目錄 $path？其中的 $count 個檔案將一併刪除。';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return '已儲存掛載：$alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count 處引用';
   }
@@ -13853,6 +15160,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String storageSpaceDeleteRefWarning(int count) {
     return '其中 $count 個檔案被訊息引用——刪除後將無法顯示';
+  }
+
+  @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '其中 $count 個檔案仍被未發送的草稿引用';
   }
 
   @override
@@ -14073,6 +15385,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get svgSaveDialogTitle => '儲存 SVG';
+
+  @override
+  String get htmlPreviewTab => '預覽';
+
+  @override
+  String get htmlSaveFile => '下載 HTML';
+
+  @override
+  String get htmlSaveSuccess => 'HTML 已儲存';
+
+  @override
+  String get htmlSaveFailed => '儲存失敗';
+
+  @override
+  String get htmlSaveDialogTitle => '儲存 HTML';
+
+  @override
+  String get htmlOpenFullScreenPreview => '全螢幕預覽';
 
   @override
   String get mermaidExportPng => '匯出 PNG';
@@ -14941,9 +16271,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditPreviewTitle => '預覽';
 
   @override
-  String get codeBlockPreviewButton => '預覽';
-
-  @override
   String get codeBlockSaveAsButton => '另存為檔案';
 
   @override
@@ -15221,6 +16548,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportFromRikkaHub => '從 RikkaHub 匯入';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub 備份可透過遷移網站轉換為 Cuplivo 相容的備份：';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => '使用教學';
+
+  @override
+  String get backupPageRikkaHubStep1 => '進入這個網站後，點擊「點擊選擇」';
+
+  @override
+  String get backupPageRikkaHubStep2 => '找到自己的 RikkaHub 備份，並點擊確認';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      '等待約 15 秒，會提示遷移完成，點擊下載遷移包，會下載到一個與原檔案名稱相同、並在後方加上 kelivo 後綴的壓縮包';
+
+  @override
+  String get backupPageRikkaHubStep4 => '回到 Cuplivo，點擊「備份檔案匯入」，匯入剛下載的遷移包即可';
+
+  @override
+  String get backupPageRikkaHubStep5 => '如有問題可進入 Cuplivo 的 QQ 群回饋';
+
+  @override
   String get backupPageNotSupportedYet => '暫不支援';
 
   @override
@@ -15450,6 +16804,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress => '未偵測到區域網路位址（裝置可能離線或未連接網路）。';
+
+  @override
   String get lanSyncServerStop => '停止服務';
 
   @override
@@ -15459,7 +16816,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get lanSyncServerPlanSent => '同步計畫已發送，等待接收資料...';
 
   @override
-  String get lanSyncServerReceived => '已接收資料，正在準備回傳...';
+  String get lanSyncServerExchanging => '正在交換資料...';
 
   @override
   String get lanSyncServerDone => '交換完成，即將套用並重啟。';
@@ -15525,6 +16882,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String lanSyncErrorConnection(Object error) {
     return '連接失敗：$error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => '請填寫主機、連接埠和 PIN。';
+
+  @override
+  String get lanSyncErrorInvalidPort => '連接埠無效。';
+
+  @override
+  String get lanSyncFirewallAllow => '防火牆放行';
+
+  @override
+  String get lanSyncFirewallAdding => '正在新增防火牆規則...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return '已新增防火牆規則（連入 TCP 連接埠 $port）。';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed => '無法自動新增防火牆規則，點擊立即放行（需要系統管理員權限）。';
 
   @override
   String get lanSyncApplyAndRestart => '套用並重啟';
@@ -15666,6 +17043,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressContextStartButton => '開始壓縮';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N條';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return '保留最近 $count 條用戶訊息';
+  }
+
+  @override
+  String get compressContextKeepAllMessages => '保留條數涵蓋全部訊息，無內容可壓縮';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '總結 $summarized 字元，原樣保留 $kept 字元 → 壓縮後約 $minTokens–$maxTokens tokens（原文約 $totalTokens tokens）';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => '學習模式';
@@ -16013,11 +17412,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '思维鏈 Markdown 渲染';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      '限制串流思考預覽長度';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      '思考過程中僅渲染預覽的尾部以提升流暢度。關閉可恢復原有的全量即時預覽。';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手訊息 Markdown 渲染';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '行動端程式碼區塊自動換行';
+
+  @override
+  String get displaySettingsPageHtmlStreamingShowCodeTitle => 'HTML 生成期間顯示程式碼';
+
+  @override
+  String get displaySettingsPageAutoOpenHtmlPreviewTitle => '生成完成後自動開啟 HTML 預覽';
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockTitle => '自動摺疊程式碼區塊';
@@ -16473,6 +17886,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetHeartbeatHint => '若頻繁遇到 429 (限流) 錯誤，建議延長心跳間隔。';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => '進階設定';
 
   @override
   String get mcpServerEditSheetUrlLabel => '伺服器地址';
@@ -17672,10 +19088,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入 QQ 群';
 
   @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+  String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
   String get aboutPageJoinDiscord => '加入我們的 Discord';
@@ -19583,6 +20996,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
 
   @override
+  String get compressPresetStandard => '標準（預設）';
+
+  @override
+  String get compressPresetDetailed => '詳細版';
+
+  @override
+  String get ocrPresetStandard => '標準（預設）';
+
+  @override
+  String get ocrPresetCoordinate => '座標精確定位版';
+
+  @override
+  String get promptPresetCustom => '自定義';
+
+  @override
   String get imageCompressionDialogTitle => '壓縮圖片';
 
   @override
@@ -19667,16 +21095,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get documentProcessingTitle => '圖片與文檔解析';
 
   @override
-  String get documentProcessingImageWithoutVision => '無視覺模型時的圖片處理';
+  String get documentProcessingImageOcr => '圖片 OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR 文字識別';
+  String get documentProcessingModeAuto => '智能識別';
+
+  @override
+  String get documentProcessingModeAlways => '全部';
+
+  @override
+  String get documentProcessingModeNever => '永不';
 
   @override
   String get documentProcessingModeDiscard => '捨棄';
 
   @override
-  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，OCR 選項不可用';
+  String get documentProcessingOcrNotConfigured => '尚未配置 OCR 模型，「全部」選項不可用';
 
   @override
   String get documentProcessingDocx => 'DOCX 處理';
@@ -19992,6 +21426,67 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get handoffBackwardChipTooltip => '返回上一級對話';
 
   @override
+  String get subagentPanelThinking => '思考中';
+
+  @override
+  String get subagentPanelStreaming => '輸出中';
+
+  @override
+  String get subagentPanelWaitingApproval => '等待批准';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return '最後一步:呼叫 $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return '最後一步:$tool 完成';
+  }
+
+  @override
+  String get subagentPanelViewChild => '查看子對話';
+
+  @override
+  String get subagentPanelCancelTooltip => '取消子代理';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => '取消子代理?';
+
+  @override
+  String get subagentPanelCancelConfirmBody => '正在執行的子代理將被終止,已生成的內容會保留在子對話中。';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => '繼續執行';
+
+  @override
+  String get subagentPanelCancelConfirmAction => '終止';
+
+  @override
+  String get subagentPanelApprove => '批准';
+
+  @override
+  String get subagentPanelDeny => '拒絕';
+
+  @override
+  String get subagentPanelAskUserPending => '需要您的回答';
+
+  @override
+  String get subagentPanelAnswerNow => '去回答';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 次工具呼叫',
+      one: '1 次工具呼叫',
+      zero: '0 次工具呼叫',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => '我的群聊';
 
   @override
@@ -20107,10 +21602,116 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '每 N 條使用者與助手訊息，注入訊息的結尾';
 
   @override
+  String get groupChatInjectGroupMembersTitle => '在助手系統提示詞中注入群聊資訊';
+
+  @override
+  String get groupChatInjectGroupMembersDesc =>
+      '開啟後，每個成員助手會在其系統提示詞的末尾被告知：目前處於一個群聊中，以及群聊的成員名單（僅包含使用者與助手成員的名字，不包含其他成員的系統提示詞）。';
+
+  @override
+  String get groupChatAdvancedDirectorSection => '導演';
+
+  @override
+  String get groupChatAdvancedAssistantSection => '助手回覆';
+
+  @override
   String get groupChatDirectorLogsEmpty => '暫無導演日誌。';
 
   @override
-  String get groupChatDirectorLogsEphemeral => '導演上下文從公共會話現場拼裝，不再單獨落庫。';
+  String get groupChatDirectorLogsEphemeral =>
+      '導演上下文從公共會話現場重建；執行時詳情僅在本次應用程式執行期間保留。';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return '第 $index 次導演呼叫';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => '由使用者訊息觸發';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant => '由助手訊息觸發';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge => '由回合上限合併觸發';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return '觀察到下一位助手：$name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp => '公共會話中未觀察到後續發言。';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached => '已達到回合上限，導演未再次呼叫。';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => '未知助手';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext => '重建的導演上下文';
+
+  @override
+  String get groupChatDirectorLogsNoContext => '此標記沒有可展示的重建上下文。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => '執行時詳情';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      '此呼叫的執行時詳情不可用（例如應用程式重啟後）。';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => '模型';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => '嘗試次數';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => '請求訊息數';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => '決策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => '原因';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => '回退';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue => '使用了回退決策';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => '嘗試錯誤';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => '失敗';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => '模型文字';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty => '沒有捕獲到額外的執行時詳情。';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => '選擇助手';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => '結束回合';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => '系統';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => '使用者';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => '助手';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => '工具';
 
   @override
   String get groupChatNoAssistantsToInvite => '沒有可邀請的助手。';

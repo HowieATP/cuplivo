@@ -13,6 +13,7 @@ import 'package:xml/xml.dart';
 
 import '../../models/assistant.dart';
 import '../../models/backup.dart';
+import '../../models/chat_input_data.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../models/group_chat.dart';
@@ -20,6 +21,8 @@ import '../../models/group_chat_member.dart';
 import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
 import '../deleted_records_store.dart';
+import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
+    show isSafeWireSegment;
 import '../../../utils/app_directories.dart';
 
 class DataSync {
@@ -196,6 +199,7 @@ class DataSync {
       final imagesDirPath = (await _getImagesDir()).path;
       final fontsDirPath = (await _getFontsDir()).path;
       final skillsDirPath = (await _getSkillsDir()).path;
+      final workspacesDirPath = (await _getWorkspacesDir()).path;
       final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
       final deletedJsonPath = deletedJsonTmp?.path;
@@ -218,6 +222,7 @@ class DataSync {
           imagesDirPath: imagesDirPath,
           fontsDirPath: fontsDirPath,
           skillsDirPath: skillsDirPath,
+          workspacesDirPath: workspacesDirPath,
         );
       });
 
@@ -338,6 +343,7 @@ class DataSync {
     required String imagesDirPath,
     required String fontsDirPath,
     required String skillsDirPath,
+    required String workspacesDirPath,
     DateTime? since,
   }) {
     final writer = _StreamingZipWriter(outPath);
@@ -360,12 +366,22 @@ class DataSync {
       // skills/ — always included, independent of includeFiles
       _addDirectoryToZip(writer, skillsDirPath, 'skills', since: since);
 
-      // files under upload/, images/, and avatars/
+      // files under upload/, images/, avatars/
       if (includeFiles) {
         _addDirectoryToZip(writer, uploadDirPath, 'upload', since: since);
         _addDirectoryToZip(writer, avatarsDirPath, 'avatars', since: since);
         _addDirectoryToZip(writer, imagesDirPath, 'images', since: since);
         _addDirectoryToZip(writer, fontsDirPath, 'fonts', since: since);
+        // workspaces/ — user content; dot-prefixed entries (e.g.
+        // .fetch_cache/) are excluded from backup/sync (one dotfile rule,
+        // same as the server's glob/grep convention).
+        _addDirectoryToZip(
+          writer,
+          workspacesDirPath,
+          'workspaces',
+          since: since,
+          skipDotEntries: true,
+        );
       }
 
       writer.closeSync();
@@ -390,12 +406,20 @@ class DataSync {
     String srcDirPath,
     String zipPrefix, {
     DateTime? since,
+    bool skipDotEntries = false,
   }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
     final entries = dir.listSync(recursive: true, followLinks: false);
     for (final ent in entries) {
       if (ent is File) {
+        final rel = p.relative(ent.path, from: srcDirPath);
+        // ZIP entries must use forward slashes regardless of platform
+        final relPosix = rel.replaceAll('\\', '/');
+        if (skipDotEntries &&
+            relPosix.split('/').any((s) => s.startsWith('.'))) {
+          continue;
+        }
         if (since != null) {
           try {
             if (ent.lastModifiedSync().isBefore(since)) continue;
@@ -403,9 +427,6 @@ class DataSync {
             // Cannot read modification time — include conservatively
           }
         }
-        final rel = p.relative(ent.path, from: srcDirPath);
-        // ZIP entries must use forward slashes regardless of platform
-        final relPosix = rel.replaceAll('\\', '/');
         _addFileToZip(writer, ent.path, '$zipPrefix/$relPosix');
       }
     }
@@ -734,6 +755,10 @@ class DataSync {
     return await AppDirectories.getSkillsDirectory();
   }
 
+  Future<Directory> _getWorkspacesDir() async {
+    return await AppDirectories.getWorkspacesDirectory();
+  }
+
   /// Returns the set of locally-existing ids for a given entity type.
   /// Used by deleted.json import to filter markers to only those that
   /// still exist locally (no point marking something that's already gone).
@@ -764,6 +789,39 @@ class DataSync {
       default:
         return <String>{};
     }
+  }
+
+  /// WorkspaceFile "still exists locally" = the wire path resolves to a file
+  /// OR directory inside the local @workspaces tree. Paths on unknown mounts
+  /// (e.g. external desktop mounts absent on this device) never match.
+  /// Dot-prefixed segments are rejected (never-synced content must not get
+  /// meaningful remote markers), and `..` is checked per segment — the same
+  /// rule as the wire-format resolver.
+  Future<List<({String id, DateTime deletedAt})>> _filterExistingWorkspaceFiles(
+    List<({String id, DateTime deletedAt})> entries,
+  ) async {
+    final ws = await _getWorkspacesDir();
+    final wsRoot = p.normalize(ws.path);
+    final out = <({String id, DateTime deletedAt})>[];
+    for (final e in entries) {
+      final id = e.id;
+      if (!id.startsWith('@workspaces/')) continue;
+      final rel = id.substring('@workspaces/'.length);
+      if (rel.isEmpty) continue;
+      final segments = rel.split(RegExp(r'[\\/]'));
+      // Same segment rule as the wire resolver: dot-prefixed (never-synced
+      // content) plus unsafe segments (`..`, Win32 trailing-dot/space forms)
+      // never match.
+      if (segments.any((s) => s.startsWith('.') || !isSafeWireSegment(s))) {
+        continue;
+      }
+      final host = p.normalize(p.join(wsRoot, segments.join(p.separator)));
+      if (!host.startsWith('$wsRoot${p.separator}')) continue;
+      final exists =
+          await File(host).exists() || await Directory(host).exists();
+      if (exists) out.add(e);
+    }
+    return out;
   }
 
   /// Analyze incremental scope for preview purposes — scans conversations and
@@ -813,11 +871,22 @@ class DataSync {
         await _getAvatarsDir(),
         await _getImagesDir(),
         await _getFontsDir(),
+        await _getWorkspacesDir(),
       ];
       for (final dir in dirs) {
         if (!await dir.exists()) continue;
+        final isWorkspaces = p.equals(
+          p.normalize(dir.path),
+          p.normalize((await _getWorkspacesDir()).path),
+        );
         await for (final ent in dir.list(recursive: true, followLinks: false)) {
           if (ent is File) {
+            if (isWorkspaces) {
+              final rel = p.relative(ent.path, from: dir.path);
+              if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
+                continue;
+              }
+            }
             try {
               final mod = await ent.lastModified();
               if (mod.isBefore(since)) continue;
@@ -827,6 +896,27 @@ class DataSync {
             fileCount++;
             totalBytes += await ent.length();
           }
+        }
+      }
+    }
+
+    // skills/ is always exported independent of includeFiles (see
+    // _packZipSync), so count it unconditionally to match the actual ZIP.
+    final skillsDir = await _getSkillsDir();
+    if (await skillsDir.exists()) {
+      await for (final ent in skillsDir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (ent is File) {
+          try {
+            final mod = await ent.lastModified();
+            if (mod.isBefore(since)) continue;
+          } catch (_) {
+            // Cannot read modification time — include conservatively
+          }
+          fileCount++;
+          totalBytes += await ent.length();
         }
       }
     }
@@ -1010,12 +1100,19 @@ class DataSync {
 
       // Restore settings
       Object? backupAssistantsRaw;
+      Object? backupLegacyOcrEnabled;
       final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       if (await settingsFile.exists()) {
         try {
           final txt = await settingsFile.readAsString();
           final map = jsonDecode(txt) as Map<String, dynamic>;
           backupAssistantsRaw = map.remove('assistants_v1');
+          // Legacy global OCR toggle: capture it so assistants restored from a
+          // pre-v15 backup get the same ocrMode mapping as an in-place upgrade
+          // (true -> auto, false -> never). Never write it back into prefs, or
+          // the one-time per-assistant ocrMode migration would re-run and
+          // overwrite user per-assistant choices.
+          backupLegacyOcrEnabled = map.remove('ocr_enabled_v1');
           final prefs = await SharedPreferencesAsync.instance;
           if (mode == RestoreMode.overwrite) {
             // For overwrite mode, restore all settings
@@ -1461,10 +1558,15 @@ class DataSync {
                 // Only write markers for ids that still exist locally.
                 // The caller (UI) will show them as "远端已删除" and offer
                 // one-click local deletion.
-                final localIds = await _getLocalIdsForType(type);
-                final toWrite = entries
-                    .where((e) => localIds.contains(e.id))
-                    .toList();
+                final List<({String id, DateTime deletedAt})> toWrite;
+                if (type == DeletionEntityType.workspaceFile) {
+                  toWrite = await _filterExistingWorkspaceFiles(entries);
+                } else {
+                  final localIds = await _getLocalIdsForType(type);
+                  toWrite = entries
+                      .where((e) => localIds.contains(e.id))
+                      .toList();
+                }
                 if (toWrite.isNotEmpty) {
                   await store.recordRemoteDeletions(
                     type: type,
@@ -1574,6 +1676,35 @@ class DataSync {
               }
             }
           }
+
+          // Restore @workspaces sandbox directory (dot-prefixed entries are
+          // never exported, so none should appear here; skip them defensively)
+          final workspacesSrc = Directory(
+            p.join(extractDir.path, 'workspaces'),
+          );
+          if (await workspacesSrc.exists()) {
+            final dst = await _getWorkspacesDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
+            }
+            await dst.create(recursive: true);
+            for (final ent in workspacesSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: workspacesSrc.path);
+                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
+                  continue;
+                }
+                final target = File(p.join(dst.path, rel));
+                await target.parent.create(recursive: true);
+                await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
+              }
+            }
+          }
         } else {
           // Merge mode: Only copy non-existing files
           // Merge upload directory
@@ -1663,6 +1794,71 @@ class DataSync {
               }
             }
           }
+
+          // Merge @workspaces sandbox directory (skip dot-prefixed entries)
+          final workspacesSrc = Directory(
+            p.join(extractDir.path, 'workspaces'),
+          );
+          if (await workspacesSrc.exists()) {
+            final dst = await _getWorkspacesDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in workspacesSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: workspacesSrc.path);
+                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
+                  continue;
+                }
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Restore skills/ -- always exported independent of includeFiles (see
+      // _packZipSync), so restore it symmetrically and unconditionally.
+      final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
+      if (await skillsSrc.exists()) {
+        final dst = await _getSkillsDir();
+        if (mode == RestoreMode.overwrite && await dst.exists()) {
+          try {
+            await dst.delete(recursive: true);
+          } catch (_) {}
+        }
+        if (!await dst.exists()) {
+          await dst.create(recursive: true);
+        }
+        for (final ent in skillsSrc.listSync(recursive: true)) {
+          if (ent is File) {
+            final rel = p.relative(ent.path, from: skillsSrc.path);
+            final target = File(p.join(dst.path, rel));
+            if (mode == RestoreMode.merge && await target.exists()) {
+              // Newer-wins per file: replace a local copy only when the
+              // backup entry is strictly newer; ties/older keep local.
+              try {
+                final backupMod = await ent.lastModified();
+                final localMod = await target.lastModified();
+                if (!backupMod.isAfter(localMod)) continue;
+              } catch (_) {
+                // Cannot compare mtimes — keep the local copy conservatively
+                continue;
+              }
+            }
+            await target.parent.create(recursive: true);
+            await ent.copy(target.path);
+            try {
+              await target.setLastModified(await ent.lastModified());
+            } catch (_) {}
+          }
         }
       }
 
@@ -1673,7 +1869,14 @@ class DataSync {
           if (mode == RestoreMode.overwrite) {
             final assistants = decoded
                 .whereType<Map>()
-                .map((e) => Assistant.fromJson(Map<String, dynamic>.from(e)))
+                .map(
+                  (e) => Assistant.fromJson(
+                    _applyLegacyOcrModeToAssistantMap(
+                      Map<String, dynamic>.from(e),
+                      backupLegacyOcrEnabled,
+                    ),
+                  ),
+                )
                 .toList();
             await chatService.putAssistants(assistants);
           } else {
@@ -1684,7 +1887,18 @@ class DataSync {
             final existing = await chatService.getAllAssistants();
             final existingMaps = existing.map((a) => a.toJson()).toList();
             final merged = _mergeAssistantMaps(existingMaps, incoming);
-            final assistants = merged.map(Assistant.fromJson).toList();
+            // Local assistants always carry an explicit ocrMode; only
+            // brand-new incoming assistants can still lack it.
+            final assistants = merged
+                .map(
+                  (m) => Assistant.fromJson(
+                    _applyLegacyOcrModeToAssistantMap(
+                      m,
+                      backupLegacyOcrEnabled,
+                    ),
+                  ),
+                )
+                .toList();
             await chatService.putAssistants(assistants);
           }
         } catch (e, st) {
@@ -1729,6 +1943,19 @@ class DataSync {
     }
 
     return jsonEncode([for (final id in order) byId[id]]);
+  }
+
+  /// Applies the legacy `ocr_enabled_v1` mapping to an assistant map that
+  /// predates per-assistant `ocrMode` (true -> 'auto', false -> 'never').
+  /// Assistants that already carry an `ocrMode` field are left untouched.
+  static Map<String, dynamic> _applyLegacyOcrModeToAssistantMap(
+    Map<String, dynamic> map,
+    Object? legacyOcrEnabled,
+  ) {
+    if (legacyOcrEnabled is bool && !map.containsKey('ocrMode')) {
+      return {...map, 'ocrMode': legacyOcrEnabled ? 'auto' : 'never'};
+    }
+    return map;
   }
 
   static List<Map<String, dynamic>> _mergeAssistantMaps(
@@ -2122,6 +2349,9 @@ class SharedPreferencesAsync {
     'desktop_hotkeys_enabled_v1',
     'codex_oauth_v1',
     'grok_oauth_v1',
+    // Chat input draft is transient per-device UI state — restoring a backup
+    // on another device must never resurrect a stale unsent draft.
+    chatInputDraftPrefsKey,
   };
 
   static Future<SharedPreferencesAsync> get instance async {

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../models/conversation.dart';
 import '../models/group_chat.dart';
 import '../models/group_chat_member.dart';
+import '../models/group_chat_director_log.dart';
 import '../models/assistant_detail_injection.dart';
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
@@ -15,12 +16,18 @@ const int groupChatMemberSoftCap = 12;
 const int groupChatMemberHardCap = 20;
 
 class GroupChatProvider extends ChangeNotifier {
+  /// Runtime metadata is diagnostic only; keep enough recent entries for a
+  /// long-running process without allowing repeated retries to grow forever.
+  static const int maxRuntimeDirectorLogsPerGroup = 200;
+
   GroupChatProvider({required this.chatService});
 
   final ChatService chatService;
   ChatService get _chatService => chatService;
   final List<GroupChat> _groups = [];
   final Map<String, List<GroupChatMember>> _membersByGroup = {};
+  final Map<String, List<GroupChatDirectorRuntimeLog>> _runtimeDirectorLogs =
+      {};
   bool _loaded = false;
 
   bool get loaded => _loaded;
@@ -35,6 +42,7 @@ class GroupChatProvider extends ChangeNotifier {
       ..clear()
       ..addAll(list);
     _membersByGroup.clear();
+    _runtimeDirectorLogs.clear();
     for (final g in list) {
       _membersByGroup[g.id] = await _chatService.repo.getGroupMembers(g.id);
     }
@@ -58,6 +66,24 @@ class GroupChatProvider extends ChangeNotifier {
         .where((m) => !m.isUser && m.assistantId != null)
         .map((m) => m.assistantId!)
         .toList(growable: false);
+  }
+
+  List<GroupChatDirectorRuntimeLog> directorRuntimeLogs(String groupChatId) {
+    return List.unmodifiable(_runtimeDirectorLogs[groupChatId] ?? const []);
+  }
+
+  void recordDirectorRuntimeLog(
+    String groupChatId,
+    GroupChatDirectorRuntimeLog log,
+  ) {
+    _runtimeDirectorLogs
+        .putIfAbsent(groupChatId, () => <GroupChatDirectorRuntimeLog>[])
+        .add(log);
+    final logs = _runtimeDirectorLogs[groupChatId]!;
+    if (logs.length > maxRuntimeDirectorLogsPerGroup) {
+      logs.removeRange(0, logs.length - maxRuntimeDirectorLogsPerGroup);
+    }
+    notifyListeners();
   }
 
   /// Latest public message preview for list subtitle.
@@ -122,6 +148,8 @@ class GroupChatProvider extends ChangeNotifier {
       maxAssistantMessagesPerRound: source.maxAssistantMessagesPerRound,
       assistantDetailInjectionMode: source.assistantDetailInjectionMode,
       assistantDetailInjectionN: source.assistantDetailInjectionN,
+      injectGroupMembersIntoAssistantSystemPrompt:
+          source.injectGroupMembersIntoAssistantSystemPrompt,
     );
 
     await _chatService.repo.putGroupChat(copy);
@@ -283,6 +311,7 @@ class GroupChatProvider extends ChangeNotifier {
 
     _groups.removeWhere((g) => g.id == groupChatId);
     _membersByGroup.remove(groupChatId);
+    _runtimeDirectorLogs.remove(groupChatId);
     notifyListeners();
   }
 }

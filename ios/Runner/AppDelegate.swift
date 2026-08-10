@@ -56,6 +56,18 @@ private let backgroundProcessingIdentifier = "psyche.cuplivo.background-generati
       iosBackgroundChannel.setMethodCallHandler { [weak self] call, result in
         self?.backgroundGenerationHandler.handle(call: call, result: result)
       }
+
+      // Exposes the real app tmp directory (NSTemporaryDirectory = <container>/tmp).
+      // path_provider's getTemporaryDirectory() returns the Caches directory on
+      // iOS, so the true tmp dir is unreachable from Dart without this channel.
+      let iosTmpChannel = FlutterMethodChannel(name: "app.ios_tmp_directory", binaryMessenger: controller.binaryMessenger)
+      iosTmpChannel.setMethodCallHandler { call, result in
+        guard call.method == "getPath" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        result(NSTemporaryDirectory())
+      }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

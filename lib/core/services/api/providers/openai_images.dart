@@ -77,6 +77,7 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
     isDone: true,
     totalTokens: usage?.totalTokens ?? 0,
     usage: usage,
+    consumedUsage: usage,
   );
 }
 

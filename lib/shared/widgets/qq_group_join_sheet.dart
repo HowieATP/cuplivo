@@ -19,12 +19,8 @@ class _QQGroupEntry {
 
 List<_QQGroupEntry> _groups(AppLocalizations l10n) => <_QQGroupEntry>[
   _QQGroupEntry(
-    name: l10n.aboutPageQQGroupOne,
-    joinUrl: 'https://qm.qq.com/q/OQaXetKssC',
-  ),
-  _QQGroupEntry(
-    name: l10n.aboutPageQQGroupTwo,
-    joinUrl: 'https://qm.qq.com/q/7t6VEqSXhm',
+    name: l10n.aboutPageQQGroup,
+    joinUrl: 'https://qm.qq.com/q/9Rnnf7XyNO',
   ),
 ];
 

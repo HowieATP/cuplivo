@@ -10,6 +10,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../core/utils/openai_model_compat.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -159,7 +160,13 @@ class MessageGenerationService {
 
     // Process user messages (documents, OCR, templates)
     final lastUserImagePaths = await messageBuilderService
-        .processUserMessagesForApi(apiMessages, settings, assistant);
+        .processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant,
+          providerKey: providerKey,
+          modelId: modelId,
+        );
 
     // Signal processing finished
     onFileProcessingFinished?.call();
@@ -354,10 +361,12 @@ class MessageGenerationService {
     required bool generateTitleOnFinish,
     Map<String, dynamic>? requestExtraBody,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     final assistantBody = generationController.buildCustomBody(assistant);
     final mergedExtraBody = <String, dynamic>{
@@ -616,10 +625,12 @@ class MessageGenerationService {
     required String modelId,
     Assistant? assistant,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = resolveOcrActive(
+      settings: settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     final includeAudio = _shouldIncludeAudioForProvider(
       settings,

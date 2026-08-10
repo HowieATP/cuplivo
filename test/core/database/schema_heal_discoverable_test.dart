@@ -5,6 +5,7 @@ import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
+import 'package:Cuplivo/core/models/group_chat.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -12,7 +13,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// Reproduces: user_version already advanced while silent migration failures
 /// left columns missing. The schema self-heal (see
-/// docs/adr/0017-schema-self-heal.md) must repair these before Drift INSERTs
+/// docs/adr/0019-schema-self-heal.md) must repair these before Drift INSERTs
 /// run, otherwise inserts crash with "table X has no column named Y".
 ///
 /// Two real-incident shapes:
@@ -103,7 +104,6 @@ void main() {
         missingIsPreset: false,
         missingHandoffColumns: false,
       );
-
       final repo = ChatDatabaseRepository.open(file: dbFile);
       await repo.ensureReady();
 
@@ -132,13 +132,15 @@ void main() {
     },
   );
 
-  test('heal adds per-message request metadata on a v15 DB missing it '
-      '(v15 incident shape)', () async {
+  test('heal adds per-message request metadata before message insert '
+      '(v18 column shape)', () async {
     _createLegacyDb(
       dbFile,
-      userVersion: 15,
+      userVersion: 18,
       missingIsPreset: false,
       missingHandoffColumns: false,
+      missingOcrMode: false,
+      missingContextTokens: false,
       missingV15RequestMetadata: true,
     );
 
@@ -168,6 +170,125 @@ void main() {
 
     await repo.close();
   });
+
+  test(
+    'heal adds ocr_mode before assistant insert (v15 column shape)',
+    () async {
+      _createLegacyDb(
+        dbFile,
+        userVersion: 15,
+        missingIsPreset: false,
+        missingHandoffColumns: false,
+        missingOcrMode: true,
+      );
+
+      final repo = ChatDatabaseRepository.open(file: dbFile);
+      await repo.ensureReady();
+
+      // Must succeed: heal adds ocr_mode before Drift INSERT.
+      await repo.putAssistant(
+        Assistant(id: 'a1', name: 'Alpha', systemPrompt: 'hi'),
+        sortOrder: 0,
+      );
+      final loaded = await repo.getAllAssistants();
+      expect(loaded, hasLength(1));
+      expect(loaded.first.name, 'Alpha');
+      expect(loaded.first.ocrMode, 'auto');
+
+      await repo.close();
+    },
+  );
+
+  test(
+    'heal adds context_tokens before message insert (v17 column shape)',
+    () async {
+      _createLegacyDb(
+        dbFile,
+        userVersion: 17,
+        missingIsPreset: false,
+        missingHandoffColumns: false,
+        missingOcrMode: false,
+        missingContextTokens: true,
+      );
+
+      final repo = ChatDatabaseRepository.open(file: dbFile);
+      await repo.ensureReady();
+
+      // Must succeed: heal adds context_tokens before Drift INSERT, and the
+      // value round-trips through the repository.
+      final conv = Conversation(title: 'Conv', assistantId: 'a1');
+      await repo.putConversation(conv);
+      await repo.putMessage(
+        ChatMessage(
+          role: 'assistant',
+          content: 'with context',
+          conversationId: conv.id,
+          contextTokens: 4321,
+        ),
+      );
+
+      final rows = await repo.db.select(repo.db.messageRows).get();
+      expect(rows, hasLength(1));
+      expect(rows.first.contextTokens, 4321);
+
+      await repo.close();
+    },
+  );
+
+  test('heal adds inject_group_members column on group_chat_rows '
+      '(v17 column shape)', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 17,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+    );
+    // A partial group_chat_rows table missing the v17 column, as if a
+    // silent migration failure left user_version at 17 without it.
+    final raw = sqlite.sqlite3.open(dbFile.path);
+    raw.execute('''
+CREATE TABLE group_chat_rows (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  avatar TEXT NULL,
+  conversation_id TEXT NOT NULL UNIQUE,
+  director_model_provider TEXT NULL,
+  director_model_id TEXT NULL,
+  director_system_prompt TEXT NOT NULL DEFAULT '',
+  max_assistant_messages_per_round INTEGER NOT NULL DEFAULT 3,
+  assistant_detail_injection_mode TEXT NOT NULL DEFAULT 'endOfEveryUserMessage',
+  assistant_detail_injection_n INTEGER NOT NULL DEFAULT 5,
+  pending_cap_assistant_message_id TEXT NULL,
+  assistant_messages_this_round INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+''');
+    raw.close();
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    // Must succeed: heal adds the column before Drift INSERT.
+    final conv = Conversation(
+      title: 'Group',
+      assistantId: null,
+      conversationKind: Conversation.kindGroup,
+    );
+    await repo.putConversation(conv);
+    await repo.putGroupChat(
+      GroupChat(
+        name: 'G',
+        conversationId: conv.id,
+        injectGroupMembersIntoAssistantSystemPrompt: true,
+      ),
+    );
+    final groups = await repo.getAllGroupChats();
+    expect(groups, hasLength(1));
+    expect(groups.first.injectGroupMembersIntoAssistantSystemPrompt, isTrue);
+
+    await repo.close();
+  });
 }
 
 /// Builds a v13-era DB shape (assistant/conversation/message tables only —
@@ -179,6 +300,8 @@ void _createLegacyDb(
   required int userVersion,
   required bool missingIsPreset,
   required bool missingHandoffColumns,
+  bool missingOcrMode = false,
+  bool missingContextTokens = true,
   bool missingV15RequestMetadata = false,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
@@ -189,6 +312,11 @@ void _createLegacyDb(
   discoverable INTEGER NOT NULL DEFAULT 0,
   handoff_id TEXT NULL,
   handoff_description TEXT NULL,
+''';
+  final ocrModeColumn = missingOcrMode
+      ? ''
+      : '''
+  ocr_mode TEXT NOT NULL DEFAULT 'auto',
 ''';
   raw.execute('''
 CREATE TABLE assistant_rows (
@@ -229,6 +357,7 @@ CREATE TABLE assistant_rows (
   docx_mode TEXT NOT NULL DEFAULT 'extract',
   pdf_mode TEXT NOT NULL DEFAULT 'extract',
   other_office_mode TEXT NOT NULL DEFAULT 'direct',
+  $ocrModeColumn
   enable_time_injection INTEGER NOT NULL DEFAULT 0,
   $handoffColumns
   sort_order INTEGER NOT NULL,
@@ -256,6 +385,11 @@ CREATE TABLE conversation_rows (
       ? ''
       : '''
   is_preset INTEGER NOT NULL DEFAULT 0,
+''';
+  final contextTokensColumn = missingContextTokens
+      ? ''
+      : '''
+  context_tokens INTEGER NULL,
 ''';
   final v15Columns = missingV15RequestMetadata
       ? ''
@@ -287,6 +421,7 @@ CREATE TABLE message_rows (
   cached_tokens INTEGER NULL,
   duration_ms INTEGER NULL,
   message_order INTEGER NOT NULL,
+  $contextTokensColumn
   $isPresetColumn
   $v15Columns
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE

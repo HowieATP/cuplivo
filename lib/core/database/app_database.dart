@@ -55,6 +55,8 @@ class MessageRows extends Table {
   TextColumn get modelId => text().nullable()();
   TextColumn get providerId => text().nullable()();
   IntColumn get totalTokens => integer().nullable()();
+  // Context semantics: total tokens of the last request round (display).
+  IntColumn get contextTokens => integer().nullable()();
   BoolColumn get isStreaming => boolean().withDefault(const Constant(false))();
   TextColumn get reasoningText => text().nullable()();
   DateTimeColumn get reasoningStartAt => dateTime().nullable()();
@@ -152,6 +154,8 @@ class AssistantRows extends Table {
   TextColumn get pdfMode => text().withDefault(const Constant('extract'))();
   TextColumn get otherOfficeMode =>
       text().withDefault(const Constant('direct'))();
+  // OCR processing mode: 'auto' | 'always' | 'never'
+  TextColumn get ocrMode => text().withDefault(const Constant('auto'))();
 
   // --- Time Injection ---
   BoolColumn get enableTimeInjection =>
@@ -267,7 +271,7 @@ class DeletionMarkerRows extends Table {
 // membership join (same shape as ConversationMcpServerRows). The Director
 // session is ephemeral — rebuilt from the public transcript on every call,
 // never persisted (the v13 `director_message_rows` table was dropped in v14).
-// See docs/adr/0015 and CONTEXT.md.
+// See docs/adr/0014-multi-assistant-group-chat-schema.md and CONTEXT.md.
 // Sync rule: any new group-related table must be wired into clearAllData
 // (child-before-parent FK order), _exportChatsToFile and _restoreFromBackupFile
 // in the same change.
@@ -291,6 +295,8 @@ class GroupChatRows extends Table {
       text().withDefault(const Constant('endOfEveryUserMessage'))();
   IntColumn get assistantDetailInjectionN =>
       integer().withDefault(const Constant(5))();
+  BoolColumn get injectGroupMembersIntoAssistantSystemPrompt =>
+      boolean().withDefault(const Constant(true))();
   TextColumn get pendingCapAssistantMessageId => text().nullable()();
   IntColumn get assistantMessagesThisRound =>
       integer().withDefault(const Constant(0))();
@@ -368,8 +374,8 @@ class AppDatabase extends _$AppDatabase {
   // column stays missing (real incidents on schema v8 and v12). The schema
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
-  // See docs/adr/0017-schema-self-heal.md.
-  int get schemaVersion => 15;
+  // See docs/adr/0019-schema-self-heal.md.
+  int get schemaVersion => 18;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -422,8 +428,8 @@ class AppDatabase extends _$AppDatabase {
   /// Repair incomplete upgrades where user_version already advanced but some
   /// ALTER TABLE / CREATE TABLE steps were skipped/failed (silent catch).
   ///
-  /// Covers every column/table added by the v5–v13 migrations that are wrapped
-  /// in silent try/catch — missing these makes inserts crash with
+  /// Covers every column/table added by the v5–v13/v16–v17 migrations that are
+  /// wrapped in silent try/catch — missing these makes inserts crash with
   /// "table X has no column named Y". Runs in beforeOpen (rescues existing
   /// broken DBs whose user_version already passed the failed step) and at the
   /// end of onUpgrade (rescues gaps created by the upgrade in this session).
@@ -452,6 +458,12 @@ class AppDatabase extends _$AppDatabase {
       'assistant_rows',
       'other_office_mode',
       "ALTER TABLE assistant_rows ADD COLUMN other_office_mode TEXT NOT NULL DEFAULT 'direct'",
+    );
+    // OCR mode (schema v15)
+    await _ensureColumn(
+      'assistant_rows',
+      'ocr_mode',
+      "ALTER TABLE assistant_rows ADD COLUMN ocr_mode TEXT NOT NULL DEFAULT 'auto'",
     );
     await _ensureColumn(
       'assistant_rows',
@@ -502,6 +514,11 @@ class AppDatabase extends _$AppDatabase {
     );
 
     // --- message_rows ---
+    await _ensureColumn(
+      'message_rows',
+      'context_tokens',
+      'ALTER TABLE message_rows ADD COLUMN context_tokens INTEGER NULL',
+    );
     await _ensureColumn(
       'message_rows',
       'subgroup_id',
@@ -562,6 +579,12 @@ class AppDatabase extends _$AppDatabase {
       'group_chat_rows',
       'assistant_messages_this_round',
       'ALTER TABLE group_chat_rows ADD COLUMN assistant_messages_this_round INTEGER NOT NULL DEFAULT 0',
+    );
+    // Schema v17 — group-context injection into member assistant system prompts.
+    await _ensureColumn(
+      'group_chat_rows',
+      'inject_group_members_into_assistant_system_prompt',
+      'ALTER TABLE group_chat_rows ADD COLUMN inject_group_members_into_assistant_system_prompt INTEGER NOT NULL DEFAULT 1',
     );
   }
 
@@ -717,6 +740,48 @@ class AppDatabase extends _$AppDatabase {
         await customStatement('DROP TABLE IF EXISTS director_message_rows');
       }
       if (from < 15) {
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.ocrMode);
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
+      }
+      if (from < 16) {
+        try {
+          await migrator.addColumn(messageRows, messageRows.contextTokens);
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
+        try {
+          await migrator.addColumn(
+            groupChatRows,
+            groupChatRows.injectGroupMembersIntoAssistantSystemPrompt,
+          );
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
+      }
+      if (from < 17) {
+        // Schema v17: two branches shipped an unrelated v16 independently —
+        // this branch added message_rows.context_tokens, master added
+        // group_chat_rows.inject_group_members_into_assistant_system_prompt.
+        // Upgrading from either v16 variant must land the other column, so
+        // both ALTERs are repeated idempotently (catch + heal covers the rest).
+        try {
+          await migrator.addColumn(messageRows, messageRows.contextTokens);
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
+        try {
+          await migrator.addColumn(
+            groupChatRows,
+            groupChatRows.injectGroupMembersIntoAssistantSystemPrompt,
+          );
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
+      }
+      if (from < 18) {
         // Per-message request metadata for image-mode routing + image
         // generation options replay on regenerate. See
         // docs/adr/0018-per-message-request-metadata.md.

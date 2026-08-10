@@ -1,15 +1,19 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../core/models/backup.dart';
 import '../../core/services/backup/data_sync.dart';
+import '../../core/services/backup/restore_refresher.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/sync/lan_sync_client.dart';
 import '../../core/services/sync/lan_sync_models.dart';
 import '../../core/services/sync/lan_sync_server.dart';
+import '../../core/services/sync/windows_firewall.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import '../dialogs/restart_required_dialog.dart';
@@ -21,10 +25,54 @@ import 'ios_tactile.dart';
 /// Adapts layout for mobile vs desktop based on [Platform.isAndroid]/[isIOS].
 /// Both layouts share the same sync logic via [LanSyncServer] and [LanSyncClient].
 class LanSyncSection extends StatefulWidget {
-  const LanSyncSection({super.key});
+  const LanSyncSection({super.key, this.lanSyncHttpClient});
+
+  /// HTTP client for the LAN sync client. Mirrors the injected client on
+  /// [LanSyncClient]: keeps LAN traffic off the environment proxy, and lets
+  /// widget tests stub the wire with a `MockClient`. Null = production
+  /// default (direct, proxy-free).
+  final http.Client? lanSyncHttpClient;
 
   @override
   State<LanSyncSection> createState() => _LanSyncSectionState();
+}
+
+/// Localized status line for the server dialog.
+String serverPhaseText(LanSyncPhase phase, AppLocalizations l10n) {
+  switch (phase) {
+    case LanSyncPhase.waiting:
+      return l10n.lanSyncServerWaiting;
+    case LanSyncPhase.planSent:
+      return l10n.lanSyncServerPlanSent;
+    case LanSyncPhase.exchanging:
+      return l10n.lanSyncServerExchanging;
+    case LanSyncPhase.done:
+      return l10n.lanSyncServerDone;
+    case LanSyncPhase.idle:
+    case LanSyncPhase.planReceived:
+    case LanSyncPhase.noData:
+      return '';
+  }
+}
+
+/// Localized status line for the client dialog/sheet.
+String clientPhaseText(LanSyncPhase phase, AppLocalizations l10n) {
+  switch (phase) {
+    case LanSyncPhase.waiting:
+      return l10n.lanSyncClientConnecting;
+    case LanSyncPhase.planReceived:
+      return l10n.lanSyncClientPlanReceived;
+    case LanSyncPhase.exchanging:
+      return l10n.lanSyncClientExchanging;
+    case LanSyncPhase.noData:
+      // The plan summary below already says "No changes to sync."
+      return '';
+    case LanSyncPhase.done:
+      return l10n.lanSyncClientDone;
+    case LanSyncPhase.idle:
+    case LanSyncPhase.planSent:
+      return '';
+  }
 }
 
 class _LanSyncSectionState extends State<LanSyncSection> {
@@ -38,7 +86,10 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   final _pinController = TextEditingController();
 
   bool get _isDesktop =>
-      !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.linux);
 
   @override
   void initState() {
@@ -46,7 +97,11 @@ class _LanSyncSectionState extends State<LanSyncSection> {
     final chatService = context.read<ChatService>();
     _dataSync = DataSync(chatService: chatService);
     _server = LanSyncServer(chatService: chatService, dataSync: _dataSync);
-    _client = LanSyncClient(chatService: chatService, dataSync: _dataSync);
+    _client = LanSyncClient(
+      chatService: chatService,
+      dataSync: _dataSync,
+      httpClient: widget.lanSyncHttpClient,
+    );
     _server.addListener(_onChanged);
     _client.addListener(_onChanged);
 
@@ -67,6 +122,7 @@ class _LanSyncSectionState extends State<LanSyncSection> {
     _portController.dispose();
     _pinController.dispose();
     _server.stop();
+    _client.close();
     super.dispose();
   }
 
@@ -80,6 +136,10 @@ class _LanSyncSectionState extends State<LanSyncSection> {
       const WebDavConfig(includeChats: true, includeFiles: true),
       mode: RestoreMode.merge,
     );
+    if (!mounted) return;
+    // Keep the in-memory providers consistent with the merged disk state
+    // while the restart prompt is up (and defensively if it is dismissed).
+    await refreshProvidersAfterRestore(context);
     if (!mounted) return;
     await showRestartRequiredDialog(context);
   }
@@ -347,13 +407,13 @@ class _LanSyncSectionState extends State<LanSyncSection> {
     final pin = _pinController.text.trim();
 
     if (host.isEmpty || portStr.isEmpty || pin.isEmpty) {
-      _showError(l10n.lanSyncErrorConnection('All fields required'));
+      _showError(l10n.lanSyncErrorFieldsRequired);
       return;
     }
 
     final port = int.tryParse(portStr);
     if (port == null || port < 1 || port > 65535) {
-      _showError(l10n.lanSyncErrorConnection('Invalid port'));
+      _showError(l10n.lanSyncErrorInvalidPort);
       return;
     }
 
@@ -368,7 +428,12 @@ class _LanSyncSectionState extends State<LanSyncSection> {
     }
   }
 
-  Future<void> _exchange() async {
+  /// Round 2. Returns `true` only when the caller should close its sheet:
+  /// the empty-response (`noData`) path — a received zip already went
+  /// through [_restoreAndRestart], which pops the dialog/sheet itself, and
+  /// errors keep the sheet open for retry (or it was already popped by the
+  /// restore flow).
+  Future<bool> _exchange() async {
     final l10n = AppLocalizations.of(context)!;
     try {
       final host = _hostController.text.trim();
@@ -376,8 +441,10 @@ class _LanSyncSectionState extends State<LanSyncSection> {
       final pin = _pinController.text.trim();
       final port = int.tryParse(portStr) ?? 9527;
       await _client.exchange(host: host, port: port, pin: pin);
+      return _client.phase == LanSyncPhase.noData;
     } catch (e) {
       _showError(l10n.lanSyncErrorConnection(e.toString()));
+      return false;
     }
   }
 
@@ -389,6 +456,8 @@ class _LanSyncSectionState extends State<LanSyncSection> {
 }
 
 // ===== Server dialog (shared by mobile & desktop) =====
+
+enum _FirewallState { idle, adding, added, needsElevation }
 
 class _ServerDialog extends StatefulWidget {
   final LanSyncServer server;
@@ -408,6 +477,14 @@ class _ServerDialog extends StatefulWidget {
 }
 
 class _ServerDialogState extends State<_ServerDialog> {
+  _FirewallState _fw = _FirewallState.idle;
+
+  /// The in-flight firewall setup, so [dispose] can defer the fallback-rule
+  /// cleanup until a still-running add (or UAC prompt) has finished —
+  /// otherwise the delete would run before the rule exists and the late
+  /// add would leave an orphan inbound rule on a random port.
+  Future<void>? _firewallOp;
+
   @override
   void initState() {
     super.initState();
@@ -422,13 +499,30 @@ class _ServerDialogState extends State<_ServerDialog> {
   @override
   void dispose() {
     widget.server.removeListener(_onChanged);
+    // Only the random-fallback port rule is removed on stop; the main-port
+    // (9527) rule is kept so the common path never re-prompts for UAC.
+    final fallbackPort =
+        !kIsWeb && Platform.isWindows && !widget.server.usedPreferredPort
+        ? widget.server.port
+        : null;
     widget.server.stop();
+    if (fallbackPort != null) {
+      final pending = _firewallOp;
+      unawaited(
+        (pending ?? Future<void>.value()).then(
+          (_) => WindowsFirewall.tryDeleteRule(fallbackPort),
+        ),
+      );
+    }
     super.dispose();
   }
 
   Future<void> _start() async {
     try {
       await widget.server.start(preferredPort: 9527);
+      if (mounted && !kIsWeb && Platform.isWindows) {
+        await _setupFirewall();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -441,11 +535,53 @@ class _ServerDialogState extends State<_ServerDialog> {
     }
   }
 
+  /// Best-effort auto-add of the inbound rule (works when the app already
+  /// runs elevated). Falls back to the UAC button when it fails.
+  Future<void> _setupFirewall() async {
+    final port = widget.server.port;
+    if (port == null) return;
+    _firewallOp = _setupFirewallInternal(port);
+    await _firewallOp;
+  }
+
+  Future<void> _setupFirewallInternal(int port) async {
+    setState(() => _fw = _FirewallState.adding);
+    if (await WindowsFirewall.ruleExists(port) ||
+        await WindowsFirewall.tryAddRule(port)) {
+      if (mounted) setState(() => _fw = _FirewallState.added);
+      return;
+    }
+    if (mounted) setState(() => _fw = _FirewallState.needsElevation);
+  }
+
+  Future<void> _elevateFirewall() async {
+    final port = widget.server.port;
+    if (port == null) return;
+    _firewallOp = _elevateFirewallInternal(port);
+    await _firewallOp;
+  }
+
+  Future<void> _elevateFirewallInternal(int port) async {
+    setState(() => _fw = _FirewallState.adding);
+    final ok = await WindowsFirewall.addRuleElevated(port);
+    if (!mounted) return;
+    setState(
+      () => _fw = ok ? _FirewallState.added : _FirewallState.needsElevation,
+    );
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.l10n.lanSyncFirewallRuleFailed)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = widget.l10n;
     final cs = widget.cs;
     final server = widget.server;
+    final port = server.port;
+    final phaseText = serverPhaseText(server.phase, l10n);
 
     return AlertDialog(
       backgroundColor: cs.surface,
@@ -471,14 +607,29 @@ class _ServerDialogState extends State<_ServerDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            _AddressDisplay(
-              label: l10n.lanSyncServerAddress,
-              value: server.address ?? '...',
-              cs: cs,
-            ),
+            // Every non-loopback IPv4 of this device — the user picks the
+            // one on the peer's subnet (multi-NIC / VPN machines).
+            if (server.addresses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  l10n.lanSyncNoLanAddress,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              )
+            else
+              for (final (index, ip) in server.addresses.indexed)
+                _AddressDisplay(
+                  label: index == 0 ? l10n.lanSyncServerAddress : '',
+                  value: ip,
+                  cs: cs,
+                ),
             _AddressDisplay(
               label: l10n.lanSyncServerPort,
-              value: server.port?.toString() ?? '...',
+              value: port?.toString() ?? '...',
               cs: cs,
             ),
             _AddressDisplay(
@@ -487,10 +638,14 @@ class _ServerDialogState extends State<_ServerDialog> {
               cs: cs,
               emphasize: true,
             ),
-            if (server.status.isNotEmpty) ...[
+            if (!kIsWeb && Platform.isWindows) ...[
+              const SizedBox(height: 10),
+              ..._buildFirewallSection(l10n, cs, port),
+            ],
+            if (phaseText.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                server.status,
+                phaseText,
                 style: TextStyle(
                   fontSize: 13,
                   color: cs.onSurface.withValues(alpha: 0.6),
@@ -507,6 +662,53 @@ class _ServerDialogState extends State<_ServerDialog> {
         ),
       ],
     );
+  }
+
+  List<Widget> _buildFirewallSection(
+    AppLocalizations l10n,
+    ColorScheme cs,
+    int? port,
+  ) {
+    switch (_fw) {
+      case _FirewallState.idle:
+        return [];
+      case _FirewallState.adding:
+        return [
+          Text(
+            l10n.lanSyncFirewallAdding,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ];
+      case _FirewallState.added:
+        return [
+          Text(
+            l10n.lanSyncFirewallRuleAdded(port ?? 0),
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ];
+      case _FirewallState.needsElevation:
+        return [
+          Text(
+            l10n.lanSyncFirewallRuleFailed,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _elevateFirewall,
+            icon: const Icon(Icons.shield, size: 16),
+            label: Text(l10n.lanSyncFirewallAllow),
+          ),
+        ];
+    }
   }
 }
 
@@ -530,11 +732,14 @@ class _AddressDisplay extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: cs.onSurface.withValues(alpha: 0.6),
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -566,7 +771,7 @@ class _ClientDialog extends StatefulWidget {
   final AppLocalizations l10n;
   final ColorScheme cs;
   final Future<void> Function() onNegotiate;
-  final Future<void> Function() onExchange;
+  final Future<bool> Function() onExchange;
   final VoidCallback onClose;
 
   const _ClientDialog({
@@ -607,6 +812,7 @@ class _ClientDialogState extends State<_ClientDialog> {
     final l10n = widget.l10n;
     final cs = widget.cs;
     final client = widget.client;
+    final phaseText = clientPhaseText(client.phase, l10n);
 
     return AlertDialog(
       backgroundColor: cs.surface,
@@ -637,7 +843,6 @@ class _ClientDialogState extends State<_ClientDialog> {
             Row(
               children: [
                 Expanded(
-                  flex: 2,
                   child: TextField(
                     controller: widget.portController,
                     keyboardType: TextInputType.number,
@@ -650,7 +855,6 @@ class _ClientDialogState extends State<_ClientDialog> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  flex: 1,
                   child: TextField(
                     controller: widget.pinController,
                     keyboardType: TextInputType.number,
@@ -665,10 +869,10 @@ class _ClientDialogState extends State<_ClientDialog> {
                 ),
               ],
             ),
-            if (client.status.isNotEmpty) ...[
+            if (phaseText.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                client.status,
+                phaseText,
                 style: TextStyle(
                   fontSize: 13,
                   color: cs.onSurface.withValues(alpha: 0.6),
@@ -727,7 +931,7 @@ class _ClientSheet extends StatefulWidget {
   final AppLocalizations l10n;
   final ColorScheme cs;
   final Future<void> Function() onNegotiate;
-  final Future<void> Function() onExchange;
+  final Future<bool> Function() onExchange;
   final VoidCallback onClose;
 
   const _ClientSheet({
@@ -769,6 +973,7 @@ class _ClientSheetState extends State<_ClientSheet> {
     final cs = widget.cs;
     final client = widget.client;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final phaseText = clientPhaseText(client.phase, l10n);
 
     return SafeArea(
       top: false,
@@ -805,33 +1010,26 @@ class _ClientSheetState extends State<_ClientSheet> {
               hintText: '192.168.1.100',
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: IosFormTextField(
-                    label: l10n.lanSyncClientPort,
-                    controller: widget.portController,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: IosFormTextField(
-                    label: l10n.lanSyncClientPin,
-                    controller: widget.pinController,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
+            // Stacked, not side-by-side: two fields in one row are too
+            // cramped for phone widths (issue #182).
+            IosFormTextField(
+              label: l10n.lanSyncClientPort,
+              controller: widget.portController,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            IosFormTextField(
+              label: l10n.lanSyncClientPin,
+              controller: widget.pinController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
             ),
             const SizedBox(height: 16),
-            if (client.status.isNotEmpty)
+            if (phaseText.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(
-                  client.status,
+                  phaseText,
                   style: TextStyle(
                     fontSize: 13,
                     color: cs.onSurface.withValues(alpha: 0.6),
@@ -849,8 +1047,10 @@ class _ClientSheetState extends State<_ClientSheet> {
                       if (client.plan == null) {
                         await widget.onNegotiate();
                       } else {
-                        await widget.onExchange();
-                        if (context.mounted) widget.onClose();
+                        final shouldClose = await widget.onExchange();
+                        if (context.mounted && shouldClose) {
+                          widget.onClose();
+                        }
                       }
                     },
               child: client.busy

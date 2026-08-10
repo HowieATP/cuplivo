@@ -1,6 +1,7 @@
 import 'package:Cuplivo/core/models/chat_input_data.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/features/home/widgets/image_generation_options.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
@@ -169,6 +170,9 @@ void main() {
         providers: [
           ChangeNotifierProvider.value(value: settings),
           ChangeNotifierProvider.value(value: AssistantProvider()),
+          Provider<InputDraftPersistence>.value(
+            value: InputDraftPersistence(null),
+          ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

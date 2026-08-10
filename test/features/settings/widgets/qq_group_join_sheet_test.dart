@@ -31,7 +31,7 @@ Widget _opener() {
 
 void main() {
   testWidgets(
-    'qq group picker uses bottom sheet on mobile and lists both groups',
+    'qq group picker uses bottom sheet on mobile and lists the group',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       try {
@@ -41,10 +41,9 @@ void main() {
 
         expect(find.byKey(CustomBottomSheet.panelKey), findsOneWidget);
         expect(find.byType(Dialog), findsNothing);
-        // Title (sheet header) + both group rows.
+        // Title (sheet header) + the single group row.
         expect(find.text('Join our QQ Group'), findsOneWidget);
-        expect(find.text('Kelivo Group 1'), findsOneWidget);
-        expect(find.text('Kelivo Group 2'), findsOneWidget);
+        expect(find.text('Cuplivo Group'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -62,8 +61,7 @@ void main() {
 
       expect(find.byType(Dialog), findsOneWidget);
       expect(find.byKey(CustomBottomSheet.panelKey), findsNothing);
-      expect(find.text('Kelivo Group 1'), findsOneWidget);
-      expect(find.text('Kelivo Group 2'), findsOneWidget);
+      expect(find.text('Cuplivo Group'), findsOneWidget);
 
       // Close via the X button.
       await tester.tap(find.byType(IosIconButton));

@@ -63,6 +63,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final List<_HeaderEntry> _headers = [];
   int _heartbeatIntervalSeconds = 12;
   final _toolPrefixCtrl = TextEditingController();
+  bool _advancedExpanded = false;
   // OAuth section: shared logic lives in McpOAuthSectionController
   // (mobile sheet + desktop dialog reuse it). Built in
   // didChangeDependencies — constructing it needs AppLocalizations
@@ -423,30 +424,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 ? 'http://localhost:3000/sse'
                 : 'http://localhost:3000',
           ),
-          _oauthSection(),
-          const SizedBox(height: 16),
-          Text(
-            l10n.mcpServerEditSheetHeartbeatLabel,
-            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
-          ),
-          const SizedBox(height: 6),
-          _heartbeatPicker(),
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              l10n.mcpServerEditSheetHeartbeatHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _inputRow(
-            label: l10n.mcpServerEditSheetToolPrefixLabel,
-            controller: _toolPrefixCtrl,
-            hint: l10n.mcpServerEditSheetToolPrefixHint,
-          ),
           const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetCustomHeadersTitle,
@@ -454,6 +431,61 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           ),
           const SizedBox(height: 8),
           _headersEditor(),
+          _oauthSection(),
+          const SizedBox(height: 16),
+          _TactileRow(
+            onTap: () => setState(() => _advancedExpanded = !_advancedExpanded),
+            builder: (pressed) => Row(
+              children: [
+                Icon(
+                  _advancedExpanded ? Lucide.ChevronDown : Lucide.ChevronRight,
+                  size: 16,
+                  color: pressed
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  l10n.mcpServerEditSheetAdvancedLabel,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.medium,
+                    color: pressed
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_advancedExpanded) ...[
+            const SizedBox(height: 12),
+            Text(
+              l10n.mcpServerEditSheetHeartbeatLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _heartbeatPicker(),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                l10n.mcpServerEditSheetHeartbeatHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _inputRow(
+              label: l10n.mcpServerEditSheetToolPrefixLabel,
+              controller: _toolPrefixCtrl,
+              hint: l10n.mcpServerEditSheetToolPrefixHint,
+            ),
+          ],
         ],
       ],
     );

@@ -96,5 +96,124 @@ void main() {
         'application/json',
       );
     });
+
+    test(
+      '404 on message POST is surfaced as a session-terminated error',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        SseClientTransport? transport;
+
+        addTearDown(() async {
+          transport?.close();
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          if (request.method == 'GET') {
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.write(
+              'event: endpoint\n'
+              'data: /messages?session_id=server-session\n\n',
+            );
+            await request.response.close();
+            return;
+          }
+
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
+        });
+
+        transport = await SseClientTransport.create(
+          serverUrl: 'http://${server.address.address}:${server.port}/sse',
+        );
+
+        final received = <dynamic>[];
+        final receivedError = Completer<void>();
+        final subscription = transport.onMessage.listen((m) {
+          received.add(m);
+          if (m is Map &&
+              m['error'] is Map &&
+              (m['error'] as Map)['code'] == 32600 &&
+              (m['error'] as Map)['message'] == 'Session terminated' &&
+              m['id'] == 7 &&
+              !receivedError.isCompleted) {
+            receivedError.complete();
+          }
+        });
+        addTearDown(subscription.cancel);
+
+        // Must not throw: a dead session is a routine condition, not an
+        // unhandled exception.
+        transport.send({'jsonrpc': '2.0', 'id': 7, 'method': 'ping'});
+
+        await receivedError.future.timeout(const Duration(seconds: 5));
+        expect(received, isNotEmpty);
+      },
+    );
+
+    test(
+      'authenticated transport: 404 on message POST is surfaced as a session-terminated error',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        SseAuthClientTransport? transport;
+
+        addTearDown(() async {
+          transport?.close();
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          if (request.method == 'GET') {
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.write(
+              'event: endpoint\n'
+              'data: /messages?session_id=server-session\n\n',
+            );
+            await request.response.close();
+            return;
+          }
+
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.notFound;
+          await request.response.close();
+        });
+
+      transport = await SseAuthClientTransport.create(
+        serverUrl: 'http://${server.address.address}:${server.port}/sse',
+      );
+
+      // The AuthenticatedEventSource reports the clean close of the SSE GET
+      // stream as an error, which the transport forwards to onClose. The
+      // client normally awaits onClose with a catchError; acknowledge it in
+      // the test so it is not left unhandled.
+      unawaited(transport.onClose.catchError((Object _) {}));
+
+        final receivedError = Completer<void>();
+        final subscription = transport.onMessage.listen((m) {
+          if (m is Map &&
+              m['error'] is Map &&
+              (m['error'] as Map)['code'] == 32600 &&
+              (m['error'] as Map)['message'] == 'Session terminated' &&
+              m['id'] == 7 &&
+              !receivedError.isCompleted) {
+            receivedError.complete();
+          }
+        });
+        addTearDown(subscription.cancel);
+
+        // Must not throw: a dead session is a routine condition, not an
+        // unhandled exception.
+        transport.send({'jsonrpc': '2.0', 'id': 7, 'method': 'ping'});
+
+        await receivedError.future.timeout(const Duration(seconds: 5));
+      },
+    );
   });
 }

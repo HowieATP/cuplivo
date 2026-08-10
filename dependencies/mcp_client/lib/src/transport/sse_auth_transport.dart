@@ -17,6 +17,11 @@ final Logger _logger = Logger('mcp_client.sse_auth_transport');
 
 /// SSE Transport with Bearer Token Authentication
 class SseAuthClientTransport implements ClientTransport {
+  /// Bounds a token refresh call so a dead/unreachable authorization server
+  /// cannot hang connect or a runtime refresh forever. Matches the endpoint
+  /// establishment bound in [create].
+  static const Duration _tokenRefreshTimeout = Duration(seconds: 15);
+
   final String serverUrl;
   final Map<String, String> _baseHeaders;
   OAuthToken? _oauthToken;
@@ -70,7 +75,37 @@ class SseAuthClientTransport implements ClientTransport {
       if (bearerToken != null) {
         authHeaders['Authorization'] = 'Bearer $bearerToken';
       } else if (oauthToken != null) {
-        authHeaders['Authorization'] = 'Bearer ${oauthToken.accessToken}';
+        // A persisted token may have expired while the app was closed; the
+        // timer-based refresh only runs while the app is up. Refresh on
+        // demand before connecting so a restart auto-connects (mirrors the
+        // Streamable HTTP transport's OAuthTokenManager.getAccessToken()).
+        var token = oauthToken;
+        if (token.isExpired &&
+            token.refreshToken != null &&
+            transport._oauthClient != null) {
+          try {
+            final newToken = await transport._oauthClient
+                .refreshToken(refreshToken: token.refreshToken!)
+                .timeout(_tokenRefreshTimeout);
+            token = newToken;
+            transport._oauthToken = newToken;
+            _logger.debug('Refreshed expired token before connecting');
+          } catch (e) {
+            // Refresh failed (revoked/invalid refresh token, unreachable
+            // auth server): fall through and connect with the stale token —
+            // the server responds 401 and the auth failure surfaces as
+            // before instead of hanging.
+            _logger.debug('Token refresh before connect failed: $e');
+          }
+          // Fire the persistence hook only when the refresh actually
+          // succeeded — outside the guard above so a throwing hook is not
+          // misreported as a failed refresh (the connection still proceeds
+          // with the valid new token).
+          if (!identical(token, oauthToken)) {
+            transport._onTokenRefreshed?.call(token);
+          }
+        }
+        authHeaders['Authorization'] = 'Bearer ${token.accessToken}';
 
         // Set up automatic token refresh if needed
         transport._scheduleTokenRefresh();
@@ -171,9 +206,9 @@ class SseAuthClientTransport implements ClientTransport {
     _logger.debug('Refreshing OAuth token...');
 
     try {
-      final newToken = await _oauthClient.refreshToken(
-        refreshToken: _oauthToken!.refreshToken!,
-      );
+      final newToken = await _oauthClient
+          .refreshToken(refreshToken: _oauthToken!.refreshToken!)
+          .timeout(_tokenRefreshTimeout);
 
       // The refreshed token must become the current one — send() and
       // future refreshes read it. Without this the 401-retry loop in
@@ -335,10 +370,7 @@ class SseAuthClientTransport implements ClientTransport {
       // Add current OAuth token if available
       final token = _oauthToken;
       if (token != null) {
-        request.headers.set(
-          'Authorization',
-          'Bearer ${token.accessToken}',
-        );
+        request.headers.set('Authorization', 'Bearer ${token.accessToken}');
       }
 
       // Send the request
@@ -356,6 +388,7 @@ class SseAuthClientTransport implements ClientTransport {
         _logger.debug(
           'Authentication error during send: ${response.statusCode} - $responseBody',
         );
+        client.close();
 
         // Try to refresh token if possible
         if (_oauthClient != null &&
@@ -365,15 +398,31 @@ class SseAuthClientTransport implements ClientTransport {
           // Retry the send operation
           return send(message);
         } else {
-          throw McpError(
+          _emitError(
             'Authentication failed during send: ${response.statusCode}',
+            message: message,
           );
+        }
+      } else if (response.statusCode == 404) {
+        // 404 means the server no longer knows this session. Mirror
+        // SseClientTransport: surface it as a JSON-RPC "Session terminated"
+        // error on the message stream instead of throwing — `send` is
+        // `void async`, so a throw would escape as an unhandled exception.
+        final responseBody = await response.transform(utf8.decoder).join();
+        _logger.debug('Session terminated (404): $responseBody');
+        if (!_messageController.isClosed) {
+          _messageController.add({
+            'jsonrpc': '2.0',
+            'error': {'code': 32600, 'message': 'Session terminated'},
+            if (message is Map && message['id'] != null) 'id': message['id'],
+          });
         }
       } else {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        throw McpError(
+        _emitError(
           'Error sending authenticated message: ${response.statusCode}',
+          message: message,
         );
       }
 
@@ -381,8 +430,21 @@ class SseAuthClientTransport implements ClientTransport {
       _logger.debug('Authenticated message sent successfully');
     } catch (e) {
       _logger.debug('Error sending authenticated message: $e');
-      rethrow;
+      _emitError('Error sending authenticated message: $e', message: message);
     }
+  }
+
+  /// Route a send failure to the message stream as a JSON-RPC error, so a
+  /// `void async` send never throws (see [send]). Requests are failed by
+  /// the client through the error response's `id`; notifications without an
+  /// `id` are logged by the client and dropped.
+  void _emitError(String description, {required dynamic message}) {
+    if (_messageController.isClosed) return;
+    _messageController.add({
+      'jsonrpc': '2.0',
+      'error': {'code': -32603, 'message': description},
+      if (message is Map && message['id'] != null) 'id': message['id'],
+    });
   }
 
   @override

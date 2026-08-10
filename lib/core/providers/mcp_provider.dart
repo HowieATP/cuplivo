@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
+import '../services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import '../services/network/mcp_log_bridge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,7 @@ import '../services/deleted_records_store.dart';
 import '../services/headless_generation_service.dart';
 import '../services/oauth/oauth_flow_service.dart';
 import 'assistant_provider.dart';
+import 'filesystem_mounts_provider.dart';
 import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
@@ -419,6 +421,7 @@ class McpProvider extends ChangeNotifier {
     this.chatService,
     this.assistantProvider,
     this.headlessGen,
+    this.filesystemMounts,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
     OAuthFlowService? oauthFlowService,
@@ -431,9 +434,10 @@ class McpProvider extends ChangeNotifier {
   final ChatService? chatService;
   final AssistantProvider? assistantProvider;
   final HeadlessGenerationService? headlessGen;
+  final FilesystemMountsProvider? filesystemMounts;
   final BuildContext Function() contextProvider;
 
-  /// Provider-agnostic OAuth flow orchestration (see ADR-0016).
+  /// Provider-agnostic OAuth flow orchestration (see ADR-0015).
   final OAuthFlowService oauthFlowService;
 
   final Map<String, mcp.Client> _clients = {};
@@ -445,6 +449,12 @@ class McpProvider extends ChangeNotifier {
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
+
+  /// Client-side request cap for the built-in in-memory `@kelivo/fetch`
+  /// server — see the clientConfig comment at connect time. The engine's own
+  /// timeouts (30 s header, 60 s per-chunk) bound every call; this cap only
+  /// exists so the client-side guard does not undercut long downloads.
+  static const Duration _builtinFetchRequestTimeout = Duration(minutes: 10);
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
@@ -461,6 +471,21 @@ class McpProvider extends ChangeNotifier {
   int get requestTimeoutSeconds => _requestTimeout.inSeconds;
 
   Future<void> _load() async {
+    await _reloadServersFromPrefs();
+
+    // Refresh @kelivo/subagent tool definitions when assistants change
+    assistantProvider?.addListener(_onAssistantsChanged);
+  }
+
+  /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
+  /// SharedPreferences, rebuilds the in-memory server list (including built-in
+  /// servers), and auto-connects enabled servers.
+  ///
+  /// Used by the constructor and by [reloadFromPrefs] after a backup/import
+  /// restore rewrote the prefs, so the in-memory state never diverges from
+  /// disk. Listener registration (e.g. assistant changes) is NOT repeated
+  /// here — callers own it.
+  Future<void> _reloadServersFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final timeoutMs = prefs.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
@@ -481,6 +506,7 @@ class McpProvider extends ChangeNotifier {
     // Ensure built-in MCP servers are present by default
     _ensureBuiltinFetchServerPresent();
     _ensureBuiltinSubagentServerPresent();
+    _ensureBuiltinFilesystemServerPresent();
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -497,9 +523,27 @@ class McpProvider extends ChangeNotifier {
       // fire and forget
       unawaited(connect(s.id));
     }
+  }
 
-    // Refresh @kelivo/subagent tool definitions when assistants change
-    assistantProvider?.addListener(_onAssistantsChanged);
+  /// Reloads the server list and connections from SharedPreferences.
+  ///
+  /// After a backup/import restore rewrote `mcp_servers_v1`, the in-memory
+  /// list would otherwise keep the pre-restore servers while disk already
+  /// holds the restored ones. This disconnects every live client, rebuilds
+  /// the list from disk, and reconnects enabled servers.
+  Future<void> reloadFromPrefs() async {
+    for (final id in _clients.keys.toList()) {
+      try {
+        await disconnect(id);
+      } catch (e) {
+        debugPrint('[MCP/Reload] disconnect $id failed: $e');
+      }
+    }
+    _servers = <McpServerConfig>[];
+    _status.clear();
+    _errors.clear();
+    _reconnecting.clear();
+    await _reloadServersFromPrefs();
   }
 
   void _onAssistantsChanged() {
@@ -537,6 +581,23 @@ class McpProvider extends ChangeNotifier {
       id: 'kelivo_fetch',
       enabled: true,
       name: '@kelivo/fetch',
+      transport: McpTransportType.inmemory,
+      tools: const <McpToolConfig>[], // will refresh on connect
+    );
+    _servers = [..._servers, cfg];
+  }
+
+  /// @kelivo/filesystem — present but DISABLED by default (unbound by
+  /// default; a sandboxed filesystem must be an explicit user choice).
+  void _ensureBuiltinFilesystemServerPresent() {
+    final exists = _servers.any(
+      (s) => s.name == '@kelivo/filesystem' || s.id == 'kelivo_filesystem',
+    );
+    if (exists) return;
+    final cfg = McpServerConfig(
+      id: 'kelivo_filesystem',
+      enabled: false,
+      name: '@kelivo/filesystem',
       transport: McpTransportType.inmemory,
       tools: const <McpToolConfig>[], // will refresh on connect
     );
@@ -1157,13 +1218,26 @@ class McpProvider extends ChangeNotifier {
         version: '1.0.0',
         // Turn on library-internal verbose logs
         enableDebugLogging: false,
-        requestTimeout: _requestTimeout,
+        // The global MCP timeout (30 s default) targets network MCP servers.
+        // The built-in in-memory @kelivo/fetch server must NOT be capped by
+        // it: the engine bounds its own work in both modes (text mode: 60 s
+        // total; download mode: 30 s header + 60 s per-chunk timeouts), so
+        // this client-side cap is only a safety net. A tighter cap would
+        // report "Request timed out" while the fetch still completes
+        // in-isolate, leaving a silently-written file the model believes
+        // failed.
+        requestTimeout: server.id == 'kelivo_fetch'
+            ? _builtinFetchRequestTimeout
+            : _requestTimeout,
         logListener: McpLogBridge.onEvent,
         logServerLabel: server.name,
       );
 
       // In-memory builtin server path
       if (server.transport == McpTransportType.inmemory) {
+        // Ensure the @workspaces sandbox + external mounts are resolved
+        // before building any in-memory engine (idempotent).
+        await filesystemMounts?.init();
         final engine = switch (server.id) {
           'kelivo_subagent' => KelivoSubagentMcpServerEngine(
             assistants: assistantProvider!,
@@ -1171,11 +1245,27 @@ class McpProvider extends ChangeNotifier {
             headlessGen: headlessGen!,
             contextProvider: contextProvider,
           ),
+          'kelivo_filesystem' => KelivoFilesystemMcpServerEngine(
+            mountsProvider: () =>
+                filesystemMounts?.allMounts ?? const <FilesystemMount>[],
+            onWorkspaceFileDeleted: (wirePath) {
+              final store = chatService?.deletedRecordsStore;
+              if (store == null) {
+                return Future<void>.value();
+              }
+              return store.recordFileDeletion(
+                id: wirePath,
+                deletedAt: DateTime.now(),
+              );
+            },
+          ),
           _ => KelivoFetchMcpServerEngine(),
         };
         final transport = switch (engine) {
           KelivoSubagentMcpServerEngine e =>
             KelivoSubagentInMemoryClientTransport(e),
+          KelivoFilesystemMcpServerEngine e =>
+            KelivoFilesystemInMemoryClientTransport(e),
           _ => KelivoInMemoryClientTransport(
             engine as KelivoFetchMcpServerEngine,
           ),
@@ -1680,6 +1770,12 @@ class McpProvider extends ChangeNotifier {
     try {
       // debugPrint('[MCP/Tools] listTools() ...');
       final tools = await client.listTools();
+      // The client may have been disconnected or replaced while listTools was
+      // in flight (e.g. restore reload rebuilt the server list). Never write
+      // a stale tool refresh back to disk — it would clobber the restored
+      // mcp_servers_v1 with the pre-restore list (assistant changes trigger
+      // this refresh, and restore reloads assistants).
+      if (!identical(_clients[id], client)) return;
       // debugPrint('[MCP/Tools] listTools() returned ${tools.length} tools');
       // Preserve enabled state from existing config
       final idx = _servers.indexWhere((e) => e.id == id);
@@ -1733,7 +1829,8 @@ class McpProvider extends ChangeNotifier {
             description: t.description,
             params: params,
             schema: schemaJson,
-            needsApproval: prior?.needsApproval ?? false,
+            needsApproval:
+                prior?.needsApproval ?? _defaultToolNeedsApproval(id, t.name),
           ),
         );
       }
@@ -1745,6 +1842,17 @@ class McpProvider extends ChangeNotifier {
       // debugPrint('[MCP/Tools] listTools() failed for id=$id');
       // ignore tool refresh errors; status stays connected
     }
+  }
+
+  /// Default approval flag for a tool when its config is first created.
+  /// Only the filesystem `delete` tool requires approval by default (see
+  /// CONTEXT.md "Filesystem MCP"); users can override per-tool in the MCP
+  /// server edit sheet.
+  static bool _defaultToolNeedsApproval(String serverId, String toolName) {
+    if (serverId == 'kelivo_filesystem' && toolName == 'kelivo_delete') {
+      return true;
+    }
+    return false;
   }
 
   Future<void> ensureConnected(String id) async {

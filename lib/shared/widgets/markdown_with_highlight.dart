@@ -15,12 +15,12 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:ui' as ui;
+import 'package:image/image.dart' as image_lib;
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/clipboard_images.dart';
 import '../../features/chat/pages/image_viewer_page.dart';
-import '../../features/chat/pages/html_preview_page.dart';
 import 'snackbar.dart';
 import 'ios_tactile.dart';
 import 'mermaid_bridge.dart';
@@ -38,7 +38,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../desktop/desktop_context_menu.dart';
-import 'package:Cuplivo/desktop/html_preview_dialog.dart';
+import 'html_preview_block.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
@@ -77,7 +77,10 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
 }
 
 class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
-  static const int _streamingDebounceThresholdChars = 8000;
+  // Issue #232: lowered from 8000 so math-heavy answers engage the render
+  // debounce early. Below this, a full markdown re-parse per 50ms stream tick
+  // is cheap; above it, renders are coalesced to the 120ms cadence.
+  static const int _streamingDebounceThresholdChars = 2000;
   static const Duration _streamingLongRenderDebounce = Duration(
     milliseconds: 120,
   );
@@ -269,6 +272,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       followLinkColor: true,
       // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
       useDollarSignsForLatex: false,
+      streaming: widget.streaming,
       onLinkTap: (url, title) => _handleLinkTap(context, url),
       components: components,
       inlineComponents: inlineComponents,
@@ -490,6 +494,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           return PlantUMLBlock(code: restoredCode);
         } else if (lang.toLowerCase() == 'svg') {
           return SvgPreviewBlock(
+            code: restoredCode,
+            streaming: widget.streaming && !closed,
+          );
+        } else if (_isHtml(lang)) {
+          return HtmlPreviewBlock(
             code: restoredCode,
             streaming: widget.streaming && !closed,
           );
@@ -744,6 +753,37 @@ String _preprocessFences(
         : '\n';
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
+
+  // Ensure \[...\] display math gets the same standalone-block treatment as
+  // $$...$$ (issue #218). Unlike $, \[ has no inline-literal ambiguity, so the
+  // normalization is unconditional — except on markdown table rows (a \n
+  // inside a cell would break the whole table; cells already render \[...\]
+  // via gpt_markdown's static LatexMathMultiLine) and for \\[-prefixed
+  // openers (row-break spacing args like \\[2pt] in aligned environments).
+  // $$...$$ spans are matched first and passed through untouched, so \[
+  // inside a $$ body is never re-normalized. Gated on enableMath: with math
+  // rendering off no renderer exists, so the rewrite would only split
+  // paragraphs and lists for no benefit.
+  if (enableMath) {
+    final inlineBracketDisplayMath = RegExp(
+      r'\$\$[\s\S]*?\$\$|(?<!\\)\\\[([\s\S]*?)\\\]',
+    );
+    out = out.replaceAllMapped(inlineBracketDisplayMath, (m) {
+      final body = m.group(1);
+      if (body == null) return m[0]!; // $$...$$ span: pass through untouched
+      final trimmed = body.trim();
+      if (trimmed.isEmpty) return m[0]!;
+      if (_isDollarMathOnMarkdownTableRow(out, m.start)) return m[0]!;
+      final prefix = m.start == 0 || out.substring(0, m.start).endsWith('\n\n')
+          ? ''
+          : '\n';
+      final suffix =
+          m.end == out.length || out.substring(m.end).startsWith('\n\n')
+          ? ''
+          : '\n';
+      return '$prefix\\[\n$trimmed\n\\]$suffix';
+    });
+  }
 
   // 2) Dedent opening fences: leading spaces before ```lang
   final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
@@ -1568,7 +1608,8 @@ bool _isCjkCodeUnit(int codeUnit) {
 }
 
 String _normalizeMathTex(String tex) {
-  final escapedSpecials = _escapeInlineMathSpecials(tex);
+  final tagRewritten = _rewriteTagCommands(tex);
+  final escapedSpecials = _escapeInlineMathSpecials(tagRewritten);
   final normalizedBraces = _escapeLikelyLiteralMathBraces(escapedSpecials);
   return normalizedBraces.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (
     match,
@@ -1577,6 +1618,36 @@ String _normalizeMathTex(String tex) {
     return r'\lVert '
         '$body'
         r' \rVert';
+  });
+}
+
+// flutter_math_fork 0.7.4 (latest) stubs \tag: it expands to
+// \gdef\df@tag{...}, but \gdef is undefined → ParseException → the WHOLE
+// formula falls back to raw plain text. Rewrite \tag{X} → \qquad\text{(X)}
+// and \tag*{X} → \qquad\text{X} so the number renders inline right after the
+// equation — an approximation, NOT right-aligned at the margin like real
+// LaTeX (proper tags via a vendored flutter_math_fork are a deferred task).
+// \notag/\nonumber produce nothing by design → strip. Only flat labels
+// without backslashes are rewritten: labels with nested braces or TeX
+// commands (e.g. \tag{\alpha} — \text cannot parse math commands) and
+// unbraced \tag 1 stay untouched (raw-text fallback keeps the original tex).
+String _rewriteTagCommands(String tex) {
+  final tag = RegExp(
+    r'(?<!\\)\\tag(\*?)\{([^{}\\]*)\}'
+    r'|(?<!\\)\\notag(?![a-zA-Z])'
+    r'|(?<!\\)\\nonumber(?![a-zA-Z])',
+  );
+  return tex.replaceAllMapped(tag, (m) {
+    final label = (m.group(2) ?? '').trim();
+    if (label.isEmpty) return '';
+    final starred = m.group(1) == '*';
+    return starred
+        ? r'\qquad\text{'
+              '$label'
+              '}'
+        : r'\qquad\text{'
+              '($label)'
+              '}';
   });
 }
 
@@ -2189,16 +2260,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                       )!.shareProviderSheetCopyButton,
                       onTap: () => _copyCode(context),
                     ),
-                    if (_isHtml(widget.language)) ...[
-                      const SizedBox(width: 16),
-                      _CodeBlockIconAction(
-                        icon: Lucide.Eye,
-                        label: AppLocalizations.of(
-                          context,
-                        )!.codeBlockPreviewButton,
-                        onTap: () => _previewHtml(context),
-                      ),
-                    ],
                   ],
                 ),
               ],
@@ -2334,35 +2395,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
         message: l10n.messageExportSheetExportFailed('$e'),
         type: NotificationType.error,
       );
-    }
-  }
-
-  void _previewHtml(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    if (Platform.isAndroid || Platform.isIOS) {
-      Navigator.of(context).push(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => HtmlPreviewPage(html: widget.code),
-          transitionDuration: const Duration(milliseconds: 300),
-          reverseTransitionDuration: const Duration(milliseconds: 240),
-          transitionsBuilder: (context, anim, sec, child) {
-            final curved = CurvedAnimation(
-              parent: anim,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            return FadeTransition(opacity: curved, child: child);
-          },
-        ),
-      );
-    } else if (Platform.isLinux) {
-      showAppSnackBar(
-        context,
-        message: l10n.htmlPreviewNotSupportedOnLinux,
-        type: NotificationType.warning,
-      );
-    } else {
-      showHtmlPreviewDesktopDialog(context, html: widget.code);
     }
   }
 
@@ -3179,8 +3211,22 @@ class _MarkdownTableBlock extends StatelessWidget {
             as RenderRepaintBoundary?;
     if (boundary == null) return null;
     final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
+    final data = await image.toByteData(
+      format: ui.ImageByteFormat.rawStraightRgba,
+    );
+    if (data == null) return null;
+    // 8-bit straight-alpha readback: ImageByteFormat.png on wide-gamut
+    // backends (iOS Impeller) embeds 10/16-bit wide-gamut bytes that
+    // downstream consumers misinterpret as sRGB. Encode to a plain
+    // 8-bit PNG here instead.
+    return image_lib.encodePng(
+      image_lib.Image.fromBytes(
+        width: image.width,
+        height: image.height,
+        bytes: data.buffer,
+        numChannels: 4,
+      ),
+    );
   }
 
   Future<File> _writeTableImageTempFile(Uint8List bytes) async {
@@ -4431,6 +4477,8 @@ class FencedCodeBlockMd extends BlockMd {
       return PlantUMLBlock(code: code);
     } else if (langLower == 'svg') {
       return SvgPreviewBlock(code: code, streaming: isStreamingFence);
+    } else if (_isHtml(langLower)) {
+      return HtmlPreviewBlock(code: code, streaming: isStreamingFence);
     }
     return _CollapsibleCodeBlock(
       language: lang,

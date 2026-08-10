@@ -906,6 +906,17 @@ class $MessageRowsTable extends MessageRows
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _contextTokensMeta = const VerificationMeta(
+    'contextTokens',
+  );
+  @override
+  late final GeneratedColumn<int> contextTokens = GeneratedColumn<int>(
+    'context_tokens',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isStreamingMeta = const VerificationMeta(
     'isStreaming',
   );
@@ -1127,6 +1138,7 @@ class $MessageRowsTable extends MessageRows
     modelId,
     providerId,
     totalTokens,
+    contextTokens,
     isStreaming,
     reasoningText,
     reasoningStartAt,
@@ -1216,6 +1228,15 @@ class $MessageRowsTable extends MessageRows
         totalTokens.isAcceptableOrUnknown(
           data['total_tokens']!,
           _totalTokensMeta,
+        ),
+      );
+    }
+    if (data.containsKey('context_tokens')) {
+      context.handle(
+        _contextTokensMeta,
+        contextTokens.isAcceptableOrUnknown(
+          data['context_tokens']!,
+          _contextTokensMeta,
         ),
       );
     }
@@ -1409,6 +1430,10 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.int,
         data['${effectivePrefix}total_tokens'],
       ),
+      contextTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}context_tokens'],
+      ),
       isStreaming: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_streaming'],
@@ -1499,6 +1524,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   final String? modelId;
   final String? providerId;
   final int? totalTokens;
+  final int? contextTokens;
   final bool isStreaming;
   final String? reasoningText;
   final DateTime? reasoningStartAt;
@@ -1532,6 +1558,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.modelId,
     this.providerId,
     this.totalTokens,
+    this.contextTokens,
     required this.isStreaming,
     this.reasoningText,
     this.reasoningStartAt,
@@ -1567,6 +1594,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     }
     if (!nullToAbsent || totalTokens != null) {
       map['total_tokens'] = Variable<int>(totalTokens);
+    }
+    if (!nullToAbsent || contextTokens != null) {
+      map['context_tokens'] = Variable<int>(contextTokens);
     }
     map['is_streaming'] = Variable<bool>(isStreaming);
     if (!nullToAbsent || reasoningText != null) {
@@ -1635,6 +1665,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       totalTokens: totalTokens == null && nullToAbsent
           ? const Value.absent()
           : Value(totalTokens),
+      contextTokens: contextTokens == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextTokens),
       isStreaming: Value(isStreaming),
       reasoningText: reasoningText == null && nullToAbsent
           ? const Value.absent()
@@ -1699,6 +1732,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       modelId: serializer.fromJson<String?>(json['modelId']),
       providerId: serializer.fromJson<String?>(json['providerId']),
       totalTokens: serializer.fromJson<int?>(json['totalTokens']),
+      contextTokens: serializer.fromJson<int?>(json['contextTokens']),
       isStreaming: serializer.fromJson<bool>(json['isStreaming']),
       reasoningText: serializer.fromJson<String?>(json['reasoningText']),
       reasoningStartAt: serializer.fromJson<DateTime?>(
@@ -1743,6 +1777,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'modelId': serializer.toJson<String?>(modelId),
       'providerId': serializer.toJson<String?>(providerId),
       'totalTokens': serializer.toJson<int?>(totalTokens),
+      'contextTokens': serializer.toJson<int?>(contextTokens),
       'isStreaming': serializer.toJson<bool>(isStreaming),
       'reasoningText': serializer.toJson<String?>(reasoningText),
       'reasoningStartAt': serializer.toJson<DateTime?>(reasoningStartAt),
@@ -1777,6 +1812,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<String?> modelId = const Value.absent(),
     Value<String?> providerId = const Value.absent(),
     Value<int?> totalTokens = const Value.absent(),
+    Value<int?> contextTokens = const Value.absent(),
     bool? isStreaming,
     Value<String?> reasoningText = const Value.absent(),
     Value<DateTime?> reasoningStartAt = const Value.absent(),
@@ -1804,6 +1840,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     modelId: modelId.present ? modelId.value : this.modelId,
     providerId: providerId.present ? providerId.value : this.providerId,
     totalTokens: totalTokens.present ? totalTokens.value : this.totalTokens,
+    contextTokens: contextTokens.present
+        ? contextTokens.value
+        : this.contextTokens,
     isStreaming: isStreaming ?? this.isStreaming,
     reasoningText: reasoningText.present
         ? reasoningText.value
@@ -1855,6 +1894,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       totalTokens: data.totalTokens.present
           ? data.totalTokens.value
           : this.totalTokens,
+      contextTokens: data.contextTokens.present
+          ? data.contextTokens.value
+          : this.contextTokens,
       isStreaming: data.isStreaming.present
           ? data.isStreaming.value
           : this.isStreaming,
@@ -1917,6 +1959,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('modelId: $modelId, ')
           ..write('providerId: $providerId, ')
           ..write('totalTokens: $totalTokens, ')
+          ..write('contextTokens: $contextTokens, ')
           ..write('isStreaming: $isStreaming, ')
           ..write('reasoningText: $reasoningText, ')
           ..write('reasoningStartAt: $reasoningStartAt, ')
@@ -1951,6 +1994,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     modelId,
     providerId,
     totalTokens,
+    contextTokens,
     isStreaming,
     reasoningText,
     reasoningStartAt,
@@ -1982,6 +2026,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.modelId == this.modelId &&
           other.providerId == this.providerId &&
           other.totalTokens == this.totalTokens &&
+          other.contextTokens == this.contextTokens &&
           other.isStreaming == this.isStreaming &&
           other.reasoningText == this.reasoningText &&
           other.reasoningStartAt == this.reasoningStartAt &&
@@ -2012,6 +2057,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   final Value<String?> modelId;
   final Value<String?> providerId;
   final Value<int?> totalTokens;
+  final Value<int?> contextTokens;
   final Value<bool> isStreaming;
   final Value<String?> reasoningText;
   final Value<DateTime?> reasoningStartAt;
@@ -2040,6 +2086,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.modelId = const Value.absent(),
     this.providerId = const Value.absent(),
     this.totalTokens = const Value.absent(),
+    this.contextTokens = const Value.absent(),
     this.isStreaming = const Value.absent(),
     this.reasoningText = const Value.absent(),
     this.reasoningStartAt = const Value.absent(),
@@ -2069,6 +2116,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.modelId = const Value.absent(),
     this.providerId = const Value.absent(),
     this.totalTokens = const Value.absent(),
+    this.contextTokens = const Value.absent(),
     this.isStreaming = const Value.absent(),
     this.reasoningText = const Value.absent(),
     this.reasoningStartAt = const Value.absent(),
@@ -2103,6 +2151,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<String>? modelId,
     Expression<String>? providerId,
     Expression<int>? totalTokens,
+    Expression<int>? contextTokens,
     Expression<bool>? isStreaming,
     Expression<String>? reasoningText,
     Expression<DateTime>? reasoningStartAt,
@@ -2132,6 +2181,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       if (modelId != null) 'model_id': modelId,
       if (providerId != null) 'provider_id': providerId,
       if (totalTokens != null) 'total_tokens': totalTokens,
+      if (contextTokens != null) 'context_tokens': contextTokens,
       if (isStreaming != null) 'is_streaming': isStreaming,
       if (reasoningText != null) 'reasoning_text': reasoningText,
       if (reasoningStartAt != null) 'reasoning_start_at': reasoningStartAt,
@@ -2168,6 +2218,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Value<String?>? modelId,
     Value<String?>? providerId,
     Value<int?>? totalTokens,
+    Value<int?>? contextTokens,
     Value<bool>? isStreaming,
     Value<String?>? reasoningText,
     Value<DateTime?>? reasoningStartAt,
@@ -2197,6 +2248,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       modelId: modelId ?? this.modelId,
       providerId: providerId ?? this.providerId,
       totalTokens: totalTokens ?? this.totalTokens,
+      contextTokens: contextTokens ?? this.contextTokens,
       isStreaming: isStreaming ?? this.isStreaming,
       reasoningText: reasoningText ?? this.reasoningText,
       reasoningStartAt: reasoningStartAt ?? this.reasoningStartAt,
@@ -2247,6 +2299,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     }
     if (totalTokens.present) {
       map['total_tokens'] = Variable<int>(totalTokens.value);
+    }
+    if (contextTokens.present) {
+      map['context_tokens'] = Variable<int>(contextTokens.value);
     }
     if (isStreaming.present) {
       map['is_streaming'] = Variable<bool>(isStreaming.value);
@@ -2327,6 +2382,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
           ..write('modelId: $modelId, ')
           ..write('providerId: $providerId, ')
           ..write('totalTokens: $totalTokens, ')
+          ..write('contextTokens: $contextTokens, ')
           ..write('isStreaming: $isStreaming, ')
           ..write('reasoningText: $reasoningText, ')
           ..write('reasoningStartAt: $reasoningStartAt, ')
@@ -2806,6 +2862,18 @@ class $AssistantRowsTable extends AssistantRows
     requiredDuringInsert: false,
     defaultValue: const Constant('direct'),
   );
+  static const VerificationMeta _ocrModeMeta = const VerificationMeta(
+    'ocrMode',
+  );
+  @override
+  late final GeneratedColumn<String> ocrMode = GeneratedColumn<String>(
+    'ocr_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('auto'),
+  );
   static const VerificationMeta _enableTimeInjectionMeta =
       const VerificationMeta('enableTimeInjection');
   @override
@@ -2929,6 +2997,7 @@ class $AssistantRowsTable extends AssistantRows
     docxMode,
     pdfMode,
     otherOfficeMode,
+    ocrMode,
     enableTimeInjection,
     discoverable,
     handoffId,
@@ -3256,6 +3325,12 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('ocr_mode')) {
+      context.handle(
+        _ocrModeMeta,
+        ocrMode.isAcceptableOrUnknown(data['ocr_mode']!, _ocrModeMeta),
+      );
+    }
     if (data.containsKey('enable_time_injection')) {
       context.handle(
         _enableTimeInjectionMeta,
@@ -3470,6 +3545,10 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}other_office_mode'],
       )!,
+      ocrMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ocr_mode'],
+      )!,
       enableTimeInjection: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}enable_time_injection'],
@@ -3545,6 +3624,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String docxMode;
   final String pdfMode;
   final String otherOfficeMode;
+  final String ocrMode;
   final bool enableTimeInjection;
   final bool discoverable;
   final String? handoffId;
@@ -3590,6 +3670,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.docxMode,
     required this.pdfMode,
     required this.otherOfficeMode,
+    required this.ocrMode,
     required this.enableTimeInjection,
     required this.discoverable,
     this.handoffId,
@@ -3664,6 +3745,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['docx_mode'] = Variable<String>(docxMode);
     map['pdf_mode'] = Variable<String>(pdfMode);
     map['other_office_mode'] = Variable<String>(otherOfficeMode);
+    map['ocr_mode'] = Variable<String>(ocrMode);
     map['enable_time_injection'] = Variable<bool>(enableTimeInjection);
     map['discoverable'] = Variable<bool>(discoverable);
     if (!nullToAbsent || handoffId != null) {
@@ -3734,6 +3816,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       docxMode: Value(docxMode),
       pdfMode: Value(pdfMode),
       otherOfficeMode: Value(otherOfficeMode),
+      ocrMode: Value(ocrMode),
       enableTimeInjection: Value(enableTimeInjection),
       discoverable: Value(discoverable),
       handoffId: handoffId == null && nullToAbsent
@@ -3811,6 +3894,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       docxMode: serializer.fromJson<String>(json['docxMode']),
       pdfMode: serializer.fromJson<String>(json['pdfMode']),
       otherOfficeMode: serializer.fromJson<String>(json['otherOfficeMode']),
+      ocrMode: serializer.fromJson<String>(json['ocrMode']),
       enableTimeInjection: serializer.fromJson<bool>(
         json['enableTimeInjection'],
       ),
@@ -3873,6 +3957,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'docxMode': serializer.toJson<String>(docxMode),
       'pdfMode': serializer.toJson<String>(pdfMode),
       'otherOfficeMode': serializer.toJson<String>(otherOfficeMode),
+      'ocrMode': serializer.toJson<String>(ocrMode),
       'enableTimeInjection': serializer.toJson<bool>(enableTimeInjection),
       'discoverable': serializer.toJson<bool>(discoverable),
       'handoffId': serializer.toJson<String?>(handoffId),
@@ -3921,6 +4006,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? docxMode,
     String? pdfMode,
     String? otherOfficeMode,
+    String? ocrMode,
     bool? enableTimeInjection,
     bool? discoverable,
     Value<String?> handoffId = const Value.absent(),
@@ -3975,6 +4061,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     docxMode: docxMode ?? this.docxMode,
     pdfMode: pdfMode ?? this.pdfMode,
     otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+    ocrMode: ocrMode ?? this.ocrMode,
     enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
     discoverable: discoverable ?? this.discoverable,
     handoffId: handoffId.present ? handoffId.value : this.handoffId,
@@ -4085,6 +4172,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       otherOfficeMode: data.otherOfficeMode.present
           ? data.otherOfficeMode.value
           : this.otherOfficeMode,
+      ocrMode: data.ocrMode.present ? data.ocrMode.value : this.ocrMode,
       enableTimeInjection: data.enableTimeInjection.present
           ? data.enableTimeInjection.value
           : this.enableTimeInjection,
@@ -4143,6 +4231,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('docxMode: $docxMode, ')
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
+          ..write('ocrMode: $ocrMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
           ..write('discoverable: $discoverable, ')
           ..write('handoffId: $handoffId, ')
@@ -4193,6 +4282,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     docxMode,
     pdfMode,
     otherOfficeMode,
+    ocrMode,
     enableTimeInjection,
     discoverable,
     handoffId,
@@ -4244,6 +4334,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.docxMode == this.docxMode &&
           other.pdfMode == this.pdfMode &&
           other.otherOfficeMode == this.otherOfficeMode &&
+          other.ocrMode == this.ocrMode &&
           other.enableTimeInjection == this.enableTimeInjection &&
           other.discoverable == this.discoverable &&
           other.handoffId == this.handoffId &&
@@ -4291,6 +4382,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> docxMode;
   final Value<String> pdfMode;
   final Value<String> otherOfficeMode;
+  final Value<String> ocrMode;
   final Value<bool> enableTimeInjection;
   final Value<bool> discoverable;
   final Value<String?> handoffId;
@@ -4337,6 +4429,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.docxMode = const Value.absent(),
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
+    this.ocrMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
     this.discoverable = const Value.absent(),
     this.handoffId = const Value.absent(),
@@ -4384,6 +4477,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.docxMode = const Value.absent(),
     this.pdfMode = const Value.absent(),
     this.otherOfficeMode = const Value.absent(),
+    this.ocrMode = const Value.absent(),
     this.enableTimeInjection = const Value.absent(),
     this.discoverable = const Value.absent(),
     this.handoffId = const Value.absent(),
@@ -4435,6 +4529,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? docxMode,
     Expression<String>? pdfMode,
     Expression<String>? otherOfficeMode,
+    Expression<String>? ocrMode,
     Expression<bool>? enableTimeInjection,
     Expression<bool>? discoverable,
     Expression<String>? handoffId,
@@ -4493,6 +4588,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (docxMode != null) 'docx_mode': docxMode,
       if (pdfMode != null) 'pdf_mode': pdfMode,
       if (otherOfficeMode != null) 'other_office_mode': otherOfficeMode,
+      if (ocrMode != null) 'ocr_mode': ocrMode,
       if (enableTimeInjection != null)
         'enable_time_injection': enableTimeInjection,
       if (discoverable != null) 'discoverable': discoverable,
@@ -4543,6 +4639,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? docxMode,
     Value<String>? pdfMode,
     Value<String>? otherOfficeMode,
+    Value<String>? ocrMode,
     Value<bool>? enableTimeInjection,
     Value<bool>? discoverable,
     Value<String?>? handoffId,
@@ -4594,6 +4691,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       docxMode: docxMode ?? this.docxMode,
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+      ocrMode: ocrMode ?? this.ocrMode,
       enableTimeInjection: enableTimeInjection ?? this.enableTimeInjection,
       discoverable: discoverable ?? this.discoverable,
       handoffId: handoffId ?? this.handoffId,
@@ -4731,6 +4829,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (otherOfficeMode.present) {
       map['other_office_mode'] = Variable<String>(otherOfficeMode.value);
     }
+    if (ocrMode.present) {
+      map['ocr_mode'] = Variable<String>(ocrMode.value);
+    }
     if (enableTimeInjection.present) {
       map['enable_time_injection'] = Variable<bool>(enableTimeInjection.value);
     }
@@ -4800,6 +4901,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('docxMode: $docxMode, ')
           ..write('pdfMode: $pdfMode, ')
           ..write('otherOfficeMode: $otherOfficeMode, ')
+          ..write('ocrMode: $ocrMode, ')
           ..write('enableTimeInjection: $enableTimeInjection, ')
           ..write('discoverable: $discoverable, ')
           ..write('handoffId: $handoffId, ')
@@ -6906,6 +7008,23 @@ class $GroupChatRowsTable extends GroupChatRows
         requiredDuringInsert: false,
         defaultValue: const Constant(5),
       );
+  static const VerificationMeta
+  _injectGroupMembersIntoAssistantSystemPromptMeta = const VerificationMeta(
+    'injectGroupMembersIntoAssistantSystemPrompt',
+  );
+  @override
+  late final GeneratedColumn<bool>
+  injectGroupMembersIntoAssistantSystemPrompt = GeneratedColumn<bool>(
+    'inject_group_members_into_assistant_system_prompt',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("inject_group_members_into_assistant_system_prompt" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _pendingCapAssistantMessageIdMeta =
       const VerificationMeta('pendingCapAssistantMessageId');
   @override
@@ -6963,6 +7082,7 @@ class $GroupChatRowsTable extends GroupChatRows
     maxAssistantMessagesPerRound,
     assistantDetailInjectionMode,
     assistantDetailInjectionN,
+    injectGroupMembersIntoAssistantSystemPrompt,
     pendingCapAssistantMessageId,
     assistantMessagesThisRound,
     createdAt,
@@ -7064,6 +7184,15 @@ class $GroupChatRowsTable extends GroupChatRows
         ),
       );
     }
+    if (data.containsKey('inject_group_members_into_assistant_system_prompt')) {
+      context.handle(
+        _injectGroupMembersIntoAssistantSystemPromptMeta,
+        injectGroupMembersIntoAssistantSystemPrompt.isAcceptableOrUnknown(
+          data['inject_group_members_into_assistant_system_prompt']!,
+          _injectGroupMembersIntoAssistantSystemPromptMeta,
+        ),
+      );
+    }
     if (data.containsKey('pending_cap_assistant_message_id')) {
       context.handle(
         _pendingCapAssistantMessageIdMeta,
@@ -7147,6 +7276,11 @@ class $GroupChatRowsTable extends GroupChatRows
         DriftSqlType.int,
         data['${effectivePrefix}assistant_detail_injection_n'],
       )!,
+      injectGroupMembersIntoAssistantSystemPrompt: attachedDatabase.typeMapping
+          .read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}inject_group_members_into_assistant_system_prompt'],
+          )!,
       pendingCapAssistantMessageId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pending_cap_assistant_message_id'],
@@ -7183,6 +7317,7 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
   final int maxAssistantMessagesPerRound;
   final String assistantDetailInjectionMode;
   final int assistantDetailInjectionN;
+  final bool injectGroupMembersIntoAssistantSystemPrompt;
   final String? pendingCapAssistantMessageId;
   final int assistantMessagesThisRound;
   final DateTime createdAt;
@@ -7198,6 +7333,7 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
     required this.maxAssistantMessagesPerRound,
     required this.assistantDetailInjectionMode,
     required this.assistantDetailInjectionN,
+    required this.injectGroupMembersIntoAssistantSystemPrompt,
     this.pendingCapAssistantMessageId,
     required this.assistantMessagesThisRound,
     required this.createdAt,
@@ -7227,6 +7363,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
     );
     map['assistant_detail_injection_n'] = Variable<int>(
       assistantDetailInjectionN,
+    );
+    map['inject_group_members_into_assistant_system_prompt'] = Variable<bool>(
+      injectGroupMembersIntoAssistantSystemPrompt,
     );
     if (!nullToAbsent || pendingCapAssistantMessageId != null) {
       map['pending_cap_assistant_message_id'] = Variable<String>(
@@ -7259,6 +7398,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
       maxAssistantMessagesPerRound: Value(maxAssistantMessagesPerRound),
       assistantDetailInjectionMode: Value(assistantDetailInjectionMode),
       assistantDetailInjectionN: Value(assistantDetailInjectionN),
+      injectGroupMembersIntoAssistantSystemPrompt: Value(
+        injectGroupMembersIntoAssistantSystemPrompt,
+      ),
       pendingCapAssistantMessageId:
           pendingCapAssistantMessageId == null && nullToAbsent
           ? const Value.absent()
@@ -7295,6 +7437,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
       assistantDetailInjectionN: serializer.fromJson<int>(
         json['assistantDetailInjectionN'],
       ),
+      injectGroupMembersIntoAssistantSystemPrompt: serializer.fromJson<bool>(
+        json['injectGroupMembersIntoAssistantSystemPrompt'],
+      ),
       pendingCapAssistantMessageId: serializer.fromJson<String?>(
         json['pendingCapAssistantMessageId'],
       ),
@@ -7327,6 +7472,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
       'assistantDetailInjectionN': serializer.toJson<int>(
         assistantDetailInjectionN,
       ),
+      'injectGroupMembersIntoAssistantSystemPrompt': serializer.toJson<bool>(
+        injectGroupMembersIntoAssistantSystemPrompt,
+      ),
       'pendingCapAssistantMessageId': serializer.toJson<String?>(
         pendingCapAssistantMessageId,
       ),
@@ -7349,6 +7497,7 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
     int? maxAssistantMessagesPerRound,
     String? assistantDetailInjectionMode,
     int? assistantDetailInjectionN,
+    bool? injectGroupMembersIntoAssistantSystemPrompt,
     Value<String?> pendingCapAssistantMessageId = const Value.absent(),
     int? assistantMessagesThisRound,
     DateTime? createdAt,
@@ -7371,6 +7520,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
         assistantDetailInjectionMode ?? this.assistantDetailInjectionMode,
     assistantDetailInjectionN:
         assistantDetailInjectionN ?? this.assistantDetailInjectionN,
+    injectGroupMembersIntoAssistantSystemPrompt:
+        injectGroupMembersIntoAssistantSystemPrompt ??
+        this.injectGroupMembersIntoAssistantSystemPrompt,
     pendingCapAssistantMessageId: pendingCapAssistantMessageId.present
         ? pendingCapAssistantMessageId.value
         : this.pendingCapAssistantMessageId,
@@ -7405,6 +7557,10 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
       assistantDetailInjectionN: data.assistantDetailInjectionN.present
           ? data.assistantDetailInjectionN.value
           : this.assistantDetailInjectionN,
+      injectGroupMembersIntoAssistantSystemPrompt:
+          data.injectGroupMembersIntoAssistantSystemPrompt.present
+          ? data.injectGroupMembersIntoAssistantSystemPrompt.value
+          : this.injectGroupMembersIntoAssistantSystemPrompt,
       pendingCapAssistantMessageId: data.pendingCapAssistantMessageId.present
           ? data.pendingCapAssistantMessageId.value
           : this.pendingCapAssistantMessageId,
@@ -7434,6 +7590,9 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
           )
           ..write('assistantDetailInjectionN: $assistantDetailInjectionN, ')
           ..write(
+            'injectGroupMembersIntoAssistantSystemPrompt: $injectGroupMembersIntoAssistantSystemPrompt, ',
+          )
+          ..write(
             'pendingCapAssistantMessageId: $pendingCapAssistantMessageId, ',
           )
           ..write('assistantMessagesThisRound: $assistantMessagesThisRound, ')
@@ -7455,6 +7614,7 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
     maxAssistantMessagesPerRound,
     assistantDetailInjectionMode,
     assistantDetailInjectionN,
+    injectGroupMembersIntoAssistantSystemPrompt,
     pendingCapAssistantMessageId,
     assistantMessagesThisRound,
     createdAt,
@@ -7476,6 +7636,8 @@ class GroupChatRow extends DataClass implements Insertable<GroupChatRow> {
           other.assistantDetailInjectionMode ==
               this.assistantDetailInjectionMode &&
           other.assistantDetailInjectionN == this.assistantDetailInjectionN &&
+          other.injectGroupMembersIntoAssistantSystemPrompt ==
+              this.injectGroupMembersIntoAssistantSystemPrompt &&
           other.pendingCapAssistantMessageId ==
               this.pendingCapAssistantMessageId &&
           other.assistantMessagesThisRound == this.assistantMessagesThisRound &&
@@ -7494,6 +7656,7 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
   final Value<int> maxAssistantMessagesPerRound;
   final Value<String> assistantDetailInjectionMode;
   final Value<int> assistantDetailInjectionN;
+  final Value<bool> injectGroupMembersIntoAssistantSystemPrompt;
   final Value<String?> pendingCapAssistantMessageId;
   final Value<int> assistantMessagesThisRound;
   final Value<DateTime> createdAt;
@@ -7510,6 +7673,7 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
     this.maxAssistantMessagesPerRound = const Value.absent(),
     this.assistantDetailInjectionMode = const Value.absent(),
     this.assistantDetailInjectionN = const Value.absent(),
+    this.injectGroupMembersIntoAssistantSystemPrompt = const Value.absent(),
     this.pendingCapAssistantMessageId = const Value.absent(),
     this.assistantMessagesThisRound = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -7527,6 +7691,7 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
     this.maxAssistantMessagesPerRound = const Value.absent(),
     this.assistantDetailInjectionMode = const Value.absent(),
     this.assistantDetailInjectionN = const Value.absent(),
+    this.injectGroupMembersIntoAssistantSystemPrompt = const Value.absent(),
     this.pendingCapAssistantMessageId = const Value.absent(),
     this.assistantMessagesThisRound = const Value.absent(),
     required DateTime createdAt,
@@ -7548,6 +7713,7 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
     Expression<int>? maxAssistantMessagesPerRound,
     Expression<String>? assistantDetailInjectionMode,
     Expression<int>? assistantDetailInjectionN,
+    Expression<bool>? injectGroupMembersIntoAssistantSystemPrompt,
     Expression<String>? pendingCapAssistantMessageId,
     Expression<int>? assistantMessagesThisRound,
     Expression<DateTime>? createdAt,
@@ -7570,6 +7736,9 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
         'assistant_detail_injection_mode': assistantDetailInjectionMode,
       if (assistantDetailInjectionN != null)
         'assistant_detail_injection_n': assistantDetailInjectionN,
+      if (injectGroupMembersIntoAssistantSystemPrompt != null)
+        'inject_group_members_into_assistant_system_prompt':
+            injectGroupMembersIntoAssistantSystemPrompt,
       if (pendingCapAssistantMessageId != null)
         'pending_cap_assistant_message_id': pendingCapAssistantMessageId,
       if (assistantMessagesThisRound != null)
@@ -7591,6 +7760,7 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
     Value<int>? maxAssistantMessagesPerRound,
     Value<String>? assistantDetailInjectionMode,
     Value<int>? assistantDetailInjectionN,
+    Value<bool>? injectGroupMembersIntoAssistantSystemPrompt,
     Value<String?>? pendingCapAssistantMessageId,
     Value<int>? assistantMessagesThisRound,
     Value<DateTime>? createdAt,
@@ -7612,6 +7782,9 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
           assistantDetailInjectionMode ?? this.assistantDetailInjectionMode,
       assistantDetailInjectionN:
           assistantDetailInjectionN ?? this.assistantDetailInjectionN,
+      injectGroupMembersIntoAssistantSystemPrompt:
+          injectGroupMembersIntoAssistantSystemPrompt ??
+          this.injectGroupMembersIntoAssistantSystemPrompt,
       pendingCapAssistantMessageId:
           pendingCapAssistantMessageId ?? this.pendingCapAssistantMessageId,
       assistantMessagesThisRound:
@@ -7665,6 +7838,11 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
         assistantDetailInjectionN.value,
       );
     }
+    if (injectGroupMembersIntoAssistantSystemPrompt.present) {
+      map['inject_group_members_into_assistant_system_prompt'] = Variable<bool>(
+        injectGroupMembersIntoAssistantSystemPrompt.value,
+      );
+    }
     if (pendingCapAssistantMessageId.present) {
       map['pending_cap_assistant_message_id'] = Variable<String>(
         pendingCapAssistantMessageId.value,
@@ -7704,6 +7882,9 @@ class GroupChatRowsCompanion extends UpdateCompanion<GroupChatRow> {
             'assistantDetailInjectionMode: $assistantDetailInjectionMode, ',
           )
           ..write('assistantDetailInjectionN: $assistantDetailInjectionN, ')
+          ..write(
+            'injectGroupMembersIntoAssistantSystemPrompt: $injectGroupMembersIntoAssistantSystemPrompt, ',
+          )
           ..write(
             'pendingCapAssistantMessageId: $pendingCapAssistantMessageId, ',
           )
@@ -8874,6 +9055,7 @@ typedef $$MessageRowsTableCreateCompanionBuilder =
       Value<String?> modelId,
       Value<String?> providerId,
       Value<int?> totalTokens,
+      Value<int?> contextTokens,
       Value<bool> isStreaming,
       Value<String?> reasoningText,
       Value<DateTime?> reasoningStartAt,
@@ -8904,6 +9086,7 @@ typedef $$MessageRowsTableUpdateCompanionBuilder =
       Value<String?> modelId,
       Value<String?> providerId,
       Value<int?> totalTokens,
+      Value<int?> contextTokens,
       Value<bool> isStreaming,
       Value<String?> reasoningText,
       Value<DateTime?> reasoningStartAt,
@@ -9033,6 +9216,11 @@ class $$MessageRowsTableFilterComposer
 
   ColumnFilters<int> get totalTokens => $composableBuilder(
     column: $table.totalTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contextTokens => $composableBuilder(
+    column: $table.contextTokens,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9246,6 +9434,11 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get contextTokens => $composableBuilder(
+    column: $table.contextTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isStreaming => $composableBuilder(
     column: $table.isStreaming,
     builder: (column) => ColumnOrderings(column),
@@ -9391,6 +9584,11 @@ class $$MessageRowsTableAnnotationComposer
 
   GeneratedColumn<int> get totalTokens => $composableBuilder(
     column: $table.totalTokens,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contextTokens => $composableBuilder(
+    column: $table.contextTokens,
     builder: (column) => column,
   );
 
@@ -9596,6 +9794,7 @@ class $$MessageRowsTableTableManager
                 Value<String?> modelId = const Value.absent(),
                 Value<String?> providerId = const Value.absent(),
                 Value<int?> totalTokens = const Value.absent(),
+                Value<int?> contextTokens = const Value.absent(),
                 Value<bool> isStreaming = const Value.absent(),
                 Value<String?> reasoningText = const Value.absent(),
                 Value<DateTime?> reasoningStartAt = const Value.absent(),
@@ -9625,6 +9824,7 @@ class $$MessageRowsTableTableManager
                 modelId: modelId,
                 providerId: providerId,
                 totalTokens: totalTokens,
+                contextTokens: contextTokens,
                 isStreaming: isStreaming,
                 reasoningText: reasoningText,
                 reasoningStartAt: reasoningStartAt,
@@ -9655,6 +9855,7 @@ class $$MessageRowsTableTableManager
                 Value<String?> modelId = const Value.absent(),
                 Value<String?> providerId = const Value.absent(),
                 Value<int?> totalTokens = const Value.absent(),
+                Value<int?> contextTokens = const Value.absent(),
                 Value<bool> isStreaming = const Value.absent(),
                 Value<String?> reasoningText = const Value.absent(),
                 Value<DateTime?> reasoningStartAt = const Value.absent(),
@@ -9684,6 +9885,7 @@ class $$MessageRowsTableTableManager
                 modelId: modelId,
                 providerId: providerId,
                 totalTokens: totalTokens,
+                contextTokens: contextTokens,
                 isStreaming: isStreaming,
                 reasoningText: reasoningText,
                 reasoningStartAt: reasoningStartAt,
@@ -9868,6 +10070,7 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> docxMode,
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
+      Value<String> ocrMode,
       Value<bool> enableTimeInjection,
       Value<bool> discoverable,
       Value<String?> handoffId,
@@ -9916,6 +10119,7 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> docxMode,
       Value<String> pdfMode,
       Value<String> otherOfficeMode,
+      Value<String> ocrMode,
       Value<bool> enableTimeInjection,
       Value<bool> discoverable,
       Value<String?> handoffId,
@@ -10117,6 +10321,11 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get otherOfficeMode => $composableBuilder(
     column: $table.otherOfficeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ocrMode => $composableBuilder(
+    column: $table.ocrMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10351,6 +10560,11 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ocrMode => $composableBuilder(
+    column: $table.ocrMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get enableTimeInjection => $composableBuilder(
     column: $table.enableTimeInjection,
     builder: (column) => ColumnOrderings(column),
@@ -10568,6 +10782,9 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get ocrMode =>
+      $composableBuilder(column: $table.ocrMode, builder: (column) => column);
+
   GeneratedColumn<bool> get enableTimeInjection => $composableBuilder(
     column: $table.enableTimeInjection,
     builder: (column) => column,
@@ -10667,6 +10884,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> docxMode = const Value.absent(),
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
+                Value<String> ocrMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
                 Value<bool> discoverable = const Value.absent(),
                 Value<String?> handoffId = const Value.absent(),
@@ -10713,6 +10931,7 @@ class $$AssistantRowsTableTableManager
                 docxMode: docxMode,
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
+                ocrMode: ocrMode,
                 enableTimeInjection: enableTimeInjection,
                 discoverable: discoverable,
                 handoffId: handoffId,
@@ -10764,6 +10983,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> docxMode = const Value.absent(),
                 Value<String> pdfMode = const Value.absent(),
                 Value<String> otherOfficeMode = const Value.absent(),
+                Value<String> ocrMode = const Value.absent(),
                 Value<bool> enableTimeInjection = const Value.absent(),
                 Value<bool> discoverable = const Value.absent(),
                 Value<String?> handoffId = const Value.absent(),
@@ -10810,6 +11030,7 @@ class $$AssistantRowsTableTableManager
                 docxMode: docxMode,
                 pdfMode: pdfMode,
                 otherOfficeMode: otherOfficeMode,
+                ocrMode: ocrMode,
                 enableTimeInjection: enableTimeInjection,
                 discoverable: discoverable,
                 handoffId: handoffId,
@@ -12477,6 +12698,7 @@ typedef $$GroupChatRowsTableCreateCompanionBuilder =
       Value<int> maxAssistantMessagesPerRound,
       Value<String> assistantDetailInjectionMode,
       Value<int> assistantDetailInjectionN,
+      Value<bool> injectGroupMembersIntoAssistantSystemPrompt,
       Value<String?> pendingCapAssistantMessageId,
       Value<int> assistantMessagesThisRound,
       required DateTime createdAt,
@@ -12495,6 +12717,7 @@ typedef $$GroupChatRowsTableUpdateCompanionBuilder =
       Value<int> maxAssistantMessagesPerRound,
       Value<String> assistantDetailInjectionMode,
       Value<int> assistantDetailInjectionN,
+      Value<bool> injectGroupMembersIntoAssistantSystemPrompt,
       Value<String?> pendingCapAssistantMessageId,
       Value<int> assistantMessagesThisRound,
       Value<DateTime> createdAt,
@@ -12606,6 +12829,12 @@ class $$GroupChatRowsTableFilterComposer
     column: $table.assistantDetailInjectionN,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get injectGroupMembersIntoAssistantSystemPrompt =>
+      $composableBuilder(
+        column: $table.injectGroupMembersIntoAssistantSystemPrompt,
+        builder: (column) => ColumnFilters(column),
+      );
 
   ColumnFilters<String> get pendingCapAssistantMessageId => $composableBuilder(
     column: $table.pendingCapAssistantMessageId,
@@ -12731,6 +12960,12 @@ class $$GroupChatRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get injectGroupMembersIntoAssistantSystemPrompt =>
+      $composableBuilder(
+        column: $table.injectGroupMembersIntoAssistantSystemPrompt,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   ColumnOrderings<String> get pendingCapAssistantMessageId =>
       $composableBuilder(
         column: $table.pendingCapAssistantMessageId,
@@ -12824,6 +13059,12 @@ class $$GroupChatRowsTableAnnotationComposer
     column: $table.assistantDetailInjectionN,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get injectGroupMembersIntoAssistantSystemPrompt =>
+      $composableBuilder(
+        column: $table.injectGroupMembersIntoAssistantSystemPrompt,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<String> get pendingCapAssistantMessageId =>
       $composableBuilder(
@@ -12934,6 +13175,8 @@ class $$GroupChatRowsTableTableManager
                 Value<String> assistantDetailInjectionMode =
                     const Value.absent(),
                 Value<int> assistantDetailInjectionN = const Value.absent(),
+                Value<bool> injectGroupMembersIntoAssistantSystemPrompt =
+                    const Value.absent(),
                 Value<String?> pendingCapAssistantMessageId =
                     const Value.absent(),
                 Value<int> assistantMessagesThisRound = const Value.absent(),
@@ -12951,6 +13194,8 @@ class $$GroupChatRowsTableTableManager
                 maxAssistantMessagesPerRound: maxAssistantMessagesPerRound,
                 assistantDetailInjectionMode: assistantDetailInjectionMode,
                 assistantDetailInjectionN: assistantDetailInjectionN,
+                injectGroupMembersIntoAssistantSystemPrompt:
+                    injectGroupMembersIntoAssistantSystemPrompt,
                 pendingCapAssistantMessageId: pendingCapAssistantMessageId,
                 assistantMessagesThisRound: assistantMessagesThisRound,
                 createdAt: createdAt,
@@ -12970,6 +13215,8 @@ class $$GroupChatRowsTableTableManager
                 Value<String> assistantDetailInjectionMode =
                     const Value.absent(),
                 Value<int> assistantDetailInjectionN = const Value.absent(),
+                Value<bool> injectGroupMembersIntoAssistantSystemPrompt =
+                    const Value.absent(),
                 Value<String?> pendingCapAssistantMessageId =
                     const Value.absent(),
                 Value<int> assistantMessagesThisRound = const Value.absent(),
@@ -12987,6 +13234,8 @@ class $$GroupChatRowsTableTableManager
                 maxAssistantMessagesPerRound: maxAssistantMessagesPerRound,
                 assistantDetailInjectionMode: assistantDetailInjectionMode,
                 assistantDetailInjectionN: assistantDetailInjectionN,
+                injectGroupMembersIntoAssistantSystemPrompt:
+                    injectGroupMembersIntoAssistantSystemPrompt,
                 pendingCapAssistantMessageId: pendingCapAssistantMessageId,
                 assistantMessagesThisRound: assistantMessagesThisRound,
                 createdAt: createdAt,

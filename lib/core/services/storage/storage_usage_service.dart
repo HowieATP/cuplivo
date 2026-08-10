@@ -7,6 +7,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
+import 'ios_tmp_directory.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -140,6 +141,7 @@ abstract final class StorageUsageService {
       'avatar_cache': _MutableStats(),
       'other_cache': _MutableStats(),
       'system_cache': _MutableStats(),
+      'tmp_cache': _MutableStats(),
     };
 
     final logsSubs = <String, _MutableStats>{
@@ -253,6 +255,15 @@ abstract final class StorageUsageService {
     final avatarCacheDir = await AppDirectories.getAvatarCacheDirectory();
     final logsDir = Directory(p.join(root.path, 'logs'));
 
+    // Real iOS app tmp directory (<container>/tmp, via platform channel).
+    // path_provider's getTemporaryDirectory() returns Caches on iOS, so the
+    // true tmp dir — where file_picker / image_picker / image_cropper / the
+    // paste-image channel copy files that are never cleaned up — is only
+    // reachable through the channel. Null on every other platform: Android's
+    // tmp IS the system cache dir (already counted above); macOS/Windows/Linux
+    // system temp is outside the app container and never counted.
+    final iosTmpPath = await IosTmpDirectory.getPath();
+
     // Platform cache directory (e.g. Android /data/user/0/<package>/cache).
     try {
       if (await systemCacheDir.exists()) {
@@ -274,6 +285,32 @@ abstract final class StorageUsageService {
         }
       }
     } catch (_) {}
+
+    if (iosTmpPath != null) {
+      final tmpDir = Directory(iosTmpPath);
+      try {
+        if (await tmpDir.exists()) {
+          await for (final ent in tmpDir.list(
+            recursive: true,
+            followLinks: false,
+          )) {
+            if (ent is! File) continue;
+            int bytes = 0;
+            try {
+              bytes = await ent.length();
+            } catch (_) {
+              bytes = 0;
+            }
+            totalFiles += 1;
+            totalBytes += bytes;
+            byCat[StorageUsageCategoryKey.cache]!.add(bytes);
+            cacheSubs['tmp_cache']!.add(bytes);
+          }
+        }
+      } catch (_) {
+        // If listing fails for any reason, fall back to 0s; UI will show load failed.
+      }
+    }
 
     final clearable = StorageUsageStats(
       fileCount:
@@ -337,6 +374,14 @@ abstract final class StorageUsageService {
               id: 'system_cache',
               stats: cacheSubs['system_cache']!.toStats(),
               path: systemCacheDir.path,
+            ),
+          if (iosTmpPath != null &&
+              (cacheSubs['tmp_cache']!.bytes > 0 ||
+                  cacheSubs['tmp_cache']!.fileCount > 0))
+            StorageUsageSubcategory(
+              id: 'tmp_cache',
+              stats: cacheSubs['tmp_cache']!.toStats(),
+              path: iosTmpPath,
             ),
         ],
       ),
@@ -429,6 +474,19 @@ abstract final class StorageUsageService {
       final dir = await AppDirectories.getSystemCacheDirectory();
       await _deleteDirectoryContents(dir);
     } catch (_) {}
+  }
+
+  /// Clears the real iOS app tmp directory contents (directory itself is
+  /// kept). No-op when the platform channel is unavailable (non-iOS).
+  ///
+  /// Per-file failures are tolerated by [_deleteDirectoryContents] (a locked
+  /// file is truncated instead of removed), matching the other `clearX`
+  /// methods; directory-level failures (e.g. the dir cannot be listed) throw
+  /// and are surfaced by the caller's error snackbar.
+  static Future<void> clearTmpCache() async {
+    final iosTmpPath = await IosTmpDirectory.getPath();
+    if (iosTmpPath == null) return;
+    await _deleteDirectoryContents(Directory(iosTmpPath));
   }
 
   static Future<void> clearLogs() async {

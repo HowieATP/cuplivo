@@ -22,6 +22,7 @@ import 'core/providers/settings_provider.dart';
 import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
+import 'core/providers/filesystem_mounts_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/group_chat_provider.dart';
@@ -43,6 +44,7 @@ import 'core/services/headless_generation_service.dart';
 import 'core/services/network/dio_http_client.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
+import 'features/home/services/input_draft_persistence.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'features/skills/skill_manager.dart';
@@ -90,7 +92,7 @@ http.Client _oauthHttpClient(SettingsProvider sp) {
 }
 
 Future<void> main() async {
-  await runZoned(
+  await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
@@ -104,6 +106,10 @@ Future<void> main() async {
         final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
         await FlutterLogger.setEnabled(enabled);
       } catch (_) {}
+      // Preload the chat input draft synchronously (before runApp) so restore
+      // at input-bar mount is race-free: the user cannot type before the
+      // draft is already in the controller.
+      await InputDraftPersistence.ensureInitialized();
       // Trim Flutter global image cache to reduce memory pressure from large images
       try {
         PaintingBinding.instance.imageCache.maximumSize = 200;
@@ -121,7 +127,19 @@ Future<void> main() async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
-      await SkillManager.initRoot();
+      // Skills root is feature-level: a resolution failure (e.g. path_provider
+      // channel unavailable) must not block app startup. Degrade to "skills
+      // unavailable this session" instead of dying before runApp.
+      try {
+        await SkillManager.initRoot();
+      } catch (e, st) {
+        debugPrint('[main] SkillManager.initRoot failed: $e\n$st');
+        FlutterLogger.log(
+          'SkillManager.initRoot failed: $e\n$st',
+          tag: 'Startup',
+          force: true,
+        );
+      }
       await CodexDeviceCodeController.instance.init();
       await GrokDeviceCodeController.instance.init();
       // Enable edge-to-edge to allow content under system bars (Android)
@@ -132,6 +150,13 @@ Future<void> main() async {
       }
       // Start app (Flutter log capture is toggleable and off by default)
       runApp(const MyApp());
+    },
+    // Unhandled root-isolate errors must not kill the process silently: log
+    // them (console + Flutter log file, forced regardless of the log toggle)
+    // and keep the app alive.
+    (Object error, StackTrace stack) {
+      debugPrint('[main] uncaught error: $error\n$stack');
+      FlutterLogger.log('$error\n$stack', tag: 'Uncaught', force: true);
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -179,7 +204,11 @@ class MyApp extends StatelessWidget {
           value: GrokDeviceCodeController.instance,
         ),
         ChangeNotifierProvider(create: (_) => ChatService()),
+        Provider<InputDraftPersistence>.value(
+          value: InputDraftPersistence.instance,
+        ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
+        ChangeNotifierProvider(create: (_) => FilesystemMountsProvider()),
         ChangeNotifierProvider(
           create: (ctx) =>
               AssistantProvider(chatService: ctx.read<ChatService>()),
@@ -201,6 +230,7 @@ class MyApp extends StatelessWidget {
               chatService: ctx.read<ChatService>(),
               assistantProvider: ctx.read<AssistantProvider>(),
               headlessGen: ctx.read<HeadlessGenerationService>(),
+              filesystemMounts: ctx.read<FilesystemMountsProvider>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),
             );

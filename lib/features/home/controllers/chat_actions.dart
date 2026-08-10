@@ -4,11 +4,11 @@ import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/headless_generation_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -1000,6 +1000,15 @@ class ChatActions {
 
       // Cancel active stream for current conversation only
       ChatApiService.cancelRequest(cid);
+      // Cascading cancellation: a wait-mode sub-agent spawned by this
+      // conversation is cancelled too (fire-and-forget keeps running).
+      // No-op when this conversation has no headless jobs.
+      try {
+        // ignore: use_build_context_synchronously (root context)
+        contextProvider.read<HeadlessGenerationService>().cancel(cid);
+      } catch (e) {
+        debugPrint('[CancelTrace] headless cascade cancel failed: $e');
+      }
       final sub = _conversationStreams.remove(cid);
       try {
         await sub?.cancel();
@@ -1065,12 +1074,14 @@ class ChatActions {
                   (
                     String messageId, {
                     String? reasoningText,
+                    DateTime? reasoningStartAt,
                     DateTime? reasoningFinishedAt,
                     String? reasoningSegmentsJson,
                   }) async {
                     await chatService.updateMessage(
                       messageId,
                       reasoningText: reasoningText,
+                      reasoningStartAt: reasoningStartAt,
                       reasoningFinishedAt: reasoningFinishedAt,
                       reasoningSegmentsJson: reasoningSegmentsJson,
                     );
@@ -1364,14 +1375,13 @@ class ChatActions {
       );
       await chatService.updateMessageSilent(
         messageId,
-        reasoningSegmentsJson: streamController
-            .serializeReasoningSegmentsWithSplits(
-              streamController.getReasoningSegments(messageId) ?? const [],
-              contentSplitOffsets: state.contentSplitOffsets,
-              reasoningCountAtSplit: state.reasoningCountAtSplit,
-              toolCountAtSplit: state.toolCountAtSplit,
-              reasoningDetails: streamController.reasoningDetails[messageId],
-            ),
+        reasoningSegmentsJson: stream_ctrl.serializeReasoningSegmentsWithSplits(
+          streamController.getReasoningSegments(messageId) ?? const [],
+          contentSplitOffsets: state.contentSplitOffsets,
+          reasoningCountAtSplit: state.reasoningCountAtSplit,
+          toolCountAtSplit: state.toolCountAtSplit,
+          reasoningDetails: streamController.reasoningDetails[messageId],
+        ),
       );
     }
 
@@ -1380,9 +1390,14 @@ class ChatActions {
     if (chunk.totalTokens > 0) {
       state.totalTokens = chunk.totalTokens;
     }
+    // Last-wins (replace): providers emit the CURRENT round's cumulative
+    // usage, so the latest chunk is the exact context at this moment.
     if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
+      state.usage = chunk.usage;
       state.totalTokens = state.usage!.totalTokens;
+    }
+    if (chunk.consumedUsage != null) {
+      state.consumedUsage = chunk.consumedUsage;
     }
 
     String streamingProcessed = _transformAssistantContent(state);
@@ -1480,6 +1495,7 @@ class ChatActions {
           (
             String messageId, {
             String? reasoningText,
+            DateTime? reasoningStartAt,
             DateTime? reasoningFinishedAt,
             String? reasoningSegmentsJson,
           }) async {
@@ -1487,6 +1503,7 @@ class ChatActions {
             await chatService.updateMessageSilent(
               messageId,
               reasoningText: reasoningText,
+              reasoningStartAt: reasoningStartAt,
               reasoningFinishedAt: reasoningFinishedAt,
               reasoningSegmentsJson: reasoningSegmentsJson,
             );
@@ -1538,9 +1555,13 @@ class ChatActions {
     if (chunk.totalTokens > 0) {
       state.totalTokens = chunk.totalTokens;
     }
+    // Last-wins (replace): see _handleContentChunk.
     if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
+      state.usage = chunk.usage;
       state.totalTokens = state.usage!.totalTokens;
+    }
+    if (chunk.consumedUsage != null) {
+      state.consumedUsage = chunk.consumedUsage;
     }
 
     // Track the _finishStreaming future so _handleStreamDone can await it
@@ -1640,9 +1661,14 @@ class ChatActions {
     final finalDurationMs = state.streamStartedAt != null
         ? DateTime.now().difference(state.streamStartedAt!).inMilliseconds
         : null;
-    final finalPromptTokens = state.usage?.promptTokens;
-    final finalCompletionTokens = state.usage?.completionTokens;
-    final finalCachedTokens = state.usage?.cachedTokens;
+    // Consumed semantics (sum across rounds) — persisted to the token fields.
+    final finalPromptTokens = state.consumedUsage?.promptTokens;
+    final finalCompletionTokens = state.consumedUsage?.completionTokens;
+    final finalCachedTokens = state.consumedUsage?.cachedTokens;
+    final finalTotalTokens =
+        state.consumedUsage?.totalTokens ?? state.totalTokens;
+    // Context semantics (last request round) — what the token display shows.
+    final finalContextTokens = state.usage?.totalTokens ?? state.totalTokens;
 
     // Flush final content to the streaming notifier before async operations.
     // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
@@ -1668,7 +1694,8 @@ class ChatActions {
     await chatService.updateMessage(
       messageId,
       content: sanitizedContent,
-      totalTokens: state.totalTokens,
+      totalTokens: finalTotalTokens,
+      contextTokens: finalContextTokens,
       isStreaming: false,
       promptTokens: finalPromptTokens,
       completionTokens: finalCompletionTokens,
@@ -1678,7 +1705,8 @@ class ChatActions {
 
     final finalizedMessage = state.ctx.assistantMessage.copyWith(
       content: sanitizedContent,
-      totalTokens: state.totalTokens,
+      totalTokens: finalTotalTokens,
+      contextTokens: finalContextTokens,
       isStreaming: false,
       promptTokens: finalPromptTokens,
       completionTokens: finalCompletionTokens,
@@ -1706,12 +1734,14 @@ class ChatActions {
           (
             String messageId, {
             String? reasoningText,
+            DateTime? reasoningStartAt,
             DateTime? reasoningFinishedAt,
             String? reasoningSegmentsJson,
           }) async {
             await chatService.updateMessage(
               messageId,
               reasoningText: reasoningText,
+              reasoningStartAt: reasoningStartAt,
               reasoningFinishedAt: reasoningFinishedAt,
               reasoningSegmentsJson: reasoningSegmentsJson,
             );
@@ -1792,12 +1822,14 @@ class ChatActions {
           (
             String messageId, {
             String? reasoningText,
+            DateTime? reasoningStartAt,
             DateTime? reasoningFinishedAt,
             String? reasoningSegmentsJson,
           }) async {
             await chatService.updateMessage(
               messageId,
               reasoningText: reasoningText,
+              reasoningStartAt: reasoningStartAt,
               reasoningFinishedAt: reasoningFinishedAt,
               reasoningSegmentsJson: reasoningSegmentsJson,
             );
@@ -1891,7 +1923,7 @@ class ChatActions {
       if (segs != null && segs.isNotEmpty) {
         await chatService.updateMessage(
           streaming.id,
-          reasoningSegmentsJson: streamController
+          reasoningSegmentsJson: stream_ctrl
               .serializeReasoningSegmentsWithSplits(
                 segs,
                 contentSplitOffsets: streamController
@@ -1911,7 +1943,7 @@ class ChatActions {
         final splits = streamController.getContentSplitData(streaming.id)!;
         await chatService.updateMessage(
           streaming.id,
-          reasoningSegmentsJson: streamController
+          reasoningSegmentsJson: stream_ctrl
               .serializeReasoningSegmentsWithSplits(
                 const [],
                 contentSplitOffsets: splits.offsets,

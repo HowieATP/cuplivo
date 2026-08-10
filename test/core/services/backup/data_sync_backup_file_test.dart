@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path/path.dart' as p;
@@ -9,6 +10,9 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Cuplivo/core/database/app_database.dart';
+import 'package:Cuplivo/core/database/chat_database_repository.dart';
+import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/backup.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
@@ -32,6 +36,38 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
+}
+
+/// An initialized [ChatService] backed by an in-memory database, for restore
+/// paths that require `chatService.initialized`.
+class _InMemoryChatService extends ChatService {
+  late final AppDatabase db;
+  late final ChatDatabaseRepository _testRepo;
+
+  _InMemoryChatService() {
+    db = AppDatabase(NativeDatabase.memory());
+    _testRepo = ChatDatabaseRepository(db);
+  }
+
+  @override
+  bool get initialized => true;
+
+  @override
+  ChatDatabaseRepository get repo => _testRepo;
+
+  @override
+  Future<List<Assistant>> getAllAssistants() => _testRepo.getAllAssistants();
+
+  @override
+  Future<void> putAssistants(List<Assistant> list) =>
+      _testRepo.putAssistants(list);
+
+  @override
+  Future<void> reloadCachesFromDb() async {}
+
+  Future<void> closeDb() async {
+    await _testRepo.close();
+  }
 }
 
 void main() {
@@ -156,6 +192,169 @@ void main() {
         List<int>.filled(128, 5),
       );
     });
+
+    test('restores skill files in overwrite and merge modes', () async {
+      final sourceDir = Directory('${root.path}/source_skills');
+      await sourceDir.create(recursive: true);
+      final sourceFile = File('${sourceDir.path}/pdf-processing/SKILL.md');
+      await sourceFile.create(recursive: true);
+      await sourceFile.writeAsString('---\nname: pdf-processing\n---\nbody');
+
+      final zipFile = File('${root.path}/skills_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(sourceFile, 'skills/pdf-processing/SKILL.md');
+      encoder.closeSync();
+
+      final skillsDir = Directory('${root.path}/skills');
+      await skillsDir.create(recursive: true);
+      final existingFile = File('${skillsDir.path}/local-skill/SKILL.md');
+      await existingFile.create(recursive: true);
+      await existingFile.writeAsString('---\nname: local-skill\n---\nbody');
+
+      final sync = DataSync(chatService: ChatService());
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      expect(await existingFile.exists(), isTrue);
+      expect(
+        await File('${skillsDir.path}/pdf-processing/SKILL.md').readAsString(),
+        contains('name: pdf-processing'),
+      );
+
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.overwrite,
+      );
+
+      expect(await existingFile.exists(), isFalse);
+      expect(
+        await File('${skillsDir.path}/pdf-processing/SKILL.md').readAsString(),
+        contains('name: pdf-processing'),
+      );
+    });
+
+    test(
+      'merge restore replaces skills only when the backup entry is newer',
+      () async {
+        final sourceDir = Directory('${root.path}/source_skills');
+        await sourceDir.create(recursive: true);
+        final sourceFile = File('${sourceDir.path}/pdf-processing/SKILL.md');
+        await sourceFile.create(recursive: true);
+        await sourceFile.writeAsString(
+          '---\nname: pdf-processing\n---\nbackup version',
+        );
+        // Even seconds: ZIP DOS timestamps round down to 2s granularity.
+        await sourceFile.setLastModified(DateTime(2026, 1, 2));
+
+        final zipFile = File('${root.path}/skills_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(sourceFile, 'skills/pdf-processing/SKILL.md');
+        encoder.closeSync();
+
+        final skillsDir = Directory('${root.path}/skills');
+        await skillsDir.create(recursive: true);
+        final localFile = File('${skillsDir.path}/pdf-processing/SKILL.md');
+        await localFile.create(recursive: true);
+        await localFile.writeAsString(
+          '---\nname: pdf-processing\n---\nlocal version',
+        );
+        await localFile.setLastModified(DateTime(2026, 1, 1));
+
+        final sync = DataSync(chatService: ChatService());
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        // Backup entry (Jan 2) is newer than the local copy (Jan 1) → replaced.
+        expect(await localFile.readAsString(), contains('backup version'));
+
+        // Local copy becomes newer than the backup entry (Jan 3) → kept.
+        await localFile.writeAsString(
+          '---\nname: pdf-processing\n---\nlocal version',
+        );
+        await localFile.setLastModified(DateTime(2026, 1, 3));
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        expect(await localFile.readAsString(), contains('local version'));
+      },
+    );
+
+    test(
+      'skills are exported and restored regardless of includeFiles',
+      () async {
+        final skillsDir = Directory('${root.path}/skills');
+        await skillsDir.create(recursive: true);
+        final skillFile = File('${skillsDir.path}/pdf-processing/SKILL.md');
+        await skillFile.create(recursive: true);
+        await skillFile.writeAsString('---\nname: pdf-processing\n---\nbody');
+
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          expect(archive.findFile('skills/pdf-processing/SKILL.md'), isNotNull);
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await skillsDir.delete(recursive: true);
+        await sync.restoreFromLocalFile(
+          backupFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        expect(await skillFile.exists(), isTrue);
+        expect(
+          await skillFile.readAsString(),
+          contains('name: pdf-processing'),
+        );
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test(
+      'incremental: analyzeIncrementalScope counts skills unconditionally',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        final skillsDir = Directory('${root.path}/skills');
+        await skillsDir.create(recursive: true);
+        final skillFile = File('${skillsDir.path}/pdf-processing/SKILL.md');
+        await skillFile.create(recursive: true);
+        await skillFile.writeAsString('---\nname: pdf-processing\n---\nbody');
+
+        final sync = DataSync(chatService: chatService);
+        final scope = await sync.analyzeIncrementalScope(
+          IncrementalBackupConfig(since: since, includeFiles: false),
+        );
+
+        expect(scope.newFileCount, 1);
+
+        await chatService.close();
+      },
+    );
 
     test(
       'merge restore imports assistant memories and mcp servers without clobbering local entries',
@@ -690,6 +889,143 @@ void main() {
         expect(scope.newFileCount, 0);
 
         await chatService.close();
+      },
+    );
+  });
+
+  group('DataSync legacy OCR restore', () {
+    late Directory root;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('kelivo_ocr_restore_');
+      PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    tearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    Future<File> makeSettingsZip(Map<String, dynamic> settings) async {
+      final settingsFile = File('${root.path}/settings.json');
+      await settingsFile.writeAsString(jsonEncode(settings));
+      final zipFile = File('${root.path}/backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.closeSync();
+      return zipFile;
+    }
+
+    test(
+      'pre-v15 backup with ocr_enabled_v1=false restores assistants to never '
+      'and never resurrects the key',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Legacy A'},
+            {'id': 'a2', 'name': 'Legacy B'},
+          ]),
+          'ocr_enabled_v1': false,
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants, hasLength(2));
+        expect(assistants.every((a) => a.ocrMode == 'never'), isTrue);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
+      },
+    );
+
+    test(
+      'pre-v15 backup with ocr_enabled_v1=true restores assistants to auto',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Legacy A'},
+          ]),
+          'ocr_enabled_v1': true,
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants.single.ocrMode, 'auto');
+      },
+    );
+
+    test('merge restore keeps existing per-assistant ocrMode and maps only new '
+        'incoming assistants', () async {
+      final chatService = _InMemoryChatService();
+      addTearDown(chatService.closeDb);
+      await chatService.putAssistants([
+        Assistant(id: 'a1', name: 'Local Alpha', ocrMode: 'always'),
+      ]);
+      final zipFile = await makeSettingsZip({
+        'assistants_v1': jsonEncode([
+          {'id': 'a1', 'name': 'Incoming Alpha'},
+          {'id': 'a2', 'name': 'New Beta'},
+        ]),
+        'ocr_enabled_v1': false,
+      });
+
+      final sync = DataSync(chatService: chatService);
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
+        mode: RestoreMode.merge,
+      );
+
+      final byId = {
+        for (final a in await chatService.getAllAssistants()) a.id: a,
+      };
+      expect(byId['a1']!.ocrMode, 'always');
+      expect(byId['a2']!.ocrMode, 'never');
+    });
+
+    test(
+      'v15-format backup preserves per-assistant ocrMode untouched',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+        final zipFile = await makeSettingsZip({
+          'assistants_v1': jsonEncode([
+            {'id': 'a1', 'name': 'Modern A', 'ocrMode': 'always'},
+            {'id': 'a2', 'name': 'Modern B', 'ocrMode': 'never'},
+          ]),
+        });
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+
+        final byId = {
+          for (final a in await chatService.getAllAssistants()) a.id: a,
+        };
+        expect(byId['a1']!.ocrMode, 'always');
+        expect(byId['a2']!.ocrMode, 'never');
       },
     );
   });

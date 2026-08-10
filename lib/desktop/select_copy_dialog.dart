@@ -17,13 +17,38 @@ Future<void> showSelectCopyDesktopDialog(
   );
 }
 
-class _SelectCopyDesktopDialog extends StatelessWidget {
+class _SelectCopyDesktopDialog extends StatefulWidget {
   const _SelectCopyDesktopDialog({required this.message});
   final ChatMessage message;
 
+  @override
+  State<_SelectCopyDesktopDialog> createState() =>
+      _SelectCopyDesktopDialogState();
+}
+
+class _SelectCopyDesktopDialogState extends State<_SelectCopyDesktopDialog> {
+  // The Scrollbar and the SingleChildScrollView must share an explicit
+  // controller (`primary: false`) instead of binding to the route-level
+  // PrimaryScrollController: boundary auto-scroll drives the position at
+  // high frequency, which can transiently leave the route primary with no
+  // attached position and trip the Scrollbar's debug assertion.
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _copyAll(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    await Clipboard.setData(ClipboardData(text: message.content));
+    await Clipboard.setData(ClipboardData(text: widget.message.content));
     if (!context.mounted) return;
     showAppSnackBar(
       context,
@@ -104,12 +129,15 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                           width: 0.6,
                         ),
                       ),
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(12),
-                          child: SelectionArea(
+                      child: SelectionArea(
+                        child: Scrollbar(
+                          controller: _scrollController,
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            primary: false,
+                            padding: const EdgeInsets.all(12),
                             child: Text(
-                              message.content,
+                              widget.message.content,
                               style: TextStyle(fontSize: 15, height: 1.5),
                             ),
                           ),

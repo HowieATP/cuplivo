@@ -16,6 +16,7 @@ class DeletionEntityType {
   static const mcpServer = 'mcpServer';
   static const memory = 'memory';
   static const groupChat = 'groupChat';
+  static const workspaceFile = 'workspaceFile';
 
   static const all = [
     conversation,
@@ -26,6 +27,7 @@ class DeletionEntityType {
     mcpServer,
     memory,
     groupChat,
+    workspaceFile,
   ];
 }
 
@@ -108,6 +110,41 @@ class DeletedRecordsStore {
     await _evictMarkers();
   }
 
+  /// Records a marker-only local deletion for a filesystem entity
+  /// (`type=workspaceFile`, id = mount-relative wire path). No
+  /// [DeletedRecordRows] payload is written — files are physically gone and
+  /// not recoverable (Skill precedent; see ADR-0021).
+  ///
+  /// Also removes any `origin='remote'` row for the same path: a local
+  /// deletion supersedes a peer's declaration (the "offer local delete"
+  /// purpose of the remote row is moot once the file is gone here).
+  Future<void> recordFileDeletion({
+    required String id,
+    required DateTime deletedAt,
+  }) async {
+    await _db.transaction(() async {
+      await _db
+          .into(_db.deletionMarkerRows)
+          .insert(
+            DeletionMarkerRowsCompanion.insert(
+              id: id,
+              type: DeletionEntityType.workspaceFile,
+              origin: DeletionOrigin.local,
+              deletedAt: deletedAt,
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+      await (_db.delete(_db.deletionMarkerRows)..where(
+            (t) =>
+                t.id.equals(id) &
+                t.type.equals(DeletionEntityType.workspaceFile) &
+                t.origin.equals(DeletionOrigin.remote),
+          ))
+          .go();
+    });
+    await _evictMarkers();
+  }
+
   /// Records a remote deletion declaration from a peer/backup's deleted.json.
   /// Only writes a [DeletionMarkerRows] entry with origin='remote'. No payload
   /// — the entity is still alive locally; the UI offers one-click local delete.
@@ -165,6 +202,15 @@ class DeletedRecordsStore {
   Future<List<DeletionMarkerRow>> listRemoteDeletionMarkers() async {
     return (_db.select(_db.deletionMarkerRows)
           ..where((t) => t.origin.equals(DeletionOrigin.remote))
+          ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)]))
+        .get();
+  }
+
+  /// Returns all [DeletionMarkerRows] of type workspaceFile (both origins),
+  /// newest-first. Backs the trash-page "File Marks" section.
+  Future<List<DeletionMarkerRow>> listFileDeletionMarkers() async {
+    return (_db.select(_db.deletionMarkerRows)
+          ..where((t) => t.type.equals(DeletionEntityType.workspaceFile))
           ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)]))
         .get();
   }

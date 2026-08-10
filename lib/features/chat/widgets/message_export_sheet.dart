@@ -1215,8 +1215,22 @@ Future<Uint8List?> _captureFullBoundaryPngBytes(
       );
       return null;
     }
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
+    final data = await image.toByteData(
+      format: ui.ImageByteFormat.rawStraightRgba,
+    );
+    if (data == null) return null;
+    // 8-bit straight-alpha readback: ImageByteFormat.png on wide-gamut
+    // backends (iOS Impeller) embeds 10/16-bit wide-gamut bytes that
+    // downstream consumers misinterpret as sRGB. Encode to a plain
+    // 8-bit PNG here instead.
+    return image_lib.encodePng(
+      image_lib.Image.fromBytes(
+        width: image.width,
+        height: image.height,
+        bytes: data.buffer,
+        numChannels: 4,
+      ),
+    );
   } catch (e) {
     debugPrint('Full export image capture failed, falling back to slices: $e');
     return null;

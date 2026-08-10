@@ -189,6 +189,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubCacheSystem => 'System cache';
 
   @override
+  String get storageSpaceSubCacheTmp => 'Temp files';
+
+  @override
+  String get storageSpaceSubDescAvatarCache =>
+      'Downloaded avatar images; they are re-downloaded automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescOtherCache =>
+      'Temporary data such as notification icons; regenerated automatically when needed.';
+
+  @override
+  String get storageSpaceSubDescSystemCache =>
+      'System-level cache (image decoding, web content, etc.); regenerated as needed.';
+
+  @override
+  String get storageSpaceSubDescTmpCache =>
+      'Temporary copies of pasted images and picked attachments; clearing does not affect chat history.';
+
+  @override
   String get storageSpaceSubLogsFlutter => 'Flutter logs';
 
   @override
@@ -274,6 +293,241 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSortByTime => 'By date';
 
   @override
+  String get storageWorkspaceEntryTitle => 'Workspace';
+
+  @override
+  String get storageMountsTitle => 'Filesystem Mounts';
+
+  @override
+  String get storageMountsAddButton => 'Add mount';
+
+  @override
+  String get storageMountsAliasLabel => 'Alias';
+
+  @override
+  String get storageMountsPathLabel => 'Path';
+
+  @override
+  String get storageMountsReadOnlyLabel => 'Read-only';
+
+  @override
+  String get storageMountsPickButton => 'Browse';
+
+  @override
+  String get storageMountsAddDialogTitle => 'Add External Mount';
+
+  @override
+  String get storageMountsEditDialogTitle => 'Edit Mount';
+
+  @override
+  String get storageMountsRemoveConfirmTitle => 'Remove Mount';
+
+  @override
+  String storageMountsRemoveConfirmMessage(Object alias) {
+    return 'Remove mount $alias? The directory itself will not be deleted.';
+  }
+
+  @override
+  String get storageMountsWorkspacesNote =>
+      'Built-in read-write sandbox. Workspace files sync with backups.';
+
+  @override
+  String get storageMountsErrorAliasInvalid =>
+      'Invalid alias (lowercase letters, digits, underscores, hyphens; max 32 chars)';
+
+  @override
+  String get storageMountsErrorAliasReserved =>
+      '\"workspaces\" is a reserved alias';
+
+  @override
+  String get storageMountsErrorAliasDuplicate => 'This alias already exists';
+
+  @override
+  String get storageMountsErrorPathInvalid =>
+      'Invalid path (must be an absolute directory path)';
+
+  @override
+  String get storageMountsErrorPathNotFound =>
+      'Path does not exist or is not a directory';
+
+  @override
+  String get storageMountsErrorSyncOverlap =>
+      'This folder overlaps the sync scope (backup/sync folders)';
+
+  @override
+  String get storageMountsErrorInsideWorkspaces =>
+      'This folder is inside the current workspace folder';
+
+  @override
+  String get storageMountsErrorDestinationNotEmpty =>
+      'This folder is not empty — choose an empty folder when moving workspace files';
+
+  @override
+  String get storageMountsWorkspacesLocationTitle => 'Workspace Location';
+
+  @override
+  String get storageMountsWorkspacesLocationDialogTitle =>
+      'Change Workspace Location';
+
+  @override
+  String get storageMountsWorkspacesMoveFilesLabel =>
+      'Move existing files to the new location';
+
+  @override
+  String get storageMountsWorkspacesLocationChanged =>
+      'Workspace location changed';
+
+  @override
+  String storageMountsWorkspacesMoved(Object path) {
+    return 'Moved workspace files to $path';
+  }
+
+  @override
+  String storageMountsWorkspacesMoveFailed(Object error) {
+    return 'Failed to move workspace files: $error';
+  }
+
+  @override
+  String mountFilesPageTitle(Object alias) {
+    return 'Files · $alias';
+  }
+
+  @override
+  String get mountFilesEmptyDir => 'Empty directory';
+
+  @override
+  String get mountFilesUploadButton => 'Upload';
+
+  @override
+  String mountFilesUploaded(Object count) {
+    return 'Uploaded $count files';
+  }
+
+  @override
+  String mountFilesUploadFailed(Object error, Object name) {
+    return 'Failed to upload $name: $error';
+  }
+
+  @override
+  String mountFilesUploadNameInvalid(Object name) {
+    return 'Skipped $name: the file name is not allowed';
+  }
+
+  @override
+  String mountFilesUploadConflict(Object name) {
+    return 'Skipped $name: a file with this name already exists';
+  }
+
+  @override
+  String get mountFilesDownloadButton => 'Download';
+
+  @override
+  String mountFilesDownloaded(Object name) {
+    return 'Saved $name';
+  }
+
+  @override
+  String mountFilesDownloadFailed(Object error, Object name) {
+    return 'Failed to download $name: $error';
+  }
+
+  @override
+  String mountFilesDownloadTooLarge(Object name) {
+    return '$name is too large to download on this device';
+  }
+
+  @override
+  String mountFilesPreviewBinary(Object name) {
+    return '$name is a binary file — cannot preview';
+  }
+
+  @override
+  String mountFilesPreviewTooLarge(Object name) {
+    return '$name is too large to preview';
+  }
+
+  @override
+  String mountFilesPreviewReadFailed(Object error, Object name) {
+    return 'Failed to read $name: $error';
+  }
+
+  @override
+  String mountFilesPreviewTruncated(Object total) {
+    return 'Preview truncated: showing the first lines of $total';
+  }
+
+  @override
+  String get mountFilesMoreButton => 'More';
+
+  @override
+  String get mountFilesOpenButton => 'Open';
+
+  @override
+  String get mountFilesShareButton => 'Share';
+
+  @override
+  String mountFilesOpenFailed(Object error, Object name) {
+    return 'Failed to open $name: $error';
+  }
+
+  @override
+  String mountFilesShareFailed(Object error, Object name) {
+    return 'Failed to share $name: $error';
+  }
+
+  @override
+  String get workspaceFilesDeleteConfirmTitle => 'Delete File';
+
+  @override
+  String workspaceFilesDeleteConfirmMessage(Object path) {
+    return 'Delete $path? This cannot be undone.';
+  }
+
+  @override
+  String get workspaceFilesDeleteButton => 'Delete';
+
+  @override
+  String workspaceFilesDeleted(Object path) {
+    return 'Deleted $path';
+  }
+
+  @override
+  String workspaceFilesDeleteFailed(Object error) {
+    return 'Delete failed: $error';
+  }
+
+  @override
+  String workspaceFilesLoadFailed(Object error) {
+    return 'Failed to load workspace files: $error';
+  }
+
+  @override
+  String get trashWorkspaceMarksTab => 'File Marks';
+
+  @override
+  String get trashWorkspaceMarksEmpty => 'No workspace file deletion marks';
+
+  @override
+  String get trashWorkspaceMarksNotRecoverable =>
+      'Workspace files cannot be restored. Marks are deletion records only.';
+
+  @override
+  String get trashWorkspaceMarksDeleteLocal => 'Delete on this device';
+
+  @override
+  String get trashWorkspaceMarksClearRecord => 'Clear record';
+
+  @override
+  String trashWorkspaceMarksDeleteDirConfirm(Object count, Object path) {
+    return 'Delete directory $path on this device? $count files inside will also be deleted.';
+  }
+
+  @override
+  String storageMountsSaved(Object alias) {
+    return 'Mount saved: $alias';
+  }
+
+  @override
   String storageSpaceRefCount(int count) {
     return '$count refs';
   }
@@ -293,6 +547,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String storageSpaceDeleteRefWarning(int count) {
     return '$count files are referenced by messages — deleting will break their display';
+  }
+
+  @override
+  String storageSpaceDeleteDraftWarning(int count) {
+    return '$count files are still referenced by your unsaved draft';
   }
 
   @override
@@ -513,6 +772,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get svgSaveDialogTitle => 'Save SVG';
+
+  @override
+  String get htmlPreviewTab => 'Preview';
+
+  @override
+  String get htmlSaveFile => 'Download HTML';
+
+  @override
+  String get htmlSaveSuccess => 'HTML saved';
+
+  @override
+  String get htmlSaveFailed => 'Save failed';
+
+  @override
+  String get htmlSaveDialogTitle => 'Save HTML';
+
+  @override
+  String get htmlOpenFullScreenPreview => 'Full-screen preview';
 
   @override
   String get mermaidExportPng => 'Export PNG';
@@ -1425,9 +1702,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPreviewTitle => 'Preview';
 
   @override
-  String get codeBlockPreviewButton => 'Preview';
-
-  @override
   String get codeBlockSaveAsButton => 'Save as file';
 
   @override
@@ -1713,6 +1987,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromRikkaHub => 'Import from RikkaHub';
 
   @override
+  String get backupPageRikkaHubMigrateUrl =>
+      'https://kelivo-helper.netlify.app/#/migrate';
+
+  @override
+  String get backupPageRikkaHubMigrateHint =>
+      'RikkaHub backups can be converted to a Cuplivo-compatible backup via the migration website:';
+
+  @override
+  String get backupPageRikkaHubTutorialTitle => 'Usage Tutorial';
+
+  @override
+  String get backupPageRikkaHubStep1 =>
+      'After opening the website, tap “Click to Select”.';
+
+  @override
+  String get backupPageRikkaHubStep2 =>
+      'Find your RikkaHub backup and tap Confirm.';
+
+  @override
+  String get backupPageRikkaHubStep3 =>
+      'Wait about 15 seconds for the migration to complete, then tap to download the migration package. A compressed file with the same name as the original plus a “kelivo” suffix will be downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep4 =>
+      'Return to Cuplivo, tap “Import Backup File” and import the migration package you just downloaded.';
+
+  @override
+  String get backupPageRikkaHubStep5 =>
+      'If you have any issues, join the Cuplivo QQ group to give feedback.';
+
+  @override
   String get backupPageNotSupportedYet => 'Not supported yet';
 
   @override
@@ -1945,6 +2250,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPin => 'PIN';
 
   @override
+  String get lanSyncNoLanAddress =>
+      'No LAN address detected (device offline or not connected to a network).';
+
+  @override
   String get lanSyncServerStop => 'Stop Server';
 
   @override
@@ -1954,7 +2263,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncServerPlanSent => 'Sync plan sent. Waiting for zip...';
 
   @override
-  String get lanSyncServerReceived => 'Received zip. Preparing response...';
+  String get lanSyncServerExchanging => 'Exchanging data...';
 
   @override
   String get lanSyncServerDone => 'Exchange complete. Apply and restart.';
@@ -2021,6 +2330,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String lanSyncErrorConnection(Object error) {
     return 'Connection failed: $error';
   }
+
+  @override
+  String get lanSyncErrorFieldsRequired => 'Host, port and PIN are required.';
+
+  @override
+  String get lanSyncErrorInvalidPort => 'Invalid port.';
+
+  @override
+  String get lanSyncFirewallAllow => 'Allow in Firewall';
+
+  @override
+  String get lanSyncFirewallAdding => 'Adding firewall rule...';
+
+  @override
+  String lanSyncFirewallRuleAdded(Object port) {
+    return 'Firewall rule added (inbound TCP port $port).';
+  }
+
+  @override
+  String get lanSyncFirewallRuleFailed =>
+      'Could not add the firewall rule automatically. Click to add it now (requires administrator).';
 
   @override
   String get lanSyncApplyAndRestart => 'Apply and restart';
@@ -2169,6 +2499,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compressContextStartButton => 'Compress';
+
+  @override
+  String get compressContextKeepRecentMessages => 'Keep N';
+
+  @override
+  String compressContextKeepCountLabel(Object count) {
+    return 'Keep the most recent $count user messages';
+  }
+
+  @override
+  String get compressContextKeepAllMessages =>
+      'Keeping that many covers all messages — nothing to compress';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return 'Summarize $summarized chars, keep $kept chars verbatim → about $minTokens–$maxTokens tokens (original about $totalTokens tokens)';
+  }
 
   @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
@@ -2528,12 +2881,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Render reasoning (thinking) with Markdown';
 
   @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
+      'Limit streaming thinking preview';
+
+  @override
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
+      'While thinking streams, only the tail of the preview is rendered for speed. Turn off to restore the original full-length live preview.';
+
+  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       'Render assistant messages with Markdown';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle =>
       'Mobile Code Block Word Wrap';
+
+  @override
+  String get displaySettingsPageHtmlStreamingShowCodeTitle =>
+      'Show code while HTML is generating';
+
+  @override
+  String get displaySettingsPageAutoOpenHtmlPreviewTitle =>
+      'Auto-open HTML preview when done';
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockTitle =>
@@ -3009,6 +3378,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpServerEditSheetHeartbeatHint =>
       'If you encounter frequent 429 (rate limit) errors, try increasing this interval.';
+
+  @override
+  String get mcpServerEditSheetAdvancedLabel => 'Advanced Settings';
 
   @override
   String get mcpServerEditSheetUrlLabel => 'Server URL';
@@ -4263,10 +4635,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageJoinQQGroup => 'Join our QQ Group';
 
   @override
-  String get aboutPageQQGroupOne => 'Kelivo Group 1';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo Group 2';
+  String get aboutPageQQGroup => 'Cuplivo Group';
 
   @override
   String get aboutPageJoinDiscord => 'Join us on Discord';
@@ -6267,6 +6636,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Change or select a preset, then tap Save to apply';
 
   @override
+  String get compressPresetStandard => 'Standard (Default)';
+
+  @override
+  String get compressPresetDetailed => 'Detailed';
+
+  @override
+  String get ocrPresetStandard => 'Standard (Default)';
+
+  @override
+  String get ocrPresetCoordinate => 'Coordinate-precise';
+
+  @override
+  String get promptPresetCustom => 'Custom';
+
+  @override
   String get imageCompressionDialogTitle => 'Compress Image';
 
   @override
@@ -6353,18 +6737,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get documentProcessingTitle => 'Image & Document Processing';
 
   @override
-  String get documentProcessingImageWithoutVision =>
-      'Images without vision model';
+  String get documentProcessingImageOcr => 'Image OCR';
 
   @override
-  String get documentProcessingModeOcr => 'OCR';
+  String get documentProcessingModeAuto => 'Auto';
+
+  @override
+  String get documentProcessingModeAlways => 'Always';
+
+  @override
+  String get documentProcessingModeNever => 'Never';
 
   @override
   String get documentProcessingModeDiscard => 'Discard';
 
   @override
   String get documentProcessingOcrNotConfigured =>
-      'No OCR model configured. OCR option unavailable.';
+      'No OCR model configured. Always-OCR unavailable.';
 
   @override
   String get documentProcessingDocx => 'DOCX';
@@ -6704,6 +7093,68 @@ class AppLocalizationsEn extends AppLocalizations {
   String get handoffBackwardChipTooltip => 'Back to the parent conversation';
 
   @override
+  String get subagentPanelThinking => 'Thinking…';
+
+  @override
+  String get subagentPanelStreaming => 'Streaming';
+
+  @override
+  String get subagentPanelWaitingApproval => 'Waiting for approval';
+
+  @override
+  String subagentPanelLastStepCall(Object tool) {
+    return 'Last step: calling $tool';
+  }
+
+  @override
+  String subagentPanelLastStepDone(Object tool) {
+    return 'Last step: $tool done';
+  }
+
+  @override
+  String get subagentPanelViewChild => 'Open sub-conversation';
+
+  @override
+  String get subagentPanelCancelTooltip => 'Cancel sub-agent';
+
+  @override
+  String get subagentPanelCancelConfirmTitle => 'Cancel sub-agent?';
+
+  @override
+  String get subagentPanelCancelConfirmBody =>
+      'The running sub-agent will be stopped. Content already generated is kept in the sub-conversation.';
+
+  @override
+  String get subagentPanelCancelConfirmKeep => 'Keep running';
+
+  @override
+  String get subagentPanelCancelConfirmAction => 'Stop';
+
+  @override
+  String get subagentPanelApprove => 'Approve';
+
+  @override
+  String get subagentPanelDeny => 'Deny';
+
+  @override
+  String get subagentPanelAskUserPending => 'Your answer is needed';
+
+  @override
+  String get subagentPanelAnswerNow => 'Answer now';
+
+  @override
+  String subagentPanelToolCalls(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tool calls',
+      one: '1 tool call',
+      zero: '0 tool calls',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get groupChatMyGroupChats => 'My group chats';
 
   @override
@@ -6825,11 +7276,125 @@ class AppLocalizationsEn extends AppLocalizations {
       'Every N user and assistant messages';
 
   @override
+  String get groupChatInjectGroupMembersTitle =>
+      'Inject group chat info into assistant system prompt';
+
+  @override
+  String get groupChatInjectGroupMembersDesc =>
+      'When enabled, each member assistant is told at the end of its system prompt that it is in a group chat and who the other members are (user and assistant names only, never their system prompts).';
+
+  @override
+  String get groupChatAdvancedDirectorSection => 'Director';
+
+  @override
+  String get groupChatAdvancedAssistantSection => 'Assistant responses';
+
+  @override
   String get groupChatDirectorLogsEmpty => 'No director logs yet.';
 
   @override
   String get groupChatDirectorLogsEphemeral =>
-      'Director context is assembled live from the public conversation and is not stored separately.';
+      'Director context is rebuilt from the public conversation. Runtime details are kept only while this app is running.';
+
+  @override
+  String groupChatDirectorLogsEntryTitle(int index) {
+    return 'Director call $index';
+  }
+
+  @override
+  String get groupChatDirectorLogsTriggerUser => 'Triggered by a user message';
+
+  @override
+  String get groupChatDirectorLogsTriggerAssistant =>
+      'Triggered by an assistant message';
+
+  @override
+  String get groupChatDirectorLogsTriggerCapMerge =>
+      'Triggered by a round-cap merge';
+
+  @override
+  String groupChatDirectorLogsObservedSpeaker(String name) {
+    return 'Observed next speaker: $name';
+  }
+
+  @override
+  String get groupChatDirectorLogsNoObservedFollowUp =>
+      'No subsequent public speaker observed.';
+
+  @override
+  String get groupChatDirectorLogsRoundCapReached =>
+      'Round cap reached; the director was not called again.';
+
+  @override
+  String get groupChatDirectorLogsUnknownSpeaker => 'Unknown assistant';
+
+  @override
+  String get groupChatDirectorLogsReconstructedContext =>
+      'Reconstructed director context';
+
+  @override
+  String get groupChatDirectorLogsNoContext =>
+      'No reconstructed context is available for this marker.';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDetails => 'Runtime details';
+
+  @override
+  String get groupChatDirectorLogsRuntimeUnavailable =>
+      'Runtime details are unavailable for this call (for example, after an app restart).';
+
+  @override
+  String get groupChatDirectorLogsRuntimeModel => 'Model';
+
+  @override
+  String get groupChatDirectorLogsRuntimeAttempts => 'Attempts';
+
+  @override
+  String get groupChatDirectorLogsRuntimeRequestMessages => 'Request messages';
+
+  @override
+  String get groupChatDirectorLogsRuntimeDecision => 'Decision';
+
+  @override
+  String get groupChatDirectorLogsRuntimeReason => 'Reason';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallback => 'Fallback';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFallbackValue =>
+      'Fallback decision was used';
+
+  @override
+  String get groupChatDirectorLogsRuntimeError => 'Attempt error';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFailure => 'Failure';
+
+  @override
+  String get groupChatDirectorLogsRuntimeFreeText => 'Model text';
+
+  @override
+  String get groupChatDirectorLogsRuntimeEmpty =>
+      'No additional runtime details were captured.';
+
+  @override
+  String get groupChatDirectorLogsDecisionSelectSpeaker => 'Select speaker';
+
+  @override
+  String get groupChatDirectorLogsDecisionEndTurn => 'End turn';
+
+  @override
+  String get groupChatDirectorLogsRoleSystem => 'System';
+
+  @override
+  String get groupChatDirectorLogsRoleUser => 'User';
+
+  @override
+  String get groupChatDirectorLogsRoleAssistant => 'Assistant';
+
+  @override
+  String get groupChatDirectorLogsRoleTool => 'Tool';
 
   @override
   String get groupChatNoAssistantsToInvite => 'No more assistants to invite.';

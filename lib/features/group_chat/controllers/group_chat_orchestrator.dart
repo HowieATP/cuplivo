@@ -7,6 +7,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/group_chat.dart';
+import '../../../core/models/group_chat_director_log.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -117,9 +118,11 @@ class GroupChatOrchestrator {
       String directorUserContent;
       var g = groupChatProvider.getById(group.id) ?? group;
       String? skipPendingForHistory;
+      var initialDirectorTrigger = GroupChatDirectorLogTrigger.user;
       if (g.pendingCapAssistantMessageId != null) {
         final pendingId = g.pendingCapAssistantMessageId!;
         skipPendingForHistory = pendingId;
+        initialDirectorTrigger = GroupChatDirectorLogTrigger.capMerge;
         final msgs = chatService.getMessages(g.conversationId);
         ChatMessage? pending;
         for (final m in msgs) {
@@ -169,6 +172,8 @@ class GroupChatOrchestrator {
           directorUserContent: directorUserContent,
           inputData: inputData,
           skipPendingCapMessageId: skipPendingForHistory,
+          sourceMessageId: userMessage.id,
+          initialTrigger: initialDirectorTrigger,
         );
       } finally {
         _excludeUserMessageIdForDirector = null;
@@ -218,7 +223,11 @@ class GroupChatOrchestrator {
         return;
       }
 
-      final effective = speaker.copyWith(enableProactiveCare: false);
+      final userName = userProvider.name.trim().isEmpty
+          ? 'User'
+          : userProvider.name.trim();
+      final effective = _applyGroupMemberInjection(group, speaker, userName);
+
       final conversation =
           chatService.getConversation(group.conversationId) ??
           Conversation(
@@ -242,9 +251,6 @@ class GroupChatOrchestrator {
       final assistantsById = {
         for (final a in assistantProvider.assistants) a.id: a,
       };
-      final userName = userProvider.name.trim().isEmpty
-          ? 'User'
-          : userProvider.name.trim();
 
       final privateMessages = _privateBuilder.build(
         conversation: conversation,
@@ -436,6 +442,8 @@ class GroupChatOrchestrator {
     required String directorUserContent,
     ChatInputData? inputData,
     String? skipPendingCapMessageId,
+    required String sourceMessageId,
+    required GroupChatDirectorLogTrigger initialTrigger,
   }) async {
     var g = groupChatProvider.getById(group.id) ?? group;
     var nextContent = directorUserContent;
@@ -443,6 +451,8 @@ class GroupChatOrchestrator {
         ? 'User'
         : userProvider.name.trim();
     var firstDirectorCall = true;
+    var nextSourceMessageId = sourceMessageId;
+    var nextTrigger = initialTrigger;
 
     while (!_stopRequested) {
       g = groupChatProvider.getById(g.id) ?? g;
@@ -479,6 +489,11 @@ class GroupChatOrchestrator {
           excludeTrailingUserMessageId: firstDirectorCall
               ? _excludeUserMessageIdForDirector
               : null,
+          sourceMessageId: nextSourceMessageId,
+          trigger: nextTrigger,
+          onRuntimeLog: (log) {
+            groupChatProvider.recordDirectorRuntimeLog(g.id, log);
+          },
         );
       } on DirectorSoftError catch (e) {
         if (e.kind == DirectorSoftErrorKind.noModel) {
@@ -547,6 +562,8 @@ class GroupChatOrchestrator {
         nextContent,
         isHumanUserTurn: false,
       );
+      nextSourceMessageId = assistantMsg.id;
+      nextTrigger = GroupChatDirectorLogTrigger.assistant;
       inputData = null;
     }
   }
@@ -592,7 +609,10 @@ class GroupChatOrchestrator {
     required Assistant speaker,
     ChatInputData? inputData,
   }) async {
-    final effective = speaker.copyWith(enableProactiveCare: false);
+    final userName = userProvider.name.trim().isEmpty
+        ? 'User'
+        : userProvider.name.trim();
+    final effective = _applyGroupMemberInjection(group, speaker, userName);
 
     final providerKey =
         (effective.chatModelProvider ?? settingsProvider.currentModelProvider)
@@ -619,9 +639,6 @@ class GroupChatOrchestrator {
     final assistantsById = {
       for (final a in assistantProvider.assistants) a.id: a,
     };
-    final userName = userProvider.name.trim().isEmpty
-        ? 'User'
-        : userProvider.name.trim();
 
     final privateMessages = _privateBuilder.build(
       conversation: conversation,
@@ -675,6 +692,33 @@ class GroupChatOrchestrator {
       if (m.id == placeholder.id) return m;
     }
     return placeholder;
+  }
+
+  /// Applies the optional "group members" paragraph to a member assistant's
+  /// system prompt (see [GroupChat.injectGroupMembersIntoAssistantSystemPrompt]).
+  Assistant _applyGroupMemberInjection(
+    GroupChat group,
+    Assistant speaker,
+    String userName,
+  ) {
+    var effective = speaker.copyWith(enableProactiveCare: false);
+    if (!group.injectGroupMembersIntoAssistantSystemPrompt) return effective;
+    final memberIds = groupChatProvider.assistantIdsOf(group.id).toSet();
+    final memberNames = assistantProvider.assistants
+        .where((a) => memberIds.contains(a.id))
+        .map((a) => a.name)
+        .toList();
+    final injection = AssistantPrivateContextBuilder.buildGroupMemberInjection(
+      group: group,
+      userName: userName,
+      memberNames: memberNames,
+    );
+    if (injection == null || injection.isEmpty) return effective;
+    final base = effective.systemPrompt.trim();
+    effective = effective.copyWith(
+      systemPrompt: base.isEmpty ? injection : '$base\n\n$injection',
+    );
+    return effective;
   }
 
   bool _modelSupportsTools(String providerKey, String modelId) {

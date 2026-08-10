@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:Cuplivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Cuplivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Cuplivo/shared/widgets/export_capture_scope.dart';
+import 'package:Cuplivo/shared/widgets/html_preview_block.dart';
 import 'package:Cuplivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
@@ -2177,6 +2178,225 @@ A-->B
   );
 
   testWidgets(
+    r'MarkdownWithCodeHighlight renders multiline \[...\] inside list items',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+1. \[
+   \boxed{v=\frac{s}{t}}
+   \]
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'\['), findsNothing);
+      expect(find.textContaining(r'\boxed{v=\frac{s}{t}}'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders single-line \[...\] inside list items',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'1. \[E=mc^2\]'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'E=mc^2'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \[...\] embedded in a paragraph',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'公式：\[E=mc^2\]，很重要。'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('公式：'), findsOneWidget);
+      expect(find.textContaining('，很重要。'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \[...\] inside table cells intact',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| 名称 | 公式 |
+| --- | --- |
+| 动能 | \[E_k=\frac{1}{2}mv^2\] |
+'''),
+      );
+      await tester.pump();
+
+      // The table block must survive: cell-level \[...\] renders via
+      // gpt_markdown's static LatexMathMultiLine (a top-level \[...\] rewrite
+      // would inject \n into the row and break the table).
+      expect(
+        find.byKey(const ValueKey('markdown-table-block')),
+        findsOneWidget,
+      );
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('名称', findRichText: true), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight does not treat \\[2pt] as display math',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'行内 \\[2pt] 调整，公式 \[x\] 结束'));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining('调整'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps multiline $$ in list items working',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+1. $$
+   \boxed{v=\frac{s}{t}}
+   $$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \tag{...} display math without fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag{1} E = mc^2$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(_encodedMathTex(tester).first, contains('(1)'));
+      expect(find.textContaining(r'\tag'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders \tag*{...} without parentheses',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag*{A} x = y$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(_encodedMathTex(tester).first, contains('A'));
+      expect(_encodedMathTex(tester).first, isNot(contains('(A)')));
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders multiple \tag rows in aligned',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+$$
+\begin{aligned}
+E &= mc^2 \tag{1} \\
+p &= mv \tag{2}
+\end{aligned}
+$$
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+    },
+  );
+
+  testWidgets(r'MarkdownWithCodeHighlight strips \notag in aligned rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(
+        r'$$\begin{aligned}a &= b \notag \\ c &= d\end{aligned}$$',
+      ),
+    );
+    await tester.pump();
+
+    final mathWidgets = _mathWidgets(tester);
+    expect(mathWidgets, hasLength(1));
+    expect(mathWidgets.single.parseError, isNull);
+  });
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders inline \tag without raw-text fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'内联 $E=mc^2 \tag{1}$ 结束'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      expect(find.textContaining('内联'), findsOneWidget);
+      expect(find.textContaining('结束'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps unknown TeX as raw-text fallback',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'$$\begin{equation}x\end{equation}$$'),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNotNull);
+      expect(find.textContaining(r'\begin{equation}'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \[...\] inline when math rendering is off',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'公式：\[E=mc^2\]，很重要。',
+          preferences: const {'display_enable_math_rendering_v1': false},
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing);
+      expect(
+        find.textContaining('公式：[E=mc^2]，很重要。', findRichText: true),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps \tag{\alpha} untouched for fallback',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness(r'$$\tag{\alpha} x = y$$'));
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNotNull);
+      // The fallback shows the ORIGINAL tex, not the rewritten approximation.
+      expect(find.textContaining(r'\tag{\alpha}'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight follows GitHub-like dollar math boundaries',
     (tester) async {
       await tester.pumpWidget(
@@ -2776,17 +2996,22 @@ void main() {}
       );
       await tester.pump();
 
-      expect(find.text('html'), findsOneWidget);
+      // html fences render as the in-chat preview block
+      expect(find.byType(HtmlPreviewBlock), findsOneWidget);
+      // switch to the Code tab to inspect the raw content
+      await tester.tap(find.text('Code'));
+      await tester.pump();
+
       expect(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(HtmlPreviewBlock),
           matching: find.textContaining('<details>'),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byType(SelectableHighlightView),
+          of: find.byType(HtmlPreviewBlock),
           matching: find.textContaining('<summary>点击展开/折叠内容</summary>'),
         ),
         findsOneWidget,
@@ -2794,6 +3019,125 @@ void main() {}
       expect(find.text('点击展开/折叠内容'), findsNothing);
       expect(find.byKey(const ValueKey('details-collapsed')), findsNothing);
       expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps html streaming content in the preview '
+    'block (no raw code dump)',
+    (tester) async {
+      final text = ValueNotifier<String>('```html\n<div>partial');
+      addTearDown(text.dispose);
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+
+      // Streaming + default setting (show-code off) → Preview tab, no code
+      // dump. The body itself is host-dependent (loading on WebView hosts,
+      // Linux notice on Linux) — only the tab state is asserted.
+      expect(find.byType(HtmlPreviewBlock), findsOneWidget);
+      expect(find.byKey(const ValueKey('html-code-body')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps the code tab while streaming html with '
+    'show-code enabled, then switches to preview on completion',
+    (tester) async {
+      final text = ValueNotifier<String>('```html\n<div>partial');
+      addTearDown(text.dispose);
+
+      await tester.pumpWidget(
+        _streamingMarkdownHarness(
+          text,
+          preferences: const {'display_html_streaming_show_code_v1': true},
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(HtmlPreviewBlock), findsOneWidget);
+      expect(find.byKey(const ValueKey('html-code-body')), findsOneWidget);
+
+      // Streaming ends (fence closes) → unconditional switch to Preview tab
+      text.value = '```html\n<div>partial</div>\n```';
+      await tester.pump();
+      expect(find.byKey(const ValueKey('html-code-body')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight handles interrupted html streaming (unclosed '
+    'fence) by leaving the preview block',
+    (tester) async {
+      final text = ValueNotifier<String>('```html\n<div>partial');
+      final streaming = ValueNotifier<bool>(true);
+      addTearDown(text.dispose);
+      addTearDown(streaming.dispose);
+
+      SharedPreferences.setMockInitialValues(const {
+        'display_html_streaming_show_code_v1': true,
+      });
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ValueListenableBuilder<String>(
+                valueListenable: text,
+                builder: (context, value, _) {
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: streaming,
+                    builder: (context, isStreaming, _) {
+                      return MarkdownWithCodeHighlight(
+                        text: value,
+                        streaming: isStreaming,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Streaming with an UNCLOSED fence → show-code force is active
+      expect(find.byType(HtmlPreviewBlock), findsOneWidget);
+      expect(find.byKey(const ValueKey('html-code-body')), findsOneWidget);
+
+      // Interrupt: streaming ends while the fence stays open
+      streaming.value = false;
+      await tester.pump();
+      expect(find.byKey(const ValueKey('html-code-body')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight forces the html code tab during export capture',
+    (tester) async {
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: const ExportCaptureScope(
+            enabled: true,
+            child: MarkdownWithCodeHighlight(
+              text: '''
+```html
+<div>content</div>
+```
+''',
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(HtmlPreviewBlock), findsOneWidget);
+      expect(find.byKey(const ValueKey('html-code-body')), findsOneWidget);
+      expect(find.byKey(const ValueKey('html-preview-loading')), findsNothing);
     },
   );
 

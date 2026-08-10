@@ -1,9 +1,45 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+
+// Longest-first so `x86_64` is not partially matched as `x86`.
+// Also used as static fallback order when device ABIs are unknown/unmatched.
+const List<String> kAndroidApkArchTags = [
+  'arm64-v8a',
+  'armeabi-v7a',
+  'x86_64',
+  'x86',
+];
+
+String? parseAndroidApkArch(String assetName) {
+  final lower = assetName.toLowerCase();
+  for (final arch in kAndroidApkArchTags) {
+    if (lower.contains(arch)) return arch;
+  }
+  return null;
+}
+
+String? selectAndroidDownloadUrl({
+  required Map<String, String> apkByArch,
+  String? unarchUrl,
+  List<String> supportedAbis = const [],
+}) {
+  for (final abi in supportedAbis) {
+    final url = apkByArch[abi];
+    if (url != null && url.isNotEmpty) return url;
+  }
+  for (final arch in kAndroidApkArchTags) {
+    final url = apkByArch[arch];
+    if (url != null && url.isNotEmpty) return url;
+  }
+  if (unarchUrl != null && unarchUrl.isNotEmpty) return unarchUrl;
+  if (apkByArch.isNotEmpty) return apkByArch.values.first;
+  return null;
+}
 
 class UpdateInfo {
   final String app;
@@ -74,7 +110,10 @@ class UpdateInfo {
   }
 
   /// Parses a GitHub Releases API response into [UpdateInfo].
-  factory UpdateInfo.fromGithubRelease(Map<String, dynamic> json) {
+  factory UpdateInfo.fromGithubRelease(
+    Map<String, dynamic> json, {
+    List<String> androidAbis = const [],
+  }) {
     final tag = (json['tag_name'] ?? '').toString();
     // Strip leading 'v' prefix if present (e.g. "v1.2.3" -> "1.2.3")
     final version = tag.startsWith('v') ? tag.substring(1) : tag;
@@ -89,6 +128,8 @@ class UpdateInfo {
 
     // Map release assets to platform download keys
     final downloads = <String, String>{};
+    final apkByArch = <String, String>{};
+    String? unarchApkUrl;
     final assets = (json['assets'] as List?) ?? const [];
     for (final asset in assets) {
       if (asset is! Map) continue;
@@ -96,7 +137,12 @@ class UpdateInfo {
       final url = (asset['browser_download_url'] ?? '').toString();
       if (url.isEmpty) continue;
       if (name.endsWith('.apk')) {
-        downloads['android'] = url;
+        final arch = parseAndroidApkArch(name);
+        if (arch != null) {
+          apkByArch[arch] = url;
+        } else {
+          unarchApkUrl = url;
+        }
       } else if (name.endsWith('.ipa')) {
         downloads['ios'] = url;
       } else if (name.endsWith('.dmg') || name.endsWith('.pkg')) {
@@ -108,6 +154,15 @@ class UpdateInfo {
           name.endsWith('.rpm')) {
         downloads['linux'] = url;
       }
+    }
+
+    final androidUrl = selectAndroidDownloadUrl(
+      apkByArch: apkByArch,
+      unarchUrl: unarchApkUrl,
+      supportedAbis: androidAbis,
+    );
+    if (androidUrl != null) {
+      downloads['android'] = androidUrl;
     }
 
     return UpdateInfo(
@@ -156,7 +211,8 @@ class UpdateProvider extends ChangeNotifier {
       }
       final data =
           jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-      final info = UpdateInfo.fromGithubRelease(data);
+      final androidAbis = await _androidSupportedAbis();
+      final info = UpdateInfo.fromGithubRelease(data, androidAbis: androidAbis);
 
       final pkg = await PackageInfo.fromPlatform();
       final currentVer = pkg.version; // e.g., 1.0.0
@@ -172,6 +228,17 @@ class UpdateProvider extends ChangeNotifier {
     } finally {
       _checking = false;
       notifyListeners();
+    }
+  }
+
+  Future<List<String>> _androidSupportedAbis() async {
+    if (!Platform.isAndroid) return const [];
+    try {
+      final info = await DeviceInfoPlugin().androidInfo;
+      return List<String>.from(info.supportedAbis);
+    } catch (e) {
+      debugPrint('UpdateProvider: failed to read Android ABIs: $e');
+      return const [];
     }
   }
 

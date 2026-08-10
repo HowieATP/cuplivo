@@ -138,13 +138,16 @@ dart format <changed-paths>
 
 ### 3.4 Minimum Sufficient Verification After Completion
 
-- Default minimum verification:
+- Default minimum verification (CI-verbatim, root package only):
 
 ```bash
-flutter analyze
+dart analyze --fatal-infos lib test
 ```
 
-- ALL `flutter analyze` info / warning issues MUST be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
+- Why scoped: an unscoped `flutter analyze` recursively scans `dependencies/**`, and path dependencies that were never `pub get`-ed (missing `.dart_tool/package_config.json`, e.g. `mcp_client`, `gpt_markdown`, `tray_manager`, `permission_handler_windows`) produce mass false "undefined" errors (observed: 816 `test/expect` errors) plus a slow cold parse (first full run timed out at 5 min). CI never sees this because it runs exactly the scoped command above.
+- ALL `dart analyze --fatal-infos lib test` issues MUST be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
+- For small-scope changes, iterate quickly with `dart analyze <files>` (or `dart analyze lib test`) before the final full run.
+- When the change touches a path dependency under `dependencies/**`: run `flutter pub get` in that dependency's own directory first and confirm `.dart_tool/package_config.json` exists (missing config = the false-error trap above), then analyze/test in the dependency's own directory -- never rely on the root repo alone.
 - Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally**, as CI validates the complete suite remotely.
 - If no directly related tests exist, perform manual verification and state it in delivery notes.
 - **For user-visible changes**, after development, provide a manual test plan covering:
@@ -154,8 +157,8 @@ flutter analyze
 
 | Change Type                                                 | Required Action                                                                                                                                                                                                                        |
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ARB / localization                                          | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze`                                                                                                                                                                |
-| `pubspec.yaml` / dependencies                               | `flutter pub get`, then `flutter analyze` and related tests                                                                                                                                                                            |
+| ARB / localization                                          | `flutter gen-l10n`, check `desiredFileName.txt`, then `dart analyze --fatal-infos lib test`                                                                                                                                             |
+| `pubspec.yaml` / dependencies                               | `flutter pub get`, then `dart analyze --fatal-infos lib test` and related tests                                                                                                                                                         |
 | `.github/workflows/**` / build scripts                      | Check ALL similar workflow files, not just one                                                                                                                                                                                         |
 | Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly                                                                                                                                                       |
 | `dependencies/**` path dependencies                         | Run analysis/tests in the dependency's own directory, not just the root repo                                                                                                                                                           |
@@ -338,7 +341,7 @@ flutter analyze
   - `copyWith` (mind which pattern the model uses, see 3.19), `toJson` / `fromJson`, custom clone / deep-copy helpers
   - Equality: most models in `lib/core/models/` have **no** `==` / `hashCode` override (only `ModelInfo` in `model_types.dart` does). If the new field participates in identity or dedup, add or update equality explicitly; otherwise state why it is excluded.
   - Database layer: table / column definitions in `lib/core/database/app_database.dart`, the migration strategy, the generated `*RowsCompanion.copyWith` in `app_database.g.dart` (regenerate via `dart run build_runner build --delete-conflicting-outputs`), and the `ChatDatabaseRepository` methods that read / write the field
-  - **Schema self-heal mirror constraint**: `AppDatabase._healSchemaIfNeeded()` repairs columns/tables that silent-catch migration failures may have skipped (real incidents on schema v8/v12; see `docs/adr/0017-schema-self-heal.md`). Any new migration column/table must be added to the heal set AND its regression test (`test/core/database/schema_heal_discoverable_test.dart`) in the same change — otherwise the heal silently stops covering future gaps. Never add `director_message_rows` back to the heal set (v14 deliberately dropped it).
+  - **Schema self-heal mirror constraint**: `AppDatabase._healSchemaIfNeeded()` repairs columns/tables that silent-catch migration failures may have skipped (real incidents on schema v8/v12; see `docs/adr/0019-schema-self-heal.md`). Any new migration column/table must be added to the heal set AND its regression test (`test/core/database/schema_heal_discoverable_test.dart`) in the same change — otherwise the heal silently stops covering future gaps. Never add `director_message_rows` back to the heal set (v14 deliberately dropped it).
   - Persistence: `shared_preferences` keys when the field is settings-level (and never for assistant fields, see 3.14)
   - Backup / import / export: `backup.dart` and the (de)serialization paths that round-trip the model to `settings.json`
 - When adding a new provider / service, register it in the `MultiProvider` tree in `lib/main.dart` and wire state management (`ChangeNotifierProvider` / `ProxyProvider` as appropriate). A provider that is constructed but not registered is invisible to the widget tree.
@@ -353,7 +356,7 @@ flutter analyze
 
 ## 4. Recommended Execution Order
 
-1. `git status --short` -- confirm workspace baseline.
+1. `git status --short` -- confirm workspace baseline. Don't panic if `windows/flutter/generated_plugin_registrant.{cc,h}`, `linux/flutter/generated_plugin_registrant.{cc,h}`, or `macos/Flutter/GeneratedPluginRegistrant.swift` show up as whole-file diffs: Flutter tool regeneration can flip their line endings (LF/CRLF -- this repo has no `.gitattributes`), so the diff is auto-generate churn, not a real change. Restore with `git checkout -- <file>` and continue; never commit the churn.
 2. Read relevant code and config. Write clear acceptance criteria. For desktop tasks, confirm entry topology first: `main.dart` -> `lib/desktop/**` -> shared chat layout.
 3. Batch all independent context reads, searches, and status checks in parallel, then decide the minimal change landing point.
 4. List requirement scenarios and verification methods first, then make minimal changes. Do not mix in unrelated refactoring.
@@ -371,7 +374,7 @@ flutter analyze
 - All 4 ARB files have been updated in sync.
 - `flutter gen-l10n` has been executed and generated files match ARB content.
 - `dart format` has been executed.
-- `flutter analyze` has been executed.
+- `dart analyze --fatal-infos lib test` has been executed.
 - Related `flutter test` (subset) executed, or manual verification performed and stated.
 - Test scenarios cover the happy path, boundary values, and failure paths for this task's requirements -- not just a single green run.
 - Desktop tasks have confirmed the entry layer. No desktop-only logic leaked into mobile branches.

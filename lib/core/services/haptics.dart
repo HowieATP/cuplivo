@@ -63,11 +63,13 @@ class Haptics {
 
   // Fire-and-forget wrapper to avoid exceptions on unsupported platforms.
   static void _safe(Future<void> Function() action) {
-    if (kIsWeb) return; // Skip on web targets
+    if (kIsWeb) return;
     try {
       // Don't await; haptic should not block UI.
       // ignore: discarded_futures
-      action();
+      action().catchError((Object _) {
+        // Swallow any MissingPluginException or platform channel errors.
+      });
     } catch (_) {
       // Swallow any MissingPluginException or platform channel errors.
     }

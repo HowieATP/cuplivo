@@ -54,6 +54,21 @@ import '../../../theme/app_font_weights.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
+/// Upper bound for the streaming thinking preview text (issue #232). While
+/// thinking streams, the collapsed preview re-parses the whole accumulated
+/// markdown on every 150ms UI tick; truncating to the tail (the preview
+/// auto-scrolls to the bottom) makes the per-tick cost O(1) in thinking
+/// length. Full text still renders when the user expands the card.
+const int _streamingThinkingPreviewMaxChars = 2000;
+
+/// Bounds [text] to the tail for the streaming thinking preview unless the
+/// user opted out via [SettingsProvider.streamingThinkingPreviewTruncate].
+String _boundedStreamingPreview(SettingsProvider settings, String text) {
+  if (!settings.streamingThinkingPreviewTruncate) return text;
+  if (text.length <= _streamingThinkingPreviewMaxChars) return text;
+  return '…\n${text.substring(text.length - _streamingThinkingPreviewMaxChars)}';
+}
+
 Uri? _tryNormalizeExternalUri(String raw) {
   var u = raw.trim();
   if (u.isEmpty) return null;
@@ -275,6 +290,14 @@ String _prettyToolJson(String raw) {
   }
 }
 
+String _prettyArgumentsJson(Map<String, dynamic> args) {
+  try {
+    return const JsonEncoder.withIndent('  ').convert(args);
+  } catch (_) {
+    return args.toString();
+  }
+}
+
 Widget _buildToolImageFromPath(
   BuildContext context,
   String path, {
@@ -341,7 +364,7 @@ void _showToolFullImage(BuildContext context, String path) {
 void _showToolDetail(BuildContext context, ToolUIPart part) {
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
-  final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
+  final argsPretty = _prettyArgumentsJson(part.arguments);
   final (cleanText, images) = _parseMcpImagePaths(part.content);
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
@@ -367,11 +390,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: 360,
-              maxWidth: 560,
-              maxHeight: 560,
-            ),
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Material(
@@ -392,7 +411,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                           Expanded(
                             child: Text(
                               _toolTitleFor(
-                                context,
+                                ctx,
                                 part.toolName,
                                 part.arguments,
                                 isResult: !part.loading,
@@ -440,7 +459,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color:
-                                      Theme.of(context).brightness ==
+                                      Theme.of(ctx).brightness ==
                                           Brightness.dark
                                       ? Colors.white10
                                       : const Color(0xFFF7F7F9),
@@ -470,7 +489,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color:
-                                      Theme.of(context).brightness ==
+                                      Theme.of(ctx).brightness ==
                                           Brightness.dark
                                       ? Colors.white10
                                       : const Color(0xFFF7F7F9),
@@ -502,11 +521,11 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                   children: images.map((path) {
                                     return GestureDetector(
                                       onTap: () =>
-                                          _showToolFullImage(context, path),
+                                          _showToolFullImage(ctx, path),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
                                         child: _buildToolImageFromPath(
-                                          context,
+                                          ctx,
                                           path,
                                           height: 280,
                                         ),
@@ -560,7 +579,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                       Expanded(
                         child: Text(
                           _toolTitleFor(
-                            context,
+                            ctx,
                             part.toolName,
                             part.arguments,
                             isResult: !part.loading,
@@ -586,7 +605,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
+                      color: Theme.of(ctx).brightness == Brightness.dark
                           ? Colors.white10
                           : const Color(0xFFF7F7F9),
                       borderRadius: BorderRadius.circular(10),
@@ -612,7 +631,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
+                      color: Theme.of(ctx).brightness == Brightness.dark
                           ? Colors.white10
                           : const Color(0xFFF7F7F9),
                       borderRadius: BorderRadius.circular(10),
@@ -644,11 +663,11 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                         itemBuilder: (ctx, i) {
                           final path = images[i];
                           return GestureDetector(
-                            onTap: () => _showToolFullImage(context, path),
+                            onTap: () => _showToolFullImage(ctx, path),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: _buildToolImageFromPath(
-                                context,
+                                ctx,
                                 path,
                                 height: 220,
                               ),
@@ -2874,10 +2893,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           ),
                         ],
                         if (widget.showTokenStats &&
-                            widget.message.totalTokens != null) ...[
+                            (widget.message.contextTokens != null ||
+                                widget.message.totalTokens != null)) ...[
                           const Spacer(),
                           TokenDisplayWidget(
-                            totalTokens: widget.message.totalTokens!,
+                            totalTokens:
+                                widget.message.contextTokens ??
+                                widget.message.totalTokens!,
                             promptTokens: widget.message.promptTokens,
                             completionTokens: widget.message.completionTokens,
                             cachedTokens: widget.message.cachedTokens,
@@ -3941,7 +3963,10 @@ class _ChainOfThoughtReasoningStepState
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final state = _stepState;
-    final display = _sanitize(widget.step.text);
+    final rawText = _sanitize(widget.step.text);
+    final display = state == _ReasoningStepState.preview
+        ? _boundedStreamingPreview(settings, rawText)
+        : rawText;
     final label = Row(
       children: [
         _Shimmer(
@@ -4740,9 +4765,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final argsPretty = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(widget.part.arguments);
+    final argsPretty = _prettyArgumentsJson(widget.part.arguments);
     final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
     final resultText = cleanText.isNotEmpty
         ? _prettyJson(cleanText)
@@ -4768,11 +4791,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 360,
-                maxWidth: 560,
-                maxHeight: 560,
-              ),
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Material(
@@ -4797,7 +4816,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                             Expanded(
                               child: Text(
                                 _titleFor(
-                                  context,
+                                  ctx,
                                   widget.part.toolName,
                                   widget.part.arguments,
                                   isResult: !widget.part.loading,
@@ -4846,7 +4865,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color:
-                                        Theme.of(context).brightness ==
+                                        Theme.of(ctx).brightness ==
                                             Brightness.dark
                                         ? Colors.white10
                                         : const Color(0xFFF7F7F9),
@@ -4876,7 +4895,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color:
-                                        Theme.of(context).brightness ==
+                                        Theme.of(ctx).brightness ==
                                             Brightness.dark
                                         ? Colors.white10
                                         : const Color(0xFFF7F7F9),
@@ -4910,8 +4929,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                     runSpacing: 8,
                                     children: images.map((path) {
                                       return GestureDetector(
-                                        onTap: () =>
-                                            _showFullImage(context, path),
+                                        onTap: () => _showFullImage(ctx, path),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(
                                             8,
@@ -4971,7 +4989,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         Expanded(
                           child: Text(
                             _titleFor(
-                              context,
+                              ctx,
                               widget.part.toolName,
                               widget.part.arguments,
                               isResult: !widget.part.loading,
@@ -4997,7 +5015,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
+                        color: Theme.of(ctx).brightness == Brightness.dark
                             ? Colors.white10
                             : const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(10),
@@ -5023,7 +5041,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
+                        color: Theme.of(ctx).brightness == Brightness.dark
                             ? Colors.white10
                             : const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(10),
@@ -5052,7 +5070,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         runSpacing: 8,
                         children: images.map((path) {
                           return GestureDetector(
-                            onTap: () => _showFullImage(context, path),
+                            onTap: () => _showFullImage(ctx, path),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: _buildImageFromPath(path, height: 240),
@@ -6239,7 +6257,10 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     );
 
     final bool isLoading = loading;
-    final display = _sanitize(widget.text);
+    final rawText = _sanitize(widget.text);
+    final display = (isLoading && !widget.expanded)
+        ? _boundedStreamingPreview(settings, rawText)
+        : rawText;
 
     // 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
     Widget reasoningContent(String text) {

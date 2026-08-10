@@ -672,6 +672,23 @@ class TtsProvider extends ChangeNotifier {
       } catch (_) {}
     }
     await chunkCompleter.future;
+    // Source governance: network TTS files were never deleted (they land in
+    // the Caches dir on iOS/Android — getTemporaryDirectory() returns Caches
+    // there — and in the OS temp dir on Windows/Linux). Delete 5s after
+    // playback ends (covers natural completion, stop and reset via the
+    // completer above), fire-and-forget — the playback queue must NOT be
+    // stalled per chunk. The delay only reduces the Windows
+    // file-handle-release failure probability; a failed delete just leaves
+    // the file behind (harmless).
+    unawaited(() async {
+      await Future<void>.delayed(const Duration(seconds: 5));
+      try {
+        final f = io.File(path);
+        if (await f.exists()) await f.delete();
+      } catch (e) {
+        debugPrint('[TtsProvider] temp audio cleanup failed: $e');
+      }
+    }());
   }
 
   Future<void> _speakCurrentSystemChunk(int session) async {

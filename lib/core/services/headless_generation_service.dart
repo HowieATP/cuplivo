@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 
+import '../../../features/home/controllers/stream_controller.dart'
+    show ReasoningSegmentData, serializeReasoningSegmentsWithSplits;
 import '../../../features/home/controllers/streaming_content_notifier.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
@@ -314,6 +316,11 @@ class HeadlessGenerationService extends ChangeNotifier {
 
       var chunkCount = 0;
       final reasoningBuf = StringBuffer();
+      DateTime? reasoningStartAt;
+      var hadThinkingBlock = false;
+      final contentSplitOffsets = <int>[];
+      final reasoningCountAtSplit = <int>[];
+      final toolCountAtSplit = <int>[];
       final toolEventsById = <String, Map<String, dynamic>>{};
       await for (final chunk in _chatStreamProvider(
         config: config,
@@ -330,7 +337,27 @@ class HeadlessGenerationService extends ChangeNotifier {
       )) {
         chunkCount++;
         final mid = record.job.assistantMessageId;
+        if (chunk.reasoning != null && chunk.reasoning!.isNotEmpty) {
+          reasoningStartAt ??= DateTime.now();
+          hadThinkingBlock = true;
+          reasoningBuf.write(chunk.reasoning);
+          if (mid != null) {
+            record.job.uiNotifier?.updateReasoning(
+              mid,
+              reasoningText: reasoningBuf.toString(),
+              reasoningStartAt: reasoningStartAt,
+            );
+          }
+        }
         if (chunk.content.isNotEmpty) {
+          // Thinking→content boundary (mirrors the page pipeline): record one
+          // split so rendering interleaves thinking before this content slice.
+          if (hadThinkingBlock && contentSplitOffsets.isEmpty) {
+            contentSplitOffsets.add(0);
+            reasoningCountAtSplit.add(1);
+            toolCountAtSplit.add(toolEventsById.length);
+            hadThinkingBlock = false;
+          }
           buf.write(chunk.content);
           record.job.streamedChars += chunk.content.length;
           record.job.streamedText.write(chunk.content);
@@ -339,15 +366,6 @@ class HeadlessGenerationService extends ChangeNotifier {
               mid,
               buf.toString(),
               chunk.totalTokens,
-            );
-          }
-        }
-        if (chunk.reasoning != null && chunk.reasoning!.isNotEmpty) {
-          reasoningBuf.write(chunk.reasoning);
-          if (mid != null) {
-            record.job.uiNotifier?.updateReasoning(
-              mid,
-              reasoningText: reasoningBuf.toString(),
             );
           }
         }
@@ -402,11 +420,34 @@ class HeadlessGenerationService extends ChangeNotifier {
         'chunks=$chunkCount buf.length=${buf.length}',
       );
 
+      final reasoningFinishedAt = reasoningStartAt != null
+          ? DateTime.now()
+          : null;
+      final reasoningSegmentsJson =
+          reasoningStartAt != null || contentSplitOffsets.isNotEmpty
+          ? serializeReasoningSegmentsWithSplits(
+              [
+                ReasoningSegmentData()
+                  ..text = reasoningBuf.toString()
+                  ..startAt = reasoningStartAt
+                  ..finishedAt = reasoningFinishedAt
+                  ..expanded = false
+                  ..toolStartIndex = 0,
+              ],
+              contentSplitOffsets: contentSplitOffsets,
+              reasoningCountAtSplit: reasoningCountAtSplit,
+              toolCountAtSplit: toolCountAtSplit,
+            )
+          : null;
+
       await _chatService.updateMessage(
         assistantMessageId,
         content: buf.toString(),
         isStreaming: false,
         reasoningText: reasoningBuf.isEmpty ? null : reasoningBuf.toString(),
+        reasoningStartAt: reasoningStartAt,
+        reasoningFinishedAt: reasoningFinishedAt,
+        reasoningSegmentsJson: reasoningSegmentsJson,
       );
       debugPrint(
         '[HeadlessGen] message updated: id=$assistantMessageId '

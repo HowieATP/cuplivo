@@ -1340,14 +1340,13 @@ class ChatActions {
       );
       await chatService.updateMessageSilent(
         messageId,
-        reasoningSegmentsJson: streamController
-            .serializeReasoningSegmentsWithSplits(
-              streamController.getReasoningSegments(messageId) ?? const [],
-              contentSplitOffsets: state.contentSplitOffsets,
-              reasoningCountAtSplit: state.reasoningCountAtSplit,
-              toolCountAtSplit: state.toolCountAtSplit,
-              reasoningDetails: streamController.reasoningDetails[messageId],
-            ),
+        reasoningSegmentsJson: stream_ctrl.serializeReasoningSegmentsWithSplits(
+          streamController.getReasoningSegments(messageId) ?? const [],
+          contentSplitOffsets: state.contentSplitOffsets,
+          reasoningCountAtSplit: state.reasoningCountAtSplit,
+          toolCountAtSplit: state.toolCountAtSplit,
+          reasoningDetails: streamController.reasoningDetails[messageId],
+        ),
       );
     }
 
@@ -1867,7 +1866,7 @@ class ChatActions {
       if (segs != null && segs.isNotEmpty) {
         await chatService.updateMessage(
           streaming.id,
-          reasoningSegmentsJson: streamController
+          reasoningSegmentsJson: stream_ctrl
               .serializeReasoningSegmentsWithSplits(
                 segs,
                 contentSplitOffsets: streamController
@@ -1887,7 +1886,7 @@ class ChatActions {
         final splits = streamController.getContentSplitData(streaming.id)!;
         await chatService.updateMessage(
           streaming.id,
-          reasoningSegmentsJson: streamController
+          reasoningSegmentsJson: stream_ctrl
               .serializeReasoningSegmentsWithSplits(
                 const [],
                 contentSplitOffsets: splits.offsets,

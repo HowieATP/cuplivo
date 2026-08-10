@@ -63,6 +63,27 @@ void main() {
       expect(find.byIcon(Icons.close), findsNothing);
     });
 
+    testWidgets('renders one card per concurrent wait job', (tester) async {
+      headlessGen.prepareJob(
+        conversationId: 'child-a',
+        parentConversationId: 'parent-conv',
+        wait: true,
+        targetName: 'Agent A',
+      );
+      headlessGen.prepareJob(
+        conversationId: 'child-b',
+        parentConversationId: 'parent-conv',
+        wait: true,
+        targetName: 'Agent B',
+      );
+
+      await pumpPanel(tester);
+
+      expect(find.textContaining('Agent A'), findsOneWidget);
+      expect(find.textContaining('Agent B'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNWidgets(2));
+    });
+
     testWidgets('renders the pill for an active wait job keyed to the current '
         'conversation', (tester) async {
       headlessGen.prepareJob(

@@ -31,14 +31,14 @@ class SubagentPanel extends StatefulWidget {
 
 class _SubagentPanelState extends State<SubagentPanel> {
   Timer? _ticker;
-  bool _expanded = false;
+  final _expandedIds = <String>{};
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      if (_activeJob() == null) return;
+      if (_activeJobs().isEmpty) return;
       setState(() {});
     });
   }
@@ -49,15 +49,18 @@ class _SubagentPanelState extends State<SubagentPanel> {
     super.dispose();
   }
 
-  SubagentJob? _activeJob() {
+  /// All running wait-mode jobs spawned by the current conversation.
+  /// Concurrent `kelivo_handoff_sync` calls produce multiple jobs — every one
+  /// gets its own pill/expanded card.
+  List<SubagentJob> _activeJobs() {
     final chatService = context.read<ChatService>();
     final parentId = chatService.currentConversationId;
-    if (parentId == null) return null;
+    if (parentId == null) return const <SubagentJob>[];
     final headlessGen = context.read<HeadlessGenerationService>();
-    for (final job in headlessGen.waitJobsFor(parentId)) {
-      if (job.status == SubagentJobStatus.running) return job;
-    }
-    return null;
+    return headlessGen
+        .waitJobsFor(parentId)
+        .where((job) => job.status == SubagentJobStatus.running)
+        .toList();
   }
 
   ToolApprovalRequest? _pendingApproval(SubagentJob job) {
@@ -113,87 +116,109 @@ class _SubagentPanelState extends State<SubagentPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final job = _activeJob();
-    if (job == null) return const SizedBox.shrink();
+    final jobs = _activeJobs();
+    if (jobs.isEmpty) return const SizedBox.shrink();
 
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = isDark ? cs.surfaceContainerHighest : cs.surface;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final job in jobs) ...[
+            _buildJobCard(context, job, base, cs, l10n),
+            if (job != jobs.last) const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJobCard(
+    BuildContext context,
+    SubagentJob job,
+    Color base,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     final approval = _pendingApproval(job);
     final askUser = _pendingAskUser(job);
     final waitingInteraction = approval != null || askUser != null;
     final forceExpanded = waitingInteraction;
-    final showExpanded = forceExpanded || _expanded;
+    final showExpanded =
+        forceExpanded || _expandedIds.contains(job.conversationId);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IosCardPress(
-            borderRadius: BorderRadius.circular(12),
-            baseColor: base,
-            pressedScale: 0.99,
-            onTap: waitingInteraction
-                ? null
-                : () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CupertinoActivityIndicator(),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      // {assistant name} · {elapsed} — no phase, no arrow
-                      '${job.targetName ?? job.conversationId} · '
-                      '${_formatElapsed(job)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IosCardPress(
+          borderRadius: BorderRadius.circular(12),
+          baseColor: base,
+          pressedScale: 0.99,
+          onTap: waitingInteraction
+              ? null
+              : () => setState(() {
+                  if (!_expandedIds.add(job.conversationId)) {
+                    _expandedIds.remove(job.conversationId);
+                  }
+                }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CupertinoActivityIndicator(),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    // {assistant name} · {elapsed} — no phase, no arrow
+                    '${job.targetName ?? job.conversationId} · '
+                    '${_formatElapsed(job)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
                     ),
                   ),
-                  if (!waitingInteraction)
-                    Icon(
-                      showExpanded
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_up,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  const SizedBox(width: 4),
-                  IosIconButton(
-                    icon: Icons.close,
-                    size: 16,
+                ),
+                if (!waitingInteraction)
+                  Icon(
+                    showExpanded
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_up,
+                    size: 18,
                     color: cs.onSurfaceVariant,
-                    semanticLabel: l10n.subagentPanelCancelTooltip,
-                    onTap: () => _confirmCancel(job),
                   ),
-                ],
-              ),
+                const SizedBox(width: 4),
+                IosIconButton(
+                  icon: Icons.close,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                  semanticLabel: l10n.subagentPanelCancelTooltip,
+                  onTap: () => _confirmCancel(job),
+                ),
+              ],
             ),
           ),
-          if (showExpanded)
-            Container(
-              margin: const EdgeInsets.only(top: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _buildExpandedBody(context, job, approval, askUser),
+        ),
+        if (showExpanded)
+          Container(
+            decoration: BoxDecoration(
+              color: base,
+              borderRadius: BorderRadius.circular(12),
             ),
-        ],
-      ),
+            child: _buildExpandedBody(context, job, approval, askUser),
+          ),
+      ],
     );
   }
 

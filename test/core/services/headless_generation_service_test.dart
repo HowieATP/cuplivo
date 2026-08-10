@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -80,6 +81,9 @@ class _FakeChatService extends ChatService {
             totalTokens: totalTokens,
             isStreaming: isStreaming,
             reasoningText: reasoningText,
+            reasoningStartAt: reasoningStartAt,
+            reasoningFinishedAt: reasoningFinishedAt,
+            reasoningSegmentsJson: reasoningSegmentsJson,
           );
         }
       }
@@ -298,6 +302,29 @@ void main() {
       expect(messages.last.content, 'final answer');
       expect(messages.last.reasoningText, 'thinking step 1 step 2');
       expect(messages.last.isStreaming, isFalse);
+      // Timestamps: startAt set at first reasoning chunk, finishedAt at stream
+      // end (mirrors the page pipeline semantics).
+      expect(messages.last.reasoningStartAt, isNotNull);
+      expect(messages.last.reasoningFinishedAt, isNotNull);
+      expect(
+        messages.last.reasoningFinishedAt!.isAfter(
+          messages.last.reasoningStartAt!,
+        ),
+        isTrue,
+      );
+      // v2 payload with one thinking→content split so rendering interleaves.
+      final payload =
+          jsonDecode(messages.last.reasoningSegmentsJson!)
+              as Map<String, dynamic>;
+      expect(payload['v'], 2);
+      final segments = (payload['segments'] as List).cast<Map>();
+      expect(segments, hasLength(1));
+      expect(segments.first['text'], 'thinking step 1 step 2');
+      expect(segments.first['expanded'], isFalse);
+      final splits = (payload['contentSplits'] as Map).cast<String, dynamic>();
+      expect(splits['offsets'], [0]);
+      expect(splits['reasoningCounts'], [1]);
+      expect(splits['toolCounts'], [0]);
     });
 
     test(

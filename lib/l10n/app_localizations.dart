@@ -5207,6 +5207,18 @@ abstract class AppLocalizations {
   /// **'Render reasoning (thinking) with Markdown'**
   String get displaySettingsPageEnableReasoningMarkdownTitle;
 
+  /// No description provided for @displaySettingsPageStreamingThinkingPreviewTruncateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit streaming thinking preview'**
+  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle;
+
+  /// No description provided for @displaySettingsPageStreamingThinkingPreviewTruncateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'While thinking streams, only the tail of the preview is rendered for speed. Turn off to restore the original full-length live preview.'**
+  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle;
+
   /// No description provided for @displaySettingsPageEnableAssistantMarkdownTitle.
   ///
   /// In en, this message translates to:

@@ -77,7 +77,10 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
 }
 
 class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
-  static const int _streamingDebounceThresholdChars = 8000;
+  // Issue #232: lowered from 8000 so math-heavy answers engage the render
+  // debounce early. Below this, a full markdown re-parse per 50ms stream tick
+  // is cheap; above it, renders are coalesced to the 120ms cadence.
+  static const int _streamingDebounceThresholdChars = 2000;
   static const Duration _streamingLongRenderDebounce = Duration(
     milliseconds: 120,
   );

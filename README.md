@@ -62,21 +62,23 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ### API & Provider Control
 
-1. **OAuth account sign-in** — Device-code sign-in for Grok xAI (#164) and OpenAI Codex (#157); MCP OAuth v2 auto flow with authorization server discovery, dynamic client registration, and loopback callback (#156).
+1. **Image generation options panel** — Visual configuration for OpenAI Images API models: quickly control quality, size/aspect ratio, output format, count, and more (#248).
 
-2. **Multi-key rotation for web search** — Configure multiple API keys for the search service; keys rotate automatically on rate limit to raise effective quotas (#139).
+2. **OAuth account sign-in** — Device-code sign-in for Grok xAI (#164) and OpenAI Codex (#157); MCP OAuth v2 auto flow with authorization server discovery, dynamic client registration, and loopback callback (#156).
 
-3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
+3. **Multi-key rotation for web search** — Configure multiple API keys for the search service; keys rotate automatically on rate limit to raise effective quotas (#139).
 
-4. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
+4. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
 
-5. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
+5. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
 
-6. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
+6. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
 
-7. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+7. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
 
-8. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+8. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+
+9. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
 
 ### Practical Utilities
 

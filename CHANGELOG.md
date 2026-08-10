@@ -2,12 +2,15 @@
 
 ## [2.7.0] - 2026-08-10
 
+> ℹ️ Android users please note: the in-app auto-update previously always downloaded the x86_64 build; this was fixed in 2.6.3, but if you are still on a version older than 2.6.3, you still need to grab the arm64-v8a APK from the GitHub Release page.
+
 ### Added
 
 - Full subagent experience: new wait mode lets a subagent return its result to the main agent for further processing, with a live progress panel in the parent conversation; parallel calls supported (#251)
 - Workspace enhancements: the built-in workspace directory is now user-configurable on desktop; added "open externally" and share buttons; improved file preview line numbers; fixed empty-folder display (#250)
 - HTML rendering enhancement: HTML code blocks now render inline in the chat list — just have the assistant output an HTML code block — enhancing role-play and other chat experiences (#203)
 - Input drafts: your typed input is saved as a draft and restored when the app restarts, recovering your last unsent content (#246)
+- Image generation options panel: visual configuration for OpenAI Images API models — quickly control quality, size/aspect ratio, output format, count, and more (#248)
 - Default behavior changes: DeepSeek provider enabled by default; assistant temperature / top_p and similar parameters disabled by default; request logging on by default with a 50 MB cap; users with existing configurations are unaffected (#240)
 - Slightly smaller install package size (#241)
 

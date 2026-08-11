@@ -12,6 +12,7 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
+import 'api/plain_text_collector.dart';
 import 'chat/chat_service.dart';
 import 'chat/prompt_transformer.dart';
 import 'instruction_injection_store.dart';
@@ -454,20 +455,21 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> apiMessages,
     int? fallbackThinkingBudget,
   }) async {
-    final buf = StringBuffer();
-    await for (final chunk in ChatApiService.sendMessageStream(
+    // Layer-① collector (ADR-0028): accumulate the silent no-tool stream.
+    final text = await PlainTextCollector().collect(
       config: config,
       modelId: modelId,
       messages: apiMessages,
       thinkingBudget: assistant.thinkingBudget ?? fallbackThinkingBudget,
-      temperature: assistant.temperature,
+      // No temperature: silent background generation — a rejected sampling
+      // parameter would fail the care reply invisibly (many models no longer
+      // support it). The assistant's temperature still applies to the main
+      // chat path.
       topP: assistant.topP,
       maxTokens: assistant.maxTokens,
       stream: false,
-    )) {
-      buf.write(chunk.content);
-    }
-    return buf.toString().trim();
+    );
+    return text.trim();
   }
 
   static const Duration _decisionTimeout = Duration(seconds: 45);
@@ -655,7 +657,9 @@ class ProactiveCareMessageFlow {
         tools: tools,
         onToolCall: onToolCall,
         thinkingBudget: assistant.thinkingBudget ?? fallbackThinkingBudget,
-        temperature: assistant.temperature,
+        // No temperature (same rationale as requestCareReply: silent
+        // background call; the decision extraction itself is sampling-
+        // agnostic).
         topP: assistant.topP,
         maxTokens: assistant.maxTokens,
         stream: false,

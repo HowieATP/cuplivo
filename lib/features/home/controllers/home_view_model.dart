@@ -374,10 +374,6 @@ class HomeViewModel extends ChangeNotifier {
   /// Called when a successful assistant reply is finalized.
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
-  /// Called to schedule inline image sanitization.
-  void Function(String messageId, String content, {bool immediate})?
-  onScheduleImageSanitize;
-
   /// Called when scrolling to bottom is needed.
   VoidCallback? onScrollToBottom;
 
@@ -555,8 +551,6 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
-
     await _clearSuggestionsFor(conversation.id);
 
     if (input.documents.isNotEmpty) {
@@ -632,8 +626,6 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     // Set up image sanitization callback before regenerating
-    _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
-
     onHapticFeedback?.call();
     await _clearSuggestionsFor(conversation.id);
 
@@ -665,7 +657,6 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
     await _clearSuggestionsFor(conversation.id);
 
     final result = await _chatActions.continueAssistantMessageAfterToolAnswer(
@@ -1293,13 +1284,6 @@ class HomeViewModel extends ChangeNotifier {
           messages[i] = updated;
           unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
         }
-
-        // Clean up any inline base64 images persisted from earlier runs
-        onScheduleImageSanitize?.call(
-          m.id,
-          messages[i].content,
-          immediate: true,
-        );
       }
     }
   }

@@ -4353,6 +4353,11 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     _ChatSurfaceForegroundPalette fg,
     ColorScheme cs,
   ) {
+    // v1 handoff only: its tool event content deterministically contains the
+    // child conversation UUID ("Handoff dispatched. Conversation: …"). The
+    // wait-mode handoff's event content is the child's FULL output — scanning
+    // it for a UUID would navigate to a wrong conversation, so sync cards get
+    // no chip (the 子代理面板's 查看子对话 covers navigation during the wait).
     if (widget.part.toolName != 'kelivo_handoff' || widget.part.loading) {
       return null;
     }

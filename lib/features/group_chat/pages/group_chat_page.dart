@@ -14,6 +14,7 @@ import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../desktop/message_edit_dialog.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -32,8 +33,8 @@ import '../../home/services/tool_approval_service.dart';
 import '../../home/widgets/chat_input_bar.dart';
 import '../../home/widgets/message_list_view.dart';
 import '../controllers/group_chat_orchestrator.dart';
-import '../controllers/group_chat_stream_executor.dart';
 import '../models/chat_input_mode.dart';
+import '../services/group_chat_slot_runner.dart';
 import 'group_chat_settings_page.dart';
 
 class GroupChatPage extends StatefulWidget {
@@ -58,7 +59,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
   late MessageBuilderService _messageBuilderService;
   late GenerationController _generationController;
   late MessageGenerationService _messageGenerationService;
-  late GroupChatStreamExecutor _streamExecutor;
+  late GroupChatSlotRunner _slotRunner;
   late GroupChatOrchestrator _orchestrator;
 
   bool _loading = false;
@@ -115,9 +116,22 @@ class _GroupChatPageState extends State<GroupChatPage> {
       streamController: _streamController,
       contextProvider: context,
     );
-    _streamExecutor = GroupChatStreamExecutor(
-      chatService: _chatService,
+    _slotRunner = GroupChatSlotRunner(
+      engine: context.read<GenerationEngine>(),
       streamController: _streamController,
+      onTruncationWarning: (reason) {
+        if (!mounted) return;
+        final l10n = AppLocalizations.of(context)!;
+        final reasonText = reason == 'max_tokens'
+            ? l10n.truncationReasonMaxTokens
+            : l10n.truncationReasonContextExceeded;
+        showAppSnackBar(
+          context,
+          message: l10n.responseTruncated(reasonText),
+          type: NotificationType.warning,
+          duration: const Duration(seconds: 30),
+        );
+      },
     );
     _orchestrator = GroupChatOrchestrator(
       chatService: _chatService,
@@ -128,7 +142,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
       streamController: _streamController,
       generationController: _generationController,
       messageGenerationService: _messageGenerationService,
-      streamExecutor: _streamExecutor,
+      slotRunner: _slotRunner,
       approvalService: context.read<ToolApprovalService>(),
       askUserService: context.read<AskUserInteractionService>(),
       onUiFeedback: _onUiFeedback,
@@ -193,7 +207,6 @@ class _GroupChatPageState extends State<GroupChatPage> {
   @override
   void dispose() {
     _orchestrator.requestStop();
-    _streamExecutor.dispose();
     _streamController.dispose();
     _chatController.removeListener(_onChatControllerChanged);
     _chatController.dispose();

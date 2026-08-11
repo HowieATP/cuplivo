@@ -6,7 +6,7 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/providers/tts_provider.dart';
 import 'package:Cuplivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
-import 'package:Cuplivo/features/home/controllers/streaming_content_notifier.dart';
+import 'package:Cuplivo/core/services/streaming_content_notifier.dart';
 import 'package:Cuplivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Cuplivo/features/home/services/tool_approval_service.dart';
 import 'package:Cuplivo/features/home/widgets/message_list_view.dart';

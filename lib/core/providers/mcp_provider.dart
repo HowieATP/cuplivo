@@ -13,7 +13,7 @@ import 'package:uuid/uuid.dart';
 
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
-import '../services/headless_generation_service.dart';
+import '../services/generation_engine.dart';
 import '../services/oauth/oauth_flow_service.dart';
 import 'assistant_provider.dart';
 import 'filesystem_mounts_provider.dart';
@@ -420,7 +420,7 @@ class McpProvider extends ChangeNotifier {
   McpProvider({
     this.chatService,
     this.assistantProvider,
-    this.headlessGen,
+    this.generationEngine,
     this.filesystemMounts,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
@@ -433,7 +433,7 @@ class McpProvider extends ChangeNotifier {
 
   final ChatService? chatService;
   final AssistantProvider? assistantProvider;
-  final HeadlessGenerationService? headlessGen;
+  final GenerationEngine? generationEngine;
   final FilesystemMountsProvider? filesystemMounts;
   final BuildContext Function() contextProvider;
 
@@ -553,7 +553,7 @@ class McpProvider extends ChangeNotifier {
   void _ensureBuiltinSubagentServerPresent() {
     if (assistantProvider == null ||
         chatService == null ||
-        headlessGen == null) {
+        generationEngine == null) {
       return;
     }
     final exists = _servers.any(
@@ -1242,7 +1242,7 @@ class McpProvider extends ChangeNotifier {
           'kelivo_subagent' => KelivoSubagentMcpServerEngine(
             assistants: assistantProvider!,
             chatService: chatService!,
-            headlessGen: headlessGen!,
+            engine: generationEngine!,
             contextProvider: contextProvider,
           ),
           'kelivo_filesystem' => KelivoFilesystemMcpServerEngine(

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/plain_text_collector.dart';
+import '../../../core/services/chat/chat_service.dart';
 
 /// OCR 缓存条目
 class OcrCacheEntry {
@@ -97,30 +97,21 @@ class OcrService {
       },
     ];
 
-    final stream = ChatApiService.sendMessageStream(
-      config: cfg,
-      modelId: model,
-      messages: messages,
-      userMediaPaths: imagePaths,
-      thinkingBudget: settings.ocrThinkingBudgetFor(null),
-      temperature: 0.0,
-      topP: null,
-      maxTokens: null,
-      tools: null,
-      onToolCall: null,
-      extraHeaders: null,
-      extraBody: null,
-      stream: false,
-      ocrActive: true,
-    );
-
     String out = '';
     try {
-      await for (final chunk in stream) {
-        if (chunk.content.isNotEmpty) {
-          out += chunk.content;
-        }
-      }
+      // Layer-① collector (ADR-0028): accumulate the no-tool stream. No
+      // temperature: many current models reject or ignore the sampling
+      // parameter on utility calls, and OCR determinism relies on the
+      // thinking budget instead.
+      out = await PlainTextCollector().collect(
+        config: cfg,
+        modelId: model,
+        messages: messages,
+        userMediaPaths: imagePaths,
+        thinkingBudget: settings.ocrThinkingBudgetFor(null),
+        stream: false,
+        ocrActive: true,
+      );
     } catch (_) {
       return null;
     }

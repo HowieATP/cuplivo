@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../services/ask_user_interaction_service.dart';
@@ -52,18 +52,18 @@ class _SubagentPanelState extends State<SubagentPanel> {
   /// All running wait-mode jobs spawned by the current conversation.
   /// Concurrent `kelivo_handoff_sync` calls produce multiple jobs — every one
   /// gets its own pill/expanded card.
-  List<SubagentJob> _activeJobs() {
+  List<GenerationSlot> _activeJobs() {
     final chatService = context.read<ChatService>();
     final parentId = chatService.currentConversationId;
-    if (parentId == null) return const <SubagentJob>[];
-    final headlessGen = context.read<HeadlessGenerationService>();
-    return headlessGen
-        .waitJobsFor(parentId)
-        .where((job) => job.status == SubagentJobStatus.running)
+    if (parentId == null) return const <GenerationSlot>[];
+    final engine = context.read<GenerationEngine>();
+    return engine
+        .waitSlotsFor(parentId)
+        .where((job) => job.status == SlotStatus.running)
         .toList();
   }
 
-  ToolApprovalRequest? _pendingApproval(SubagentJob job) {
+  ToolApprovalRequest? _pendingApproval(GenerationSlot job) {
     final service = context.watch<ToolApprovalService>();
     for (final req in service.pendingRequests.values) {
       if (req.conversationId == job.conversationId) return req;
@@ -71,7 +71,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
     return null;
   }
 
-  AskUserRequest? _pendingAskUser(SubagentJob job) {
+  AskUserRequest? _pendingAskUser(GenerationSlot job) {
     final service = context.watch<AskUserInteractionService>();
     for (final req in service.pendingRequests.values) {
       if (req.conversationId == job.conversationId) return req;
@@ -79,7 +79,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
     return null;
   }
 
-  Future<void> _confirmCancel(SubagentJob job) async {
+  Future<void> _confirmCancel(GenerationSlot job) async {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
@@ -111,7 +111,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
     context.read<AskUserInteractionService>().cancelForConversation(
       job.conversationId,
     );
-    context.read<HeadlessGenerationService>().cancel(job.conversationId);
+    context.read<GenerationEngine>().cancelConversation(job.conversationId);
   }
 
   @override
@@ -140,7 +140,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
 
   Widget _buildJobCard(
     BuildContext context,
-    SubagentJob job,
+    GenerationSlot job,
     Color base,
     ColorScheme cs,
     AppLocalizations l10n,
@@ -224,7 +224,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
 
   Widget _buildExpandedBody(
     BuildContext context,
-    SubagentJob job,
+    GenerationSlot job,
     ToolApprovalRequest? approval,
     AskUserRequest? askUser,
   ) {
@@ -393,7 +393,7 @@ class _SubagentPanelState extends State<SubagentPanel> {
     return entries.isEmpty ? '{}' : entries.join('\n');
   }
 
-  static String _formatElapsed(SubagentJob job) {
+  static String _formatElapsed(GenerationSlot job) {
     final d = DateTime.now().difference(job.startedAt);
     final h = d.inHours;
     final m = d.inMinutes % 60;

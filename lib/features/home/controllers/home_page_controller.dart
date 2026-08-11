@@ -769,12 +769,14 @@ class HomePageController extends ChangeNotifier {
       if (!_context.mounted) return ChatInputSubmissionResult.rejected;
       // Check for MCP tool name collisions
       final mcp = _context.read<McpProvider>();
+      final settings = _context.read<SettingsProvider>();
       final assistant = await _context
           .read<AssistantProvider>()
           .getLoadedCurrentAssistant();
       final collisions = ToolHandlerService.detectToolNameCollisions(
         mcp: mcp,
         assistant: assistant,
+        settings: settings,
       );
       if (collisions.isNotEmpty) {
         if (!_context.mounted) return ChatInputSubmissionResult.rejected;

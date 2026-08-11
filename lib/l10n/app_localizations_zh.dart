@@ -4229,6 +4229,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
+  String get searchServicesPageEnableFallbackFetchTitle =>
+      '为无 Fetch 功能的提供商启用 Fetch';
+
+  @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
 
   @override
@@ -7534,6 +7538,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceToolUnzipUserDesc => '解压 zip 压缩包';
+
+  @override
+  String get workspaceToolDownloadTitle => '下载';
+
+  @override
+  String get workspaceToolDownloadUserDesc => '将 URL 下载到工作区';
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
@@ -11764,6 +11774,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
+  String get searchServicesPageEnableFallbackFetchTitle =>
+      '为无 Fetch 功能的提供商启用 Fetch';
+
+  @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
 
   @override
@@ -15069,6 +15083,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceToolUnzipUserDesc => '解压 zip 压缩包';
+
+  @override
+  String get workspaceToolDownloadTitle => '下载';
+
+  @override
+  String get workspaceToolDownloadUserDesc => '将 URL 下载到工作区';
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
@@ -19296,6 +19316,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用選項';
 
   @override
+  String get searchServicesPageEnableFallbackFetchTitle =>
+      '為不支援 Fetch 的提供商啟用 Fetch';
+
+  @override
   String get searchServicesPageAutoTestTitle => '啟動時自動測試連線';
 
   @override
@@ -22604,6 +22628,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceToolUnzipUserDesc => '解壓 zip 壓縮檔';
+
+  @override
+  String get workspaceToolDownloadTitle => '下載';
+
+  @override
+  String get workspaceToolDownloadUserDesc => '將 URL 下載到工作區';
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作區';

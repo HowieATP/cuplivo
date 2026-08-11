@@ -2,7 +2,7 @@
 
 The built-in `@workspaces` sandbox lives at `<appData>/workspaces/`, which pins it to the OS system drive (Windows: `C:\Users\<user>\AppData\...`) and to the app container on mobile. Desktop users want it elsewhere (a secondary drive, a synced folder); the wire format (ADR-0022) deliberately keeps host paths out of the model context, so relocation can be purely a host-side setting.
 
-Decision: the host location of `@workspaces` is user-configurable on desktop targets via the SharedPreferences key `workspaces_dir_v1`, honored only by `AppDirectories.getWorkspacesDirectory()` — the single resolution point for the backup pack, restore, `clearAllData`, the trash-page resolver, `kelivo_fetch` download targets, and the mounts provider. Mobile targets ignore the key entirely (device-local config, same rule as external mounts). The setting rides `settings.json` in backups, so a desktop→desktop migration carries the location (files restore into it); desktop→mobile restore is inert.
+Decision: the host location of `@workspaces` is user-configurable on desktop targets via the SharedPreferences key `workspaces_dir_v1`, honored only by `AppDirectories.getWorkspacesDirectory()` — the single resolution point for the backup pack, restore, `clearAllData`, the trash-page resolver, `web_fetch` download targets, and the mounts provider. Mobile targets ignore the key entirely (device-local config, same rule as external mounts). The setting rides `settings.json` in backups, so a desktop→desktop migration carries the location (files restore into it); desktop→mobile restore is inert.
 
 Relocation guards (canonicalized comparison via `AppDirectories.canonPath`, Windows case-folded, root-aware):
 

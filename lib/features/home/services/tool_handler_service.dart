@@ -216,11 +216,17 @@ class ToolHandlerService {
     return null;
   }
 
-  static Set<String> _getBuiltinToolNames(Assistant? assistant) {
+  static Set<String> _getBuiltinToolNames(
+    Assistant? assistant,
+    SettingsProvider settings,
+  ) {
     final names = <String>{};
     if (assistant == null) return names;
     if (assistant.searchEnabled == true) {
       names.add(SearchToolService.toolName);
+      if (SearchToolService.shouldExposeFetchTool(settings)) {
+        names.add(SearchToolService.fetchToolName);
+      }
     }
     if (assistant.enableMemory == true) {
       names.add('create_memory');
@@ -250,11 +256,12 @@ class ToolHandlerService {
   static List<ToolNameCollision> detectToolNameCollisions({
     required McpProvider mcp,
     required Assistant? assistant,
+    required SettingsProvider settings,
   }) {
     final collisions = <ToolNameCollision>[];
     if (assistant == null) return collisions;
 
-    final builtinNames = _getBuiltinToolNames(assistant);
+    final builtinNames = _getBuiltinToolNames(assistant, settings);
     final selectedIds = assistant.mcpServerIds.toSet();
     final boundServers = mcp.connectedServers
         .where((s) => selectedIds.contains(s.id) && s.enabled)
@@ -330,6 +337,15 @@ class ToolHandlerService {
         !hasBuiltInSearch &&
         supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
+      if (SearchToolService.shouldExposeFetchTool(settings)) {
+        toolDefs.add(
+          SearchToolService.getFetchToolDefinition(
+            includeBuiltInOptions: SearchToolService.shouldUseBuiltInFetch(
+              settings,
+            ),
+          ),
+        );
+      }
     }
 
     // Memory tools
@@ -620,6 +636,10 @@ class ToolHandlerService {
             assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
+        }
+        if (name == SearchToolService.fetchToolName &&
+            assistant?.searchEnabled == true) {
+          return await SearchToolService.executeFetch(args, settings);
         }
 
         // Memory tools

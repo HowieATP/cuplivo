@@ -12,7 +12,7 @@ Handoff lets one assistant delegate a task to another. We chose fire-and-forget 
 
 ## Consequences
 
-- `@kelivo/subagent` is an in-memory MCP server (same pattern as `@kelivo/fetch`). Per-assistant binding via `mcpServerIds` replaces a dedicated `handoffDisabled` field — don't bind the server, can't delegate.
+- `@kelivo/subagent` is an in-memory MCP server. Per-assistant binding via `mcpServerIds` replaces a dedicated `handoffDisabled` field — don't bind the server, can't delegate. The former `@kelivo/fetch` in-memory MCP server was later retired in favor of the search-layer `web_fetch` tool.
 - Three new fields on `Assistant` (`discoverable`, `handoffId`, `handoffDescription`) enable decentralized discovery. The target declares itself; the source doesn't maintain a list.
 - One new field on `Conversation` (`parentConversationId`) enables bidirectional navigation bars (forward on the handoff message, backward on the first user message).
 - The tool uses a free-form `assistant` string parameter validated at call time (no schema enum), eliminating the stale-cache problem inherent in MCP's connection-time `tools/list`.

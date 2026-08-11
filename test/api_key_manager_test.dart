@@ -35,6 +35,21 @@ ProviderConfig _provider({
 
 void main() {
   group('ApiKeyManager', () {
+    test('successful status update clears a prior key error', () {
+      final key = ApiKeyConfig.create(
+        'key',
+      ).copyWith(status: ApiKeyStatus.error, lastError: 'previous failure');
+
+      final updated = ApiKeyManager().updateKeyStatusFromConfig(
+        const KeyManagementConfig(),
+        key,
+        true,
+      );
+
+      expect(updated.status, ApiKeyStatus.active);
+      expect(updated.lastError, isNull);
+    });
+
     test('round robin consumes keys in configured list order', () {
       final provider = _provider(
         id: 'round-robin-list-order',

@@ -8042,6 +8042,12 @@ abstract class AppLocalizations {
   /// **'General Options'**
   String get searchServicesPageGeneralOptions;
 
+  /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fetch for providers without native fetch'**
+  String get searchServicesPageEnableFallbackFetchTitle;
+
   /// No description provided for @searchServicesPageAutoTestTitle.
   ///
   /// In en, this message translates to:
@@ -14263,6 +14269,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Extract zip archives'**
   String get workspaceToolUnzipUserDesc;
+
+  /// No description provided for @workspaceToolDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get workspaceToolDownloadTitle;
+
+  /// No description provided for @workspaceToolDownloadUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Download a URL into the workspace'**
+  String get workspaceToolDownloadUserDesc;
 
   /// No description provided for @assistantEditLocalToolWorkspaceTitle.
   ///

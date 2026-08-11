@@ -4395,6 +4395,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesPageGeneralOptions => 'General Options';
 
   @override
+  String get searchServicesPageEnableFallbackFetchTitle =>
+      'Enable fetch for providers without native fetch';
+
+  @override
   String get searchServicesPageAutoTestTitle =>
       'Auto-test connections on launch';
 
@@ -7876,6 +7880,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceToolUnzipUserDesc => 'Extract zip archives';
+
+  @override
+  String get workspaceToolDownloadTitle => 'Download';
+
+  @override
+  String get workspaceToolDownloadUserDesc =>
+      'Download a URL into the workspace';
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => 'Workspace';

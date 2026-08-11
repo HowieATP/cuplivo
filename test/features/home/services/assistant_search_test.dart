@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -55,7 +57,7 @@ void main() {
       expect(enabledMessages.first['role'], 'user');
     });
 
-    testWidgets('builds search tool only when the assistant enables search', (
+    testWidgets('builds search tools only when the assistant enables search', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues({});
@@ -63,6 +65,14 @@ void main() {
 
       late List<Map<String, dynamic>> disabledTools;
       late List<Map<String, dynamic>> enabledTools;
+      late List<Map<String, dynamic>> unsupportedTools;
+      late List<Map<String, dynamic>> builtInSearchTools;
+      late Future<String> Function(
+        String name,
+        Map<String, dynamic> args, {
+        String? toolCallId,
+      })
+      handler;
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -97,16 +107,46 @@ void main() {
                 false,
                 isToolModel: (_, _) => true,
               );
+              unsupportedTools = service.buildToolDefinitions(
+                settings,
+                Assistant(id: 'assistant-c', name: 'C', searchEnabled: true),
+                'openai',
+                'gpt-no-tools',
+                false,
+                isToolModel: (_, _) => false,
+              );
+              builtInSearchTools = service.buildToolDefinitions(
+                settings,
+                Assistant(id: 'assistant-d', name: 'D', searchEnabled: true),
+                'openai',
+                'gpt-4.1',
+                true,
+                isToolModel: (_, _) => true,
+              );
+              handler = service.buildToolCallHandler(
+                settings,
+                Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
+              )!;
               return const SizedBox.shrink();
             },
           ),
         ),
       );
-
       expect(disabledTools, isEmpty);
       expect(enabledTools.map((tool) => tool['function']['name']), [
         SearchToolService.toolName,
+        SearchToolService.fetchToolName,
       ]);
+      expect(unsupportedTools, isEmpty);
+      expect(builtInSearchTools, isEmpty);
+      final fetchResult =
+          jsonDecode(
+                await handler(SearchToolService.fetchToolName, {
+                  'url': 'not-a-url',
+                }),
+              )
+              as Map<String, dynamic>;
+      expect(fetchResult['error'], contains('Invalid URL'));
     });
   });
 }

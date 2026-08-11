@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
 
@@ -14,6 +15,51 @@ class JinaSearchService extends SearchService<JinaOptions> {
       l10n.searchProviderJinaDescription,
       style: const TextStyle(fontSize: 12),
     );
+  }
+
+  @override
+  bool get supportsNativeFetch => true;
+
+  @override
+  Future<WebFetchResult> fetch({
+    required Uri url,
+    required SearchCommonOptions commonOptions,
+    required JinaOptions serviceOptions,
+    required http.Client fetchClient,
+    String? apiKeyOverride,
+  }) async {
+    try {
+      final response = await fetchClient
+          .get(
+            Uri.parse('https://r.jina.ai/${url.toString()}'),
+            headers: {
+              'Authorization':
+                  'Bearer ${apiKeyOverride ?? serviceOptions.apiKey}',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(Duration(milliseconds: commonOptions.timeout));
+      if (response.statusCode != 200) {
+        throw Exception('API request failed: ${response.statusCode}');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final raw = data['data'] ?? data;
+      if (raw is! Map) {
+        throw Exception('Reader response did not contain page content');
+      }
+      final result = raw.cast<String, dynamic>();
+      final content = (result['content'] ?? '').toString();
+      if (content.trim().isEmpty) {
+        throw Exception('Reader response contained empty page content');
+      }
+      return WebFetchResult(
+        url: (result['url'] ?? url).toString(),
+        title: result['title']?.toString(),
+        content: content,
+      );
+    } catch (e) {
+      throw Exception('Jina fetch failed: $e');
+    }
   }
 
   @override

@@ -816,7 +816,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
     _modelCtl = TextEditingController(text: _modelOf(initial));
     _voiceCtl = TextEditingController(text: _voiceOf(initial));
     _emotionCtl = TextEditingController(
-      text: (initial is MiniMaxTtsOptions) ? initial.emotion : 'calm',
+      text: (initial is MiniMaxTtsOptions) ? initial.emotion : '',
     );
     _speedCtl = TextEditingController(
       text: (initial is MiniMaxTtsOptions) ? initial.speed.toString() : '1.0',
@@ -945,7 +945,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                           _TtsEditorTextField(
                             label: l10n.ttsServicesFieldEmotionLabel,
                             controller: _emotionCtl,
-                            hint: 'calm',
+                            hint: l10n.ttsServicesEmotionAutoHint,
                           ),
                           _TtsEditorTextField(
                             label: l10n.ttsServicesFieldSpeedLabel,
@@ -1049,9 +1049,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           baseUrl: base,
           model: model,
           voiceId: voice,
-          emotion: _emotionCtl.text.trim().isEmpty
-              ? 'calm'
-              : _emotionCtl.text.trim(),
+          emotion: _emotionCtl.text.trim(),
           speed: double.tryParse(_speedCtl.text.trim()) ?? 1.0,
         );
       case NetworkTtsKind.qwen:

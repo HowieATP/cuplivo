@@ -9422,6 +9422,12 @@ abstract class AppLocalizations {
   /// **'Emotion'**
   String get ttsServicesFieldEmotionLabel;
 
+  /// No description provided for @ttsServicesEmotionAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty for auto emotion'**
+  String get ttsServicesEmotionAutoHint;
+
   /// No description provided for @ttsServicesFieldSpeedLabel.
   ///
   /// In en, this message translates to:

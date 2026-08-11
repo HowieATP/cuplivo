@@ -91,7 +91,7 @@ abstract class TtsServiceOptions {
               .toString(),
           model: (json['model'] ?? 'speech-2.6-turbo').toString(),
           voiceId: (json['voiceId'] ?? 'female-shaonv').toString(),
-          emotion: (json['emotion'] ?? 'calm').toString(),
+          emotion: (json['emotion'] ?? '').toString(),
           speed: _toDouble(json['speed'], 1.0),
         );
       case 'qwen':
@@ -591,7 +591,7 @@ class NetworkTtsService {
       'stream_options': {'exclude_aggregated_audio': true},
       'voice_setting': {
         'voice_id': opt.voiceId,
-        'emotion': opt.emotion,
+        if (opt.emotion.isNotEmpty) 'emotion': opt.emotion,
         'speed': opt.speed,
       },
     });

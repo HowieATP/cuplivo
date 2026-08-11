@@ -2156,6 +2156,7 @@
   "ttsServicesFieldVoiceLabel": "Voice",
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
+  "ttsServicesEmotionAutoHint": "Leave empty for auto emotion",
   "ttsServicesFieldSpeedLabel": "Speed",
   "ttsServicesFieldLanguageTypeLabel": "Language type",
   "ttsServicesFieldLanguageLabel": "Language",

@@ -5170,6 +5170,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldEmotionLabel => 'Emotion';
 
   @override
+  String get ttsServicesEmotionAutoHint => 'Leave empty for auto emotion';
+
+  @override
   String get ttsServicesFieldSpeedLabel => 'Speed';
 
   @override

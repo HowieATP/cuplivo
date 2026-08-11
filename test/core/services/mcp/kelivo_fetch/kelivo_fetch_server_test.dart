@@ -123,7 +123,7 @@ void main() {
       );
       expect(tool['description'], contains('requires authentication'));
       expect(tool['description'], contains('download_path'));
-      expect(tool['description'], contains('@workspaces/.fetch_cache/'));
+      expect(tool['description'], contains('@default/.fetch_cache/'));
 
       final schema = (tool['inputSchema'] as Map).cast<String, dynamic>();
       final properties = (schema['properties'] as Map).cast<String, dynamic>();
@@ -143,7 +143,7 @@ void main() {
       expect(properties['raw'], containsPair('default', false));
       expect(
         properties['download_path']['description'],
-        contains('full file path under @workspaces/'),
+        contains('full file path under @default/'),
       );
       expect(
         properties['download_path']['description'],
@@ -232,12 +232,12 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/download.txt'),
-          arguments: const {'download_path': '@workspaces/notes/sample.txt'},
+          arguments: const {'download_path': '@default/notes/sample.txt'},
         );
         final text = _resultText(result);
 
         expect(result['isError'], isFalse);
-        expect(text, contains('@workspaces/notes/sample.txt'));
+        expect(text, contains('@default/notes/sample.txt'));
         expect(text, contains('17 bytes'));
         expect(text, isNot(contains('raw payload as-is')));
 
@@ -251,7 +251,7 @@ void main() {
       final result = await _callFetch(
         engine,
         baseUri.resolve('/download.bin'),
-        arguments: const {'download_path': '@workspaces/payload.bin'},
+        arguments: const {'download_path': '@default/payload.bin'},
       );
 
       expect(result['isError'], isFalse);
@@ -268,7 +268,7 @@ void main() {
       final result = await _callFetch(
         engine,
         baseUri.resolve('/download.txt'),
-        arguments: const {'download_path': '@workspaces/overwrite.txt'},
+        arguments: const {'download_path': '@default/overwrite.txt'},
       );
 
       expect(result['isError'], isFalse);
@@ -282,7 +282,7 @@ void main() {
           engine,
           baseUri.resolve('/download.txt'),
           arguments: const {
-            'download_path': '@workspaces/notes/sample.txt',
+            'download_path': '@default/notes/sample.txt',
             'max_length': 3,
             'start_index': 1,
             'raw': true,
@@ -301,16 +301,16 @@ void main() {
 
     test('rejects invalid download_path values', () async {
       for (final bad in const [
-        'notes/sample.txt', // no @workspaces prefix
+        'notes/sample.txt', // no @default prefix
         '@other/sample.txt', // external mount
-        '@workspaces/', // directory, not a file
-        '@workspaces/a/../b.txt', // traversal segment
-        '@workspaces/a\\b.txt', // backslash
-        '@workspaces/..', // all-dot segment (Win32 parent hazard)
-        '@workspaces/.fetch_cache/x.bin', // reserved temp storage
-        '@workspaces/.fetch_cache', // reserved temp storage root
-        '@workspaces/.hidden/x.bin', // dot-prefixed segment
-        '@workspaces/reports/.git/notes.md', // dot-prefixed segment (nested)
+        '@default/', // directory, not a file
+        '@default/a/../b.txt', // traversal segment
+        '@default/a\\b.txt', // backslash
+        '@default/..', // all-dot segment (Win32 parent hazard)
+        '@default/.fetch_cache/x.bin', // reserved temp storage
+        '@default/.fetch_cache', // reserved temp storage root
+        '@default/.hidden/x.bin', // dot-prefixed segment
+        '@default/reports/.git/notes.md', // dot-prefixed segment (nested)
       ]) {
         final result = await _callFetch(
           engine,
@@ -340,7 +340,7 @@ void main() {
         expect(text, contains('start_index=5000'));
         final match = RegExp(
           r'Full content \(\d+ characters\) saved to '
-          r'(@workspaces/\.fetch_cache/\w+\.md)',
+          r'(@default/\.fetch_cache/\w+\.md)',
         ).firstMatch(text);
         expect(match, isNotNull);
         final wirePath = match!.group(1)!;
@@ -348,7 +348,7 @@ void main() {
         final file = File(
           p.joinAll([
             wsDir.path,
-            ...wirePath.substring('@workspaces/'.length).split('/'),
+            ...wirePath.substring('@default/'.length).split('/'),
           ]),
         );
         expect(await file.exists(), isTrue);
@@ -368,13 +368,13 @@ void main() {
 
       final text = _resultText(result);
       final match = RegExp(
-        r'(@workspaces/\.fetch_cache/\w+\.txt)',
+        r'(@default/\.fetch_cache/\w+\.txt)',
       ).firstMatch(text);
       expect(match, isNotNull);
       final file = File(
         p.joinAll([
           wsDir.path,
-          ...match!.group(1)!.substring('@workspaces/'.length).split('/'),
+          ...match!.group(1)!.substring('@default/'.length).split('/'),
         ]),
       );
       expect(await file.exists(), isTrue);
@@ -412,10 +412,10 @@ void main() {
         final first = await _callFetch(engine, baseUri.resolve('/html'));
         final second = await _callFetch(engine, baseUri.resolve('/html'));
         final firstPath = RegExp(
-          r'(@workspaces/\.fetch_cache/\w+\.md)',
+          r'(@default/\.fetch_cache/\w+\.md)',
         ).firstMatch(_resultText(first))!.group(1)!;
         final secondPath = RegExp(
-          r'(@workspaces/\.fetch_cache/\w+\.md)',
+          r'(@default/\.fetch_cache/\w+\.md)',
         ).firstMatch(_resultText(second))!.group(1)!;
 
         expect(secondPath, firstPath);
@@ -496,7 +496,7 @@ void main() {
       final result = await _callFetch(
         failingEngine,
         baseUri.resolve('/download.txt'),
-        arguments: const {'download_path': '@workspaces/sample.txt'},
+        arguments: const {'download_path': '@default/sample.txt'},
       );
 
       expect(result['isError'], isTrue);
@@ -511,7 +511,7 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/gzipped.txt'),
-          arguments: const {'download_path': '@workspaces/gz.txt'},
+          arguments: const {'download_path': '@default/gz.txt'},
         );
 
         expect(result['isError'], isFalse);
@@ -541,7 +541,7 @@ void main() {
           engine,
           baseUri.resolve('/download.txt'),
           arguments: const {
-            'download_path': '@workspaces/sample.txt',
+            'download_path': '@default/sample.txt',
             'max_length': 20001,
             'start_index': -5,
             'raw': 'not-a-bool',
@@ -563,7 +563,7 @@ void main() {
 
         expect(text, contains('Content too large to save as text'));
         expect(text, contains('download_path'));
-        expect(text, isNot(contains('saved to @workspaces/.fetch_cache')));
+        expect(text, isNot(contains('saved to @default/.fetch_cache')));
         expect(_fetchCacheFiles(wsDir), isEmpty);
       },
     );
@@ -580,7 +580,7 @@ void main() {
       final result = await _callFetch(
         engine,
         baseUri.resolve('/download.txt'),
-        arguments: const {'download_path': '@workspaces/sample.txt'},
+        arguments: const {'download_path': '@default/sample.txt'},
       );
 
       expect(result['isError'], isFalse);
@@ -602,7 +602,7 @@ void main() {
       final result = await _callFetch(
         engine,
         baseUri.resolve('/download.txt'),
-        arguments: const {'download_path': '@workspaces/sample.txt'},
+        arguments: const {'download_path': '@default/sample.txt'},
       );
 
       expect(result['isError'], isFalse);
@@ -625,7 +625,7 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/download.txt'),
-          arguments: const {'download_path': '@workspaces/sample.txt'},
+          arguments: const {'download_path': '@default/sample.txt'},
         );
 
         expect(result['isError'], isFalse);
@@ -642,7 +642,7 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/download.txt'),
-          arguments: const {'download_path': '@workspaces/notes'},
+          arguments: const {'download_path': '@default/notes'},
         );
 
         expect(result['isError'], isTrue);
@@ -664,7 +664,7 @@ void main() {
       final result = await _callFetch(
         engine,
         baseUri.resolve('/stall'),
-        arguments: const {'download_path': '@workspaces/stall.bin'},
+        arguments: const {'download_path': '@default/stall.bin'},
       );
 
       expect(result['isError'], isTrue);
@@ -688,7 +688,7 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/no-headers'),
-          arguments: const {'download_path': '@workspaces/nohead.bin'},
+          arguments: const {'download_path': '@default/nohead.bin'},
         );
 
         expect(result['isError'], isTrue);
@@ -723,7 +723,7 @@ void main() {
         final result = await _callFetch(
           engine,
           baseUri.resolve('/download.txt'),
-          arguments: const {'download_path': '@workspaces/sample.txt'},
+          arguments: const {'download_path': '@default/sample.txt'},
         );
 
         expect(result['isError'], isFalse);
@@ -776,7 +776,7 @@ void main() {
         try {
           await client.callTool('kelivo_fetch', {
             'url': baseUri.resolve('/stall').toString(),
-            'download_path': '@workspaces/sample.txt',
+            'download_path': '@default/sample.txt',
           });
           fail('expected the client-side request timeout to fire');
         } on mcp.McpError catch (e) {

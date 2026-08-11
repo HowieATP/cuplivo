@@ -12,6 +12,7 @@ import '../services/deleted_records_store.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
+import '../models/workspace.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
@@ -147,6 +148,76 @@ class AssistantProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint('[AssistantProvider] legacy OCR mode migration failed: $e');
       }
+    }
+
+    // MCP filesystem → workspace bind (one-shot per assistant that still
+    // references kelivo_filesystem). Full FS tools are enabled on default
+    // workspace meta when any assistant migrates.
+    try {
+      var dirty = false;
+      var anyFsMigrate = false;
+      final migrated = <Assistant>[];
+      for (final a in _assistants) {
+        final hadFs = a.mcpServerIds.contains('kelivo_filesystem');
+        if (!hadFs) {
+          migrated.add(a);
+          continue;
+        }
+        dirty = true;
+        anyFsMigrate = true;
+        migrated.add(
+          a.copyWith(
+            mcpServerIds: [
+              for (final id in a.mcpServerIds)
+                if (id != 'kelivo_filesystem') id,
+            ],
+            workspaceEnabled: true,
+            workspaceId: a.workspaceId ?? Workspace.defaultId,
+          ),
+        );
+      }
+      if (dirty) {
+        await repo.putAssistants(migrated);
+        _assistants
+          ..clear()
+          ..addAll(migrated);
+      }
+      if (anyFsMigrate) {
+        // Best-effort: enable full FS tool surface on the default workspace.
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final raw = prefs.getString('workspaces_meta_v1');
+          if (raw != null && raw.isNotEmpty) {
+            final list = Workspace.decodeList(raw);
+            final next = [
+              for (final w in list)
+                if (w.id == Workspace.defaultId ||
+                    w.alias == Workspace.defaultAlias)
+                  w.copyWith(
+                    tools: {
+                      for (final t in WorkspaceToolNames.filesystemTools)
+                        t: true,
+                      WorkspaceToolNames.shell: w.isToolEnabled(
+                        WorkspaceToolNames.shell,
+                      ),
+                    },
+                  )
+                else
+                  w,
+            ];
+            await prefs.setString(
+              'workspaces_meta_v1',
+              Workspace.encodeList(next),
+            );
+          }
+        } catch (e) {
+          debugPrint(
+            '[AssistantProvider] default workspace tools expand failed: $e',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[AssistantProvider] filesystem→workspace migrate failed: $e');
     }
 
     if (_assistants.isEmpty) return;

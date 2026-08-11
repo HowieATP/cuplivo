@@ -38,7 +38,7 @@ void main() {
     Directory('${tmp.path}/sub').createSync();
 
     final mount = FilesystemMount(
-      alias: 'workspaces',
+      alias: 'default',
       path: tmp.path,
       readOnly: false,
     );
@@ -57,7 +57,7 @@ void main() {
       tester.element(find.byType(MountFilesPage)),
     )!;
     await pumpUntilFound(tester, find.text(l10n.mountFilesEmptyDir));
-    expect(find.text('@workspaces'), findsOneWidget, reason: 'root crumb');
+    expect(find.text('@default'), findsOneWidget, reason: 'root crumb');
     expect(find.text('sub'), findsOneWidget, reason: 'subdir crumb');
   });
 
@@ -73,7 +73,7 @@ void main() {
     File('${tmp.path}/a.txt').writeAsStringSync('x');
 
     final mount = FilesystemMount(
-      alias: 'workspaces',
+      alias: 'default',
       path: tmp.path,
       readOnly: false,
     );
@@ -85,6 +85,6 @@ void main() {
     );
 
     await pumpUntilFound(tester, find.text('a.txt'));
-    expect(find.text('@workspaces'), findsOneWidget, reason: 'breadcrumb');
+    expect(find.text('@default'), findsOneWidget, reason: 'breadcrumb');
   });
 }

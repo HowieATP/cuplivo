@@ -4942,6 +4942,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldEmotionLabel => '情感';
 
   @override
+  String get ttsServicesEmotionAutoHint => '留空即自动';
+
+  @override
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
@@ -12266,6 +12269,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldEmotionLabel => '情感';
 
   @override
+  String get ttsServicesEmotionAutoHint => '留空即自动';
+
+  @override
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
@@ -19585,6 +19591,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesFieldEmotionLabel => '情感';
+
+  @override
+  String get ttsServicesEmotionAutoHint => '留空即自動';
 
   @override
   String get ttsServicesFieldSpeedLabel => '語速';

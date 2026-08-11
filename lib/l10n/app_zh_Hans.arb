@@ -1706,6 +1706,7 @@
   "ttsServicesFieldVoiceLabel": "音色",
   "ttsServicesFieldVoiceIdLabel": "音色 ID",
   "ttsServicesFieldEmotionLabel": "情感",
+  "ttsServicesEmotionAutoHint": "留空即自动",
   "ttsServicesFieldSpeedLabel": "语速",
   "ttsServicesFieldLanguageTypeLabel": "语言类型",
   "ttsServicesFieldLanguageLabel": "语言",

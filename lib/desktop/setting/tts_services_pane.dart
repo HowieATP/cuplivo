@@ -1127,7 +1127,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : '',
   );
   final emotionCtl = TextEditingController(
-    text: (initial is MiniMaxTtsOptions) ? initial.emotion : 'calm',
+    text: (initial is MiniMaxTtsOptions) ? initial.emotion : '',
   );
   final speedCtl = TextEditingController(
     text: (initial is MiniMaxTtsOptions) ? initial.speed.toString() : '1.0',
@@ -1298,7 +1298,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               _InputRow(
                                 label: l10n.ttsServicesFieldEmotionLabel,
                                 controller: emotionCtl,
-                                hint: 'calm',
+                                hint: l10n.ttsServicesEmotionAutoHint,
                               ),
                               const SizedBox(height: 6),
                               _InputRow(
@@ -1393,9 +1393,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   baseUrl: base,
                                   model: model,
                                   voiceId: voice,
-                                  emotion: emotionCtl.text.trim().isEmpty
-                                      ? 'calm'
-                                      : emotionCtl.text.trim(),
+                                  emotion: emotionCtl.text.trim(),
                                   speed: spd,
                                 );
                               } else if (kind == NetworkTtsKind.qwen) {

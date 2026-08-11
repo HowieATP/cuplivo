@@ -45,6 +45,7 @@ void main() {
 
       expect(minimax, isA<MiniMaxTtsOptions>());
       expect((minimax as MiniMaxTtsOptions).model, 'speech-2.6-turbo');
+      expect(minimax.emotion, '');
     });
   });
 
@@ -352,6 +353,62 @@ void main() {
           ),
           throwsA(isA<Exception>()),
         );
+      },
+    );
+    test(
+      'omits MiniMax voice_setting.emotion when empty, sends it when set',
+      () async {
+        late Map<String, dynamic> bodyEmpty;
+        late Map<String, dynamic> bodyEmotion;
+        final server = await _bindServer((request) async {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          final voiceSetting = body['voice_setting'] as Map;
+          if (!voiceSetting.containsKey('emotion')) {
+            bodyEmpty = body;
+          } else {
+            bodyEmotion = body;
+          }
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'data': {'audio': '01ff'},
+            })}\n\n',
+          );
+          await request.response.close();
+        });
+
+        addTearDown(() async => server.close(force: true));
+
+        MiniMaxTtsOptions options(String emotion) => MiniMaxTtsOptions(
+          enabled: true,
+          name: 'MiniMax',
+          apiKey: 'mm-key',
+          baseUrl: _baseUrl(server),
+          model: 'speech-2.8-hd',
+          voiceId: 'female-shaonv',
+          emotion: emotion,
+          speed: 1.0,
+        );
+
+        await NetworkTtsService.synthesize(options: options(''), text: 'hello');
+        await NetworkTtsService.synthesize(
+          options: options('happy'),
+          text: 'hello',
+        );
+
+        expect(bodyEmpty, isNotNull);
+        expect(bodyEmotion, isNotNull);
+        expect(
+          (bodyEmpty['voice_setting'] as Map).containsKey('emotion'),
+          isFalse,
+        );
+        expect((bodyEmotion['voice_setting'] as Map)['emotion'], 'happy');
       },
     );
   });

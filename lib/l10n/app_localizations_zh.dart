@@ -2920,6 +2920,42 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => '批量导出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '没有可导出的对话';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '选择导出文件夹';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已导出 $exported 个对话';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已导出 $exported 个对话，跳过 $skipped 个空对话';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '导出 $exported 个对话，$failed 个失败';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '导出 $exported 个对话，$failed 个失败，跳过 $skipped 个空对话';
+  }
+
+  @override
   String get sideDrawerSelectAll => '全选';
 
   @override
@@ -10250,6 +10286,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => '批量导出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '没有可导出的对话';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '选择导出文件夹';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已导出 $exported 个对话';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已导出 $exported 个对话，跳过 $skipped 个空对话';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '导出 $exported 个对话，$failed 个失败';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '导出 $exported 个对话，$failed 个失败，跳过 $skipped 个空对话';
+  }
+
+  @override
   String get sideDrawerSelectAll => '全选';
 
   @override
@@ -17575,6 +17647,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String sideDrawerBatchPartialFailure(int success, int failed) {
     return '成功 $success 個，失敗 $failed 個';
+  }
+
+  @override
+  String get sideDrawerMenuBatchExport => '批量匯出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '沒有可匯出的對話';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '選擇匯出資料夾';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已匯出 $exported 個對話';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已匯出 $exported 個對話，跳過 $skipped 個空對話';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '匯出 $exported 個對話，$failed 個失敗';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '匯出 $exported 個對話，$failed 個失敗，跳過 $skipped 個空對話';
   }
 
   @override

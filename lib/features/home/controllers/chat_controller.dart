@@ -770,7 +770,22 @@ class ChatController extends ChangeNotifier {
   ///
   /// This groups messages by their groupId and returns only the message
   /// at the selected version index for each group.
+  ///
+  /// Single canonical implementation: [collapseWithSelections] holds the
+  /// logic; this instance method feeds it the live in-memory selections.
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
+    return collapseWithSelections(items, _versionSelections);
+  }
+
+  /// Static collapse for a supplied version-selection map.
+  ///
+  /// Used by conversation-level batch export, which has no live
+  /// [ChatController] for non-open conversations: it feeds the persisted
+  /// `versionSelections` read from `ChatService.getVersionSelections`.
+  static List<ChatMessage> collapseWithSelections(
+    List<ChatMessage> items,
+    Map<String, int> versionSelections,
+  ) {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
     final List<String> order = <String>[];
@@ -793,7 +808,7 @@ class ChatController extends ChangeNotifier {
     final out = <ChatMessage>[];
     for (final gid in order) {
       final vers = byGroup[gid]!;
-      final sel = _versionSelections[gid];
+      final sel = versionSelections[gid];
       final idx = (sel != null && sel >= 0 && sel < vers.length)
           ? sel
           : (vers.length - 1);

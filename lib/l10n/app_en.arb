@@ -1286,6 +1286,30 @@
     }
   },
   "sideDrawerBatchPartialFailure": "{success} succeeded, {failed} failed",
+  "sideDrawerMenuBatchExport": "Export as Markdown",
+  "sideDrawerBatchActionsTitle": "Batch actions",
+  "sideDrawerBatchExportNothingToExport": "No conversations to export",
+  "sideDrawerBatchExportPickDirectory": "Choose export folder",
+  "sideDrawerBatchExportSuccess": "{exported} conversations exported",
+  "@sideDrawerBatchExportSuccess": {
+    "description": "Batch export completed successfully",
+    "placeholders": {"exported": {"type": "int"}}
+  },
+  "sideDrawerBatchExportSuccessSkipped": "{exported} conversations exported, {skipped} empty skipped",
+  "@sideDrawerBatchExportSuccessSkipped": {
+    "description": "Batch export completed successfully with empty conversations skipped",
+    "placeholders": {"exported": {"type": "int"}, "skipped": {"type": "int"}}
+  },
+  "sideDrawerBatchExportPartialFailure": "{exported} exported, {failed} failed",
+  "@sideDrawerBatchExportPartialFailure": {
+    "description": "Batch export partially failed",
+    "placeholders": {"exported": {"type": "int"}, "failed": {"type": "int"}}
+  },
+  "sideDrawerBatchExportPartialFailureSkipped": "{exported} exported, {failed} failed, {skipped} empty skipped",
+  "@sideDrawerBatchExportPartialFailureSkipped": {
+    "description": "Batch export partially failed with empty conversations skipped",
+    "placeholders": {"exported": {"type": "int"}, "failed": {"type": "int"}, "skipped": {"type": "int"}}
+  },
   "@sideDrawerBatchPartialFailure": {
     "placeholders": {
       "success": {

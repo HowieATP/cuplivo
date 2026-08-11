@@ -95,6 +95,15 @@
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
+## Markdown Batch Export (批量导出 Markdown)
+
+- **Markdown 批量导出 (batch Markdown export)**: Conversation-level batch export producing one human-readable `.md` file per selected conversation. Distinct from **备份/backup** (data-level JSON ZIP) and from message-level 导出 (single conversation, curated selection). Entry: the conversation batch-select mode in `SideDrawer` (mobile drawer + desktop sidebars).
+- **⋯ sheet (批量操作面板)**: The batch-select action bar is select-all + count + ⋯ + ✕ — the ✕ exit stays first-level (select mode is always escapable, even with zero selected). The ⋯ opens a dual-shell sheet (mobile bottom sheet / desktop centered dialog) with rows: 导出 Markdown / 移动到 / 删除. The ✕ is the only direct bar action besides ⋯ — the sheet is the overflow surface, so new batch actions never crowd the bar again.
+- **Export scope = selected versions only (仅导出选中版本)**: Each conversation's export contains ONLY the collapsed user-visible stream — one message per group (`groupId ?? id`), the version at the persisted `versionSelections[gid]`, falling back to the latest version. Statically replicated from DB rows via `ChatController.collapseWithSelections` (the single canonical collapse implementation — `collapseVersions` delegates to it), no live controller needed for non-open conversations. Thinking/tool cards excluded, no toggles. Multi-AI card-mode subgroups drop exactly as in the existing single-conversation export (parity, not a new regression).
+- **Artifacts**: One `.md` per conversation. Filename = sanitized conversation title (filesystem-hostile chars stripped, reserved names prefixed; fallback `chat-<id8>.md`; `-2`/`-3` dedupe on collision — both within-batch AND against existing files in the target directory, never overwriting). Desktop: `FilePicker.getDirectoryPath()` then write files; Mobile: `cuplivo_chats_<ts>.zip` (flat root) via the bytes-based saveFile.
+- **Empty conversations**: skipped, counted in the summary. **Failure semantics**: continue-and-aggregate applies ONLY to the desktop write phase — per-file write failures are logged, skipped, and the summary reports exported/failed/skipped. The body-build phase (message/image reads) and the mobile ZIP build/save are all-or-nothing: any throw shows the generic failure snackbar. A cancelled destination picker aborts silently and keeps the selection (parity with move/delete cancel semantics).
+- **Body format**: reuses the single-conversation Markdown builder verbatim (extracted shared body builder) — `# title`, `> time · role`, content, images inline base64, docs as `- name (mime)`, `---` separators.
+
 ## Multi-AI Comparison Mode (Side-by-side)
 
 - **Trigger**: 

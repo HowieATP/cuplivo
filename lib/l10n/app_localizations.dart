@@ -5531,6 +5531,58 @@ abstract class AppLocalizations {
   /// **'{success} succeeded, {failed} failed'**
   String sideDrawerBatchPartialFailure(int success, int failed);
 
+  /// No description provided for @sideDrawerMenuBatchExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Markdown'**
+  String get sideDrawerMenuBatchExport;
+
+  /// No description provided for @sideDrawerBatchActionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch actions'**
+  String get sideDrawerBatchActionsTitle;
+
+  /// No description provided for @sideDrawerBatchExportNothingToExport.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations to export'**
+  String get sideDrawerBatchExportNothingToExport;
+
+  /// No description provided for @sideDrawerBatchExportPickDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose export folder'**
+  String get sideDrawerBatchExportPickDirectory;
+
+  /// Batch export completed successfully
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} conversations exported'**
+  String sideDrawerBatchExportSuccess(int exported);
+
+  /// Batch export completed successfully with empty conversations skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} conversations exported, {skipped} empty skipped'**
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped);
+
+  /// Batch export partially failed
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} exported, {failed} failed'**
+  String sideDrawerBatchExportPartialFailure(int exported, int failed);
+
+  /// Batch export partially failed with empty conversations skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} exported, {failed} failed, {skipped} empty skipped'**
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  );
+
   /// No description provided for @sideDrawerSelectAll.
   ///
   /// In en, this message translates to:

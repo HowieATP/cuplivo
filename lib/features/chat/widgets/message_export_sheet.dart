@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as image_lib;
@@ -35,6 +36,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
+import '../../home/controllers/chat_controller.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
@@ -453,13 +455,6 @@ Future<void> exportChatMessagesMarkdown(
   bool expandThinkingContent = false,
 }) async {
   final l10n = AppLocalizations.of(context)!;
-  final settings = context.read<SettingsProvider>();
-  final userProvider = context.read<UserProvider>();
-  final assistant = context.read<AssistantProvider>().currentAssistant;
-  final thinkingLabel = l10n.messageExportThinkingContentLabel;
-  final timeFormatter = DateFormat(
-    l10n.messageExportSheetDateTimeWithSecondsPattern,
-  );
   try {
     showAppSnackBar(
       context,
@@ -467,84 +462,23 @@ Future<void> exportChatMessagesMarkdown(
       type: NotificationType.info,
     );
 
-    final title = (conversation.title.trim().isNotEmpty)
-        ? conversation.title
-        : l10n.messageExportSheetDefaultTitle;
-    final includeThinking = showThinkingAndToolCards && expandThinkingContent;
-
-    final buf = StringBuffer();
-    buf.writeln('# $title');
-    buf.writeln('');
-
-    for (final msg in messages) {
-      final time = timeFormatter.format(msg.timestamp);
-      final roleName = _getRoleNameFromDependencies(
-        l10n: l10n,
-        settings: settings,
-        userProvider: userProvider,
-        assistant: assistant,
-        msg: msg,
-      );
-      buf.writeln('> $time · $roleName');
-      buf.writeln('');
-
-      final exportData = (msg.role == 'assistant')
-          ? _thinkingExportDataForMessage(msg)
-          : null;
-      final contentForExport = exportData?.cleanedContent ?? msg.content;
-
-      final parsed = _parseContent(contentForExport);
-      if (parsed.text.isNotEmpty) {
-        buf.writeln(parsed.text);
-        buf.writeln('');
-      }
-
-      for (final p in parsed.images) {
-        final fixed = SandboxPathResolver.fix(p);
-        try {
-          final f = File(fixed);
-          if (await f.exists()) {
-            final bytes = await f.readAsBytes();
-            final b64 = base64Encode(bytes);
-            final mime = _guessImageMime(fixed);
-            buf.writeln('![](data:$mime;base64,$b64)');
-          } else {
-            buf.writeln('![image]($fixed)');
-          }
-        } catch (_) {
-          buf.writeln('![image]($fixed)');
-        }
-        buf.writeln('');
-      }
-
-      for (final d in parsed.docs) {
-        buf.writeln('- ${d.fileName}  `(${d.mime})`');
-      }
-
-      if (includeThinking &&
-          exportData != null &&
-          exportData.thinkingTexts.isNotEmpty) {
-        final t = exportData.thinkingTexts.join('\n\n').trim();
-        if (t.isNotEmpty) {
-          buf.writeln('');
-          buf.writeln('**$thinkingLabel**');
-          buf.writeln('');
-          buf.writeln('```text');
-          buf.writeln(t);
-          buf.writeln('```');
-          buf.writeln('');
-        }
-      }
-
-      buf.writeln('\n---\n');
-    }
+    final content = await buildMarkdownExportBody(
+      l10n: l10n,
+      settings: context.read<SettingsProvider>(),
+      userProvider: context.read<UserProvider>(),
+      assistant: context.read<AssistantProvider>().currentAssistant,
+      conversation: conversation,
+      messages: messages,
+      showThinkingAndToolCards: showThinkingAndToolCards,
+      expandThinkingContent: expandThinkingContent,
+    );
 
     final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
     if (!context.mounted) return;
     await _saveExportTextWithPicker(
       context,
       filename: filename,
-      content: buf.toString(),
+      content: content,
       allowedExtensions: const ['md'],
     );
   } catch (e) {
@@ -555,6 +489,314 @@ Future<void> exportChatMessagesMarkdown(
       type: NotificationType.error,
     );
   }
+}
+
+/// Shared Markdown body builder — single source of truth for both the
+/// single-conversation export and the conversation batch export.
+Future<String> buildMarkdownExportBody({
+  required AppLocalizations l10n,
+  required SettingsProvider settings,
+  required UserProvider userProvider,
+  required Assistant? assistant,
+  required Conversation conversation,
+  required List<ChatMessage> messages,
+  bool showThinkingAndToolCards = false,
+  bool expandThinkingContent = false,
+}) async {
+  final thinkingLabel = l10n.messageExportThinkingContentLabel;
+  final timeFormatter = DateFormat(
+    l10n.messageExportSheetDateTimeWithSecondsPattern,
+  );
+
+  final title = (conversation.title.trim().isNotEmpty)
+      ? conversation.title
+      : l10n.messageExportSheetDefaultTitle;
+  final includeThinking = showThinkingAndToolCards && expandThinkingContent;
+
+  final buf = StringBuffer();
+  buf.writeln('# $title');
+  buf.writeln('');
+
+  for (final msg in messages) {
+    final time = timeFormatter.format(msg.timestamp);
+    final roleName = _getRoleNameFromDependencies(
+      l10n: l10n,
+      settings: settings,
+      userProvider: userProvider,
+      assistant: assistant,
+      msg: msg,
+    );
+    buf.writeln('> $time · $roleName');
+    buf.writeln('');
+
+    final exportData = (msg.role == 'assistant')
+        ? _thinkingExportDataForMessage(msg)
+        : null;
+    final contentForExport = exportData?.cleanedContent ?? msg.content;
+
+    final parsed = _parseContent(contentForExport);
+    if (parsed.text.isNotEmpty) {
+      buf.writeln(parsed.text);
+      buf.writeln('');
+    }
+
+    for (final p in parsed.images) {
+      final fixed = SandboxPathResolver.fix(p);
+      try {
+        final f = File(fixed);
+        if (await f.exists()) {
+          final bytes = await f.readAsBytes();
+          final b64 = base64Encode(bytes);
+          final mime = _guessImageMime(fixed);
+          buf.writeln('![](data:$mime;base64,$b64)');
+        } else {
+          buf.writeln('![image]($fixed)');
+        }
+      } catch (_) {
+        buf.writeln('![image]($fixed)');
+      }
+      buf.writeln('');
+    }
+
+    for (final d in parsed.docs) {
+      buf.writeln('- ${d.fileName}  `(${d.mime})`');
+    }
+
+    if (includeThinking &&
+        exportData != null &&
+        exportData.thinkingTexts.isNotEmpty) {
+      final t = exportData.thinkingTexts.join('\n\n').trim();
+      if (t.isNotEmpty) {
+        buf.writeln('');
+        buf.writeln('**$thinkingLabel**');
+        buf.writeln('');
+        buf.writeln('```text');
+        buf.writeln(t);
+        buf.writeln('```');
+        buf.writeln('');
+      }
+    }
+
+    buf.writeln('\n---\n');
+  }
+
+  return buf.toString();
+}
+
+class _BatchExportItem {
+  const _BatchExportItem({required this.name, required this.content});
+  final String name;
+  final String content;
+}
+
+final RegExp _exportFileNameHostileChars = RegExp(r'[\\/:*?"<>|\x00-\x1f]');
+final RegExp _exportFileNameTrailingDotsSpaces = RegExp(r'[. ]+$');
+final RegExp _exportFileNameReserved = RegExp(
+  r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)',
+  caseSensitive: false,
+);
+
+String _uniqueExportFileName(Conversation convo, Set<String> usedNames) {
+  final rawTitle = convo.title.trim();
+  var base = rawTitle.isEmpty
+      ? 'chat-${convo.id.length > 8 ? convo.id.substring(0, 8) : convo.id}'
+      : rawTitle
+            .replaceAll(_exportFileNameHostileChars, '_')
+            .replaceAll(_exportFileNameTrailingDotsSpaces, '');
+  if (base.isEmpty || _exportFileNameReserved.hasMatch(base)) {
+    base = 'chat-${convo.id.length > 8 ? convo.id.substring(0, 8) : convo.id}';
+  }
+  var name = '$base.md';
+  var i = 2;
+  while (!usedNames.add(name)) {
+    name = '$base-$i.md';
+    i++;
+  }
+  return name;
+}
+
+/// Batch export: one .md per conversation.
+///
+/// Desktop: user picks a target directory, N files are written into it.
+/// Mobile: the files are packed into `cuplivo_chats_<ts>.zip` and saved via
+/// the bytes-based file picker. Empty conversations are skipped; per-file
+/// write failures are logged and aggregated into the summary snackbar.
+/// Returns `true` when an actual export completed (or partially completed),
+/// `false` when the user cancelled the destination picker or there was
+/// nothing to export.
+Future<bool> exportConversationsMarkdownBatch(
+  BuildContext context, {
+  required List<String> conversationIds,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final chatService = context.read<ChatService>();
+  final settings = context.read<SettingsProvider>();
+  final userProvider = context.read<UserProvider>();
+  final assistant = context.read<AssistantProvider>().currentAssistant;
+
+  Future<List<_BatchExportItem>> buildItems() async {
+    final items = <_BatchExportItem>[];
+    final usedNames = <String>{};
+    for (final id in conversationIds) {
+      final convo = chatService.getConversation(id);
+      if (convo == null) continue;
+      final count = chatService.getMessageCount(id);
+      final all = chatService.getMessagesRange(id, start: 0, limit: count);
+      if (all.isEmpty) continue; // empty conversation → skipped
+      final collapsed = ChatController.collapseWithSelections(
+        all,
+        chatService.getVersionSelections(id),
+      );
+      final body = await buildMarkdownExportBody(
+        l10n: l10n,
+        settings: settings,
+        userProvider: userProvider,
+        assistant: assistant,
+        conversation: convo,
+        messages: collapsed,
+      );
+      items.add(
+        _BatchExportItem(
+          name: _uniqueExportFileName(convo, usedNames),
+          content: body,
+        ),
+      );
+    }
+    return items;
+  }
+
+  Future<bool> reportIfEmpty(List<_BatchExportItem> items) async {
+    if (items.isNotEmpty) return false;
+    if (!context.mounted) return true;
+    showAppSnackBar(
+      context,
+      message: l10n.sideDrawerBatchExportNothingToExport,
+      type: NotificationType.info,
+    );
+    return true;
+  }
+
+  try {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Pick the destination FIRST — a cancelled picker must not waste the
+      // (potentially multi-MB, base64-heavy) body build.
+      final String? dirPath = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: l10n.sideDrawerBatchExportPickDirectory,
+      );
+      if (dirPath == null) return false; // user cancelled
+      if (!context.mounted) return false;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExporting,
+        type: NotificationType.info,
+      );
+      final items = await buildItems();
+      if (await reportIfEmpty(items)) return false;
+      int failed = 0;
+      for (final item in items) {
+        try {
+          final target = await _uniqueDiskFileName(dirPath, item.name);
+          await File(target).writeAsString(item.content);
+        } catch (e) {
+          failed++;
+          debugPrint('Batch export failed for ${item.name}: $e');
+        }
+      }
+      if (!context.mounted) return true;
+      _showBatchExportResultSnack(
+        context,
+        exported: items.length - failed,
+        failed: failed,
+        skipped: conversationIds.length - items.length,
+      );
+      return true;
+    } else {
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExporting,
+        type: NotificationType.info,
+      );
+      final items = await buildItems();
+      if (await reportIfEmpty(items)) return false;
+      final archive = Archive();
+      for (final item in items) {
+        archive.addFile(ArchiveFile.string(item.name, item.content));
+      }
+      final zipBytes = ZipEncoder().encode(archive);
+      final filename =
+          'cuplivo_chats_${DateTime.now().millisecondsSinceEpoch}.zip';
+      final String? savePath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.backupPageExportToFile,
+        fileName: filename,
+        type: FileType.custom,
+        allowedExtensions: const ['zip'],
+        bytes: Uint8List.fromList(zipBytes),
+      );
+      if (savePath == null) return false; // user cancelled
+      if (!context.mounted) return true;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+        type: NotificationType.success,
+      );
+      return true;
+    }
+  } catch (e) {
+    if (!context.mounted) return false;
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportFailed('$e'),
+      type: NotificationType.error,
+    );
+    return false;
+  }
+}
+
+/// Resolves a non-clobbering file path: if `fileName` already exists in
+/// `dirPath`, append `-2`, `-3`, ... until a free name is found. Never
+/// overwrites an existing file.
+Future<String> _uniqueDiskFileName(String dirPath, String fileName) async {
+  if (!await File(p.join(dirPath, fileName)).exists()) {
+    return p.join(dirPath, fileName);
+  }
+  final dot = fileName.lastIndexOf('.');
+  final base = dot > 0 ? fileName.substring(0, dot) : fileName;
+  final ext = dot > 0 ? fileName.substring(dot) : '';
+  var i = 2;
+  while (true) {
+    final candidate = p.join(dirPath, '$base-$i$ext');
+    if (!await File(candidate).exists()) return candidate;
+    i++;
+  }
+}
+
+void _showBatchExportResultSnack(
+  BuildContext context, {
+  required int exported,
+  required int failed,
+  required int skipped,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  String message;
+  if (failed > 0 && skipped > 0) {
+    message = l10n.sideDrawerBatchExportPartialFailureSkipped(
+      exported,
+      failed,
+      skipped,
+    );
+  } else if (failed > 0) {
+    message = l10n.sideDrawerBatchExportPartialFailure(exported, failed);
+  } else if (skipped > 0) {
+    message = l10n.sideDrawerBatchExportSuccessSkipped(exported, skipped);
+  } else {
+    message = l10n.sideDrawerBatchExportSuccess(exported);
+  }
+  showAppSnackBar(
+    context,
+    message: message,
+    type: failed > 0 ? NotificationType.warning : NotificationType.success,
+    duration: const Duration(seconds: 4),
+  );
 }
 
 Future<void> exportChatMessagesTxt(

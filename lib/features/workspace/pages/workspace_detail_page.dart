@@ -660,6 +660,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     WorkspaceToolNames.move => l10n.workspaceToolMoveTitle,
     WorkspaceToolNames.zip => l10n.workspaceToolZipTitle,
     WorkspaceToolNames.unzip => l10n.workspaceToolUnzipTitle,
+    WorkspaceToolNames.download => l10n.workspaceToolDownloadTitle,
     _ => tool,
   };
 
@@ -675,6 +676,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     WorkspaceToolNames.move => l10n.workspaceToolMoveUserDesc,
     WorkspaceToolNames.zip => l10n.workspaceToolZipUserDesc,
     WorkspaceToolNames.unzip => l10n.workspaceToolUnzipUserDesc,
+    WorkspaceToolNames.download => l10n.workspaceToolDownloadUserDesc,
     _ => '',
   };
 

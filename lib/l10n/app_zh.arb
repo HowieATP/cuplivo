@@ -2995,5 +2995,7 @@
   "workspaceToolZipUserDesc": "创建 zip 压缩包",
   "workspaceToolUnzipTitle": "解压",
   "workspaceToolUnzipUserDesc": "解压 zip 压缩包",
+  "workspaceToolDownloadTitle": "下载",
+  "workspaceToolDownloadUserDesc": "将 URL 下载到工作区",
   "assistantEditLocalToolWorkspaceTitle": "工作区"
 }

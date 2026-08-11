@@ -3549,5 +3549,7 @@
   "workspaceToolZipUserDesc": "Create zip archives",
   "workspaceToolUnzipTitle": "Unzip",
   "workspaceToolUnzipUserDesc": "Extract zip archives",
+  "workspaceToolDownloadTitle": "Download",
+  "workspaceToolDownloadUserDesc": "Download a URL into the workspace",
   "assistantEditLocalToolWorkspaceTitle": "Workspace"
 }

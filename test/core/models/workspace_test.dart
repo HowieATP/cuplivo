@@ -9,9 +9,11 @@ void main() {
     expect(ws.isToolEnabled(WorkspaceToolNames.write), isTrue);
     expect(ws.isToolEnabled(WorkspaceToolNames.patch), isTrue);
     expect(ws.isToolEnabled(WorkspaceToolNames.glob), isFalse);
+    expect(ws.isToolEnabled(WorkspaceToolNames.download), isFalse);
     expect(ws.isToolEnabled(WorkspaceToolNames.shell), isFalse);
     expect(ws.isToolNeedsApproval(WorkspaceToolNames.delete), isTrue);
     expect(ws.isToolNeedsApproval(WorkspaceToolNames.shell), isTrue);
+    expect(ws.isToolNeedsApproval(WorkspaceToolNames.download), isFalse);
     expect(ws.isToolNeedsApproval(WorkspaceToolNames.read), isFalse);
     expect(ws.alias, Workspace.defaultAlias);
   });

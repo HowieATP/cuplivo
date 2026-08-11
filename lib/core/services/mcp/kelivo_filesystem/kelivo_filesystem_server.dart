@@ -8,6 +8,9 @@ import 'package:archive/archive_io.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:path/path.dart' as p;
 
+import '../../workspace/workspace_download_service.dart';
+import '../../fetch/web_fetch_target_guard.dart' show WebFetchTargetGuard;
+
 /// A named root directory bound into the `@kelivo/filesystem` MCP server.
 ///
 /// External mounts are desktop-only and never sync. The built-in `@workspaces`
@@ -316,6 +319,8 @@ class KelivoFilesystemMcpServerEngine {
           return await _zip(args);
         case 'unzip':
           return await _unzip(args);
+        case 'download':
+          return await _download(args);
         default:
           return _toolErr('Tool not found: $name');
       }
@@ -1182,6 +1187,59 @@ class KelivoFilesystemMcpServerEngine {
     );
   }
 
+  Future<Map<String, dynamic>> _download(Map<String, dynamic> args) async {
+    final resolved = _resolve((args['path'] ?? '').toString());
+    if (resolved.isRoot) {
+      return _toolErr(
+        'download target must be a full file path, not a mount root: '
+        '${_display(resolved.wirePath)}',
+      );
+    }
+    _requireWritable(resolved);
+    final urlRaw = (args['url'] ?? '').toString().trim();
+    final url = Uri.tryParse(urlRaw);
+    if (url == null ||
+        !url.hasAuthority ||
+        url.host.isEmpty ||
+        !(url.isScheme('http') || url.isScheme('https'))) {
+      return _toolErr('Invalid url: expected an absolute http(s) URL');
+    }
+    final blockReason = WebFetchTargetGuard.literalBlockReason(url);
+    if (blockReason != null) {
+      return _toolErr('Invalid url: $blockReason');
+    }
+    final target = File(resolved.hostPath);
+    if (await Directory(target.path).exists()) {
+      return _toolErr(
+        'Invalid path: a directory already exists at '
+        '${_display(resolved.wirePath)}. download must target a full file '
+        'path, not a directory.',
+      );
+    }
+    final cacheDir = Directory(p.join(resolved.mount.path, '.fetch_cache'));
+    try {
+      final result = await WorkspaceDownloadService.download(
+        url: url,
+        target: target,
+        cacheDir: cacheDir,
+        wirePath: _display(resolved.wirePath),
+      );
+      if (_isSyncedWorkspaceMount(resolved.mount)) {
+        try {
+          await target.setLastModified(DateTime.now());
+        } catch (_) {}
+      }
+      return _toolOk(
+        'Downloaded ${result.downloadedBytes} bytes to '
+        '${_display(resolved.wirePath)}',
+      );
+    } on WorkspaceDownloadException catch (e) {
+      return _toolErr(e.message);
+    } catch (e) {
+      return _toolErr(e.toString());
+    }
+  }
+
   // =====================================================================
   // Helpers
   // =====================================================================
@@ -1719,6 +1777,30 @@ class KelivoFilesystemMcpServerEngine {
             },
           },
           'required': ['source', 'destination'],
+        },
+      },
+      'download': {
+        'name': 'download',
+        'description':
+            'Download a file from a URL into the workspace, saving the '
+            'response bytes as-is (binary allowed). The target must be a '
+            'full file path — the directory must already exist and '
+            'directories are never created by download. Fails on read-only '
+            'mounts.',
+        'inputSchema': {
+          'type': 'object',
+          'properties': {
+            'url': {
+              'type': 'string',
+              'description': 'Absolute http:// or https:// URL to download',
+            },
+            'path': {
+              'type': 'string',
+              'description':
+                  'Target file path (mount-relative, e.g. @default/reports/q3.pdf)',
+            },
+          },
+          'required': ['url', 'path'],
         },
       },
     }.values.toList();

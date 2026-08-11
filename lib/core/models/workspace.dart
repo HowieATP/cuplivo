@@ -15,6 +15,7 @@ class WorkspaceToolNames {
   static const String move = 'move';
   static const String zip = 'zip';
   static const String unzip = 'unzip';
+  static const String download = 'download';
   static const String shell = 'shell';
 
   /// Filesystem tools (excludes shell).
@@ -30,6 +31,7 @@ class WorkspaceToolNames {
     move,
     zip,
     unzip,
+    download,
   ];
 
   static const List<String> allTools = <String>[...filesystemTools, shell];

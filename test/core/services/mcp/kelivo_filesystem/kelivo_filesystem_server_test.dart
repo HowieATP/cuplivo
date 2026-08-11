@@ -585,7 +585,7 @@ void main() {
       expect(textOf(r), contains('Unsafe zip entry'));
     });
 
-    test('tools/list advertises the 11 tool definitions', () async {
+    test('tools/list advertises the 12 tool definitions', () async {
       final resp = await engine.handleMessage({
         'jsonrpc': '2.0',
         'id': 1,
@@ -607,6 +607,7 @@ void main() {
           'move',
           'zip',
           'unzip',
+          'download',
         ]),
       );
     });

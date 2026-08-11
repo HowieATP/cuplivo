@@ -661,3 +661,12 @@
 
 - "默认启动 DeepSeek" (issue #196) — resolved: default **selection**, not zero-config working. The base URL is seeded but the API key still comes from the user.
 - "关闭温度" — resolved: omit the sampling parameter, not send `temperature: 0`.
+
+## Kelivo Backup Interop (Image-Compression Settings)
+
+- **Kelivo image-compression settings (上游图片压缩设置)**: Kelivo's structurally different model — `image_upload_quality_v1` (enum: `original`/`high`/`balanced`/`saver`/`custom`), `image_compress_custom_quality_v1` (int, custom quality), `image_compress_transparent_enabled_v1` (bool). Cuplivo's native model stays untouched: `one_click_compress_*` (4 orthogonal params).
+- **Bidirectional translation (双向翻译)**: `KelivoImageSettingsMapper` (in `lib/core/services/backup/kelivo_image_settings_mapper.dart`) bridges the two models across backup import AND export (issue #124). See `docs/adr/0028-kelivo-image-settings-restore-translation.md`.
+- **Import (Kelivo → Cuplivo)**: `translateFromUpstream` runs in `_restoreFromBackupFile` (before the overwrite/merge branch). Trigger: String `image_upload_quality_v1` present AND no `one_click_compress_*` keys in the file — the second guard makes a Cuplivo export (which carries BOTH key sets) restore its own values verbatim instead of being re-translated (re-translation would overwrite the file's own maxLongEdge with 1568). Unknown enum values fall back to `balanced` with a `debugPrint`; out-of-range custom quality (upstream clamps 10–100) clamps to Cuplivo's 50–95 with a `debugPrint`.
+- **Export (Cuplivo → Kelivo)**: `_exportSettingsJson` derives the upstream keys at export time from the current `one_click_compress_*` values (`enabled=false` → `original`; `true` → `custom` + quality + transparent). Derived, never mirror-written — prefs hold no dual truth and no staleness when the user later changes Cuplivo settings.
+- **Lossy in one dimension only**: upstream persists NO long-edge field — `custom` is hardcoded at 1568 px (1568/2048/1024 are per-preset constants). A Cuplivo long edge collapses to 1568 in Kelivo and stays there if the backup returns. `enabled`, `quality` (Cuplivo 50–95 ⊂ upstream clamp 10–100) and the transparent toggle round-trip losslessly.
+- **Precedence**: overwrite mode — translated keys win (a Kelivo zip implies migration). Merge mode: non-mergeable keys only fill absent slots — local user preferences win. The 3 upstream keys are always stripped from the map on import (whether or not a translation fired), so they never linger inert in prefs — exports re-derive them.

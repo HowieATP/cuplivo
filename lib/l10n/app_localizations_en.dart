@@ -1352,7 +1352,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.';
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Cuplivo running forever.';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1380,7 +1380,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Notifications not allowed';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo is generating';
+  String get iosBackgroundGenerationActiveTitle => 'Cuplivo is generating';
 
   @override
   String get iosBackgroundGenerationActiveDetail =>
@@ -1439,7 +1439,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant reply has been generated';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo is running';
+  String get androidBackgroundNotificationTitle => 'Cuplivo is running';
 
   @override
   String get androidBackgroundNotificationText =>
@@ -5367,7 +5367,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - Open Source AI Assistant';
+  String get settingsShare => 'Cuplivo - Open Source AI Assistant';
 
   @override
   String get searchProviderBingLocalDescription =>

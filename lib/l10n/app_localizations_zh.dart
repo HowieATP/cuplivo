@@ -7332,6 +7332,211 @@ class AppLocalizationsZh extends AppLocalizations {
   String imageGenPartialNotice(Object received, Object requested) {
     return '仅生成 $received/$requested 张图片';
   }
+
+  @override
+  String get settingsPageWorkspace => '工作区';
+
+  @override
+  String get workspaceListEmpty => '暂无工作区';
+
+  @override
+  String get workspaceAdd => '添加工作区';
+
+  @override
+  String get workspaceNameHint => '工作区名称';
+
+  @override
+  String get workspaceCancel => '取消';
+
+  @override
+  String get workspaceConfirm => '确定';
+
+  @override
+  String get workspaceCannotDeleteDefault => '无法删除默认工作区';
+
+  @override
+  String get workspaceNotFound => '未找到工作区';
+
+  @override
+  String get workspaceRename => '重命名';
+
+  @override
+  String get workspaceFilesEntry => '工作区文件';
+
+  @override
+  String get workspaceFilesystemTools => '文件系统工具';
+
+  @override
+  String get workspaceInstallDeps => '安装依赖';
+
+  @override
+  String get workspaceEnableTitle => '开启工作区';
+
+  @override
+  String get workspaceBindTitle => '绑定工作区';
+
+  @override
+  String get workspaceEntryTitle => '工作区';
+
+  @override
+  String get workspaceEntrySubtitleOff => '未开启';
+
+  @override
+  String get workspaceShellAndroidOnly => 'Shell 仅在 Android 可用';
+
+  @override
+  String get workspaceToolShellTitle => 'Shell';
+
+  @override
+  String get workspaceToolShellUserDesc =>
+      '在 Linux 沙箱中运行命令（仅 Android，需先安装基础依赖）';
+
+  @override
+  String get workspaceDepSettings => '源设置';
+
+  @override
+  String get workspaceDepInstall => '安装';
+
+  @override
+  String get workspaceDepInstalling => '正在安装…';
+
+  @override
+  String get workspaceDepInstallDone => '安装完成';
+
+  @override
+  String get workspaceDepInstalled => '已安装';
+
+  @override
+  String get workspaceDepReinstall => '重新安装';
+
+  @override
+  String get workspaceSandboxRuntimeMissing => '缺少 proot 运行时，请重装本应用构建包';
+
+  @override
+  String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepDeveloping => '开发中';
+
+  @override
+  String get workspaceDepSource => '安装源';
+
+  @override
+  String get workspaceDepSourceAuto => '自动选择';
+
+  @override
+  String get workspaceDepSourceOfficial => '官方';
+
+  @override
+  String get workspaceDepSourceTuna => '清华 TUNA';
+
+  @override
+  String get workspaceDepSourceAliyun => '阿里云';
+
+  @override
+  String get workspaceDepSourceCustom => '自定义链接';
+
+  @override
+  String get workspaceDepCustomUrlHint => 'https://…';
+
+  @override
+  String get workspaceDepBaseTitle => '基础依赖';
+
+  @override
+  String get workspaceDepBaseDesc => '运行 Linux 沙箱所需的基础系统';
+
+  @override
+  String get workspaceDepPythonTitle => 'Python';
+
+  @override
+  String get workspaceDepPythonDesc => 'python3 与 pip';
+
+  @override
+  String get workspaceDepNodeTitle => 'Node.js';
+
+  @override
+  String get workspaceDepNodeDesc => 'nodejs 与 npm';
+
+  @override
+  String get workspaceDepGitTitle => 'Git';
+
+  @override
+  String get workspaceDepGitDesc => '版本控制工具';
+
+  @override
+  String get workspaceDepBuildTitle => '编译工具链';
+
+  @override
+  String get workspaceDepBuildDesc => 'gcc、make 等编译相关包';
+
+  @override
+  String get workspaceToolReadTitle => '读取';
+
+  @override
+  String get workspaceToolReadUserDesc => '读取工作区文件或列出目录';
+
+  @override
+  String get workspaceToolWriteTitle => '写入';
+
+  @override
+  String get workspaceToolWriteUserDesc => '创建或覆盖文件';
+
+  @override
+  String get workspaceToolPatchTitle => '补丁';
+
+  @override
+  String get workspaceToolPatchUserDesc => '替换文件中的文本';
+
+  @override
+  String get workspaceToolDeleteTitle => '删除';
+
+  @override
+  String get workspaceToolDeleteUserDesc => '删除文件或目录（需确认）';
+
+  @override
+  String get workspaceToolGlobTitle => 'Glob';
+
+  @override
+  String get workspaceToolGlobUserDesc => '按模式查找文件';
+
+  @override
+  String get workspaceToolGrepTitle => 'Grep';
+
+  @override
+  String get workspaceToolGrepUserDesc => '用正则搜索文件内容';
+
+  @override
+  String get workspaceToolOutlineTitle => '大纲';
+
+  @override
+  String get workspaceToolOutlineUserDesc => '查看源码文件结构';
+
+  @override
+  String get workspaceToolMkdirTitle => '建目录';
+
+  @override
+  String get workspaceToolMkdirUserDesc => '创建目录';
+
+  @override
+  String get workspaceToolMoveTitle => '移动';
+
+  @override
+  String get workspaceToolMoveUserDesc => '移动或重命名文件';
+
+  @override
+  String get workspaceToolZipTitle => '压缩';
+
+  @override
+  String get workspaceToolZipUserDesc => '创建 zip 压缩包';
+
+  @override
+  String get workspaceToolUnzipTitle => '解压';
+
+  @override
+  String get workspaceToolUnzipUserDesc => '解压 zip 压缩包';
+
+  @override
+  String get assistantEditLocalToolWorkspaceTitle => '工作区';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -14662,6 +14867,211 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String imageGenPartialNotice(Object received, Object requested) {
     return '仅生成 $received/$requested 张图片';
   }
+
+  @override
+  String get settingsPageWorkspace => '工作区';
+
+  @override
+  String get workspaceListEmpty => '暂无工作区';
+
+  @override
+  String get workspaceAdd => '添加工作区';
+
+  @override
+  String get workspaceNameHint => '工作区名称';
+
+  @override
+  String get workspaceCancel => '取消';
+
+  @override
+  String get workspaceConfirm => '确定';
+
+  @override
+  String get workspaceCannotDeleteDefault => '无法删除默认工作区';
+
+  @override
+  String get workspaceNotFound => '未找到工作区';
+
+  @override
+  String get workspaceRename => '重命名';
+
+  @override
+  String get workspaceFilesEntry => '工作区文件';
+
+  @override
+  String get workspaceFilesystemTools => '文件系统工具';
+
+  @override
+  String get workspaceInstallDeps => '安装依赖';
+
+  @override
+  String get workspaceEnableTitle => '开启工作区';
+
+  @override
+  String get workspaceBindTitle => '绑定工作区';
+
+  @override
+  String get workspaceEntryTitle => '工作区';
+
+  @override
+  String get workspaceEntrySubtitleOff => '未开启';
+
+  @override
+  String get workspaceShellAndroidOnly => 'Shell 仅在 Android 可用';
+
+  @override
+  String get workspaceToolShellTitle => 'Shell';
+
+  @override
+  String get workspaceToolShellUserDesc =>
+      '在 Linux 沙箱中运行命令（仅 Android，需先安装基础依赖）';
+
+  @override
+  String get workspaceDepSettings => '源设置';
+
+  @override
+  String get workspaceDepInstall => '安装';
+
+  @override
+  String get workspaceDepInstalling => '正在安装…';
+
+  @override
+  String get workspaceDepInstallDone => '安装完成';
+
+  @override
+  String get workspaceDepInstalled => '已安装';
+
+  @override
+  String get workspaceDepReinstall => '重新安装';
+
+  @override
+  String get workspaceSandboxRuntimeMissing => '缺少 proot 运行时，请重装本应用构建包';
+
+  @override
+  String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepDeveloping => '开发中';
+
+  @override
+  String get workspaceDepSource => '安装源';
+
+  @override
+  String get workspaceDepSourceAuto => '自动选择';
+
+  @override
+  String get workspaceDepSourceOfficial => '官方';
+
+  @override
+  String get workspaceDepSourceTuna => '清华 TUNA';
+
+  @override
+  String get workspaceDepSourceAliyun => '阿里云';
+
+  @override
+  String get workspaceDepSourceCustom => '自定义链接';
+
+  @override
+  String get workspaceDepCustomUrlHint => 'https://…';
+
+  @override
+  String get workspaceDepBaseTitle => '基础依赖';
+
+  @override
+  String get workspaceDepBaseDesc => '运行 Linux 沙箱所需的基础系统';
+
+  @override
+  String get workspaceDepPythonTitle => 'Python';
+
+  @override
+  String get workspaceDepPythonDesc => 'python3 与 pip';
+
+  @override
+  String get workspaceDepNodeTitle => 'Node.js';
+
+  @override
+  String get workspaceDepNodeDesc => 'nodejs 与 npm';
+
+  @override
+  String get workspaceDepGitTitle => 'Git';
+
+  @override
+  String get workspaceDepGitDesc => '版本控制工具';
+
+  @override
+  String get workspaceDepBuildTitle => '编译工具链';
+
+  @override
+  String get workspaceDepBuildDesc => 'gcc、make 等编译相关包';
+
+  @override
+  String get workspaceToolReadTitle => '读取';
+
+  @override
+  String get workspaceToolReadUserDesc => '读取工作区文件或列出目录';
+
+  @override
+  String get workspaceToolWriteTitle => '写入';
+
+  @override
+  String get workspaceToolWriteUserDesc => '创建或覆盖文件';
+
+  @override
+  String get workspaceToolPatchTitle => '补丁';
+
+  @override
+  String get workspaceToolPatchUserDesc => '替换文件中的文本';
+
+  @override
+  String get workspaceToolDeleteTitle => '删除';
+
+  @override
+  String get workspaceToolDeleteUserDesc => '删除文件或目录（需确认）';
+
+  @override
+  String get workspaceToolGlobTitle => 'Glob';
+
+  @override
+  String get workspaceToolGlobUserDesc => '按模式查找文件';
+
+  @override
+  String get workspaceToolGrepTitle => 'Grep';
+
+  @override
+  String get workspaceToolGrepUserDesc => '用正则搜索文件内容';
+
+  @override
+  String get workspaceToolOutlineTitle => '大纲';
+
+  @override
+  String get workspaceToolOutlineUserDesc => '查看源码文件结构';
+
+  @override
+  String get workspaceToolMkdirTitle => '建目录';
+
+  @override
+  String get workspaceToolMkdirUserDesc => '创建目录';
+
+  @override
+  String get workspaceToolMoveTitle => '移动';
+
+  @override
+  String get workspaceToolMoveUserDesc => '移动或重命名文件';
+
+  @override
+  String get workspaceToolZipTitle => '压缩';
+
+  @override
+  String get workspaceToolZipUserDesc => '创建 zip 压缩包';
+
+  @override
+  String get workspaceToolUnzipTitle => '解压';
+
+  @override
+  String get workspaceToolUnzipUserDesc => '解压 zip 压缩包';
+
+  @override
+  String get assistantEditLocalToolWorkspaceTitle => '工作区';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -21992,4 +22402,209 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String imageGenPartialNotice(Object received, Object requested) {
     return '僅生成 $received/$requested 張圖片';
   }
+
+  @override
+  String get settingsPageWorkspace => '工作區';
+
+  @override
+  String get workspaceListEmpty => '暫無工作區';
+
+  @override
+  String get workspaceAdd => '新增工作區';
+
+  @override
+  String get workspaceNameHint => '工作區名稱';
+
+  @override
+  String get workspaceCancel => '取消';
+
+  @override
+  String get workspaceConfirm => '確定';
+
+  @override
+  String get workspaceCannotDeleteDefault => '無法刪除預設工作區';
+
+  @override
+  String get workspaceNotFound => '找不到工作區';
+
+  @override
+  String get workspaceRename => '重新命名';
+
+  @override
+  String get workspaceFilesEntry => '工作區檔案';
+
+  @override
+  String get workspaceFilesystemTools => '檔案系統工具';
+
+  @override
+  String get workspaceInstallDeps => '安裝依賴';
+
+  @override
+  String get workspaceEnableTitle => '開啟工作區';
+
+  @override
+  String get workspaceBindTitle => '綁定工作區';
+
+  @override
+  String get workspaceEntryTitle => '工作區';
+
+  @override
+  String get workspaceEntrySubtitleOff => '未開啟';
+
+  @override
+  String get workspaceShellAndroidOnly => 'Shell 僅在 Android 可用';
+
+  @override
+  String get workspaceToolShellTitle => 'Shell';
+
+  @override
+  String get workspaceToolShellUserDesc =>
+      '在 Linux 沙箱中執行命令（僅 Android，需先安裝基礎依賴）';
+
+  @override
+  String get workspaceDepSettings => '來源設定';
+
+  @override
+  String get workspaceDepInstall => '安裝';
+
+  @override
+  String get workspaceDepInstalling => '正在安裝…';
+
+  @override
+  String get workspaceDepInstallDone => '安裝完成';
+
+  @override
+  String get workspaceDepInstalled => '已安裝';
+
+  @override
+  String get workspaceDepReinstall => '重新安裝';
+
+  @override
+  String get workspaceSandboxRuntimeMissing => '缺少 proot 執行環境，請重裝本應用建置包';
+
+  @override
+  String get workspaceSandboxBaseRequired => '請先安裝基礎相依元件';
+
+  @override
+  String get workspaceDepDeveloping => '開發中';
+
+  @override
+  String get workspaceDepSource => '安裝來源';
+
+  @override
+  String get workspaceDepSourceAuto => '自動選擇';
+
+  @override
+  String get workspaceDepSourceOfficial => '官方';
+
+  @override
+  String get workspaceDepSourceTuna => '清華 TUNA';
+
+  @override
+  String get workspaceDepSourceAliyun => '阿里雲';
+
+  @override
+  String get workspaceDepSourceCustom => '自訂連結';
+
+  @override
+  String get workspaceDepCustomUrlHint => 'https://…';
+
+  @override
+  String get workspaceDepBaseTitle => '基礎依賴';
+
+  @override
+  String get workspaceDepBaseDesc => '執行 Linux 沙箱所需的基礎系統';
+
+  @override
+  String get workspaceDepPythonTitle => 'Python';
+
+  @override
+  String get workspaceDepPythonDesc => 'python3 與 pip';
+
+  @override
+  String get workspaceDepNodeTitle => 'Node.js';
+
+  @override
+  String get workspaceDepNodeDesc => 'nodejs 與 npm';
+
+  @override
+  String get workspaceDepGitTitle => 'Git';
+
+  @override
+  String get workspaceDepGitDesc => '版本控制工具';
+
+  @override
+  String get workspaceDepBuildTitle => '編譯工具鏈';
+
+  @override
+  String get workspaceDepBuildDesc => 'gcc、make 等編譯相關套件';
+
+  @override
+  String get workspaceToolReadTitle => '讀取';
+
+  @override
+  String get workspaceToolReadUserDesc => '讀取工作區檔案或列出目錄';
+
+  @override
+  String get workspaceToolWriteTitle => '寫入';
+
+  @override
+  String get workspaceToolWriteUserDesc => '建立或覆蓋檔案';
+
+  @override
+  String get workspaceToolPatchTitle => '修補';
+
+  @override
+  String get workspaceToolPatchUserDesc => '替換檔案中的文字';
+
+  @override
+  String get workspaceToolDeleteTitle => '刪除';
+
+  @override
+  String get workspaceToolDeleteUserDesc => '刪除檔案或目錄（需確認）';
+
+  @override
+  String get workspaceToolGlobTitle => 'Glob';
+
+  @override
+  String get workspaceToolGlobUserDesc => '依模式尋找檔案';
+
+  @override
+  String get workspaceToolGrepTitle => 'Grep';
+
+  @override
+  String get workspaceToolGrepUserDesc => '以正規表示式搜尋檔案內容';
+
+  @override
+  String get workspaceToolOutlineTitle => '大綱';
+
+  @override
+  String get workspaceToolOutlineUserDesc => '檢視原始碼檔案結構';
+
+  @override
+  String get workspaceToolMkdirTitle => '建目錄';
+
+  @override
+  String get workspaceToolMkdirUserDesc => '建立目錄';
+
+  @override
+  String get workspaceToolMoveTitle => '移動';
+
+  @override
+  String get workspaceToolMoveUserDesc => '移動或重新命名檔案';
+
+  @override
+  String get workspaceToolZipTitle => '壓縮';
+
+  @override
+  String get workspaceToolZipUserDesc => '建立 zip 壓縮檔';
+
+  @override
+  String get workspaceToolUnzipTitle => '解壓';
+
+  @override
+  String get workspaceToolUnzipUserDesc => '解壓 zip 壓縮檔';
+
+  @override
+  String get assistantEditLocalToolWorkspaceTitle => '工作區';
 }

@@ -62,17 +62,10 @@ class AppDirectories {
     return Directory('${root.path}/skills');
   }
 
-  /// Gets the directory for the built-in `@workspaces` filesystem sandbox.
-  ///
-  /// Desktop users may relocate the sandbox via the storage mounts settings
-  /// (`workspaces_dir_v1`); the preference is honored on desktop only, so a
-  /// backup restored on mobile can never point the sandbox at a foreign
-  /// host path (mount configs are device-local, see CONTEXT.md). The value
-  /// is re-validated at load (`_isSafeWorkspacesLocation`): a restored or
-  /// hand-edited pref that is relative, a filesystem root, or overlapping a
-  /// fixed sync tree falls back to the default location with a log — the
-  /// write-time guards cannot cover the settings.json restore door.
-  static Future<Directory> getWorkspacesDirectory() async {
+  /// Root directory that holds all workspace sandboxes (`default/`,
+  /// `workspace_N/`, …). Desktop users may relocate this root via
+  /// `workspaces_dir_v1` (honored on desktop only).
+  static Future<Directory> getWorkspacesRootDirectory() async {
     if (PlatformUtils.isDesktopTarget) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -94,6 +87,30 @@ class AppDirectories {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/workspaces');
   }
+
+  /// Files directory for a single workspace alias under the multi-workspace root.
+  static Future<Directory> getWorkspaceFilesDirectory(String alias) async {
+    final a = alias.trim();
+    if (a.isEmpty ||
+        a.contains('/') ||
+        a.contains('\\') ||
+        a.contains('..') ||
+        a.contains('\u0000')) {
+      throw ArgumentError('Invalid workspace alias: $alias');
+    }
+    final root = await getWorkspacesRootDirectory();
+    final dir = Directory(p.join(root.path, a));
+    final rootCanon = p.normalize(root.absolute.path);
+    final dirCanon = p.normalize(dir.absolute.path);
+    if (dirCanon != rootCanon && !p.isWithin(rootCanon, dirCanon)) {
+      throw ArgumentError('Workspace path escapes root: $alias');
+    }
+    return dir;
+  }
+
+  /// @deprecated Use [getWorkspacesRootDirectory]. Kept for call-site compat.
+  static Future<Directory> getWorkspacesDirectory() =>
+      getWorkspacesRootDirectory();
 
   /// Load-time safety check for [workspacesDirPrefsKey]: the path must be
   /// absolute, must not be a filesystem root (a sandbox at `C:/` or `/`

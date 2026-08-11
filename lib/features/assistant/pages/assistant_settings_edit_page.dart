@@ -5,7 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -32,6 +32,7 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';

@@ -2699,6 +2699,32 @@ class $AssistantRowsTable extends AssistantRows
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _workspaceEnabledMeta = const VerificationMeta(
+    'workspaceEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> workspaceEnabled = GeneratedColumn<bool>(
+    'workspace_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("workspace_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _regexRulesJsonMeta = const VerificationMeta(
     'regexRulesJson',
   );
@@ -2984,6 +3010,8 @@ class $AssistantRowsTable extends AssistantRows
     mcpServerIdsJson,
     localToolIdsJson,
     skillIdsJson,
+    workspaceEnabled,
+    workspaceId,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -3214,6 +3242,24 @@ class $AssistantRowsTable extends AssistantRows
         skillIdsJson.isAcceptableOrUnknown(
           data['skill_ids_json']!,
           _skillIdsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('workspace_enabled')) {
+      context.handle(
+        _workspaceEnabledMeta,
+        workspaceEnabled.isAcceptableOrUnknown(
+          data['workspace_enabled']!,
+          _workspaceEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
         ),
       );
     }
@@ -3493,6 +3539,14 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}skill_ids_json'],
       )!,
+      workspaceEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}workspace_enabled'],
+      )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      ),
       regexRulesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}regex_rules_json'],
@@ -3611,6 +3665,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String mcpServerIdsJson;
   final String localToolIdsJson;
   final String skillIdsJson;
+  final bool workspaceEnabled;
+  final String? workspaceId;
   final String regexRulesJson;
   final bool enableProactiveCare;
   final DateTime? proactiveCareNextMessageAt;
@@ -3657,6 +3713,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.mcpServerIdsJson,
     required this.localToolIdsJson,
     required this.skillIdsJson,
+    required this.workspaceEnabled,
+    this.workspaceId,
     required this.regexRulesJson,
     required this.enableProactiveCare,
     this.proactiveCareNextMessageAt,
@@ -3722,6 +3780,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['mcp_server_ids_json'] = Variable<String>(mcpServerIdsJson);
     map['local_tool_ids_json'] = Variable<String>(localToolIdsJson);
     map['skill_ids_json'] = Variable<String>(skillIdsJson);
+    map['workspace_enabled'] = Variable<bool>(workspaceEnabled);
+    if (!nullToAbsent || workspaceId != null) {
+      map['workspace_id'] = Variable<String>(workspaceId);
+    }
     map['regex_rules_json'] = Variable<String>(regexRulesJson);
     map['enable_proactive_care'] = Variable<bool>(enableProactiveCare);
     if (!nullToAbsent || proactiveCareNextMessageAt != null) {
@@ -3800,6 +3862,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       mcpServerIdsJson: Value(mcpServerIdsJson),
       localToolIdsJson: Value(localToolIdsJson),
       skillIdsJson: Value(skillIdsJson),
+      workspaceEnabled: Value(workspaceEnabled),
+      workspaceId: workspaceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workspaceId),
       regexRulesJson: Value(regexRulesJson),
       enableProactiveCare: Value(enableProactiveCare),
       proactiveCareNextMessageAt:
@@ -3867,6 +3933,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       mcpServerIdsJson: serializer.fromJson<String>(json['mcpServerIdsJson']),
       localToolIdsJson: serializer.fromJson<String>(json['localToolIdsJson']),
       skillIdsJson: serializer.fromJson<String>(json['skillIdsJson']),
+      workspaceEnabled: serializer.fromJson<bool>(json['workspaceEnabled']),
+      workspaceId: serializer.fromJson<String?>(json['workspaceId']),
       regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
       enableProactiveCare: serializer.fromJson<bool>(
         json['enableProactiveCare'],
@@ -3936,6 +4004,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'mcpServerIdsJson': serializer.toJson<String>(mcpServerIdsJson),
       'localToolIdsJson': serializer.toJson<String>(localToolIdsJson),
       'skillIdsJson': serializer.toJson<String>(skillIdsJson),
+      'workspaceEnabled': serializer.toJson<bool>(workspaceEnabled),
+      'workspaceId': serializer.toJson<String?>(workspaceId),
       'regexRulesJson': serializer.toJson<String>(regexRulesJson),
       'enableProactiveCare': serializer.toJson<bool>(enableProactiveCare),
       'proactiveCareNextMessageAt': serializer.toJson<DateTime?>(
@@ -3993,6 +4063,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? mcpServerIdsJson,
     String? localToolIdsJson,
     String? skillIdsJson,
+    bool? workspaceEnabled,
+    Value<String?> workspaceId = const Value.absent(),
     String? regexRulesJson,
     bool? enableProactiveCare,
     Value<DateTime?> proactiveCareNextMessageAt = const Value.absent(),
@@ -4043,6 +4115,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
     localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
     skillIdsJson: skillIdsJson ?? this.skillIdsJson,
+    workspaceEnabled: workspaceEnabled ?? this.workspaceEnabled,
+    workspaceId: workspaceId.present ? workspaceId.value : this.workspaceId,
     regexRulesJson: regexRulesJson ?? this.regexRulesJson,
     enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
     proactiveCareNextMessageAt: proactiveCareNextMessageAt.present
@@ -4136,6 +4210,12 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       skillIdsJson: data.skillIdsJson.present
           ? data.skillIdsJson.value
           : this.skillIdsJson,
+      workspaceEnabled: data.workspaceEnabled.present
+          ? data.workspaceEnabled.value
+          : this.workspaceEnabled,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
       regexRulesJson: data.regexRulesJson.present
           ? data.regexRulesJson.value
           : this.regexRulesJson,
@@ -4216,6 +4296,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('skillIdsJson: $skillIdsJson, ')
+          ..write('workspaceEnabled: $workspaceEnabled, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -4269,6 +4351,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     mcpServerIdsJson,
     localToolIdsJson,
     skillIdsJson,
+    workspaceEnabled,
+    workspaceId,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -4319,6 +4403,8 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.mcpServerIdsJson == this.mcpServerIdsJson &&
           other.localToolIdsJson == this.localToolIdsJson &&
           other.skillIdsJson == this.skillIdsJson &&
+          other.workspaceEnabled == this.workspaceEnabled &&
+          other.workspaceId == this.workspaceId &&
           other.regexRulesJson == this.regexRulesJson &&
           other.enableProactiveCare == this.enableProactiveCare &&
           other.proactiveCareNextMessageAt == this.proactiveCareNextMessageAt &&
@@ -4369,6 +4455,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> mcpServerIdsJson;
   final Value<String> localToolIdsJson;
   final Value<String> skillIdsJson;
+  final Value<bool> workspaceEnabled;
+  final Value<String?> workspaceId;
   final Value<String> regexRulesJson;
   final Value<bool> enableProactiveCare;
   final Value<DateTime?> proactiveCareNextMessageAt;
@@ -4416,6 +4504,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
     this.skillIdsJson = const Value.absent(),
+    this.workspaceEnabled = const Value.absent(),
+    this.workspaceId = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -4464,6 +4554,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
     this.skillIdsJson = const Value.absent(),
+    this.workspaceEnabled = const Value.absent(),
+    this.workspaceId = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -4516,6 +4608,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? mcpServerIdsJson,
     Expression<String>? localToolIdsJson,
     Expression<String>? skillIdsJson,
+    Expression<bool>? workspaceEnabled,
+    Expression<String>? workspaceId,
     Expression<String>? regexRulesJson,
     Expression<bool>? enableProactiveCare,
     Expression<DateTime>? proactiveCareNextMessageAt,
@@ -4568,6 +4662,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (mcpServerIdsJson != null) 'mcp_server_ids_json': mcpServerIdsJson,
       if (localToolIdsJson != null) 'local_tool_ids_json': localToolIdsJson,
       if (skillIdsJson != null) 'skill_ids_json': skillIdsJson,
+      if (workspaceEnabled != null) 'workspace_enabled': workspaceEnabled,
+      if (workspaceId != null) 'workspace_id': workspaceId,
       if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
       if (enableProactiveCare != null)
         'enable_proactive_care': enableProactiveCare,
@@ -4626,6 +4722,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? mcpServerIdsJson,
     Value<String>? localToolIdsJson,
     Value<String>? skillIdsJson,
+    Value<bool>? workspaceEnabled,
+    Value<String?>? workspaceId,
     Value<String>? regexRulesJson,
     Value<bool>? enableProactiveCare,
     Value<DateTime?>? proactiveCareNextMessageAt,
@@ -4674,6 +4772,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
       localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
       skillIdsJson: skillIdsJson ?? this.skillIdsJson,
+      workspaceEnabled: workspaceEnabled ?? this.workspaceEnabled,
+      workspaceId: workspaceId ?? this.workspaceId,
       regexRulesJson: regexRulesJson ?? this.regexRulesJson,
       enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
       proactiveCareNextMessageAt:
@@ -4779,6 +4879,12 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     }
     if (skillIdsJson.present) {
       map['skill_ids_json'] = Variable<String>(skillIdsJson.value);
+    }
+    if (workspaceEnabled.present) {
+      map['workspace_enabled'] = Variable<bool>(workspaceEnabled.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
     }
     if (regexRulesJson.present) {
       map['regex_rules_json'] = Variable<String>(regexRulesJson.value);
@@ -4886,6 +4992,8 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('skillIdsJson: $skillIdsJson, ')
+          ..write('workspaceEnabled: $workspaceEnabled, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -10057,6 +10165,8 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
       Value<String> skillIdsJson,
+      Value<bool> workspaceEnabled,
+      Value<String?> workspaceId,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -10106,6 +10216,8 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
       Value<String> skillIdsJson,
+      Value<bool> workspaceEnabled,
+      Value<String?> workspaceId,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -10256,6 +10368,16 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get skillIdsJson => $composableBuilder(
     column: $table.skillIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get workspaceEnabled => $composableBuilder(
+    column: $table.workspaceEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10494,6 +10616,16 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get workspaceEnabled => $composableBuilder(
+    column: $table.workspaceEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => ColumnOrderings(column),
@@ -10720,6 +10852,16 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get workspaceEnabled => $composableBuilder(
+    column: $table.workspaceEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => column,
@@ -10868,6 +11010,8 @@ class $$AssistantRowsTableTableManager
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> skillIdsJson = const Value.absent(),
+                Value<bool> workspaceEnabled = const Value.absent(),
+                Value<String?> workspaceId = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -10918,6 +11062,8 @@ class $$AssistantRowsTableTableManager
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
                 skillIdsJson: skillIdsJson,
+                workspaceEnabled: workspaceEnabled,
+                workspaceId: workspaceId,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,
@@ -10967,6 +11113,8 @@ class $$AssistantRowsTableTableManager
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> skillIdsJson = const Value.absent(),
+                Value<bool> workspaceEnabled = const Value.absent(),
+                Value<String?> workspaceId = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -11017,6 +11165,8 @@ class $$AssistantRowsTableTableManager
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
                 skillIdsJson: skillIdsJson,
+                workspaceEnabled: workspaceEnabled,
+                workspaceId: workspaceId,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,

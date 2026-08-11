@@ -1,0 +1,8 @@
+PRoot native libraries (libproot_exec.so, libproot_loader.so)
+============================================================
+These binaries are builds of PRoot (https://proot-me.github.io / https://github.com/proot-me/proot),
+licensed under GNU GPL v2 or later.
+
+Cuplivo vendors them solely as the Android userland chroot helper for the optional
+Linux sandbox feature. Corresponding source for PRoot is available from the
+upstream project. No AGPL application source from third-party apps is included.

@@ -23,9 +23,9 @@ import '../kelivo_filesystem/kelivo_filesystem_server.dart'
 /// by default, while raw content requires an explicit opt-in. Responses are
 /// bounded and can be continued with `start_index`.
 ///
-/// `download_path` saves fetched bytes as-is into `@workspaces` (binary
+/// `download_path` saves fetched bytes as-is into `@default` (binary
 /// allowed); without it, over-length content is stored in
-/// `@workspaces/.fetch_cache/` and the path is returned. See CONTEXT.md
+/// `@default/.fetch_cache/` and the path is returned. See CONTEXT.md
 /// "@kelivo/fetch (Built-in Fetch Tool)".
 ///
 /// The server implements a minimal subset of MCP over JSON-RPC 2.0:
@@ -43,7 +43,7 @@ class KelivoFetchRequestPayload {
   final int startIndex;
   final bool raw;
 
-  /// Full wire path under `@workspaces/` (validated), or null for text mode.
+  /// Full wire path under `@default/` (validated), or null for text mode.
   final String? downloadPath;
 
   KelivoFetchRequestPayload({
@@ -120,36 +120,44 @@ class KelivoFetchRequestPayload {
     );
   }
 
-  /// Validates [raw] as a full-file wire path under `@workspaces/` only
+  /// Validates [raw] as a full-file wire path under `@default/` only
   /// (ADR 0022 rules; the fetch built-in never touches external mounts).
   /// Directories are not allowed — the path IS the complete target file.
+  /// Legacy `@workspaces/…` paths are rewritten to `@default/…`.
   static String _validateDownloadPath(String raw) {
-    if (raw.trim() != raw) {
+    final trimmed = raw.trim();
+    if (trimmed != raw) {
       throw ArgumentError(
         'Invalid download_path: leading/trailing whitespace is not allowed: $raw',
       );
     }
-    const prefix = '@workspaces/';
-    if (!raw.startsWith(prefix)) {
+    var path = trimmed;
+    if (path.startsWith('@workspaces/')) {
+      path = '@default/${path.substring('@workspaces/'.length)}';
+    }
+    const prefix = '@default/';
+    if (!path.startsWith(prefix) || path.length <= prefix.length) {
       throw ArgumentError(
         'Invalid download_path: must be a full file path under '
-        '@workspaces/ (e.g. @workspaces/reports/q3.pdf). '
-        'External mounts are not available to the fetch tool.',
+        '@default/ (e.g. @default/reports/q3.pdf). '
+        'Absolute paths and other mounts are not allowed.',
       );
     }
-    if (raw.endsWith('/')) {
+    if (path.endsWith('/')) {
       throw ArgumentError(
         'Invalid download_path: trailing slash is not allowed '
-        '(a full file path is required, not a directory): $raw',
+        '(must be a full file path): $raw',
       );
     }
-    if (raw.contains('\\')) {
+    if (path.contains(r'\')) {
       throw ArgumentError(
         'Invalid download_path: backslashes are not allowed; '
         'use forward slashes: $raw',
       );
     }
-    for (final seg in raw.substring(prefix.length).split('/')) {
+    final rest = path.substring(prefix.length);
+    final segments = rest.split('/');
+    for (final seg in segments) {
       if (!isSafeWireSegment(seg)) {
         throw ArgumentError('Invalid download_path: unsafe path segment: $raw');
       }
@@ -159,19 +167,13 @@ class KelivoFetchRequestPayload {
         );
       }
       if (seg.startsWith('.')) {
-        // Dot-prefixed segments (e.g. `.fetch_cache/`, `.git/`, `.hidden/`)
-        // are excluded from backup/sync and invisible to glob/grep — the
-        // opposite of a permanent download target: the confirmation's own
-        // browsing advice would silently fail and the file never backs up.
-        // Mirrors the trash resolver's dot-segment rule.
         throw ArgumentError(
           'Invalid download_path: dot-prefixed segments are reserved '
-          'system paths (e.g. .fetch_cache/); download to a regular '
-          'workspace path instead.',
+          'for internal cache storage: $raw',
         );
       }
     }
-    return raw;
+    return path;
   }
 
   static int _parseInteger(
@@ -287,7 +289,7 @@ class KelivoFetcher {
           'byte in the first $_binarySniffBytes bytes). If the payload is a '
           'file (image, PDF, archive, ...), re-call kelivo_fetch with '
           'download_path set (e.g. download_path: '
-          '"@workspaces/download.bin") to save it as-is.',
+          '"@default/download.bin") to save it as-is.',
         );
       }
       final body = _decodeBody(resp, bytes);
@@ -377,7 +379,7 @@ class KelivoFetcher {
     return binaryPrefixes.any(contentType.startsWith);
   }
 
-  /// Downloads [payload] to [downloadPath] (a validated `@workspaces/...`
+  /// Downloads [payload] to [downloadPath] (a validated `@default/...`
   /// full file path). Streams to a unique `.part` file inside
   /// `.fetch_cache/`, then renames onto the target. Existing targets are
   /// replaced atomically via a backup name with rollback (a failed rename
@@ -392,13 +394,13 @@ class KelivoFetcher {
     try {
       ws = await _resolveWorkspaces(workspacesDirProvider);
     } catch (e) {
-      debugPrint('[kelivo_fetch] @workspaces sandbox unavailable: $e');
+      debugPrint('[kelivo_fetch] @default sandbox unavailable: $e');
       return _err(
-        'Failed to resolve the @workspaces sandbox: '
+        'Failed to resolve the @default sandbox: '
         '${e is Exception ? e.toString() : 'Unknown error'}',
       );
     }
-    final rel = downloadPath.substring('@workspaces/'.length);
+    final rel = downloadPath.substring('@default/'.length);
     final target = File(p.join(ws.path, rel));
     final cacheDir = Directory(p.join(ws.path, '.fetch_cache'));
     // Fail fast: a directory at the target path must never be replaced by a
@@ -542,14 +544,17 @@ class KelivoFetcher {
     }
   }
 
-  /// Resolves the `@workspaces` sandbox directory (default:
-  /// `AppDirectories.getWorkspacesDirectory`), creating it if missing.
+  /// Resolves the `@default` workspace files directory (or legacy root via
+  /// [workspacesDirProvider]), creating it if missing.
   static Future<Directory> _resolveWorkspaces(
     Future<Directory> Function()? workspacesDirProvider,
   ) async {
-    final dir =
-        await (workspacesDirProvider ??
-            AppDirectories.getWorkspacesDirectory)();
+    if (workspacesDirProvider != null) {
+      final dir = await workspacesDirProvider();
+      await dir.create(recursive: true);
+      return dir;
+    }
+    final dir = await AppDirectories.getWorkspaceFilesDirectory('default');
     await dir.create(recursive: true);
     return dir;
   }
@@ -570,7 +575,7 @@ class KelivoFetcher {
   }
 
   /// Saves the full converted text of an over-length fetch into
-  /// `@workspaces/.fetch_cache/<key>.md|.txt` and runs the eviction pass.
+  /// `@default/.fetch_cache/<key>.md|.txt` and runs the eviction pass.
   /// Returns the wire path, or null when the sandbox is unavailable (logged;
   /// the bounded text response still stands — recoverable environment issue).
   static Future<String?> _saveOverflowText(
@@ -584,7 +589,7 @@ class KelivoFetcher {
       ws = await _resolveWorkspaces(workspacesDirProvider);
     } catch (e) {
       debugPrint(
-        '[kelivo_fetch] @workspaces sandbox unavailable, '
+        '[kelivo_fetch] @default sandbox unavailable, '
         'skipping overflow save: $e',
       );
       return null;
@@ -596,7 +601,7 @@ class KelivoFetcher {
       final file = File(p.join(dir.path, name));
       await file.writeAsString(text);
       await _evictCache(dir, justWritten: file);
-      return '@workspaces/.fetch_cache/$name';
+      return '@default/.fetch_cache/$name';
     } catch (e) {
       debugPrint('[kelivo_fetch] overflow save failed: $e');
       return null;
@@ -770,7 +775,7 @@ class KelivoFetcher {
 class KelivoFetchMcpServerEngine {
   bool _closed = false;
 
-  /// Resolves the `@workspaces` sandbox for download/overflow saves.
+  /// Resolves the `@default` sandbox for download/overflow saves.
   /// Defaults to `AppDirectories.getWorkspacesDirectory()`; injectable for
   /// tests. Resolved lazily per call — no I/O at construction time.
   final Future<Directory> Function()? workspacesDirProvider;
@@ -915,8 +920,8 @@ class KelivoFetchMcpServerEngine {
         'download_path': {
           'type': 'string',
           'description':
-              'Optional full file path under @workspaces/ (e.g. '
-              '@workspaces/reports/q3.pdf) that saves the fetched bytes '
+              'Optional full file path under @default/ (e.g. '
+              '@default/reports/q3.pdf) that saves the fetched bytes '
               'as-is — binary content included. Must be a complete file '
               'path, not a directory; existing files are silently '
               'overwritten. When set, the response is a save confirmation '
@@ -939,7 +944,7 @@ class KelivoFetchMcpServerEngine {
             'Markdown with bounded output by default. Continue truncated content with '
             'start_index; use raw=true only when exact source is required. '
             'When content exceeds max_length, the full content is saved to '
-            '@workspaces/.fetch_cache/ and the path is returned. Use '
+            '@default/.fetch_cache/ and the path is returned. Use '
             'download_path to save any content as-is (binary included).',
         'inputSchema': schema(),
       },

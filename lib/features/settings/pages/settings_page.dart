@@ -18,6 +18,7 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../workspace/pages/workspace_list_page.dart';
 import '../../skills/pages/skills_page.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
@@ -248,6 +249,19 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.FolderOpen,
+                label: l10n.settingsPageWorkspace,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WorkspaceListPage(),
+                    ),
+                  );
                 },
               ),
               _iosDivider(context),

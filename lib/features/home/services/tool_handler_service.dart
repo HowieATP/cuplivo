@@ -5,15 +5,20 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_memory.dart';
+import '../../../core/models/workspace.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/headless_generation_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/workspace/linux_sandbox_service.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
@@ -232,6 +237,9 @@ class ToolHandlerService {
       names.add(LocalToolNames.loadSkill);
       names.add(LocalToolNames.readSkillFile);
     }
+    if (assistant.workspaceEnabled) {
+      names.addAll(WorkspaceToolNames.allTools);
+    }
     return names;
   }
 
@@ -338,6 +346,21 @@ class ToolHandlerService {
         supportsTools: supportsTools,
       ),
     );
+
+    // Workspace filesystem + shell tools
+    try {
+      final wp = contextProvider.read<WorkspaceProvider>();
+      toolDefs.addAll(
+        WorkspaceToolsService.buildToolDefinitions(
+          assistant: assistant,
+          workspaces: wp,
+          supportsTools: supportsTools,
+          sandbox: LinuxSandboxService.instance,
+        ),
+      );
+    } on ProviderNotFoundException catch (e) {
+      debugPrint('workspace tools defs skipped: $e');
+    }
 
     // MCP tools
     final mcpTools = _buildMcpToolDefinitions(
@@ -519,9 +542,17 @@ class ToolHandlerService {
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
-    // Capture AssistantProvider reference before async gap to avoid
+    // Capture provider references before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    WorkspaceProvider? workspaceProvider;
+    ChatService? chatService;
+    try {
+      workspaceProvider = contextProvider.read<WorkspaceProvider>();
+      chatService = contextProvider.read<ChatService>();
+    } catch (_) {
+      // Headless / tests without WorkspaceProvider.
+    }
 
     return (name, args, {toolCallId}) async {
       try {
@@ -623,6 +654,58 @@ class ToolHandlerService {
         );
         if (localResult != null) {
           return localResult;
+        }
+
+        // Workspace tools (filesystem + shell)
+        if (WorkspaceToolNames.isWorkspaceTool(name) &&
+            assistant?.workspaceEnabled == true) {
+          final wp = workspaceProvider;
+          if (wp == null) {
+            return _toolError(
+              error: 'workspace_unavailable',
+              message: 'WorkspaceProvider is not available',
+              tool: name,
+            );
+          }
+          final boundId = assistant?.workspaceId;
+          final boundWs =
+              boundId != null ? wp.getById(boundId) : null;
+          final needsApproval =
+              boundWs?.isToolNeedsApproval(name) ??
+              WorkspaceToolNames.defaultApprovalFor(name);
+          if (approvalService != null && needsApproval) {
+            final callId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+            final result = await approvalService.requestApproval(
+              toolCallId: callId,
+              toolName: name,
+              arguments: args,
+              conversationId: conversationId,
+            );
+            if (!result.approved) {
+              return _toolError(
+                error: 'approval_denied',
+                message: result.denyReason ?? 'User denied the tool call',
+                tool: name,
+              );
+            }
+          }
+          try {
+            final wsResult = await WorkspaceToolsService.tryHandleToolCall(
+              name: name,
+              args: args,
+              assistant: assistant,
+              workspaces: wp,
+              chatService: chatService,
+              sandbox: LinuxSandboxService.instance,
+            );
+            if (wsResult != null) return wsResult;
+          } catch (e) {
+            return _toolError(
+              error: 'workspace_tool_error',
+              message: e.toString(),
+              tool: name,
+            );
+          }
         }
 
         if (name == LocalToolNames.askUser &&

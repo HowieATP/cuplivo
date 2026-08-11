@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        flutterEngine.plugins.add(LinuxSandboxPlugin())
         processTextChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processTextChannelName)
         processTextChannel?.setMethodCallHandler { call, result ->
             when (call.method) {

@@ -98,6 +98,8 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 8. **Sane defaults for new installs** — New installs start with the DeepSeek provider enabled, assistant temperature / top_p parameters disabled, and request logging on with a 50 MB cap; users with existing configuration are unaffected (#240).
 
+9. **Mini-map message-level search** — Search within a conversation's mini-map: filter to matching messages with match highlighting, sharing the same search logic between the desktop popover and the mobile sheet (#270).
+
 ### UI & Rendering
 
 1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).

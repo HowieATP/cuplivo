@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.1] - 2026-08-11
+
+> ℹ️ If you've been experiencing crashes on Windows, please upgrade: this release fully fixes the crash that occurred after maximizing the window, closing dialogs, or navigating between pages, introduced in v2.2.0.
+
+### Added
+
+- Message-level search: search within a conversation's mini-map, filter to matching messages, and highlight the matches (#270)
+- Image-compression backup sync: bidirectional import/export of the new Kelivo image-compression settings (#124)
+- Test connection improvements: the current model is now auto-selected (#280)
+
+### Fixed
+
+- Windows crash fix: replaced the built-in slider with Syncfusion (SfSliderTile) to fix crashes caused by a corrupted accessibility tree (#281, fixes the regression introduced by #119, a Flutter compatibility issue)
+- MiniMax TTS emotion parameter support: clearing the "emotion" input lets the AI decide the emotion from content (auto mode) (#284)
+
 ## [2.7.0] - 2026-08-10
 
 > ℹ️ Android users please note: the in-app auto-update previously always downloaded the x86_64 build; this was fixed in 2.6.3, but if you are still on a version older than 2.6.3, you still need to grab the arm64-v8a APK from the GitHub Release page.

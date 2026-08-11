@@ -24,6 +24,12 @@ class _LocalToolsTab extends StatelessWidget {
     final calculateEnabled = assistant.localToolIds.contains(
       LocalToolNames.calculate,
     );
+    final handoffEnabled = assistant.localToolIds.contains(
+      LocalToolNames.handoff,
+    );
+    final handoffSyncEnabled = assistant.localToolIds.contains(
+      LocalToolNames.handoffSync,
+    );
 
     Future<void> updateTool(String toolId, bool value) {
       final ids = assistant.localToolIds.toSet();
@@ -104,6 +110,23 @@ class _LocalToolsTab extends StatelessWidget {
               subtitle: l10n.assistantEditLocalToolCalculateSubtitle,
               enabled: calculateEnabled,
               onChanged: (value) => updateTool(LocalToolNames.calculate, value),
+            ),
+            _iosDivider(context),
+            _LocalToolRow(
+              icon: Lucide.Bot,
+              title: l10n.assistantEditLocalToolHandoffTitle,
+              subtitle: l10n.assistantEditLocalToolHandoffSubtitle,
+              enabled: handoffEnabled,
+              onChanged: (value) => updateTool(LocalToolNames.handoff, value),
+            ),
+            _iosDivider(context),
+            _LocalToolRow(
+              icon: Lucide.Timer,
+              title: l10n.assistantEditLocalToolHandoffSyncTitle,
+              subtitle: l10n.assistantEditLocalToolHandoffSyncSubtitle,
+              enabled: handoffSyncEnabled,
+              onChanged: (value) =>
+                  updateTool(LocalToolNames.handoffSync, value),
             ),
           ],
         ),

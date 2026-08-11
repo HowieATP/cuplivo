@@ -5710,6 +5710,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.';
 
   @override
+  String get assistantEditLocalToolHandoffTitle => 'Task Handoff';
+
+  @override
+  String get assistantEditLocalToolHandoffSubtitle =>
+      'Delegate a task to another assistant in a new conversation without waiting for the result.';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncTitle => 'Sync Handoff';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncSubtitle =>
+      'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override

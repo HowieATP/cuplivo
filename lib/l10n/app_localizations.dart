@@ -10400,6 +10400,30 @@ abstract class AppLocalizations {
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
 
+  /// No description provided for @assistantEditLocalToolHandoffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Task Handoff'**
+  String get assistantEditLocalToolHandoffTitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate a task to another assistant in a new conversation without waiting for the result.'**
+  String get assistantEditLocalToolHandoffSubtitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Handoff'**
+  String get assistantEditLocalToolHandoffSyncTitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.'**
+  String get assistantEditLocalToolHandoffSyncSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:

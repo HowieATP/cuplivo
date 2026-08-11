@@ -100,6 +100,27 @@ void main() {
     );
   });
 
+  testWidgets('assistant local tools page lists handoff tools', (tester) async {
+    _seedPreferences();
+    final assistantProvider = await _createAssistantProvider();
+
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: assistantProvider,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Local Tools'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Task Handoff'), findsOneWidget);
+    expect(find.text('Sync Handoff'), findsOneWidget);
+  });
+
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
     _seedPreferences();
     final assistantProvider = await _createAssistantProvider();

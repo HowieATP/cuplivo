@@ -11,10 +11,7 @@ import 'package:uuid/uuid.dart';
 
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
-import '../services/headless_generation_service.dart';
 import '../services/oauth/oauth_flow_service.dart';
-import 'assistant_provider.dart';
-import '../services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
 enum McpTransportType { sse, http, stdio, inmemory }
@@ -416,8 +413,6 @@ class McpProvider extends ChangeNotifier {
 
   McpProvider({
     this.chatService,
-    this.assistantProvider,
-    this.headlessGen,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
     OAuthFlowService? oauthFlowService,
@@ -428,8 +423,6 @@ class McpProvider extends ChangeNotifier {
   }
 
   final ChatService? chatService;
-  final AssistantProvider? assistantProvider;
-  final HeadlessGenerationService? headlessGen;
   final BuildContext Function() contextProvider;
 
   /// Provider-agnostic OAuth flow orchestration (see ADR-0015).
@@ -462,9 +455,6 @@ class McpProvider extends ChangeNotifier {
 
   Future<void> _load() async {
     await _reloadServersFromPrefs();
-
-    // Refresh @kelivo/subagent tool definitions when assistants change
-    assistantProvider?.addListener(_onAssistantsChanged);
   }
 
   /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
@@ -473,8 +463,7 @@ class McpProvider extends ChangeNotifier {
   ///
   /// Used by the constructor and by [reloadFromPrefs] after a backup/import
   /// restore rewrote the prefs, so the in-memory state never diverges from
-  /// disk. Listener registration (e.g. assistant changes) is NOT repeated
-  /// here — callers own it.
+  /// disk.
   Future<void> _reloadServersFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     var removedRetiredServer = false;
@@ -497,8 +486,6 @@ class McpProvider extends ChangeNotifier {
         debugPrint('[MCP/Load] failed to parse persisted servers: $e');
       }
     }
-    // Ensure the remaining built-in MCP servers are present by default.
-    _ensureBuiltinSubagentServerPresent();
     if (removedRetiredServer) {
       await _persist();
     }
@@ -541,42 +528,20 @@ class McpProvider extends ChangeNotifier {
     await _reloadServersFromPrefs();
   }
 
-  void _onAssistantsChanged() {
-    unawaited(refreshTools('kelivo_subagent'));
-  }
-
   /// Retired built-in MCP servers, removed on load and import:
   /// - `kelivo_fetch`: replaced by the search-layer `web_fetch` tool.
   /// - `kelivo_filesystem`: filesystem tools moved into per-workspace local
   ///   tools (see WorkspaceToolsService).
+  /// - `kelivo_subagent`: handoff is now the local `kelivo_handoff` /
+  ///   `kelivo_handoff_sync` tools (see HandoffToolService).
   static bool _isRetiredServer(McpServerConfig server) =>
       server.id == 'kelivo_fetch' ||
       server.id == 'kelivo_filesystem' ||
+      server.id == 'kelivo_subagent' ||
       (server.transport == McpTransportType.inmemory &&
           (server.name == '@kelivo/fetch' ||
-              server.name == '@kelivo/filesystem'));
-
-  void _ensureBuiltinSubagentServerPresent() {
-    if (assistantProvider == null ||
-        chatService == null ||
-        headlessGen == null) {
-      return;
-    }
-    final exists = _servers.any(
-      (s) => s.id == 'kelivo_subagent' || s.name == '@kelivo/subagent',
-    );
-    if (exists) return;
-    _servers = [
-      ..._servers,
-      McpServerConfig(
-        id: 'kelivo_subagent',
-        enabled: true,
-        name: '@kelivo/subagent',
-        transport: McpTransportType.inmemory,
-        tools: const <McpToolConfig>[],
-      ),
-    ];
-  }
+              server.name == '@kelivo/filesystem' ||
+              server.name == '@kelivo/subagent'));
 
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
@@ -685,6 +650,12 @@ class McpProvider extends ChangeNotifier {
         final isDesktop = _isDesktopPlatform();
         serversFromMap.forEach((id, cfgAny) {
           if (cfgAny is! Map) return;
+          // @kelivo/subagent was a built-in in-memory server in older
+          // versions; handoff is a local tool now — never import it.
+          if (id == 'kelivo_subagent' || id == '@kelivo/subagent') {
+            retiredServerSeen = true;
+            return;
+          }
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
@@ -694,20 +665,6 @@ class McpProvider extends ChangeNotifier {
                 id == 'kelivo_filesystem' ||
                 name == '@kelivo/filesystem') {
               retiredServerSeen = true;
-              return;
-            }
-            final enabled = (cfg['isActive'] as bool?) ?? true;
-            if (id == 'kelivo_subagent' || name == '@kelivo/subagent') {
-              if (!next.any((server) => server.id == 'kelivo_subagent')) {
-                next.add(
-                  McpServerConfig(
-                    id: 'kelivo_subagent',
-                    enabled: enabled,
-                    name: '@kelivo/subagent',
-                    transport: McpTransportType.inmemory,
-                  ),
-                );
-              }
               return;
             }
             debugPrint(
@@ -872,7 +829,6 @@ class McpProvider extends ChangeNotifier {
 
     // Replace and reset statuses
     _servers = next;
-    _ensureBuiltinSubagentServerPresent();
     _status.clear();
     _errors.clear();
     for (final s in _servers) {
@@ -1222,34 +1178,13 @@ class McpProvider extends ChangeNotifier {
         logServerLabel: server.name,
       );
 
-      // In-memory builtin server path
+      // In-memory builtin server path — all built-in in-memory engines
+      // (fetch, filesystem, subagent) have been retired; refuse any
+      // in-memory id as a safety net.
       if (server.transport == McpTransportType.inmemory) {
-        if (server.id != 'kelivo_subagent') {
-          // Retired built-ins (fetch, filesystem) never survive load/import;
-          // refuse any other in-memory id as a safety net.
-          _status[id] = McpStatus.error;
-          _errors[id] = 'Unsupported in-memory MCP server: ${server.id}';
-          notifyListeners();
-          return;
-        }
-        final engine = KelivoSubagentMcpServerEngine(
-          assistants: assistantProvider!,
-          chatService: chatService!,
-          headlessGen: headlessGen!,
-          contextProvider: contextProvider,
-        );
-        final transport = KelivoSubagentInMemoryClientTransport(engine);
-        final client = mcp.McpClient.createClient(clientConfig);
-        await client.connect(transport);
-        _clients[id] = client;
-        _status[id] = McpStatus.connected;
-        _errors.remove(id);
+        _status[id] = McpStatus.error;
+        _errors[id] = 'Unsupported in-memory MCP server: ${server.id}';
         notifyListeners();
-        await refreshTools(id);
-        _startHeartbeat(
-          id,
-          interval: Duration(seconds: server.heartbeatIntervalSeconds ?? 12),
-        );
         return;
       }
 
@@ -1901,7 +1836,6 @@ class McpProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    assistantProvider?.removeListener(_onAssistantsChanged);
     // Clean up timers
     for (final t in _heartbeats.values) {
       t.cancel();

@@ -5468,6 +5468,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolHandoffTitle => '任务交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncSubtitle =>
+      '委派任务并等待子助手的完整输出作为工具结果。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -13013,6 +13026,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolHandoffTitle => '任务交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncSubtitle =>
+      '委派任务并等待子助手的完整输出作为工具结果。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -20555,6 +20581,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
       '計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolHandoffTitle => '任務交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSubtitle => '將任務委派給另一個助手的新對話，無需等待結果。';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncSubtitle =>
+      '委派任務並等待子助手的完整輸出作為工具結果。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

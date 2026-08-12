@@ -297,7 +297,29 @@ Widget _markdownHarness(
       darkTheme: darkTheme,
       themeMode: themeMode,
       home: Scaffold(
-        body: width == null
+        body: streaming
+            ? _streamingBody(
+                width == null
+                    ? MarkdownWithCodeHighlight(
+                        text: text,
+                        streaming: streaming,
+                        onCitationTap: onCitationTap,
+                        baseStyle: baseStyle,
+                      )
+                    : Align(
+                        alignment: Alignment.topLeft,
+                        child: SizedBox(
+                          width: width,
+                          child: MarkdownWithCodeHighlight(
+                            text: text,
+                            streaming: streaming,
+                            onCitationTap: onCitationTap,
+                            baseStyle: baseStyle,
+                          ),
+                        ),
+                      ),
+              )
+            : width == null
             ? MarkdownWithCodeHighlight(
                 text: text,
                 streaming: streaming,
@@ -319,6 +341,13 @@ Widget _markdownHarness(
       ),
     ),
   );
+}
+
+/// Wraps long streaming content in an unbounded-height container so the
+/// incremental-rendering Column (stable blocks + live tail) can size itself
+/// to its content like the real chat scroll view does.
+Widget _streamingBody(Widget child) {
+  return SingleChildScrollView(child: child);
 }
 
 void _overrideMarkdownTablePlatform(TargetPlatform platform) {
@@ -345,12 +374,14 @@ Widget _streamingMarkdownHarness(
               text: value,
               streaming: true,
             );
-            return width == null
-                ? child
-                : Align(
-                    alignment: Alignment.topLeft,
-                    child: SizedBox(width: width, child: child),
-                  );
+            return _streamingBody(
+              width == null
+                  ? child
+                  : Align(
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(width: width, child: child),
+                    ),
+            );
           },
         ),
       ),

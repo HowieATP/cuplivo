@@ -9,6 +9,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/models/chat_item.dart';
 import '../../../core/providers/user_provider.dart';
@@ -2470,11 +2471,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
 
     if (widget.embedded) {
+      final blurEnabled = adaptiveBlurEnabled(context);
+      final drawerSurface = cs.surface.withValues(alpha: 0.60);
       return ClipRect(
-        child: BackdropFilter(
+        child: AdaptiveBlurFilter(
+          enabled: blurEnabled,
           filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Material(
-            color: cs.surface.withValues(alpha: 0.60),
+            color: blurEnabled
+                ? drawerSurface
+                : preblendedBlurColor(context, drawerSurface),
             child: SizedBox(width: widget.embeddedWidth ?? 300, child: inner),
           ),
         ),

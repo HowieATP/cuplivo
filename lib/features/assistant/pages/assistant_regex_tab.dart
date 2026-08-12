@@ -10,6 +10,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
@@ -616,6 +617,10 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
     final borderColor = cs.outlineVariant.withValues(alpha: 0.10);
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
 
     final child = SizedBox(
       width: 48,
@@ -637,11 +642,12 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         child: ClipOval(
-          child: BackdropFilter(
+          child: AdaptiveBlurFilter(
+            enabled: blurEnabled,
             filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
             child: Container(
               decoration: BoxDecoration(
-                color: tileColor,
+                color: tileSurfaceColor,
                 border: Border.all(color: borderColor, width: 0.8),
               ),
               child: child,

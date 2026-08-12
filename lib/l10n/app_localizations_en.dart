@@ -1307,6 +1307,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Background Generation (Android)';
 
   @override
+  String get displaySettingsPageAndroidHighRefreshRateTitle =>
+      'Prefer High Refresh Rate';
+
+  @override
+  String get displaySettingsPageAndroidHighRefreshRateSubtitle =>
+      'Request the highest refresh rate the display supports. This is a preference only: the system may still lower the frame rate to save power or when the device gets warm.';
+
+  @override
   String get displaySettingsPageIosBackgroundChatTitle =>
       'Background Generation (iOS)';
 
@@ -2891,6 +2899,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       'Render assistant messages with Markdown';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsTitle =>
+      'Frosted Glass Effects';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsSubtitle =>
+      'Blur behind frosted panels (input bar, menus, toolbars). Turning this off replaces blur with solid surfaces for smoother scrolling.';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle =>

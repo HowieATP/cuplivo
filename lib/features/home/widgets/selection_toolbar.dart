@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 /// Toolbar for selection mode with cancel and confirm buttons.
@@ -108,6 +109,10 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.35 : 0.40,
     );
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -124,12 +129,13 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
         curve: Curves.easeOutCubic,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: BackdropFilter(
+          child: AdaptiveBlurFilter(
+            enabled: blurEnabled,
             filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: tileColor,
+                color: tileSurfaceColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: borderColor, width: 1.0),
               ),
@@ -198,6 +204,10 @@ class _GlassCircleButtonSmallState extends State<GlassCircleButtonSmall> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.10 : 0.10,
     );
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
 
     final child = SizedBox(
       width: widget.size,
@@ -222,11 +232,12 @@ class _GlassCircleButtonSmallState extends State<GlassCircleButtonSmall> {
           duration: const Duration(milliseconds: 110),
           curve: Curves.easeOutCubic,
           child: ClipOval(
-            child: BackdropFilter(
+            child: AdaptiveBlurFilter(
+              enabled: blurEnabled,
               filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
                 decoration: BoxDecoration(
-                  color: tileColor,
+                  color: tileSurfaceColor,
                   shape: BoxShape.circle,
                   border: Border.all(color: borderColor, width: 1.0),
                 ),

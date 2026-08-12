@@ -4,6 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
@@ -47,6 +48,11 @@ class QuickPhraseMenu extends StatelessWidget {
     // Place menu above input bar + keyboard with a small gap
     final double bottom = 72 + 12 + 38;
 
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final menuFill = isDark
+        ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+        : Colors.white.withValues(alpha: 0.66);
+
     return Stack(
       children: [
         Positioned(
@@ -56,15 +62,16 @@ class QuickPhraseMenu extends StatelessWidget {
             color: Colors.transparent,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
+              child: AdaptiveBlurFilter(
+                enabled: blurEnabled,
                 filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                 child: Container(
                   width: menuWidth,
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
-                        : Colors.white.withValues(alpha: 0.66),
+                    color: blurEnabled
+                        ? menuFill
+                        : preblendedBlurColor(context, menuFill),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isDark

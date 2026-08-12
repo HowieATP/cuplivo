@@ -39,6 +39,7 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../shared/widgets/version_switcher.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
@@ -1112,6 +1113,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final menuFill = isDark
+        ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+        : Colors.white.withValues(alpha: 0.66);
 
     showGeneralDialog<void>(
       context: context,
@@ -1142,13 +1147,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: BackdropFilter(
+                    child: AdaptiveBlurFilter(
+                      enabled: blurEnabled,
                       filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
-                              : Colors.white.withValues(alpha: 0.66),
+                          color: blurEnabled
+                              ? menuFill
+                              : preblendedBlurColor(context, menuFill),
                         ),
                         child: Material(
                           color: Colors.transparent,
@@ -3217,15 +3223,19 @@ Widget _buildSharedChatSurface(
 
   switch (style) {
     case ChatMessageBackgroundStyle.frosted:
+      final blurEnabled = adaptiveBlurEnabled(context);
+      final fill = isDark
+          ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+          : Colors.white.withValues(alpha: 0.66);
       return ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter.grouped(
+        child: AdaptiveBlurFilter(
+          enabled: blurEnabled,
+          grouped: true,
           filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
-                  : Colors.white.withValues(alpha: 0.66),
+              color: blurEnabled ? fill : preblendedBlurColor(context, fill),
               borderRadius: borderRadius,
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.14),

@@ -18,6 +18,7 @@ import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
 import '../services/haptics.dart';
+import '../services/android_display_mode.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
@@ -209,6 +210,10 @@ class SettingsProvider extends ChangeNotifier {
       'display_streaming_thinking_preview_truncate_v1';
   static const String _displayEnableAssistantMarkdownKey =
       'display_enable_assistant_markdown_v1';
+  static const String _displayPreferAndroidHighRefreshRateKey =
+      'display_prefer_android_high_refresh_rate_v1';
+  static const String _displayMobileBlurEffectsKey =
+      'display_mobile_blur_effects_v1';
   static const String _displayShowChatListDateKey =
       'display_show_chat_list_date_v1';
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
@@ -1145,6 +1150,10 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayStreamingThinkingPreviewTruncateKey) ?? true;
     _enableAssistantMarkdown =
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
+    _preferAndroidHighRefreshRate =
+        prefs.getBool(_displayPreferAndroidHighRefreshRateKey) ?? true;
+    _mobileBlurEffectsEnabled =
+        prefs.getBool(_displayMobileBlurEffectsKey) ?? false;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
     _oneClickCompressEnabled =
@@ -1394,6 +1403,9 @@ class SettingsProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+
+    // Apply the persisted Android high refresh rate preference on startup.
+    await _applyAndroidHighRefreshRate(_preferAndroidHighRefreshRate);
   }
 
   Future<void> setGlobalProxyEnabled(bool v) async {
@@ -4072,6 +4084,52 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayEnableAssistantMarkdownKey, v);
   }
 
+  // Display: prefer the highest refresh rate supported by the Android
+  // display. Only exposed on Android. The system may still lower the
+  // frame rate for power saving or thermal reasons.
+  bool _preferAndroidHighRefreshRate = true;
+  bool get preferAndroidHighRefreshRate => _preferAndroidHighRefreshRate;
+  Future<void> setPreferAndroidHighRefreshRate(bool v) async {
+    if (_preferAndroidHighRefreshRate == v) return;
+    _preferAndroidHighRefreshRate = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayPreferAndroidHighRefreshRateKey, v);
+    await _applyAndroidHighRefreshRate(v);
+  }
+
+  /// Ask the Android platform to switch display modes. Recoverable: failures
+  /// are logged, never surfaced as errors to the user.
+  Future<void> _applyAndroidHighRefreshRate(bool v) async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      final result = await AndroidDisplayMode.setHighRefreshRate(v);
+      if (result == null) return;
+      debugPrint(
+        '[SettingsProvider] Android high refresh rate: supported='
+        '${result.supported} enabled=${result.enabled} '
+        'refreshRate=${result.refreshRate} modeId=${result.modeId}',
+      );
+    } catch (e) {
+      debugPrint(
+        '[SettingsProvider] Failed to apply Android high refresh '
+        'rate ($v): $e',
+      );
+    }
+  }
+
+  // Display: keep frosted-glass (BackdropFilter) effects on Android/iOS.
+  // Defaults to off so long chat scroll avoids expensive backdrop blurs.
+  bool _mobileBlurEffectsEnabled = false;
+  bool get mobileBlurEffectsEnabled => _mobileBlurEffectsEnabled;
+  Future<void> setMobileBlurEffectsEnabled(bool v) async {
+    if (_mobileBlurEffectsEnabled == v) return;
+    _mobileBlurEffectsEnabled = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayMobileBlurEffectsKey, v);
+  }
+
   // Display: show chat list date
   bool _showChatListDate = false;
   bool get showChatListDate => _showChatListDate;
@@ -4648,6 +4706,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._streamingThinkingPreviewTruncate = _streamingThinkingPreviewTruncate;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;
+    copy._preferAndroidHighRefreshRate = _preferAndroidHighRefreshRate;
+    copy._mobileBlurEffectsEnabled = _mobileBlurEffectsEnabled;
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;
     copy._autoCollapseCodeBlockLines = _autoCollapseCodeBlockLines;

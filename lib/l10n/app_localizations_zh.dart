@@ -1265,6 +1265,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAndroidBackgroundChatTitle => '后台聊天生成';
 
   @override
+  String get displaySettingsPageAndroidHighRefreshRateTitle => '优先高刷新率';
+
+  @override
+  String get displaySettingsPageAndroidHighRefreshRateSubtitle =>
+      '请求显示器支持的最高刷新率。这仅是偏好设置：系统仍可能为省电或温控降低帧率。';
+
+  @override
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
@@ -2792,6 +2799,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsTitle => '毛玻璃效果';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsSubtitle =>
+      '模糊输入栏、菜单和工具栏背后的内容。关闭后以纯色表面替代模糊，滚动更流畅。';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
@@ -8595,6 +8609,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageAndroidBackgroundChatTitle => '后台聊天生成';
 
   @override
+  String get displaySettingsPageAndroidHighRefreshRateTitle => '优先高刷新率';
+
+  @override
+  String get displaySettingsPageAndroidHighRefreshRateSubtitle =>
+      '请求显示器支持的最高刷新率。这仅是偏好设置：系统仍可能为省电或温控降低帧率。';
+
+  @override
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
@@ -10122,6 +10143,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手消息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsTitle => '毛玻璃效果';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsSubtitle =>
+      '模糊输入栏、菜单和工具栏背后的内容。关闭后以纯色表面替代模糊，滚动更流畅。';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
@@ -15924,6 +15952,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageAndroidBackgroundChatTitle => '後台聊天生成';
 
   @override
+  String get displaySettingsPageAndroidHighRefreshRateTitle => '優先高刷新率';
+
+  @override
+  String get displaySettingsPageAndroidHighRefreshRateSubtitle =>
+      '請求顯示器支援的最高刷新率。這僅是偏好設定：系統仍可能為省電或溫控降低幀率。';
+
+  @override
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 後台生成';
 
   @override
@@ -17450,6 +17485,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       '助手訊息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsTitle => '毛玻璃效果';
+
+  @override
+  String get displaySettingsPageMobileBlurEffectsSubtitle =>
+      '模糊輸入欄、選單和工具列背後的內容。關閉後以純色表面取代模糊，捲動更流暢。';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '行動端程式碼區塊自動換行';

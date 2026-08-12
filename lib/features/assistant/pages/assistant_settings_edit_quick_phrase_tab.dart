@@ -487,6 +487,10 @@ class _GlassCircleButtonQPState extends State<_GlassCircleButtonQP> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.10 : 0.10,
     );
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
 
     final child = SizedBox(
       width: 48,
@@ -508,11 +512,12 @@ class _GlassCircleButtonQPState extends State<_GlassCircleButtonQP> {
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         child: ClipOval(
-          child: BackdropFilter(
+          child: AdaptiveBlurFilter(
+            enabled: blurEnabled,
             filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
             child: Container(
               decoration: BoxDecoration(
-                color: tileColor,
+                color: tileSurfaceColor,
                 shape: BoxShape.circle,
                 border: Border.all(color: borderColor, width: 1.0),
               ),

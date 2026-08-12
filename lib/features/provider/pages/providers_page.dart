@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
@@ -1488,6 +1489,11 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
       child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
     );
 
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
+
     return Semantics(
       button: true,
       label: widget.semanticLabel,
@@ -1505,11 +1511,12 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
           duration: const Duration(milliseconds: 110),
           curve: Curves.easeOutCubic,
           child: ClipOval(
-            child: BackdropFilter(
+            child: AdaptiveBlurFilter(
+              enabled: blurEnabled,
               filter: ui.ImageFilter.blur(sigmaX: 36, sigmaY: 36),
               child: Container(
                 decoration: BoxDecoration(
-                  color: tileColor,
+                  color: tileSurfaceColor,
                   shape: BoxShape.circle,
                   border: Border.all(color: borderColor, width: 1.0),
                 ),

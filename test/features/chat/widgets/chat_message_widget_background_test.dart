@@ -27,6 +27,9 @@ SettingsProvider _createSettings(ChatMessageBackgroundStyle style) {
   };
   SharedPreferences.setMockInitialValues({
     'display_chat_message_background_style_v1': rawStyle,
+    // Frosted-glass assertions below rely on the mobile blur effect toggle.
+    'display_mobile_blur_effects_v1':
+        style == ChatMessageBackgroundStyle.frosted,
   });
   return SettingsProvider();
 }

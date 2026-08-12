@@ -2423,6 +2423,18 @@ abstract class AppLocalizations {
   /// **'Background Generation (Android)'**
   String get displaySettingsPageAndroidBackgroundChatTitle;
 
+  /// No description provided for @displaySettingsPageAndroidHighRefreshRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefer High Refresh Rate'**
+  String get displaySettingsPageAndroidHighRefreshRateTitle;
+
+  /// No description provided for @displaySettingsPageAndroidHighRefreshRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request the highest refresh rate the display supports. This is a preference only: the system may still lower the frame rate to save power or when the device gets warm.'**
+  String get displaySettingsPageAndroidHighRefreshRateSubtitle;
+
   /// No description provided for @displaySettingsPageIosBackgroundChatTitle.
   ///
   /// In en, this message translates to:
@@ -5308,6 +5320,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Render assistant messages with Markdown'**
   String get displaySettingsPageEnableAssistantMarkdownTitle;
+
+  /// No description provided for @displaySettingsPageMobileBlurEffectsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Frosted Glass Effects'**
+  String get displaySettingsPageMobileBlurEffectsTitle;
+
+  /// No description provided for @displaySettingsPageMobileBlurEffectsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blur behind frosted panels (input bar, menus, toolbars). Turning this off replaces blur with solid surfaces for smoother scrolling.'**
+  String get displaySettingsPageMobileBlurEffectsSubtitle;
 
   /// No description provided for @displaySettingsPageMobileCodeBlockWrapTitle.
   ///

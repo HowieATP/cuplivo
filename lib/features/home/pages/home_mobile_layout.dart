@@ -17,6 +17,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
@@ -509,14 +510,17 @@ class _ScrollButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final fill = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.07);
     return ClipOval(
-      child: BackdropFilter(
+      child: AdaptiveBlurFilter(
+        enabled: blurEnabled,
         filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.07),
+            color: blurEnabled ? fill : preblendedBlurColor(context, fill),
             shape: BoxShape.circle,
             border: Border.all(
               color: isDark
@@ -645,6 +649,10 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
     final borderColor = cs.outlineVariant.withValues(alpha: 0.10);
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final tileSurfaceColor = blurEnabled
+        ? tileColor
+        : preblendedBlurColor(context, tileColor);
 
     return Semantics(
       button: true,
@@ -660,13 +668,14 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
           duration: const Duration(milliseconds: 110),
           curve: Curves.easeOutCubic,
           child: ClipOval(
-            child: BackdropFilter(
+            child: AdaptiveBlurFilter(
+              enabled: blurEnabled,
               filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: tileColor,
+                  color: tileSurfaceColor,
                   shape: BoxShape.circle,
                   border: Border.all(color: borderColor, width: 1.0),
                 ),

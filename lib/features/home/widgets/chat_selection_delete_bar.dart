@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../theme/design_tokens.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
@@ -33,6 +34,8 @@ class ChatSelectionDeleteBar extends StatelessWidget {
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.40)
         : Colors.black.withValues(alpha: 0.10);
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final bgSurface = blurEnabled ? bg : preblendedBlurColor(context, bg);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -47,10 +50,11 @@ class ChatSelectionDeleteBar extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-        child: BackdropFilter(
+        child: AdaptiveBlurFilter(
+          enabled: blurEnabled,
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: ColoredBox(
-            color: bg,
+            color: bgSurface,
             child: SafeArea(
               top: false,
               left: false,

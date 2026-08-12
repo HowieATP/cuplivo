@@ -1872,6 +1872,33 @@ class RenderingSettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
+              if (Platform.isAndroid) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Monitor,
+                  label: l10n.displaySettingsPageAndroidHighRefreshRateTitle,
+                  subtitle:
+                      l10n.displaySettingsPageAndroidHighRefreshRateSubtitle,
+                  value: sp.preferAndroidHighRefreshRate,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setPreferAndroidHighRefreshRate(v),
+                ),
+                _iosDivider(context),
+              ],
+              if (Platform.isAndroid || Platform.isIOS) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Sparkles,
+                  label: l10n.displaySettingsPageMobileBlurEffectsTitle,
+                  subtitle: l10n.displaySettingsPageMobileBlurEffectsSubtitle,
+                  value: sp.mobileBlurEffectsEnabled,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setMobileBlurEffectsEnabled(v),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Hash,

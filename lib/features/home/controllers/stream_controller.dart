@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -23,7 +24,7 @@ export 'streaming_content_notifier.dart';
 ///
 /// The controller is designed to work alongside ChatController and be used
 /// by the home page to handle streaming generation without cluttering the UI code.
-class StreamController {
+class StreamController with WidgetsBindingObserver {
   StreamController({
     required this._chatService,
     required this.onStateChanged,
@@ -136,8 +137,12 @@ class StreamController {
   // Throttle State
   // ============================================================================
 
-  /// UI output interval for streaming content.
-  static const Duration _streamThrottleInterval = Duration(milliseconds: 50);
+  /// UI output pacing for streaming content.
+  ///
+  /// Content is published on actual displayed frames via
+  /// [SchedulerBinding.scheduleFrameCallback] instead of a fixed timer, so
+  /// the cadence naturally adapts to 60/90/120Hz and iOS ProMotion while
+  /// never publishing more than once per frame.
   static const int _streamSmoothMinCount = 2;
   static const int _streamSmoothBaseCount = 40;
   static const int _streamSmoothMaxCount = 240;
@@ -154,8 +159,20 @@ class StreamController {
   /// thinking preview (issue #232).
   static const Duration _reasoningUiThrottle = Duration(milliseconds: 150);
 
-  /// Throttle timers per message ID.
-  final Map<String, Timer?> _streamThrottleTimers = <String, Timer?>{};
+  /// Frame-driven publishing state. A single frame callback flushes every
+  /// dirty message at most once per displayed frame; it keeps re-arming
+  /// while any message still has an unpresented backlog and stops once
+  /// caught up.
+  bool _frameScheduled = false;
+
+  /// Incremented to invalidate already-scheduled frame callbacks (session
+  /// switch, disposal, app backgrounding).
+  int _frameEpoch = 0;
+
+  /// Whether the lifecycle observer is attached to the binding.
+  bool _lifecycleObserverAttached = false;
+
+  AppLifecycleState _appLifecycle = AppLifecycleState.resumed;
 
   /// Per-message smooth output state.
   final Map<String, _StreamSmoothState> _streamSmoothStates =
@@ -579,27 +596,85 @@ class StreamController {
     // Ensure notifier exists for this message
     streamingContentNotifier.getNotifier(messageId);
 
-    _streamThrottleTimers[messageId] ??= Timer.periodic(
-      _streamThrottleInterval,
-      (_) => _flushSmoothStreamTick(messageId),
-    );
+    _scheduleFrameLocked();
   }
 
-  void _flushSmoothStreamTick(String messageId) {
-    final state = _streamSmoothStates[messageId];
-    if (state == null) return;
-    if (getCurrentConversationId() != state.conversationId) return;
+  /// Schedules one frame callback that flushes every dirty streaming message
+  /// at most once. Re-arms itself while any message has a backlog left.
+  void _scheduleFrameLocked() {
+    if (_frameScheduled) return;
+    _frameScheduled = true;
+    _ensureLifecycleObserver();
+    final epoch = _frameEpoch;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _onStreamFrame(epoch);
+    });
+  }
 
-    final nextContent = state.takeNextContentSlice(
-      minCount: _streamSmoothMinCount,
-      baseCount: _streamSmoothBaseCount,
-      maxCount: _streamSmoothMaxCount,
-      pickRate: _streamSmoothPickRate,
-      moveAverageLength: _streamSmoothMoveAverageLength,
-    );
-    if (nextContent == null) return;
+  void _onStreamFrame(int epoch) {
+    if (epoch != _frameEpoch) return;
+    _frameScheduled = false;
+    _flushAllPendingInFrame();
+  }
 
-    _publishSmoothStreamContent(messageId, state, nextContent);
+  void _flushAllPendingInFrame() {
+    var published = false;
+    var stillPending = false;
+    for (final entry in Map<String, _StreamSmoothState>.of(
+      _streamSmoothStates,
+    ).entries) {
+      final messageId = entry.key;
+      final state = entry.value;
+      if (getCurrentConversationId() != state.conversationId) continue;
+
+      final nextContent = state.takeNextContentSlice(
+        minCount: _streamSmoothMinCount,
+        baseCount: _streamSmoothBaseCount,
+        maxCount: _streamSmoothMaxCount,
+        pickRate: _streamSmoothPickRate,
+        moveAverageLength: _streamSmoothMoveAverageLength,
+      );
+      if (nextContent == null) continue;
+
+      _publishSmoothStreamContent(messageId, state, nextContent);
+      published = true;
+      if (state.targetContent != state.visibleContent) {
+        stillPending = true;
+      }
+    }
+    // Auto-scroll is merged into this single frame flush so one frame never
+    // triggers more than one layout pass for streaming output.
+    if (published) {
+      onStreamTick?.call();
+    }
+    if (stillPending && _appLifecycle == AppLifecycleState.resumed) {
+      _scheduleFrameLocked();
+    }
+  }
+
+  void _ensureLifecycleObserver() {
+    if (_lifecycleObserverAttached) return;
+    _lifecycleObserverAttached = true;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appLifecycle = state;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      // Cancel pending frame work; content resumes on the next resumed
+      // frame (vsync stops while backgrounded anyway).
+      _frameEpoch++;
+      _frameScheduled = false;
+    } else if (state == AppLifecycleState.resumed) {
+      // Re-arm if any message still has an unpresented backlog.
+      final hasBacklog = _streamSmoothStates.values.any(
+        (s) => s.targetContent != s.visibleContent,
+      );
+      if (hasBacklog) _scheduleFrameLocked();
+    }
   }
 
   void _publishSmoothStreamContent(
@@ -620,7 +695,8 @@ class StreamController {
       durationMs: state.durationMs,
     );
     state.updateMessageInList?.call(messageId, content, state.totalTokens);
-    onStreamTick?.call();
+    // NOTE: onStreamTick (auto-scroll) is intentionally NOT fired here; it is
+    // invoked once per frame by _flushAllPendingInFrame after all publishes.
   }
 
   String? _flushPendingStreamUpdate(String messageId) {
@@ -649,11 +725,9 @@ class StreamController {
     state.targetContent = content;
   }
 
-  /// Clean up stream throttle timers for a message.
+  /// Clean up stream throttle state for a message.
   void _cleanupStreamTimers(String messageId) {
     _flushPendingStreamUpdate(messageId);
-    _streamThrottleTimers[messageId]?.cancel();
-    _streamThrottleTimers.remove(messageId);
     _streamSmoothStates.remove(messageId);
     _inlineImageSanitizeTimers[messageId]?.cancel();
     _inlineImageSanitizeTimers.remove(messageId);
@@ -680,12 +754,10 @@ class StreamController {
     streamingContentNotifier.removeNotifier(messageId);
   }
 
-  /// Cancel all throttle timers.
+  /// Cancel all throttle timers and any pending frame work.
   void _cancelAllTimers() {
-    for (final timer in _streamThrottleTimers.values) {
-      timer?.cancel();
-    }
-    _streamThrottleTimers.clear();
+    _frameEpoch++;
+    _frameScheduled = false;
     _streamSmoothStates.clear();
     for (final timer in _inlineImageSanitizeTimers.values) {
       timer?.cancel();
@@ -1391,6 +1463,10 @@ class StreamController {
   /// Dispose of all resources.
   void dispose() {
     _cancelAllTimers();
+    if (_lifecycleObserverAttached) {
+      _lifecycleObserverAttached = false;
+      WidgetsBinding.instance.removeObserver(this);
+    }
     streamingContentNotifier.dispose();
   }
 }

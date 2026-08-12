@@ -31,6 +31,7 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/adaptive_blur.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/image_compressor.dart';
@@ -2504,6 +2505,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       lightOpacity: widget.inputBackgroundOpacityLight,
       darkOpacity: widget.inputBackgroundOpacityDark,
     );
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final inputSurfaceColor = blurEnabled
+        ? inputFillColor
+        : preblendedBlurColor(context, inputFillColor);
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
@@ -2571,12 +2576,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                 // Main input container with iOS-like frosted glass effect
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
+                  child: AdaptiveBlurFilter(
+                    enabled: blurEnabled,
                     filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                     child: Container(
                       decoration: BoxDecoration(
                         // Translucent background over blurred content
-                        color: inputFillColor,
+                        color: inputSurfaceColor,
                         borderRadius: BorderRadius.circular(20),
                         // Use previous gray border for better contrast on white
                         border: Border.all(
@@ -3017,6 +3023,8 @@ class _DismissiblePill extends StatelessWidget {
     final bg = (isDark ? Colors.black : Colors.white).withValues(
       alpha: isDark ? 0.34 : 0.58,
     );
+    final blurEnabled = adaptiveBlurEnabled(context);
+    final surfaceColor = blurEnabled ? bg : preblendedBlurColor(context, bg);
     final border = isDark
         ? Colors.white.withValues(alpha: 0.14)
         : scheme.primary.withValues(alpha: 0.36);
@@ -3027,11 +3035,12 @@ class _DismissiblePill extends StatelessWidget {
     return RepaintBoundary(
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
+        child: AdaptiveBlurFilter(
+          enabled: blurEnabled,
           filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: bg,
+              color: surfaceColor,
               borderRadius: radius,
               border: Border.all(color: border),
             ),

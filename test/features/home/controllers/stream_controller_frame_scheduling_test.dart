@@ -190,6 +190,40 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('final flush still fires auto-scroll (onStreamTick)', (
+    tester,
+  ) async {
+    var tickCount = 0;
+    final settings = SettingsProvider();
+    final controller = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+      onStreamTick: () => tickCount++,
+    );
+    final updates = listenTo(controller, 'm1');
+
+    controller.scheduleThrottledUpdate(
+      'm1',
+      'conversation-1',
+      'a' * 5000,
+      totalTokens: 5000,
+      updateMessageInList: (_, __, ___) {},
+    );
+    await tester.pump();
+    final ticksAfterFrame = tickCount;
+    expect(ticksAfterFrame, 1);
+
+    // Stream ends with leftover backlog: the cleanup flush publishes the
+    // remaining content and must scroll the view along with it.
+    controller.cleanupTimers('m1');
+
+    expect(updates.last, 'a' * 5000);
+    expect(tickCount, ticksAfterFrame + 1);
+    controller.dispose();
+  });
+
   testWidgets('auto-scroll fires once per frame even with many messages', (
     tester,
   ) async {

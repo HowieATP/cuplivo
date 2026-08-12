@@ -1113,7 +1113,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final blurEnabled = adaptiveBlurEnabled(context);
+    // Gesture-callback path: read without subscribing to SettingsProvider.
+    final blurEnabled = adaptiveBlurRead(context);
     final menuFill = isDark
         ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
         : Colors.white.withValues(alpha: 0.66);

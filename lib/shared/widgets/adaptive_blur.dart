@@ -10,11 +10,34 @@ import '../../core/providers/settings_provider.dart';
 /// On Android/iOS the behavior follows
 /// [SettingsProvider.mobileBlurEffectsEnabled] (default off) to avoid the
 /// expensive backdrop blur that hurts long chat scroll performance.
+///
+/// Must only be called during build. The subscription is scoped to the
+/// blur setting via [context.select], so unrelated settings changes do not
+/// rebuild callers (this runs on every chat message bubble).
 bool adaptiveBlurEnabled(BuildContext context) {
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS)) {
-    return context.watch<SettingsProvider>().mobileBlurEffectsEnabled;
+    return context.select<SettingsProvider, bool>(
+      (s) => s.mobileBlurEffectsEnabled,
+    );
+  }
+  return true;
+}
+
+/// Read the current blur preference without subscribing.
+///
+/// For event handlers (gesture callbacks, dialogs) that run outside the
+/// build phase; registering a dependency there would leak rebuilds and can
+/// throw if the element is deactivated mid-callback.
+bool adaptiveBlurRead(BuildContext context) {
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS)) {
+    return Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    ).mobileBlurEffectsEnabled;
   }
   return true;
 }

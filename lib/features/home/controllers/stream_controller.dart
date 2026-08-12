@@ -706,6 +706,10 @@ class StreamController with WidgetsBindingObserver {
     if (content == null) return state.visibleContent;
     if (getCurrentConversationId() == state.conversationId) {
       _publishSmoothStreamContent(messageId, state, content);
+      // Final flush happens outside the frame pump (stream end/cancel), so
+      // auto-scroll must be triggered here too; otherwise the last chunk of
+      // a reply can be published without the view following it.
+      onStreamTick?.call();
     } else {
       state.updateMessageInList?.call(messageId, content, state.totalTokens);
     }

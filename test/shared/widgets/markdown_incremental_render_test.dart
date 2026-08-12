@@ -146,31 +146,26 @@ void main() {
       await tester.pump();
 
       expect(_stableBlockFinder(), findsNWidgets(2));
-      final blockText = tester
-          .widgetList<GptMarkdown>(
-            find.descendant(
-              of: _stableBlockFinder().first,
-              matching: find.byType(GptMarkdown),
-            ),
-          )
-          .single
-          .data;
+      final firstBlock = tester.widget<GptMarkdown>(
+        find.descendant(
+          of: _stableBlockFinder().first,
+          matching: find.byType(GptMarkdown),
+        ),
+      );
 
       text.value = 'stable one\n\nstable two\n\nnew-tail';
       await tester.pump();
 
-      // Same two cached blocks, identical text; only the tail moved on.
+      // Same cached widget instance is reused: proves the block was neither
+      // rebuilt nor re-created.
       expect(_stableBlockFinder(), findsNWidgets(2));
-      final blockTextAfter = tester
-          .widgetList<GptMarkdown>(
-            find.descendant(
-              of: _stableBlockFinder().first,
-              matching: find.byType(GptMarkdown),
-            ),
-          )
-          .single
-          .data;
-      expect(blockTextAfter, blockText);
+      final firstBlockAfter = tester.widget<GptMarkdown>(
+        find.descendant(
+          of: _stableBlockFinder().first,
+          matching: find.byType(GptMarkdown),
+        ),
+      );
+      expect(identical(firstBlockAfter, firstBlock), isTrue);
       expect(find.textContaining('new-tail'), findsOneWidget);
     });
 
@@ -203,6 +198,55 @@ void main() {
       expect(_stableBlockFinder(), findsOneWidget);
       expect(find.textContaining('REWRITTEN words'), findsOneWidget);
       expect(find.textContaining('original words'), findsNothing);
+    });
+
+    testWidgets('theme change clears the stable block cache', (tester) async {
+      final text = ValueNotifier<String>('first paragraph\n\nsecond');
+
+      await tester.pumpWidget(_streamingHarness(text));
+      await tester.pump();
+      expect(_stableBlockFinder(), findsOneWidget);
+      final blockBefore = tester.widget<GptMarkdown>(
+        find.descendant(
+          of: _stableBlockFinder().first,
+          matching: find.byType(GptMarkdown),
+        ),
+      );
+
+      // Re-pump under a different brightness: MaterialApp animates theme
+      // transitions (kThemeAnimationDuration), so pump past it, then the
+      // theme key changes and the cached blocks (with stale colors) must be
+      // dropped and rebuilt.
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            theme: ThemeData(brightness: Brightness.dark),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: ValueListenableBuilder<String>(
+                  valueListenable: text,
+                  builder: (context, value, _) =>
+                      MarkdownWithCodeHighlight(text: value, streaming: true),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(_stableBlockFinder(), findsOneWidget);
+      final blockAfter = tester.widget<GptMarkdown>(
+        find.descendant(
+          of: _stableBlockFinder().first,
+          matching: find.byType(GptMarkdown),
+        ),
+      );
+      expect(identical(blockAfter, blockBefore), isFalse);
     });
 
     testWidgets('final render merges blocks and tail into one full pass', (

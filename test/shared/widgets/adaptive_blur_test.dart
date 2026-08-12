@@ -15,7 +15,7 @@ void main() {
   /// Watches the provider so the builder re-runs once SettingsProvider's
   /// asynchronous load completes (prefs are applied after construction).
   Widget harness({
-    required void Function(bool enabled, Color? blended) onResult,
+    required void Function(bool enabled) onResult,
     Map<String, Object>? preferences,
   }) {
     SharedPreferences.setMockInitialValues(preferences ?? const {});
@@ -24,33 +24,41 @@ void main() {
       child: Builder(
         builder: (context) {
           context.watch<SettingsProvider>();
-          onResult(
-            adaptiveBlurEnabled(context),
-            Theme.of(context).colorScheme.surface,
-          );
+          onResult(adaptiveBlurEnabled(context));
           return const SizedBox();
         },
       ),
     );
   }
 
-  tearDown(() {
-    debugDefaultTargetPlatformOverride = null;
-  });
+  /// Pumps until [result] matches [expected], so the async preference load
+  /// cannot race with a fixed pump duration.
+  Future<void> pumpUntilResult(
+    WidgetTester tester,
+    bool? Function() result,
+    bool expected,
+  ) async {
+    for (var i = 0; i < 100 && result() != expected; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+  }
+
   Future<bool> readEnabled(
     WidgetTester tester,
     Map<String, Object> preferences,
+    bool expected,
   ) async {
     bool? result;
     await tester.pumpWidget(
       harness(
         preferences: preferences,
-        onResult: (enabled, _) {
+        onResult: (enabled) {
           result = enabled;
         },
       ),
     );
-    await tester.pump(const Duration(milliseconds: 100));
+    await pumpUntilResult(tester, () => result, expected);
+    expect(result, expected, reason: 'settings load should complete');
     return result!;
   }
 
@@ -61,7 +69,7 @@ void main() {
       expect(
         await readEnabled(tester, const {
           'display_mobile_blur_effects_v1': false,
-        }),
+        }, false),
         isFalse,
       );
     });
@@ -72,7 +80,7 @@ void main() {
       expect(
         await readEnabled(tester, const {
           'display_mobile_blur_effects_v1': true,
-        }),
+        }, true),
         isTrue,
       );
     });
@@ -85,7 +93,7 @@ void main() {
         expect(
           await readEnabled(tester, const {
             'display_mobile_blur_effects_v1': false,
-          }),
+          }, true),
           isTrue,
         );
       } finally {
@@ -93,6 +101,40 @@ void main() {
         // runs before addTearDown callbacks.
         debugDefaultTargetPlatformOverride = null;
       }
+    });
+  });
+
+  group('adaptiveBlurRead', () {
+    testWidgets('reads the current preference without subscribing', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(const {
+        'display_mobile_blur_effects_v1': true,
+      });
+      final settings = SettingsProvider();
+      // Wait for the async load so the read observes the persisted value.
+      for (var i = 0; i < 100 && !settings.mobileBlurEffectsEnabled; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+
+      bool? read;
+      await tester.pumpWidget(
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: settings,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  read = adaptiveBlurRead(context);
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(read, isTrue);
     });
   });
 
@@ -125,7 +167,10 @@ void main() {
 
     Future<void> pumpProbe(WidgetTester tester, bool prefEnabled) async {
       await tester.pumpWidget(probe(prefEnabled: prefEnabled));
-      await tester.pump(const Duration(milliseconds: 100));
+      // Keep pumping until the setting is loaded (deterministic wait).
+      for (var i = 0; i < 100; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
     }
 
     testWidgets('renders BackdropFilter when enabled', (tester) async {
@@ -153,11 +198,11 @@ void main() {
         debugDefaultTargetPlatformOverride = null;
       }
     });
-  });
 
-  group('preblendedBlurColor', () {
-    testWidgets('produces an opaque pre-blended surface color', (tester) async {
-      Color? blended;
+    testWidgets('grouped mode mirrors BackdropFilter.grouped', (tester) async {
+      SharedPreferences.setMockInitialValues(const {
+        'display_mobile_blur_effects_v1': true,
+      });
       await tester.pumpWidget(
         ChangeNotifierProvider(
           create: (_) => SettingsProvider(),
@@ -165,6 +210,43 @@ void main() {
             home: Scaffold(
               body: Builder(
                 builder: (context) {
+                  context.watch<SettingsProvider>();
+                  return AdaptiveBlurFilter(
+                    enabled: adaptiveBlurEnabled(context),
+                    grouped: true,
+                    filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: const SizedBox(),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 100; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
+      expect(filter, isA<BackdropFilter>());
+    });
+  });
+
+  group('preblendedBlurColor', () {
+    testWidgets('pre-blends the translucent foreground over the surface', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(const {});
+      Color? blended;
+      Color? surface;
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  surface = Theme.of(context).colorScheme.surface;
                   blended = preblendedBlurColor(
                     context,
                     Colors.white.withValues(alpha: 0.6),
@@ -176,9 +258,15 @@ void main() {
           ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 10));
+
       expect(blended, isNotNull);
       expect(blended!.a, 1.0);
+      final expected = Color.alphaBlend(
+        Colors.white.withValues(alpha: 0.6),
+        surface!,
+      );
+      expect(blended!.toARGB32(), expected.toARGB32());
     });
   });
 }

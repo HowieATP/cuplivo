@@ -957,6 +957,7 @@ class DataSync {
     // compression settings in Kelivo natively too. Derived at export time —
     // prefs never hold a mirror copy (no dual truth, no staleness).
     map.addAll(KelivoImageSettingsMapper.translateToUpstream(map));
+    _retainCloudAsrForExport(map);
     return jsonEncode(map);
   }
 
@@ -1159,6 +1160,7 @@ class DataSync {
               'assistant_tags_v1', // Ordered tag list [{id,name}]
               'assistant_tag_map_v1', // assistantId -> tagId
               'assistant_tag_collapsed_v1', // tagId -> bool
+              'asr_services_v1', // ASR service configurations
             };
 
             for (final entry in map.entries) {
@@ -1195,6 +1197,18 @@ class DataSync {
                   } catch (_) {}
                 } else if (key == 'mcp_servers_v1' &&
                     existing.containsKey(key)) {
+                  try {
+                    await prefs.restoreSingle(
+                      key,
+                      _mergeJsonListById(
+                        existing[key] as String,
+                        newValue as String,
+                      ),
+                    );
+                  } catch (_) {}
+                } else if (key == 'asr_services_v1' &&
+                    existing.containsKey(key)) {
+                  // Merge ASR services by id; prefer existing on conflicts
                   try {
                     await prefs.restoreSingle(
                       key,
@@ -1967,6 +1981,56 @@ class DataSync {
     }
 
     return jsonEncode([for (final id in order) byId[id]]);
+  }
+
+  static const _cloudAsrKinds = {
+    'openai_realtime',
+    'openAiRealtime',
+    'dashscope',
+    'dashScope',
+    'volcengine',
+    'mimo',
+    'step',
+  };
+
+  /// Removes device-bound recognizers from the portable backup payload:
+  /// sherpa models embed local paths and system recognizers are device
+  /// bound, so only cloud services (and their credentials) are exported.
+  static void _retainCloudAsrForExport(Map<String, Object?> data) {
+    const asrServicesKey = 'asr_services_v1';
+    const asrSelectedServiceKey = 'asr_selected_service_id_v1';
+    if (!data.containsKey(asrServicesKey)) {
+      data.remove(asrSelectedServiceKey);
+      return;
+    }
+    final cloudServices = _decodeAsrServices(data[asrServicesKey])
+        .where((service) => _cloudAsrKinds.contains(service['kind']))
+        .toList(growable: false);
+    data[asrServicesKey] = jsonEncode(cloudServices);
+    final selectedId = data[asrSelectedServiceKey];
+    if (selectedId is! String ||
+        !cloudServices.any((service) => service['id'] == selectedId)) {
+      data.remove(asrSelectedServiceKey);
+    }
+  }
+
+  static List<Map<String, Object?>> _decodeAsrServices(Object? raw) {
+    if (raw == null) return const <Map<String, Object?>>[];
+    if (raw is! String) throw const FormatException('asr_services_v1');
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List || decoded.any((entry) => entry is! Map)) {
+        throw const FormatException('asr_services_v1');
+      }
+      return [
+        for (final entry in decoded)
+          (entry as Map).map(
+            (key, value) => MapEntry(key.toString(), value as Object?),
+          ),
+      ];
+    } on FormatException {
+      throw const FormatException('asr_services_v1');
+    }
   }
 
   /// Applies the legacy `ocr_enabled_v1` mapping to an assistant map that

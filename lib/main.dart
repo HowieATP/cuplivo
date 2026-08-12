@@ -24,6 +24,7 @@ import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/filesystem_mounts_provider.dart';
 import 'core/providers/tts_provider.dart';
+import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/group_chat_provider.dart';
 import 'core/providers/tag_provider.dart';
@@ -238,6 +239,10 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              AsrProvider(settingsProvider: ctx.read<SettingsProvider>()),
+        ),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(
           create: (ctx) =>

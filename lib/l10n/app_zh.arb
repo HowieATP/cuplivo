@@ -844,7 +844,23 @@
   "compressContextEstimatePreview": "总结 {summarized} 字符，原样保留 {kept} 字符 → 压缩后约 {minTokens}–{maxTokens} tokens（原文约 {totalTokens} tokens）",
   "@compressContextEstimatePreview": {
     "description": "保留最近压缩预览：总结/保留字符数与预估结果 token 区间",
-    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
   },
   "bottomToolsSheetLearningMode": "学习模式",
   "bottomToolsSheetLearningModeDescription": "帮助你循序渐进地学习知识",
@@ -1062,6 +1078,11 @@
   "chatInputBarReasoningStrengthTooltip": "思维链强度",
   "chatInputBarMcpServersTooltip": "MCP服务器",
   "chatInputBarMoreTooltip": "更多",
+  "chatInputBarVoiceCancelTooltip": "取消录音",
+  "chatInputBarVoiceInputTooltip": "语音输入",
+  "chatInputBarVoiceSendTooltip": "转文字并发送",
+  "chatInputBarVoiceStopTooltip": "停止并转为文字",
+  "chatInputBarVoiceTranscribing": "正在识别…",
   "chatInputBarImageMode": "绘图模式",
   "chatInputBarDisableImageModeTooltip": "关闭绘图模式",
   "chatInputBarImageWarning": "将忽略图片",
@@ -1584,9 +1605,15 @@
   "oneClickCompressResult": "压缩了 {count} 张图片，节省了 {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "placeholders": {
-      "count": { "type": "int" },
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "oneClickCompressNone": "无需压缩",
@@ -1661,9 +1688,62 @@
   "themeSettingsPageSeedColorLabel": "种子颜色",
   "ttsServicesPageBackButton": "返回",
   "ttsServicesPageTitle": "语音服务",
+  "ttsServicesSectionTitle": "文字转语音",
   "ttsServicesPageSettingsTooltip": "TTS 设置",
   "ttsServicesPageAddTooltip": "新增",
   "ttsServicesPageAddNotImplemented": "新增 TTS 服务暂未实现",
+  "asrServicesAddAction": "添加",
+  "asrServicesAddTitle": "添加语音识别",
+  "asrServicesAddTooltip": "添加语音识别服务",
+  "asrServicesApiKeyLabel": "API Key",
+  "asrServicesApiKeyRequired": "请输入 API Key 后再使用此服务。",
+  "asrServicesAutomaticLabel": "自动",
+  "asrServicesCancelAction": "取消",
+  "asrServicesChooseModelTitle": "模型",
+  "asrServicesCloudGroup": "云端",
+  "asrServicesDashScopeSubtitle": "Qwen 实时转写",
+  "asrServicesDashScopeTitle": "DashScope",
+  "asrServicesDeleteAction": "删除",
+  "asrServicesDownloadFailed": "模型下载失败：{error}",
+  "asrServicesEditAction": "编辑",
+  "asrServicesEditTitle": "编辑语音识别",
+  "asrServicesEmptySubtitle": "添加后，聊天输入框才会显示麦克风。",
+  "asrServicesEmptyTitle": "尚未添加语音识别服务",
+  "asrServicesEndpointLabel": "服务地址",
+  "asrServicesLanguageLabel": "语言",
+  "asrServicesLocalSubtitle": "下载后在设备上离线运行",
+  "asrServicesLocalTitle": "本地模型",
+  "asrServicesMicrophonePermissionDenied": "未获得麦克风权限。",
+  "asrServicesMimoSubtitle": "分段云端转写",
+  "asrServicesMimoTitle": "MiMo",
+  "asrServicesModelDeleteAction": "删除下载",
+  "asrServicesModelDownloadAction": "下载",
+  "asrServicesModelDownloadedLabel": "已下载",
+  "asrServicesModelDownloadingLabel": "正在下载…",
+  "asrServicesModelLabel": "模型",
+  "asrServicesModelNotDownloadedLabel": "未下载",
+  "asrServicesModelUseAction": "使用此模型",
+  "asrServicesNameLabel": "名称",
+  "asrServicesNoSpeechDetected": "没有识别到语音。",
+  "asrServicesOnDeviceGroup": "设备端",
+  "asrServicesOpenAiSubtitle": "低延迟流式转写",
+  "asrServicesOpenAiTitle": "OpenAI Realtime",
+  "asrServicesRecognitionFailed": "语音识别失败：{error}",
+  "asrServicesResourceIdLabel": "资源 ID",
+  "asrServicesSaveAction": "保存",
+  "asrServicesSectionDescription": "使用本地、系统或云端服务将语音转换为文字。",
+  "asrServicesSectionTitle": "语音识别",
+  "asrServicesSelectedLabel": "已选择",
+  "asrServicesStepSubtitle": "Step Audio 分段云端转写",
+  "asrServicesStepTitle": "Step",
+  "asrServicesSystemAvailable": "可用",
+  "asrServicesSystemCheckFailed": "这台设备没有可用的系统语音识别服务。",
+  "asrServicesSystemChecking": "正在检查…",
+  "asrServicesSystemSubtitle": "使用设备内置能力",
+  "asrServicesSystemTitle": "系统",
+  "asrServicesUnavailableLabel": "不可用",
+  "asrServicesVolcengineSubtitle": "豆包语音流式转写",
+  "asrServicesVolcengineTitle": "火山引擎",
   "ttsServicesPageSystemTtsTitle": "系统TTS",
   "ttsServicesPageSystemTtsAvailableSubtitle": "使用系统内置语音合成",
   "ttsServicesPageSystemTtsUnavailableSubtitle": "不可用：{error}",
@@ -2444,7 +2524,7 @@
     "description": "在多 AI 对比中移除某个模型回复的按钮提示"
   },
   "documentProcessingTitle": "图片与文档解析",
-    "@documentProcessingTitle": {
+  "@documentProcessingTitle": {
     "description": "文档处理配置面板标题"
   },
   "documentProcessingImageOcr": "图片 OCR",

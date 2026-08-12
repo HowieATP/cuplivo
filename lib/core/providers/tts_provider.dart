@@ -15,6 +15,26 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
 
+String ttsAudioFileExtensionForMime(String? mime) {
+  switch ((mime ?? '').toLowerCase()) {
+    case 'audio/mpeg':
+    case 'audio/mp3':
+      return 'mp3';
+    case 'audio/wav':
+    case 'audio/x-wav':
+      return 'wav';
+    case 'audio/ogg':
+    case 'audio/opus':
+      return 'ogg';
+    case 'audio/flac':
+      return 'flac';
+    case 'audio/pcm':
+      return 'pcm';
+    default:
+      return 'mp3';
+  }
+}
+
 /// System and network TTS coordinator.
 ///
 /// Long text is split into smaller chunks. Network TTS chunks are prefetched
@@ -25,8 +45,9 @@ class TtsProvider extends ChangeNotifier {
   static const String _pitchKey = 'tts_pitch_v1';
   static const String _engineKey = 'tts_engine_v1';
   static const String _langKey = 'tts_language_v1';
+  static const String _cacheNetworkAudioForReplayKey =
+      'tts_cache_network_audio_for_replay_v1';
   static const int _systemChunkMaxLength = 360;
-  static const int _networkChunkMaxLength = 220;
   static const int _networkPrefetchCount = 3;
   static const Duration _seekStep = Duration(seconds: 15);
 
@@ -55,6 +76,7 @@ class TtsProvider extends ChangeNotifier {
   // Settings
   double _speechRate = 0.5; // flutter_tts platform value, 0.5 is normal.
   double _pitch = 1.0;
+  bool _cacheNetworkAudioForReplay = false;
   String? _engineId;
   String? _languageTag;
 
@@ -79,6 +101,7 @@ class TtsProvider extends ChangeNotifier {
   String? get error => _error;
   double get speechRate => _speechRate;
   double get pitch => _pitch;
+  bool get cacheNetworkAudioForReplay => _cacheNetworkAudioForReplay;
   String? get engineId => _engineId;
   String? get languageTag => _languageTag;
   TtsPlaybackState get playbackState => _playbackState;
@@ -96,6 +119,8 @@ class TtsProvider extends ChangeNotifier {
           .clamp(0.1, 1.0)
           .toDouble();
       _pitch = (prefs.getDouble(_pitchKey) ?? 1.0).clamp(0.5, 2.0).toDouble();
+      _cacheNetworkAudioForReplay =
+          prefs.getBool(_cacheNetworkAudioForReplayKey) ?? false;
       _engineId = prefs.getString(_engineKey);
       _languageTag = prefs.getString(_langKey);
       _playbackState = _playbackState.copyWith(
@@ -330,6 +355,14 @@ class TtsProvider extends ChangeNotifier {
     await prefs.setDouble(_pitchKey, _pitch);
   }
 
+  Future<void> setCacheNetworkAudioForReplay(bool value) async {
+    if (_cacheNetworkAudioForReplay == value) return;
+    _cacheNetworkAudioForReplay = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_cacheNetworkAudioForReplayKey, value);
+  }
+
   Future<List<String>> listEngines() async {
     try {
       final res = await _tts.getEngines;
@@ -393,6 +426,7 @@ class TtsProvider extends ChangeNotifier {
     String text, {
     TtsServiceOptions? networkService,
     bool flush = true,
+    bool reuseResolvedNetworkAudio = false,
   }) async {
     final content = _stripMarkdown(text).trim();
     if (content.isEmpty) return;
@@ -403,14 +437,14 @@ class TtsProvider extends ChangeNotifier {
     final session = ++_sessionId;
     _usingNetwork = networkService != null;
     _networkCache.clear();
-    _resolvedChunks.clear();
+    if (!reuseResolvedNetworkAudio) _resolvedChunks.clear();
     _chunks
       ..clear()
       ..addAll(
         TtsTextChunker.split(
           content,
           maxChunkLength: _usingNetwork
-              ? _networkChunkMaxLength
+              ? networkTtsMaxCharsPerRequest(networkService!)
               : _systemChunkMaxLength,
         ),
       );
@@ -495,11 +529,26 @@ class TtsProvider extends ChangeNotifier {
     if (!_initialized) return;
     final content = _lastReplayContent;
     if (content == null || content.isEmpty) return;
+    final networkService = _lastReplayNetworkService;
     await _speakQueued(
       content,
-      networkService: _lastReplayNetworkService,
+      networkService: networkService,
       flush: true,
+      reuseResolvedNetworkAudio:
+          _cacheNetworkAudioForReplay &&
+          networkService != null &&
+          _hasCompleteResolvedNetworkAudio(),
     );
+  }
+
+  bool _hasCompleteResolvedNetworkAudio() {
+    if (_chunks.isEmpty || _resolvedChunks.length != _chunks.length) {
+      return false;
+    }
+    for (var i = 0; i < _chunks.length; i++) {
+      if (!_resolvedChunks.containsKey(i)) return false;
+    }
+    return true;
   }
 
   Future<void> stop() async {
@@ -636,6 +685,8 @@ class TtsProvider extends ChangeNotifier {
     int index,
   ) {
     return _networkCache.putIfAbsent(index, () {
+      final resolved = _resolvedChunks[index];
+      if (resolved != null) return Future<NetworkTtsResult>.value(resolved);
       return NetworkTtsService.synthesize(
         options: service,
         text: _chunks[index].text,
@@ -874,7 +925,6 @@ class TtsProvider extends ChangeNotifier {
     _usingNetwork = false;
     _networkSeekInterruptedChunk = false;
     _networkCache.clear();
-    _resolvedChunks.clear();
     final position = status == TtsPlaybackStatus.ended
         ? _timeline.estimatedDuration
         : _playbackState.position;
@@ -986,20 +1036,7 @@ class TtsProvider extends ChangeNotifier {
     }
   }
 
-  String _extForMime(String? mime) {
-    switch ((mime ?? '').toLowerCase()) {
-      case 'audio/mpeg':
-      case 'audio/mp3':
-        return 'mp3';
-      case 'audio/wav':
-      case 'audio/x-wav':
-        return 'wav';
-      case 'audio/ogg':
-        return 'ogg';
-      default:
-        return 'mp3';
-    }
-  }
+  String _extForMime(String? mime) => ttsAudioFileExtensionForMime(mime);
 
   Future<(Uint8List, String)?> synthesizeAllAndCollect() async {
     if (_chunks.isEmpty || !_usingNetwork) return collectSynthesizedAudio();
@@ -1039,6 +1076,9 @@ class TtsProvider extends ChangeNotifier {
     final first = _resolvedChunks[indices.first]!;
     final isWav = _hasRiffHeader(first.bytes);
     final ext = isWav ? 'wav' : _extForMime(first.mime);
+    if (ext == 'flac') {
+      throw StateError('FLAC TTS chunks cannot be exported as one audio file.');
+    }
 
     final parts = <Uint8List>[];
     int totalSize = 0;
@@ -1095,13 +1135,30 @@ class TtsProvider extends ChangeNotifier {
   Future<TtsServiceOptions?> _getSelectedNetworkService() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final selected = prefs.getInt('tts_selected_v1') ?? -1;
-      if (selected < 0) return null;
+      final selectedId = prefs.getString('tts_selected_service_id_v1');
+      if (selectedId != null && selectedId.isNotEmpty) {
+        final jsonStr = prefs.getString('tts_services_v1') ?? '';
+        if (jsonStr.isEmpty) return null;
+        final list = jsonDecode(jsonStr) as List;
+        for (final obj in list) {
+          final map = obj is Map<String, dynamic>
+              ? obj
+              : Map<String, dynamic>.from(obj as Map);
+          if ((map['id'] ?? '').toString() == selectedId) {
+            return TtsServiceOptions.fromJson(map);
+          }
+        }
+        return null;
+      }
+
+      // Compatibility for profiles not yet loaded by SettingsProvider.
+      final legacyIndex = prefs.getInt('tts_selected_v1') ?? -1;
+      if (legacyIndex < 0) return null;
       final jsonStr = prefs.getString('tts_services_v1') ?? '';
       if (jsonStr.isEmpty) return null;
       final list = jsonDecode(jsonStr) as List;
-      if (selected >= list.length) return null;
-      final obj = list[selected];
+      if (legacyIndex >= list.length) return null;
+      final obj = list[legacyIndex];
       final map = obj is Map<String, dynamic>
           ? obj
           : Map<String, dynamic>.from(obj as Map);

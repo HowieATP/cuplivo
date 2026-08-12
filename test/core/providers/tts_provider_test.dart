@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:Cuplivo/core/providers/tts_provider.dart';
+import 'package:Cuplivo/core/services/tts/network_tts.dart';
 import 'package:Cuplivo/core/services/tts/tts_playback_models.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
 
   const channel = MethodChannel('flutter_tts');
   const audioGlobalChannel = MethodChannel('xyz.luan/audioplayers.global');
@@ -15,24 +20,36 @@ void main() {
   late Set<String> audioEventChannels;
   late int speakCallCount;
   late List<String> spokenTexts;
+  late String? audioPlayerEventChannel;
 
   setUp(() {
     SharedPreferences.setMockInitialValues(const {});
     audioEventChannels = <String>{};
     speakCallCount = 0;
     spokenTexts = <String>[];
+    audioPlayerEventChannel = null;
     _mockAudioEventStream('xyz.luan/audioplayers.global/events');
     audioEventChannels.add('xyz.luan/audioplayers.global/events');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(audioGlobalChannel, (_) async => null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(audioChannel, (call) async {
+          final args = call.arguments as Map<dynamic, dynamic>;
+          final playerId = args['playerId'] as String;
+          final eventChannel = 'xyz.luan/audioplayers/events/$playerId';
           if (call.method == 'create') {
-            final args = call.arguments as Map<dynamic, dynamic>;
-            final playerId = args['playerId'] as String;
-            final eventChannel = 'xyz.luan/audioplayers/events/$playerId';
+            audioPlayerEventChannel = eventChannel;
             _mockAudioEventStream(eventChannel);
             audioEventChannels.add(eventChannel);
+          } else if (call.method == 'setSourceUrl') {
+            scheduleMicrotask(() {
+              unawaited(
+                _emitAudioEvent(eventChannel, {
+                  'event': 'audio.onPrepared',
+                  'value': true,
+                }),
+              );
+            });
           }
           return null;
         });
@@ -139,6 +156,94 @@ void main() {
       expect(provider.playbackState.position, Duration.zero);
     },
   );
+
+  test('maps network audio MIME types to matching file extensions', () {
+    expect(ttsAudioFileExtensionForMime('audio/mpeg'), 'mp3');
+    expect(ttsAudioFileExtensionForMime('audio/wav'), 'wav');
+    expect(ttsAudioFileExtensionForMime('audio/flac'), 'flac');
+    expect(ttsAudioFileExtensionForMime('audio/pcm'), 'pcm');
+  });
+
+  test('network replay uses cached audio only when enabled', () async {
+    final originalPathProvider = PathProviderPlatform.instance;
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'kelivo_tts_replay_test_',
+    );
+    PathProviderPlatform.instance = _FakePathProviderPlatform(
+      tempDirectory.path,
+    );
+    addTearDown(() async {
+      PathProviderPlatform.instance = originalPathProvider;
+      await tempDirectory.delete(recursive: true);
+    });
+
+    var requestCount = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      requestCount++;
+      await request.drain<void>();
+      request.response.statusCode = HttpStatus.ok;
+      request.response.add(const <int>[1, 2, 3]);
+      await request.response.close();
+    });
+    addTearDown(() => server.close(force: true));
+
+    final provider = TtsProvider();
+    addTearDown(provider.dispose);
+    await _waitUntil(() => provider.isAvailable);
+
+    expect(provider.cacheNetworkAudioForReplay, isFalse);
+    await provider.setCacheNetworkAudioForReplay(true);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('tts_cache_network_audio_for_replay_v1'), isTrue);
+
+    final service = OpenAiTtsOptions(
+      enabled: true,
+      name: 'Local TTS',
+      apiKey: 'test-key',
+      baseUrl: 'http://${server.address.address}:${server.port}/v1',
+      model: 'test-model',
+      voice: 'alloy',
+    );
+    unawaited(provider.speakWithNetworkService(service, 'hello network'));
+    await _waitUntil(
+      () =>
+          requestCount == 1 &&
+          provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+    await _emitAudioEvent(audioPlayerEventChannel!, {
+      'event': 'audio.onComplete',
+    });
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.ended,
+    );
+
+    unawaited(provider.togglePause());
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+    expect(requestCount, 1);
+    await _emitAudioEvent(audioPlayerEventChannel!, {
+      'event': 'audio.onComplete',
+    });
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.ended,
+    );
+
+    await provider.setCacheNetworkAudioForReplay(false);
+    unawaited(provider.togglePause());
+    await _waitUntil(
+      () =>
+          requestCount == 2 &&
+          provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+    await _emitAudioEvent(audioPlayerEventChannel!, {
+      'event': 'audio.onComplete',
+    });
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.ended,
+    );
+  });
 }
 
 Future<void> _waitUntil(bool Function() condition) async {
@@ -161,6 +266,14 @@ Future<void> _emitTtsCallback(String method, [dynamic arguments]) async {
   await completer.future;
 }
 
+Future<void> _emitAudioEvent(String channel, Map<String, dynamic> event) async {
+  final data = const StandardMethodCodec().encodeSuccessEnvelope(event);
+  final completer = Completer<void>();
+  await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .handlePlatformMessage(channel, data, (_) => completer.complete());
+  await completer.future;
+}
+
 void _mockAudioEventStream(String channel) {
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMessageHandler(channel, (message) async {
@@ -174,4 +287,13 @@ void _mockAudioEventStream(String channel) {
           'Unexpected audioplayers event stream method ${methodCall.method}',
         );
       });
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getTemporaryPath() async => path;
 }

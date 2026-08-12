@@ -245,7 +245,11 @@
   "storageSpaceDeleteDraftWarning": "{count} files are still referenced by your unsaved draft",
   "@storageSpaceDeleteDraftWarning": {
     "description": "Storage delete guardrail: selected files are still referenced by the unsent input draft",
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "@storageSpaceDeleteRefWarning": {
     "placeholders": {
@@ -987,7 +991,23 @@
   "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
   "@compressContextEstimatePreview": {
     "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
-    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
   },
   "bottomToolsSheetLearningMode": "Learning Mode",
   "bottomToolsSheetLearningModeDescription": "Help you learn step by step",
@@ -2034,9 +2054,15 @@
   "@oneClickCompressResult": {
     "description": "SnackBar message after one-click compression showing savings",
     "placeholders": {
-      "count": { "type": "int" },
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "oneClickCompressNone": "No compression needed",
@@ -2156,7 +2182,43 @@
   "ttsServicesFieldVoiceLabel": "Voice",
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
-  "ttsServicesEmotionAutoHint": "Leave empty for auto emotion",
+  "ttsServicesEmotionAutoLabel": "Auto match",
+  "ttsServicesFieldBitrateLabel": "Bitrate",
+  "ttsServicesFieldChannelLabel": "Channels",
+  "ttsServicesFieldChooseReferenceAudioButton": "Choose reference audio",
+  "ttsServicesFieldFormatLabel": "Audio format",
+  "ttsServicesFieldInstructionLabel": "Style / voice description",
+  "ttsServicesFieldLanguageBoostLabel": "Language boost",
+  "ttsServicesFieldLatencyLabel": "Latency",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "Optimize text preview",
+  "ttsServicesFieldOutputFormatLabel": "Output format",
+  "ttsServicesFieldPitchLabel": "Pitch",
+  "ttsServicesFieldPronunciationDictionaryLabel": "Pronunciation dictionary (one entry per line)",
+  "ttsServicesFieldReferenceAudioLabel": "Reference audio (WAV/MP3 data URI)",
+  "ttsServicesFieldRegionLabel": "Region",
+  "ttsServicesFieldSampleRateLabel": "Sample rate",
+  "ttsServicesFieldStreamingLabel": "Streaming",
+  "ttsServicesFieldSubtitlesLabel": "Generate subtitles",
+  "ttsServicesFieldTemperatureLabel": "Temperature",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldVolumeLabel": "Volume",
+  "ttsServicesFieldWorkspaceIdLabel": "Workspace ID",
+  "ttsServicesSectionTitle": "Text-to-Speech",
+  "ttsServicesValidationInstructionRequired": "A voice description is required",
+  "ttsServicesValidationReferenceIdRequired": "Voice/reference ID is required",
+  "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
+  "@ttsServicesValidationSampleRate": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
+    }
+  },
+  "ttsSettingsCacheReplayDescription": "Replay generated network audio without requesting the TTS service again.",
+  "ttsSettingsCacheReplayTitle": "Reuse Audio for Replay",
   "ttsServicesFieldSpeedLabel": "Speed",
   "ttsServicesFieldLanguageTypeLabel": "Language type",
   "ttsServicesFieldLanguageLabel": "Language",
@@ -2998,7 +3060,7 @@
     "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
   },
   "documentProcessingTitle": "Image & Document Processing",
-    "@documentProcessingTitle": {
+  "@documentProcessingTitle": {
     "description": "Title for the document processing configuration panel"
   },
   "documentProcessingImageOcr": "Image OCR",

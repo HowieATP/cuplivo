@@ -844,7 +844,23 @@
   "compressContextEstimatePreview": "總結 {summarized} 字元，原樣保留 {kept} 字元 → 壓縮後約 {minTokens}–{maxTokens} tokens（原文約 {totalTokens} tokens）",
   "@compressContextEstimatePreview": {
     "description": "保留最近壓縮預覽：總結/保留字元數與預估結果 token 區間",
-    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
   },
   "bottomToolsSheetLearningMode": "學習模式",
   "bottomToolsSheetLearningModeDescription": "幫助你循序漸進地學習知識",
@@ -1562,9 +1578,15 @@
   "oneClickCompressResult": "壓縮了 {count} 張圖片，節省了 {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "placeholders": {
-      "count": { "type": "int" },
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "oneClickCompressNone": "無需壓縮",
@@ -1674,6 +1696,33 @@
   "ttsServicesFieldVoiceLabel": "音色",
   "ttsServicesFieldVoiceIdLabel": "音色 ID",
   "ttsServicesFieldEmotionLabel": "情感",
+  "ttsServicesEmotionAutoLabel": "自動配對",
+  "ttsServicesFieldBitrateLabel": "位元率",
+  "ttsServicesFieldChannelLabel": "聲道數",
+  "ttsServicesFieldChooseReferenceAudioButton": "選擇參考音訊",
+  "ttsServicesFieldFormatLabel": "音訊格式",
+  "ttsServicesFieldInstructionLabel": "風格／音色描述",
+  "ttsServicesFieldLanguageBoostLabel": "語言增強",
+  "ttsServicesFieldLatencyLabel": "延遲模式",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "最佳化播報文字",
+  "ttsServicesFieldOutputFormatLabel": "輸出格式",
+  "ttsServicesFieldPitchLabel": "音調",
+  "ttsServicesFieldPronunciationDictionaryLabel": "發音詞典（每行一項）",
+  "ttsServicesFieldReferenceAudioLabel": "參考音訊（WAV/MP3 資料 URI）",
+  "ttsServicesFieldRegionLabel": "地域",
+  "ttsServicesFieldSampleRateLabel": "取樣率",
+  "ttsServicesFieldStreamingLabel": "串流輸出",
+  "ttsServicesFieldSubtitlesLabel": "產生字幕",
+  "ttsServicesFieldTemperatureLabel": "隨機度",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldVolumeLabel": "音量",
+  "ttsServicesFieldWorkspaceIdLabel": "業務空間 ID",
+  "ttsServicesSectionTitle": "文字轉語音",
+  "ttsServicesValidationInstructionRequired": "音色描述不能為空",
+  "ttsServicesValidationReferenceIdRequired": "音色／參考 ID 不能為空",
+  "ttsServicesValidationSampleRate": "{format} 格式要求使用 {rates} Hz。",
+  "ttsSettingsCacheReplayDescription": "重新播放網路語音時使用已產生的音訊，不再請求語音服務。",
+  "ttsSettingsCacheReplayTitle": "使用快取重播",
   "ttsServicesEmotionAutoHint": "留空即自動",
   "ttsServicesFieldSpeedLabel": "語速",
   "ttsServicesFieldLanguageTypeLabel": "語言類型",
@@ -2444,7 +2493,7 @@
     "description": "在多 AI 對比中移除某個模型回覆的按鈕提示"
   },
   "documentProcessingTitle": "圖片與文檔解析",
-    "@documentProcessingTitle": {
+  "@documentProcessingTitle": {
     "description": "文檔處理設定面板標題"
   },
   "documentProcessingImageOcr": "圖片 OCR",

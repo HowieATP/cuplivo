@@ -695,22 +695,34 @@
   "backupPageIncrementalPreviewNewConv": "新对话 {count} 个 · 新消息 {msgCount} 条",
   "@backupPageIncrementalPreviewNewConv": {
     "placeholders": {
-      "count": { "type": "int" },
-      "msgCount": { "type": "int" }
+      "count": {
+        "type": "int"
+      },
+      "msgCount": {
+        "type": "int"
+      }
     }
   },
   "backupPageIncrementalPreviewUpdatedConv": "更新旧对话 {count} 个 · 新消息 {msgCount} 条",
   "@backupPageIncrementalPreviewUpdatedConv": {
     "placeholders": {
-      "count": { "type": "int" },
-      "msgCount": { "type": "int" }
+      "count": {
+        "type": "int"
+      },
+      "msgCount": {
+        "type": "int"
+      }
     }
   },
   "backupPageIncrementalPreviewFiles": "新附件 {count} 个 ({size})",
   "@backupPageIncrementalPreviewFiles": {
     "placeholders": {
-      "count": { "type": "int" },
-      "size": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
     }
   },
   "backupReminderSectionTitle": "备份提醒",
@@ -877,7 +889,23 @@
   "compressContextEstimatePreview": "总结 {summarized} 字符，原样保留 {kept} 字符 → 压缩后约 {minTokens}–{maxTokens} tokens（原文约 {totalTokens} tokens）",
   "@compressContextEstimatePreview": {
     "description": "保留最近压缩预览：总结/保留字符数与预估结果 token 区间",
-    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
   },
   "bottomToolsSheetLearningMode": "学习模式",
   "bottomToolsSheetLearningModeDescription": "帮助你循序渐进地学习知识",
@@ -1595,9 +1623,15 @@
   "oneClickCompressResult": "压缩了 {count} 张图片，节省了 {saved} (-{pct}%)",
   "@oneClickCompressResult": {
     "placeholders": {
-      "count": { "type": "int" },
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "oneClickCompressNone": "无需压缩",
@@ -1707,6 +1741,33 @@
   "ttsServicesFieldVoiceLabel": "音色",
   "ttsServicesFieldVoiceIdLabel": "音色 ID",
   "ttsServicesFieldEmotionLabel": "情感",
+  "ttsServicesEmotionAutoLabel": "自动匹配",
+  "ttsServicesFieldBitrateLabel": "比特率",
+  "ttsServicesFieldChannelLabel": "声道数",
+  "ttsServicesFieldChooseReferenceAudioButton": "选择参考音频",
+  "ttsServicesFieldFormatLabel": "音频格式",
+  "ttsServicesFieldInstructionLabel": "风格／音色描述",
+  "ttsServicesFieldLanguageBoostLabel": "语言增强",
+  "ttsServicesFieldLatencyLabel": "延迟模式",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "优化播报文本",
+  "ttsServicesFieldOutputFormatLabel": "输出格式",
+  "ttsServicesFieldPitchLabel": "音调",
+  "ttsServicesFieldPronunciationDictionaryLabel": "发音词典（每行一项）",
+  "ttsServicesFieldReferenceAudioLabel": "参考音频（WAV/MP3 数据 URI）",
+  "ttsServicesFieldRegionLabel": "地域",
+  "ttsServicesFieldSampleRateLabel": "采样率",
+  "ttsServicesFieldStreamingLabel": "流式输出",
+  "ttsServicesFieldSubtitlesLabel": "生成字幕",
+  "ttsServicesFieldTemperatureLabel": "随机度",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldVolumeLabel": "音量",
+  "ttsServicesFieldWorkspaceIdLabel": "业务空间 ID",
+  "ttsServicesSectionTitle": "文字转语音",
+  "ttsServicesValidationInstructionRequired": "音色描述不能为空",
+  "ttsServicesValidationReferenceIdRequired": "音色／参考 ID 不能为空",
+  "ttsServicesValidationSampleRate": "{format} 格式要求使用 {rates} Hz。",
+  "ttsSettingsCacheReplayDescription": "重新播放网络语音时使用已生成的音频，不再请求语音服务。",
+  "ttsSettingsCacheReplayTitle": "使用缓存复播",
   "ttsServicesEmotionAutoHint": "留空即自动",
   "ttsServicesFieldSpeedLabel": "语速",
   "ttsServicesFieldLanguageTypeLabel": "语言类型",
@@ -2344,17 +2405,27 @@
   "@imageCompressionSingleResult": {
     "description": "SnackBar 单图压缩完成后的体积变化提示",
     "placeholders": {
-      "from": { "type": "String" },
-      "to": { "type": "String" },
-      "pct": { "type": "String" }
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "imageCompressionBatchResult": "全部压缩完成，共节省 {saved} (-{pct}%)",
   "@imageCompressionBatchResult": {
     "description": "SnackBar 全部图片压缩完成后的节省提示",
     "placeholders": {
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "messageMoreSheetMultiAI": "启动对比",
@@ -2369,7 +2440,9 @@
   "@multiAIModelsBadge": {
     "description": "Badge on model selector button showing active model count in multi-AI mode",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "modelSelectorMultiSelect": "多选",
@@ -2380,7 +2453,9 @@
   "@modelSelectorMultiConfirm": {
     "description": "Confirm button in multi-select mode of model selector",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "multiAIAdoptVersion": "采纳",
@@ -2408,7 +2483,9 @@
   "@multiAISelectedCount": {
     "description": "多选模式下显示已选模型数量",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "multiAIDropThread": "移除",
@@ -2416,7 +2493,7 @@
     "description": "在多 AI 对比中移除某个模型回复的按钮提示"
   },
   "documentProcessingTitle": "图片与文档解析",
-    "@documentProcessingTitle": {
+  "@documentProcessingTitle": {
     "description": "文档处理配置面板标题"
   },
   "documentProcessingImageOcr": "图片 OCR",

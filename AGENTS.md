@@ -138,18 +138,17 @@ dart format <changed-paths>
 
 ### 3.4 Minimum Sufficient Verification After Completion
 
-- ⚠️ **No CI PR gate anymore**: `pr-check.yml` was switched to manual trigger only (to save GitHub Actions minutes). The local verification below is now the only gate before merge. Manual full runs are still possible from the Actions UI (`Manual Checks (Analyze / Test / L10n / Format)`).
-- Default minimum verification (root package only):
+- Default minimum verification (CI-verbatim, root package only):
 
 ```bash
 dart analyze --fatal-infos lib test
 ```
 
-- Why scoped: an unscoped `flutter analyze` recursively scans `dependencies/**`, and path dependencies that were never `pub get`-ed (missing `.dart_tool/package_config.json`, e.g. `mcp_client`, `gpt_markdown`, `tray_manager`, `permission_handler_windows`) produce mass false "undefined" errors (observed: 816 `test/expect` errors) plus a slow cold parse (first full run timed out at 5 min).
-- ALL `dart analyze --fatal-infos lib test` issues MUST be fixed. Always run with `--fatal-infos` so info-level issues are errors -- there is no CI left to catch them.
+- Why scoped: an unscoped `flutter analyze` recursively scans `dependencies/**`, and path dependencies that were never `pub get`-ed (missing `.dart_tool/package_config.json`, e.g. `mcp_client`, `gpt_markdown`, `tray_manager`, `permission_handler_windows`) produce mass false "undefined" errors (observed: 816 `test/expect` errors) plus a slow cold parse (first full run timed out at 5 min). CI never sees this because it runs exactly the scoped command above.
+- ALL `dart analyze --fatal-infos lib test` issues MUST be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
 - For small-scope changes, iterate quickly with `dart analyze <files>` (or `dart analyze lib test`) before the final full run.
 - When the change touches a path dependency under `dependencies/**`: run `flutter pub get` in that dependency's own directory first and confirm `.dart_tool/package_config.json` exists (missing config = the false-error trap above), then analyze/test in the dependency's own directory -- never rely on the root repo alone.
-- **Full `flutter test` is mandatory for any change touching `lib/` or `test/`** -- there is no CI validating the suite remotely anymore. During development, iterate quickly with the subset relevant to the change scope, but the final verification must be the complete local suite. Docs/yaml-only changes may skip the test suite.
+- Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally**, as CI validates the complete suite remotely.
 - If no directly related tests exist, perform manual verification and state it in delivery notes.
 - **For user-visible changes**, after development, provide a manual test plan covering:
   - Happy path
@@ -382,7 +381,7 @@ dart analyze --fatal-infos lib test
 - `flutter gen-l10n` has been executed and generated files match ARB content.
 - `dart format` has been executed.
 - `dart analyze --fatal-infos lib test` has been executed.
-- Full `flutter test` executed locally when `lib/` or `test/` changed (no CI PR gate exists); docs/yaml-only changes may skip. Subset iteration during development is allowed.
+- Related `flutter test` (subset) executed, or manual verification performed and stated.
 - Test scenarios cover the happy path, boundary values, and failure paths for this task's requirements -- not just a single green run.
 - Desktop tasks have confirmed the entry layer. No desktop-only logic leaked into mobile branches.
 - New or adjusted UI prioritized reuse of existing shared / desktop components. No near-duplicate widgets created.

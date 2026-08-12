@@ -1,12 +1,11 @@
-name: Manual Checks (Analyze / Test / L10n / Format)
+name: PR Checks
 
 env:
   FLUTTER_VERSION: '3.44.1'
 
-# 手动触发：PR 自动检查已关闭以节省 GitHub Actions minutes。
-# 需要完整验证时，在 Actions 页面手动运行本 workflow。
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [master]
 
 jobs:
   checks:
@@ -29,13 +28,21 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Dart format (all lib/ and test/ files)
+      - name: Dart format (changed files only)
         shell: bash
         run: |
           set -euo pipefail
-          files="$(git ls-files | grep -E '^(lib|test)/.*\.dart$' || true)"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test)/.*\\.dart$' || true)"
           if [ -z "$files" ]; then
-            echo "No Dart files to format-check."
+            echo "No changed Dart files to format-check."
             exit 0
           fi
 
@@ -48,11 +55,12 @@ jobs:
           flutter gen-l10n
           git diff --exit-code -- lib/l10n
 
-      - name: No new untranslated messages (vs origin/master)
+      - name: No new untranslated messages (PR)
+        if: ${{ github.event_name == 'pull_request' }}
         shell: bash
         run: |
           set -euo pipefail
-          BASE_SHA="$(git rev-parse origin/master)"
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
           BASE_DIR="$(mktemp -d)"
           cleanup() {
             git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true

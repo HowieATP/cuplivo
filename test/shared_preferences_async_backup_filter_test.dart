@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/models/chat_input_data.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart' as backup_sync;
+import 'package:Cuplivo/core/services/backup/double_pref_keys.dart'
+    show doublePrefKeys;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -149,5 +151,71 @@ void main() {
       );
       expect(rawPrefs.getBool('display_auto_scroll_enabled_v1'), isTrue);
     });
+
+    test(
+      'restore normalizes int-injected double-typed keys to double',
+      () async {
+        SharedPreferences.setMockInitialValues(const {
+          'display_auto_scroll_enabled_v1': false,
+        });
+
+        final prefs = await backup_sync.SharedPreferencesAsync.instance;
+        await prefs.restore({
+          // Poisoned ints from kelivo-helper-migrated RikkaHub backups.
+          for (final key in doublePrefKeys) key: 1,
+          // Boundary ints must normalize too.
+          'display_chat_background_mask_strength_v1': 0,
+          'display_chat_input_background_opacity_dark_v1': -1,
+          // Already-double values pass through unchanged.
+          'display_chat_input_background_opacity_light_v1': 0.5,
+          'desktop_right_sidebar_width_v1': 2.0,
+          'some_regular_int_key_v1': 42,
+        });
+
+        final rawPrefs = await SharedPreferences.getInstance();
+        for (final key in doublePrefKeys) {
+          expect(rawPrefs.getDouble(key), isA<double>());
+        }
+        expect(rawPrefs.getDouble('tts_speech_rate_v1'), 1.0);
+        expect(rawPrefs.getDouble('tts_pitch_v1'), 1.0);
+        expect(
+          rawPrefs.getDouble('display_chat_background_mask_strength_v1'),
+          0.0,
+        );
+        expect(
+          rawPrefs.getDouble('display_chat_input_background_opacity_light_v1'),
+          0.5,
+        );
+        expect(
+          rawPrefs.getDouble('display_chat_input_background_opacity_dark_v1'),
+          -1.0,
+        );
+        expect(rawPrefs.getDouble('desktop_sidebar_width_v1'), 1.0);
+        expect(rawPrefs.getDouble('desktop_right_sidebar_width_v1'), 2.0);
+        // Non-double-typed int keys keep their int type.
+        expect(rawPrefs.getInt('some_regular_int_key_v1'), 42);
+      },
+    );
+
+    test(
+      'restoreSingle normalizes int-injected double-typed keys to double',
+      () async {
+        SharedPreferences.setMockInitialValues(const {
+          'display_auto_scroll_enabled_v1': false,
+        });
+
+        final prefs = await backup_sync.SharedPreferencesAsync.instance;
+        for (final key in doublePrefKeys) {
+          await prefs.restoreSingle(key, 1);
+        }
+        await prefs.restoreSingle('some_regular_int_key_v1', 42);
+
+        final rawPrefs = await SharedPreferences.getInstance();
+        for (final key in doublePrefKeys) {
+          expect(rawPrefs.getDouble(key), 1.0);
+        }
+        expect(rawPrefs.getInt('some_regular_int_key_v1'), 42);
+      },
+    );
   });
 }

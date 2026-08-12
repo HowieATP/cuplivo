@@ -139,6 +139,29 @@ void main() {
       expect(provider.playbackState.position, Duration.zero);
     },
   );
+
+  test(
+    'int-stored rate/pitch from migrated backups are read as double',
+    () async {
+      // kelivo-helper-migrated RikkaHub backups write these keys as int;
+      // prefs.getDouble would throw and permanently disable system TTS.
+      // Values differ from the fallbacks (rate 0.5 / pitch 1.0) so the
+      // assertions prove int->double conversion, not fallback.
+      SharedPreferences.setMockInitialValues(const {
+        'tts_speech_rate_v1': 1,
+        'tts_pitch_v1': 2,
+      });
+
+      final provider = TtsProvider();
+      addTearDown(provider.dispose);
+
+      await _waitUntil(() => provider.isAvailable);
+
+      expect(provider.isAvailable, isTrue);
+      expect(provider.speechRate, 1.0);
+      expect(provider.pitch, 2.0);
+    },
+  );
 }
 
 Future<void> _waitUntil(bool Function() condition) async {

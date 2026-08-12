@@ -24,6 +24,7 @@ import '../deleted_records_store.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment;
 import 'kelivo_image_settings_mapper.dart';
+import 'double_pref_keys.dart';
 import '../../../utils/app_directories.dart';
 
 class DataSync {
@@ -2394,33 +2395,22 @@ class SharedPreferencesAsync {
     return map;
   }
 
-  Future<void> restore(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final entry in data.entries) {
-      final k = entry.key;
-      final v = entry.value;
-      if (_localOnlyKeys.contains(k)) continue;
-      if (v is bool) {
-        await prefs.setBool(k, v);
-      } else if (v is int) {
-        await prefs.setInt(k, v);
-      } else if (v is double) {
-        await prefs.setDouble(k, v);
-      } else if (v is String) {
-        await prefs.setString(k, v);
-      } else if (v is List) {
-        await prefs.setStringList(k, v.whereType<String>().toList());
-      }
-    }
-  }
-
-  Future<void> restoreSingle(String key, dynamic value) async {
-    if (_localOnlyKeys.contains(key)) return;
-    final prefs = await SharedPreferences.getInstance();
+  /// Writes a single pref, normalizing int values for double-typed keys:
+  /// kelivo-helper-migrated RikkaHub backups may carry them as int, and
+  /// storing them as int makes `getDouble` reads throw.
+  Future<void> _writePref(
+    SharedPreferences prefs,
+    String key,
+    dynamic value,
+  ) async {
     if (value is bool) {
       await prefs.setBool(key, value);
     } else if (value is int) {
-      await prefs.setInt(key, value);
+      if (doublePrefKeys.contains(key)) {
+        await prefs.setDouble(key, value.toDouble());
+      } else {
+        await prefs.setInt(key, value);
+      }
     } else if (value is double) {
       await prefs.setDouble(key, value);
     } else if (value is String) {
@@ -2428,5 +2418,20 @@ class SharedPreferencesAsync {
     } else if (value is List) {
       await prefs.setStringList(key, value.whereType<String>().toList());
     }
+  }
+
+  Future<void> restore(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in data.entries) {
+      final k = entry.key;
+      if (_localOnlyKeys.contains(k)) continue;
+      await _writePref(prefs, k, entry.value);
+    }
+  }
+
+  Future<void> restoreSingle(String key, dynamic value) async {
+    if (_localOnlyKeys.contains(key)) return;
+    final prefs = await SharedPreferences.getInstance();
+    await _writePref(prefs, key, value);
   }
 }

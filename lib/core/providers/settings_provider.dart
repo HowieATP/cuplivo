@@ -14,6 +14,8 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
+import '../services/backup/double_pref_keys.dart'
+    show doublePrefKeys, prefDouble;
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
@@ -81,6 +83,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerConfigsBackupKey = 'provider_configs_backup_v1';
   static const String _migrationsVersionKey = 'migrations_version_v1';
   static const int _embeddingOverridesMigrationVersion = 3;
+  static const int _doubleKeysNormalizationMigrationVersion = 4;
   static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
   static const Set<String> _embeddingChatOnlyFields = {
     'abilities',
@@ -695,6 +698,73 @@ class SettingsProvider extends ChangeNotifier {
     return _MigrationResult.applied;
   }
 
+  /// One-time normalization of double-typed keys that backups may have
+  /// injected as int (kelivo-helper-migrated RikkaHub backups). Idempotent;
+  /// advances `migrations_version_v1` to 4 only when every write succeeded
+  /// AND the v3 embedding-overrides migration is settled — otherwise a
+  /// skipped or failed v3 migration would be permanently masked, and
+  /// re-running this normalization on later loads is harmless.
+  Future<void> _normalizeDoublePrefKeys(SharedPreferences prefs) async {
+    try {
+      final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
+      if (migrationVersion >= _doubleKeysNormalizationMigrationVersion) {
+        return;
+      }
+      var normalized = 0;
+      var allWritesOk = true;
+      for (final key in doublePrefKeys) {
+        final v = prefs.get(key);
+        if (v is int) {
+          final ok = await prefs.setDouble(key, v.toDouble());
+          if (ok) {
+            normalized++;
+          } else {
+            allWritesOk = false;
+          }
+        }
+      }
+      final finalized =
+          allWritesOk &&
+          migrationVersion >= _embeddingOverridesMigrationVersion;
+      if (finalized) {
+        final ok = await prefs.setInt(
+          _migrationsVersionKey,
+          _doubleKeysNormalizationMigrationVersion,
+        );
+        if (!ok) return;
+      }
+      assert(() {
+        debugPrint(
+          '[SettingsProvider] double keys normalization migration: '
+          'normalized=$normalized, finalized=$finalized',
+        );
+        return true;
+      }());
+      try {
+        FlutterLogger.log(
+          '[SettingsProvider] double keys normalization migration done '
+          '(normalized=$normalized, finalized=$finalized)',
+          tag: 'Migration',
+        );
+      } catch (_) {}
+    } catch (e, st) {
+      try {
+        FlutterLogger.log(
+          '[SettingsProvider] double keys normalization migration failed: '
+          '$e\n$st',
+          tag: 'Migration',
+        );
+      } catch (_) {}
+      assert(() {
+        debugPrint(
+          '[SettingsProvider] double keys normalization migration failed: $e',
+        );
+        debugPrint('$st');
+        return true;
+      }());
+    }
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
@@ -807,6 +877,12 @@ class SettingsProvider extends ChangeNotifier {
         return true;
       }());
     }
+
+    // Normalize double-typed settings that backups may have injected as int
+    // (RikkaHub backups migrated by kelivo-helper write e.g.
+    // tts_speech_rate_v1 as 1 instead of 1.0; getDouble on such a value
+    // throws). Runs before the getDouble reads below within this same _load.
+    await _normalizeDoublePrefKeys(prefs);
 
     // load provider grouping
     try {
@@ -1115,16 +1191,21 @@ class SettingsProvider extends ChangeNotifier {
     _autoScrollEnabled = prefs.getBool(_displayAutoScrollEnabledKey) ?? true;
     _autoScrollIdleSeconds =
         prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
-    _chatBackgroundMaskStrength =
-        prefs.getDouble(_displayChatBackgroundMaskStrengthKey) ?? 1.0;
-    _chatInputBackgroundOpacityLight =
-        (prefs.getDouble(_displayChatInputBackgroundOpacityLightKey) ??
-                defaultChatInputBackgroundOpacityLight)
-            .clamp(0.0, 1.0);
-    _chatInputBackgroundOpacityDark =
-        (prefs.getDouble(_displayChatInputBackgroundOpacityDarkKey) ??
-                defaultChatInputBackgroundOpacityDark)
-            .clamp(0.0, 1.0);
+    _chatBackgroundMaskStrength = prefDouble(
+      prefs,
+      _displayChatBackgroundMaskStrengthKey,
+      1.0,
+    );
+    _chatInputBackgroundOpacityLight = prefDouble(
+      prefs,
+      _displayChatInputBackgroundOpacityLightKey,
+      defaultChatInputBackgroundOpacityLight,
+    ).clamp(0.0, 1.0);
+    _chatInputBackgroundOpacityDark = prefDouble(
+      prefs,
+      _displayChatInputBackgroundOpacityDarkKey,
+      defaultChatInputBackgroundOpacityDark,
+    ).clamp(0.0, 1.0);
     final pureBgPref = prefs.getBool(_displayUsePureBackgroundKey);
     if (pureBgPref == null) {
       final isDesktop =
@@ -1232,10 +1313,13 @@ class SettingsProvider extends ChangeNotifier {
     _mobileAssistantDetailOutlineEnabled =
         prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
     // desktop UI
-    _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
+    _desktopSidebarWidth = prefDouble(prefs, _desktopSidebarWidthKey, 300);
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
-    _desktopRightSidebarWidth =
-        prefs.getDouble(_desktopRightSidebarWidthKey) ?? 300;
+    _desktopRightSidebarWidth = prefDouble(
+      prefs,
+      _desktopRightSidebarWidthKey,
+      300,
+    );
     // Load app locale; default to follow system on first launch
     _appLocaleTag = prefs.getString(_appLocaleKey);
     if (_appLocaleTag == null || _appLocaleTag!.isEmpty) {

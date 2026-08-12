@@ -5,6 +5,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -119,6 +120,7 @@ class ChatInputSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final ap = context.watch<AssistantProvider>();
+    final asr = context.watch<AsrProvider>();
     final a = ap.currentAssistant;
     final assistantId = a?.id;
 
@@ -155,6 +157,7 @@ class ChatInputSection extends StatelessWidget {
       focusNode: inputFocus,
       controller: inputController,
       mediaController: mediaController,
+      asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
       reasoningActive: isReasoningEnabled(
         (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??

@@ -3128,6 +3128,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
+
+  @override
   String get chatInputBarImageMode => '绘图模式';
 
   @override
@@ -4838,6 +4853,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
@@ -4845,6 +4863,166 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '语音识别失败：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系统TTS';
@@ -10458,6 +10636,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
+
+  @override
   String get chatInputBarImageMode => '绘图模式';
 
   @override
@@ -12168,6 +12361,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
@@ -12175,6 +12371,166 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '语音识别失败：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系统TTS';
@@ -17786,6 +18142,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceCancelTooltip => '取消錄音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '語音輸入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '轉文字並發送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止並轉為文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在辨識…';
+
+  @override
   String get chatInputBarImageMode => '繪圖模式';
 
   @override
@@ -19495,6 +19866,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '語音服務';
 
   @override
+  String get ttsServicesSectionTitle => '文字轉語音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 設定';
 
   @override
@@ -19502,6 +19876,166 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服務暫未實現';
+
+  @override
+  String get asrServicesAddAction => '新增';
+
+  @override
+  String get asrServicesAddTitle => '新增語音辨識';
+
+  @override
+  String get asrServicesAddTooltip => '新增語音辨識服務';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '請輸入 API Key 後再使用此服務。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自動';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '雲端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 即時轉寫';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '刪除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下載失敗：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '編輯';
+
+  @override
+  String get asrServicesEditTitle => '編輯語音辨識';
+
+  @override
+  String get asrServicesEmptySubtitle => '新增後，聊天輸入框才會顯示麥克風。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未新增語音辨識服務';
+
+  @override
+  String get asrServicesEndpointLabel => '服務位址';
+
+  @override
+  String get asrServicesLanguageLabel => '語言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下載後在裝置上離線執行';
+
+  @override
+  String get asrServicesLocalTitle => '本機模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未取得麥克風權限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段雲端轉寫';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '刪除下載';
+
+  @override
+  String get asrServicesModelDownloadAction => '下載';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下載';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下載…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下載';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名稱';
+
+  @override
+  String get asrServicesNoSpeechDetected => '沒有辨識到語音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '裝置端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '語音辨識失敗：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '資源 ID';
+
+  @override
+  String get asrServicesSaveAction => '儲存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本機、系統或雲端服務將語音轉換為文字。';
+
+  @override
+  String get asrServicesSectionTitle => '語音辨識';
+
+  @override
+  String get asrServicesSelectedLabel => '已選擇';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段雲端轉寫';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '這台裝置沒有可用的系統語音辨識服務。';
+
+  @override
+  String get asrServicesSystemChecking => '正在檢查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用裝置內建能力';
+
+  @override
+  String get asrServicesSystemTitle => '系統';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包語音串流轉寫';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系統TTS';

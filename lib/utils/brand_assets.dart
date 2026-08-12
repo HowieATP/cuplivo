@@ -36,6 +36,7 @@ class BrandAssets {
         MapEntry(RegExp(r'anthropic'), 'anthropic.svg'),
         MapEntry(RegExp(r'deepseek'), 'deepseek-color.svg'),
         MapEntry(RegExp(r'grok'), 'grok.svg'),
+        MapEntry(RegExp(r'fish.?audio|fishaudio'), 'fish-audio.svg'),
         MapEntry(RegExp(r'qwen|qwq|qvq'), 'qwen-color.svg'),
         MapEntry(RegExp(r'doubao'), 'doubao-color.svg'),
         MapEntry(RegExp(r'openrouter'), 'openrouter.svg'),
@@ -357,6 +358,7 @@ class BrandAssets {
         asset.contains('ollama') ||
         asset.contains('github') ||
         asset.contains('codex') ||
+        asset.contains('fish-audio') ||
         asset.contains('mimo');
   }
 

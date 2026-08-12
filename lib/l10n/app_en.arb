@@ -2240,7 +2240,43 @@
   "ttsServicesFieldVoiceLabel": "Voice",
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
-  "ttsServicesEmotionAutoHint": "Leave empty for auto emotion",
+  "ttsServicesEmotionAutoLabel": "Auto match",
+  "ttsServicesFieldBitrateLabel": "Bitrate",
+  "ttsServicesFieldChannelLabel": "Channels",
+  "ttsServicesFieldChooseReferenceAudioButton": "Choose reference audio",
+  "ttsServicesFieldFormatLabel": "Audio format",
+  "ttsServicesFieldInstructionLabel": "Style / voice description",
+  "ttsServicesFieldLanguageBoostLabel": "Language boost",
+  "ttsServicesFieldLatencyLabel": "Latency",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "Optimize text preview",
+  "ttsServicesFieldOutputFormatLabel": "Output format",
+  "ttsServicesFieldPitchLabel": "Pitch",
+  "ttsServicesFieldPronunciationDictionaryLabel": "Pronunciation dictionary (one entry per line)",
+  "ttsServicesFieldReferenceAudioLabel": "Reference audio (WAV/MP3 data URI)",
+  "ttsServicesFieldRegionLabel": "Region",
+  "ttsServicesFieldSampleRateLabel": "Sample rate",
+  "ttsServicesFieldStreamingLabel": "Streaming",
+  "ttsServicesFieldSubtitlesLabel": "Generate subtitles",
+  "ttsServicesFieldTemperatureLabel": "Temperature",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldVolumeLabel": "Volume",
+  "ttsServicesFieldWorkspaceIdLabel": "Workspace ID",
+  "ttsServicesSectionTitle": "Text-to-Speech",
+  "ttsServicesValidationInstructionRequired": "A voice description is required",
+  "ttsServicesValidationReferenceIdRequired": "Voice/reference ID is required",
+  "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
+  "@ttsServicesValidationSampleRate": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
+    }
+  },
+  "ttsSettingsCacheReplayDescription": "Replay generated network audio without requesting the TTS service again.",
+  "ttsSettingsCacheReplayTitle": "Reuse Audio for Replay",
   "ttsServicesFieldSpeedLabel": "Speed",
   "ttsServicesFieldLanguageTypeLabel": "Language type",
   "ttsServicesFieldLanguageLabel": "Language",

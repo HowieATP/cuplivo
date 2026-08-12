@@ -92,7 +92,6 @@ class _VoiceServiceHeaderIconButtonState
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final alpha = _pressed ? 0.10 : (_hovered ? 0.06 : 0.0);
     return Tooltip(
       message: widget.tooltip,
@@ -117,9 +116,7 @@ class _VoiceServiceHeaderIconButtonState
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: (isDark ? Colors.white : Colors.black).withValues(
-                  alpha: alpha,
-                ),
+                color: cs.onSurface.withValues(alpha: alpha),
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
@@ -144,7 +141,7 @@ class VoiceServiceMobileCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: _appSurfaceCard(cs),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -306,11 +303,8 @@ class _VoiceServiceSmallIconButtonState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final base = widget.destructive ? cs.error : cs.onSurface;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final background = _pressed || _hovered
-        ? (isDark ? Colors.white : Colors.black).withValues(
-            alpha: _pressed ? 0.09 : 0.05,
-          )
+        ? cs.onSurface.withValues(alpha: _pressed ? 0.09 : 0.05)
         : Colors.transparent;
     return Tooltip(
       message: widget.tooltip,
@@ -411,6 +405,156 @@ class VoiceServiceSelectRow<T> extends StatelessWidget {
   }
 }
 
+class VoiceServiceMobileSelectRow<T> extends StatelessWidget {
+  const VoiceServiceMobileSelectRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.labelFor,
+    required this.onSelected,
+  });
+
+  final String label;
+  final T value;
+  final List<T> options;
+  final String Function(T value) labelFor;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: double.infinity,
+      child: VoiceServiceTactileRow(
+        haptics: true,
+        onTap: () async {
+          if (options.isEmpty) return;
+          final selected = await _showVoiceServiceMobileOptions<T>(
+            context,
+            current: value,
+            options: options,
+            labelFor: labelFor,
+          );
+          if (selected != null) onSelected(selected);
+        },
+        builder: (pressed) {
+          final foreground = cs.onSurface.withValues(
+            alpha: pressed ? 0.68 : 0.9,
+          );
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.medium,
+                      color: foreground,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  labelFor(value),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.regular,
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(Lucide.ChevronRight, size: 16, color: foreground),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+Future<T?> _showVoiceServiceMobileOptions<T>(
+  BuildContext context, {
+  required T current,
+  required List<T> options,
+  required String Function(T value) labelFor,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  return showModalBottomSheet<T>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (sheetContext) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.72,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 6, bottom: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < options.length; index++) ...[
+                VoiceServiceTactileRow(
+                  onTap: () => Navigator.of(sheetContext).pop(options[index]),
+                  haptics: true,
+                  builder: (pressed) {
+                    final selected = options[index] == current;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              labelFor(options[index]),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: selected
+                                    ? AppFontWeights.semibold
+                                    : AppFontWeights.regular,
+                                color: cs.onSurface.withValues(
+                                  alpha: pressed ? 0.68 : 0.9,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (selected)
+                            Icon(Lucide.Check, size: 18, color: cs.primary),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                if (index != options.length - 1)
+                  Divider(
+                    height: 1,
+                    thickness: 0.6,
+                    indent: 16,
+                    endIndent: 16,
+                    color: cs.outlineVariant.withValues(alpha: 0.18),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _VoiceServiceSelectButton<T> extends StatefulWidget {
   const _VoiceServiceSelectButton({
     required this.value,
@@ -436,7 +580,6 @@ class _VoiceServiceSelectButtonState<T>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -458,7 +601,7 @@ class _VoiceServiceSelectButtonState<T>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: _hovered
-                ? (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)
+                ? cs.onSurface.withValues(alpha: 0.05)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
@@ -564,11 +707,10 @@ class _VoiceServiceDialogOptionState extends State<_VoiceServiceDialogOption> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final background = widget.selected
         ? cs.primary.withValues(alpha: 0.08)
         : _hovered
-        ? (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04)
+        ? cs.onSurface.withValues(alpha: 0.04)
         : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -602,4 +744,17 @@ class _VoiceServiceDialogOptionState extends State<_VoiceServiceDialogOption> {
       ),
     );
   }
+}
+
+Color _appSurfaceCard(ColorScheme cs) {
+  final isDark = cs.brightness == Brightness.dark;
+  return isDark
+      ? Color.alphaBlend(
+          const Color(0xFFFFFFFF).withValues(alpha: 0.10),
+          cs.surface,
+        )
+      : Color.alphaBlend(
+          const Color(0xFFFFFFFF).withValues(alpha: 0.96),
+          cs.surface,
+        );
 }

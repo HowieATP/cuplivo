@@ -5355,7 +5355,94 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldEmotionLabel => 'Emotion';
 
   @override
-  String get ttsServicesEmotionAutoHint => 'Leave empty for auto emotion';
+  String get ttsServicesEmotionAutoLabel => 'Auto match';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => 'Bitrate';
+
+  @override
+  String get ttsServicesFieldChannelLabel => 'Channels';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton =>
+      'Choose reference audio';
+
+  @override
+  String get ttsServicesFieldFormatLabel => 'Audio format';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => 'Style / voice description';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => 'Language boost';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => 'Latency';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel =>
+      'Optimize text preview';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => 'Output format';
+
+  @override
+  String get ttsServicesFieldPitchLabel => 'Pitch';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel =>
+      'Pronunciation dictionary (one entry per line)';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel =>
+      'Reference audio (WAV/MP3 data URI)';
+
+  @override
+  String get ttsServicesFieldRegionLabel => 'Region';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => 'Sample rate';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => 'Streaming';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => 'Generate subtitles';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => 'Temperature';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => 'Volume';
+
+  @override
+  String get ttsServicesFieldWorkspaceIdLabel => 'Workspace ID';
+
+  @override
+  String get ttsServicesSectionTitle => 'Text-to-Speech';
+
+  @override
+  String get ttsServicesValidationInstructionRequired =>
+      'A voice description is required';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired =>
+      'Voice/reference ID is required';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format requires $rates Hz.';
+  }
+
+  @override
+  String get ttsSettingsCacheReplayDescription =>
+      'Replay generated network audio without requesting the TTS service again.';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => 'Reuse Audio for Replay';
 
   @override
   String get ttsServicesFieldSpeedLabel => 'Speed';

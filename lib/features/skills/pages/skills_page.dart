@@ -11,13 +11,18 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../github_importer.dart';
 import '../skill_manager.dart';
 
 class SkillsPage extends StatefulWidget {
-  const SkillsPage({super.key});
+  const SkillsPage({super.key, this.desktop = false});
+
+  /// When true, renders as an embedded desktop settings pane (no Scaffold /
+  /// AppBar / FAB, desktop-style cards) instead of a full mobile page.
+  final bool desktop;
 
   @override
   State<SkillsPage> createState() => _SkillsPageState();
@@ -167,6 +172,19 @@ class _SkillsPageState extends State<SkillsPage> {
               ),
             ),
           ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop('manual'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Lucide.Plus),
+                  const SizedBox(width: 16),
+                  Text(l10n.skillsImportManualTitle),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -175,6 +193,8 @@ class _SkillsPageState extends State<SkillsPage> {
       await _importFromFile();
     } else if (choice == 'github') {
       await _importFromGitHub();
+    } else if (choice == 'manual') {
+      await _showAddDialog();
     }
   }
 
@@ -648,6 +668,10 @@ class _SkillsPageState extends State<SkillsPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
+    if (widget.desktop) {
+      return _buildDesktop(l10n, cs);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.skillsTitle),
@@ -658,10 +682,6 @@ class _SkillsPageState extends State<SkillsPage> {
             onPressed: _showImportChoice,
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddDialog,
-        child: const Icon(Lucide.Plus),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -683,67 +703,221 @@ class _SkillsPageState extends State<SkillsPage> {
               onRefresh: () async => _refresh(),
               child: ListView(
                 padding: const EdgeInsets.all(16),
-                children: [
-                  for (final (group, skills) in groupSkillsByCategory(
-                    _skills,
-                  )) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
-                      child: Text(
-                        group ?? l10n.skillsUncategorizedGroup,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: AppFontWeights.semibold,
-                          color: cs.onSurface.withValues(alpha: 0.55),
-                        ),
-                      ),
-                    ),
-                    for (final skill in skills)
-                      Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Icon(Lucide.BookOpen, color: cs.primary),
-                          title: Text(
-                            skill.name,
-                            style: TextStyle(
-                              fontWeight: AppFontWeights.semibold,
-                            ),
-                          ),
-                          subtitle: skill.description.isNotEmpty
-                              ? Text(
-                                  skill.description,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 120,
-                                ),
-                                child: _CategoryTag(
-                                  category: skill.category,
-                                  label:
-                                      skill.category ??
-                                      l10n.skillsUncategorizedGroup,
-                                  onTap: () => _editCategory(skill),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Lucide.Trash2),
-                                color: cs.error,
-                                onPressed: () => _deleteSkill(skill.name),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ],
+                children: _buildSkillGroups(),
               ),
             ),
+    );
+  }
+
+  Widget _buildDesktop(AppLocalizations l10n, ColorScheme cs) {
+    return Container(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _buildDesktopHeader(l10n, cs),
+                    const SizedBox(height: 8),
+                    if (_skills.isEmpty)
+                      _buildDesktopEmpty(l10n, cs)
+                    else
+                      ..._buildSkillGroups(desktop: true),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader(AppLocalizations l10n, ColorScheme cs) {
+    return SizedBox(
+      height: 36,
+      child: Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l10n.skillsTitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: AppFontWeights.regular,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ),
+          Tooltip(
+            message: l10n.skillsImportChoiceTitle,
+            child: IosIconButton(
+              icon: Lucide.Import,
+              size: 18,
+              onTap: _showImportChoice,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopEmpty(AppLocalizations l10n, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Lucide.BookOpen,
+              size: 56,
+              color: cs.onSurface.withValues(alpha: 0.28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.skillsEmptyMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.65),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSkillGroups({bool desktop = false}) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return [
+      for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
+          child: Text(
+            group ?? l10n.skillsUncategorizedGroup,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+        for (final skill in skills)
+          desktop
+              ? _buildDesktopSkillCard(l10n, cs, skill)
+              : Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: Icon(Lucide.BookOpen, color: cs.primary),
+                    title: Text(
+                      skill.name,
+                      style: TextStyle(fontWeight: AppFontWeights.semibold),
+                    ),
+                    subtitle: skill.description.isNotEmpty
+                        ? Text(
+                            skill.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: _CategoryTag(
+                            category: skill.category,
+                            label:
+                                skill.category ?? l10n.skillsUncategorizedGroup,
+                            onTap: () => _editCategory(skill),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Lucide.Trash2),
+                          color: cs.error,
+                          onPressed: () => _deleteSkill(skill.name),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+      ],
+    ];
+  }
+
+  Widget _buildDesktopSkillCard(
+    AppLocalizations l10n,
+    ColorScheme cs,
+    SkillMetadata skill,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: IosCardPress(
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Lucide.BookOpen, size: 20, color: cs.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      skill.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    if (skill.description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        skill.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: _CategoryTag(
+                  category: skill.category,
+                  label: skill.category ?? l10n.skillsUncategorizedGroup,
+                  onTap: () => _editCategory(skill),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: l10n.skillsDeleteConfirmDeleteButton,
+                child: IosIconButton(
+                  icon: Lucide.Trash2,
+                  size: 18,
+                  color: cs.error,
+                  onTap: () => _deleteSkill(skill.name),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

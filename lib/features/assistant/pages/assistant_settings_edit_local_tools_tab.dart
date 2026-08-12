@@ -25,16 +25,20 @@ class _LocalToolsTab extends StatelessWidget {
       LocalToolNames.calculate,
     );
 
-    Future<void> updateTool(String toolId, bool value) {
+    Future<void> updateTool(String toolId, bool value) async {
       final ids = assistant.localToolIds.toSet();
       if (value) {
         ids.add(toolId);
       } else {
         ids.remove(toolId);
       }
-      return context.read<AssistantProvider>().updateAssistant(
-        assistant.copyWith(localToolIds: ids.toList(growable: false)),
-      );
+      try {
+        await context.read<AssistantProvider>().updateAssistant(
+          assistant.copyWith(localToolIds: ids.toList(growable: false)),
+        );
+      } catch (e) {
+        debugPrint('Failed to persist local tool switch: $e');
+      }
     }
 
     return ListView(

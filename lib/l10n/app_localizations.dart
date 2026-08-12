@@ -10394,6 +10394,30 @@ abstract class AppLocalizations {
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
 
+  /// No description provided for @assistantEditSkillDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Skills'**
+  String get assistantEditSkillDownloadTitle;
+
+  /// No description provided for @assistantEditSkillDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant download and install skills from GitHub repository URLs.'**
+  String get assistantEditSkillDownloadSubtitle;
+
+  /// No description provided for @assistantEditSkillCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Skills'**
+  String get assistantEditSkillCreateTitle;
+
+  /// No description provided for @assistantEditSkillCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant create new skills from SKILL.md content.'**
+  String get assistantEditSkillCreateSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:

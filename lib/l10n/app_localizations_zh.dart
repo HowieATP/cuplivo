@@ -5464,6 +5464,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditSkillDownloadTitle => '下载 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '创建 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -12794,6 +12807,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditSkillDownloadTitle => '下载 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '创建 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -20121,6 +20147,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
       '計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditSkillDownloadTitle => '下載 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允許助手透過 GitHub 儲存庫 URL 下載並安裝技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '建立 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允許助手根據 SKILL.md 內容建立新技能。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

@@ -145,7 +145,11 @@ class MainActivity : FlutterActivity() {
             it.physicalWidth == current.physicalWidth &&
                 it.physicalHeight == current.physicalHeight
         }
-        val candidates = if (sameResolution.isEmpty()) modes else sameResolution
+        // Unify the branch types: modes is Array<Display.Mode> while filter
+        // returns List<Display.Mode>; a bare if/else would widen to Any and
+        // break maxByOrNull resolution.
+        val candidates: List<Display.Mode> =
+            if (sameResolution.isEmpty()) modes.toList() else sameResolution
         val best = candidates.maxByOrNull { it.refreshRate } ?: modes.first()
         val attributes = window.attributes
         attributes.preferredDisplayModeId = if (enabled) best.modeId else 0

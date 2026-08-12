@@ -13,7 +13,11 @@ flutter_launcher_icons:
     image_path: "assets/app_icon.png"
     background_color: "#C1BDB4"
   windows:
-    generate: true
+    # The Windows .ico (windows/runner/resources/app_icon.ico) is generated
+    # locally with rounded corners (12.5% Fluent-style radius, multi-size
+    # 16-256px). Keep generation disabled so this tool never overwrites it
+    # with the square master PNG.
+    generate: false
     image_path: "assets/app_icon.png"
     icon_size: 256
   macos:

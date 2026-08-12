@@ -7737,14 +7737,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceEntrySubtitleOff => 'Off';
 
   @override
-  String get workspaceShellAndroidOnly => 'Shell is only available on Android';
+  String get workspaceShellMobileOnly =>
+      'Shell is only available on Android or iOS';
 
   @override
   String get workspaceToolShellTitle => 'Shell';
 
   @override
   String get workspaceToolShellUserDesc =>
-      'Run commands in the Linux sandbox (Android, requires base dependency)';
+      'Run commands in the Linux sandbox (Android or iOS, requires base dependency)';
 
   @override
   String get workspaceDepSettings => 'Source settings';
@@ -7766,14 +7767,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceSandboxRuntimeMissing =>
-      'proot runtime missing; reinstall this app build';
+      'Sandbox runtime missing; reinstall this app build';
 
   @override
   String get workspaceSandboxBaseRequired =>
       'Install the base dependency first';
-
-  @override
-  String get workspaceDepDeveloping => 'Under development';
 
   @override
   String get workspaceDepSource => 'Install source';

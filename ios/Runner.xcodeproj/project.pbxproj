@@ -20,6 +20,12 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		B15A000000000000000000A1 /* CuplivoISHKernel.m in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B2 /* CuplivoISHKernel.m */; };
+		B15A000000000000000000A2 /* CuplivoISHExecutor.m in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B4 /* CuplivoISHExecutor.m */; };
+		B15A000000000000000000A3 /* CuplivoISHCrashGuards.c in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B6 /* CuplivoISHCrashGuards.c */; };
+		B15A000000000000000000A4 /* CuplivoLinuxSandboxPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B7 /* CuplivoLinuxSandboxPlugin.swift */; };
+		B15A000000000000000000A5 /* CuplivoSandboxRootfsInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B8 /* CuplivoSandboxRootfsInstaller.swift */; };
+		B15A000000000000000000A6 /* alpine-rootfs.zip in Resources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B9 /* alpine-rootfs.zip */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +103,15 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0FC04191A5EC777C16F7895 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		C7611D570BED92819FE5AADD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B15A000000000000000000B1 /* CuplivoISHKernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CuplivoISHKernel.h; sourceTree = "<group>"; };
+		B15A000000000000000000B2 /* CuplivoISHKernel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CuplivoISHKernel.m; sourceTree = "<group>"; };
+		B15A000000000000000000B3 /* CuplivoISHExecutor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CuplivoISHExecutor.h; sourceTree = "<group>"; };
+		B15A000000000000000000B4 /* CuplivoISHExecutor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CuplivoISHExecutor.m; sourceTree = "<group>"; };
+		B15A000000000000000000B5 /* CuplivoISHCrashGuards.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CuplivoISHCrashGuards.h; sourceTree = "<group>"; };
+		B15A000000000000000000B6 /* CuplivoISHCrashGuards.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = CuplivoISHCrashGuards.c; sourceTree = "<group>"; };
+		B15A000000000000000000B7 /* CuplivoLinuxSandboxPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuplivoLinuxSandboxPlugin.swift; sourceTree = "<group>"; };
+		B15A000000000000000000B8 /* CuplivoSandboxRootfsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuplivoSandboxRootfsInstaller.swift; sourceTree = "<group>"; };
+		B15A000000000000000000B9 /* alpine-rootfs.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = "alpine-rootfs.zip"; path = "sandbox/resources/alpine-rootfs.zip"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -189,8 +204,24 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				B15A000000000000000000C1 /* iSHSandbox */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		B15A000000000000000000C1 /* iSHSandbox */ = {
+			isa = PBXGroup;
+			children = (
+				B15A000000000000000000B1 /* CuplivoISHKernel.h */,
+				B15A000000000000000000B2 /* CuplivoISHKernel.m */,
+				B15A000000000000000000B3 /* CuplivoISHExecutor.h */,
+				B15A000000000000000000B4 /* CuplivoISHExecutor.m */,
+				B15A000000000000000000B5 /* CuplivoISHCrashGuards.h */,
+				B15A000000000000000000B6 /* CuplivoISHCrashGuards.c */,
+				B15A000000000000000000B7 /* CuplivoLinuxSandboxPlugin.swift */,
+				B15A000000000000000000B8 /* CuplivoSandboxRootfsInstaller.swift */,
+			);
+			path = iSHSandbox;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000015 /* GenerationActivityExtension */ = {
@@ -347,6 +378,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				B15A000000000000000000A6 /* alpine-rootfs.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -489,6 +521,11 @@
 				A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				B15A000000000000000000A1 /* CuplivoISHKernel.m in Sources */,
+				B15A000000000000000000A2 /* CuplivoISHExecutor.m in Sources */,
+				B15A000000000000000000A3 /* CuplivoISHCrashGuards.c in Sources */,
+				B15A000000000000000000A4 /* CuplivoLinuxSandboxPlugin.swift in Sources */,
+				B15A000000000000000000A5 /* CuplivoSandboxRootfsInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -661,7 +698,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -681,10 +718,32 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"ISH_INTERNAL=1",
+					"GUEST_ARM64=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/include",
+					"$(SRCROOT)/sandbox/include/ish",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/libs",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+					"-lsqlite3",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cup11.cuplivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -801,7 +860,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -853,7 +912,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -875,10 +934,32 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"ISH_INTERNAL=1",
+					"GUEST_ARM64=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/include",
+					"$(SRCROOT)/sandbox/include/ish",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/libs",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+					"-lsqlite3",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cup11.cuplivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -901,10 +982,32 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 5WN7Y88J52;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"ISH_INTERNAL=1",
+					"GUEST_ARM64=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/include",
+					"$(SRCROOT)/sandbox/include/ish",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/sandbox/libs",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+					"-lsqlite3",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.cup11.cuplivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -96,7 +96,7 @@ class WorkspaceToolsService {
 
   static bool _shellAvailable(LinuxSandboxService? sandbox) {
     if (sandbox == null) return false;
-    if (!Platform.isAndroid) return false;
+    if (!Platform.isAndroid && !Platform.isIOS) return false;
     return true;
   }
 
@@ -230,10 +230,10 @@ class WorkspaceToolsService {
     required WorkspaceProvider workspaces,
     LinuxSandboxService? sandbox,
   }) async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       return jsonEncode({
         'error': 'shell_unsupported',
-        'message': 'Linux sandbox shell is only available on Android.',
+        'message': 'Linux sandbox shell is only available on Android or iOS.',
       });
     }
     final svc = sandbox ?? LinuxSandboxService.instance;

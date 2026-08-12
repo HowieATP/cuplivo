@@ -14,6 +14,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/path_canon.dart';
 import '../deleted_records_store.dart';
+import '../workspace/linux_sandbox_service.dart';
 
 class ChatService extends ChangeNotifier {
   static const int defaultInitialMessageMin = 2;
@@ -1868,6 +1869,27 @@ class ChatService extends ChangeNotifier {
         await wsDir.delete(recursive: true);
       }
     } catch (_) {}
+    // iOS Linux sandbox: the shared iSH rootfs lives OUTSIDE @workspaces
+    // (Application Support, ADR-0029), so wipe it separately. Refuse while
+    // the kernel is booted — deleting a live fakefs mount would corrupt the
+    // running guest; it goes away on the next clear after a relaunch.
+    if (Platform.isIOS) {
+      try {
+        if (!await LinuxSandboxService.instance.isIosKernelBooted()) {
+          final sandboxDir =
+              await AppDirectories.getLinuxSandboxRuntimeDirectory();
+          if (await sandboxDir.exists()) {
+            await sandboxDir.delete(recursive: true);
+          }
+        } else {
+          debugPrint(
+            'clearAllData: iOS sandbox kernel booted; keeping rootfs until relaunch',
+          );
+        }
+      } catch (e) {
+        debugPrint('clearAllData: failed to remove iOS sandbox runtime: $e');
+      }
+    }
     notifyListeners();
   }
 

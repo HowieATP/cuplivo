@@ -196,6 +196,18 @@ class AppDirectories {
   static bool pathsOverlap(String a, String b) =>
       isPathInside(a, b) || isPathInside(b, a);
 
+  /// Runtime directory for the Linux sandbox engine (iOS: shared iSH
+  /// rootfs). iOS uses Application Support instead of Documents because the
+  /// rootfs is app-managed data that should not appear in the Files app.
+  static Future<Directory> getLinuxSandboxRuntimeDirectory() async {
+    if (Platform.isIOS) {
+      final support = await getApplicationSupportDirectory();
+      return Directory(p.join(support.path, 'linux-sandbox'));
+    }
+    final root = await getAppDataDirectory();
+    return Directory(p.join(root.path, 'linux-sandbox'));
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

@@ -7399,14 +7399,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntrySubtitleOff => '未开启';
 
   @override
-  String get workspaceShellAndroidOnly => 'Shell 仅在 Android 可用';
+  String get workspaceShellMobileOnly => 'Shell 仅在 Android 或 iOS 可用';
 
   @override
   String get workspaceToolShellTitle => 'Shell';
 
   @override
   String get workspaceToolShellUserDesc =>
-      '在 Linux 沙箱中运行命令（仅 Android，需先安装基础依赖）';
+      '在 Linux 沙箱中运行命令（Android 或 iOS，需先安装基础依赖）';
 
   @override
   String get workspaceDepSettings => '源设置';
@@ -7427,13 +7427,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepReinstall => '重新安装';
 
   @override
-  String get workspaceSandboxRuntimeMissing => '缺少 proot 运行时，请重装本应用构建包';
+  String get workspaceSandboxRuntimeMissing => '缺少沙箱运行时，请重装本应用构建包';
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
-
-  @override
-  String get workspaceDepDeveloping => '开发中';
 
   @override
   String get workspaceDepSource => '安装源';
@@ -14957,14 +14954,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntrySubtitleOff => '未开启';
 
   @override
-  String get workspaceShellAndroidOnly => 'Shell 仅在 Android 可用';
+  String get workspaceShellMobileOnly => 'Shell 仅在 Android 或 iOS 可用';
 
   @override
   String get workspaceToolShellTitle => 'Shell';
 
   @override
   String get workspaceToolShellUserDesc =>
-      '在 Linux 沙箱中运行命令（仅 Android，需先安装基础依赖）';
+      '在 Linux 沙箱中运行命令（Android 或 iOS，需先安装基础依赖）';
 
   @override
   String get workspaceDepSettings => '源设置';
@@ -14985,13 +14982,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepReinstall => '重新安装';
 
   @override
-  String get workspaceSandboxRuntimeMissing => '缺少 proot 运行时，请重装本应用构建包';
+  String get workspaceSandboxRuntimeMissing => '缺少沙箱运行时，请重装本应用构建包';
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
-
-  @override
-  String get workspaceDepDeveloping => '开发中';
 
   @override
   String get workspaceDepSource => '安装源';
@@ -22515,14 +22509,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntrySubtitleOff => '未開啟';
 
   @override
-  String get workspaceShellAndroidOnly => 'Shell 僅在 Android 可用';
+  String get workspaceShellMobileOnly => 'Shell 僅在 Android 或 iOS 可用';
 
   @override
   String get workspaceToolShellTitle => 'Shell';
 
   @override
   String get workspaceToolShellUserDesc =>
-      '在 Linux 沙箱中執行命令（僅 Android，需先安裝基礎依賴）';
+      '在 Linux 沙箱中執行命令（Android 或 iOS，需先安裝基礎依賴）';
 
   @override
   String get workspaceDepSettings => '來源設定';
@@ -22543,13 +22537,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceDepReinstall => '重新安裝';
 
   @override
-  String get workspaceSandboxRuntimeMissing => '缺少 proot 執行環境，請重裝本應用建置包';
+  String get workspaceSandboxRuntimeMissing => '缺少沙箱執行環境，請重裝本應用建置包';
 
   @override
   String get workspaceSandboxBaseRequired => '請先安裝基礎相依元件';
-
-  @override
-  String get workspaceDepDeveloping => '開發中';
 
   @override
   String get workspaceDepSource => '安裝來源';

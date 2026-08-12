@@ -13988,11 +13988,11 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get workspaceEntrySubtitleOff;
 
-  /// No description provided for @workspaceShellAndroidOnly.
+  /// No description provided for @workspaceShellMobileOnly.
   ///
   /// In en, this message translates to:
-  /// **'Shell is only available on Android'**
-  String get workspaceShellAndroidOnly;
+  /// **'Shell is only available on Android or iOS'**
+  String get workspaceShellMobileOnly;
 
   /// No description provided for @workspaceToolShellTitle.
   ///
@@ -14003,7 +14003,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceToolShellUserDesc.
   ///
   /// In en, this message translates to:
-  /// **'Run commands in the Linux sandbox (Android, requires base dependency)'**
+  /// **'Run commands in the Linux sandbox (Android or iOS, requires base dependency)'**
   String get workspaceToolShellUserDesc;
 
   /// No description provided for @workspaceDepSettings.
@@ -14045,7 +14045,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceSandboxRuntimeMissing.
   ///
   /// In en, this message translates to:
-  /// **'proot runtime missing; reinstall this app build'**
+  /// **'Sandbox runtime missing; reinstall this app build'**
   String get workspaceSandboxRuntimeMissing;
 
   /// No description provided for @workspaceSandboxBaseRequired.
@@ -14053,12 +14053,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
-
-  /// No description provided for @workspaceDepDeveloping.
-  ///
-  /// In en, this message translates to:
-  /// **'Under development'**
-  String get workspaceDepDeveloping;
 
   /// No description provided for @workspaceDepSource.
   ///

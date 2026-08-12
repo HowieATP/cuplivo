@@ -3,45 +3,45 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SandboxReadiness.compute', () {
-    test('non-android is unsupported', () {
+    test('unsupported platform is unsupported', () {
       expect(
         SandboxReadiness.compute(
-          isAndroid: false,
+          supported: false,
           hasRootfs: true,
-          hasProot: true,
+          hasRuntime: true,
         ),
         SandboxStatus.unsupported,
       );
     });
 
-    test('no rootfs is disabled even with proot', () {
+    test('no rootfs is disabled even with runtime', () {
       expect(
         SandboxReadiness.compute(
-          isAndroid: true,
+          supported: true,
           hasRootfs: false,
-          hasProot: true,
+          hasRuntime: true,
         ),
         SandboxStatus.disabled,
       );
     });
 
-    test('rootfs without proot is runtimeMissing', () {
+    test('rootfs without runtime is runtimeMissing', () {
       expect(
         SandboxReadiness.compute(
-          isAndroid: true,
+          supported: true,
           hasRootfs: true,
-          hasProot: false,
+          hasRuntime: false,
         ),
         SandboxStatus.runtimeMissing,
       );
     });
 
-    test('rootfs and proot is ready', () {
+    test('rootfs and runtime is ready', () {
       expect(
         SandboxReadiness.compute(
-          isAndroid: true,
+          supported: true,
           hasRootfs: true,
-          hasProot: true,
+          hasRuntime: true,
         ),
         SandboxStatus.ready,
       );
@@ -50,9 +50,9 @@ void main() {
     test('rootfs check failure is broken', () {
       expect(
         SandboxReadiness.compute(
-          isAndroid: true,
+          supported: true,
           hasRootfs: false,
-          hasProot: true,
+          hasRuntime: true,
           rootfsCheckFailed: true,
         ),
         SandboxStatus.broken,
@@ -67,7 +67,11 @@ void main() {
     );
     expect(
       LinuxSandboxService.statusUserMessage(SandboxStatus.runtimeMissing),
-      contains('proot'),
+      contains('runtime'),
+    );
+    expect(
+      LinuxSandboxService.statusUserMessage(SandboxStatus.unsupported),
+      contains('Android or iOS'),
     );
   });
 }

@@ -203,6 +203,14 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "版本号: $VERSION"
+      - name: 🔧 安装 iSH 构建依赖 (iOS Linux 沙箱)
+        run: |
+          brew install ninja llvm
+          pip3 install --quiet meson
+
+      - name: 🐧 构建 iSH 静态库 (iOS Linux 沙箱)
+        run: ios/sandbox/build_ish.sh
+
       - name: 🏗️ 构建 iOS (无签名)
         run: |
           flutter build ios --release --no-codesign

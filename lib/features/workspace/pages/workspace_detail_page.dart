@@ -31,7 +31,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
   double? _installProgress; // null = indeterminate
   final Map<String, bool> _depInstalled = <String, bool>{};
   bool _depStatusLoading = false;
-  bool _hasProot = true;
+  bool _hasRuntime = true;
 
   @override
   void initState() {
@@ -42,7 +42,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
   }
 
   Future<void> _refreshDepStatus() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     final wp = context.read<WorkspaceProvider>();
     final ws = wp.getById(widget.workspaceId);
     if (ws == null) return;
@@ -51,14 +51,14 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     setState(() => _depStatusLoading = true);
     try {
       final svc = LinuxSandboxService.instance;
-      final proot = await svc.hasProotRuntime();
+      final runtime = await svc.hasRuntime();
       final next = <String, bool>{};
       for (final id in WorkspaceDependencyIds.ordered) {
         next[id] = await svc.isDependencyInstalled(host, id);
       }
       if (!mounted) return;
       setState(() {
-        _hasProot = proot;
+        _hasRuntime = runtime;
         _depInstalled
           ..clear()
           ..addAll(next);
@@ -163,20 +163,22 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
                 ws,
                 WorkspaceToolNames.shell,
                 forceTitle: l10n.workspaceToolShellTitle,
-                forceSubtitle: !Platform.isAndroid
-                    ? l10n.workspaceShellAndroidOnly
-                    : !_hasProot
+                forceSubtitle: (!Platform.isAndroid && !Platform.isIOS)
+                    ? l10n.workspaceShellMobileOnly
+                    : !_hasRuntime
                     ? l10n.workspaceSandboxRuntimeMissing
                     : (_depInstalled[WorkspaceDependencyIds.base] != true)
                     ? l10n.workspaceSandboxBaseRequired
                     : l10n.workspaceToolShellUserDesc,
-                enabledOverride: Platform.isAndroid ? null : false,
-                onChangedOverride: Platform.isAndroid
+                enabledOverride: (Platform.isAndroid || Platform.isIOS)
+                    ? null
+                    : false,
+                onChangedOverride: (Platform.isAndroid || Platform.isIOS)
                     ? null
                     : (_) {
                         showAppSnackBar(
                           context,
-                          message: l10n.workspaceShellAndroidOnly,
+                          message: l10n.workspaceShellMobileOnly,
                         );
                       },
               ),
@@ -328,13 +330,13 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     final baseInstalled = _depInstalled[WorkspaceDependencyIds.base] == true;
     final needsBaseFirst =
         depId != WorkspaceDependencyIds.base && !baseInstalled;
-    final needsProot =
-        depId != WorkspaceDependencyIds.base && baseInstalled && !_hasProot;
+    final needsRuntime =
+        depId != WorkspaceDependencyIds.base && baseInstalled && !_hasRuntime;
 
     String? subtitleExtra;
     if (needsBaseFirst) {
       subtitleExtra = l10n.workspaceSandboxBaseRequired;
-    } else if (needsProot) {
+    } else if (needsRuntime) {
       subtitleExtra = l10n.workspaceSandboxRuntimeMissing;
     }
 
@@ -424,12 +426,8 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     bool reinstall = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    if (Platform.isIOS) {
-      showAppSnackBar(context, message: l10n.workspaceDepDeveloping);
-      return;
-    }
-    if (!Platform.isAndroid) {
-      showAppSnackBar(context, message: l10n.workspaceShellAndroidOnly);
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      showAppSnackBar(context, message: l10n.workspaceShellMobileOnly);
       return;
     }
     if (reinstall) {
@@ -473,9 +471,9 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
         },
       );
       if (!context.mounted) return;
-      final proot = await LinuxSandboxService.instance.hasProotRuntime();
+      final runtime = await LinuxSandboxService.instance.hasRuntime();
       if (!context.mounted) return;
-      if (depId == WorkspaceDependencyIds.base && !proot) {
+      if (depId == WorkspaceDependencyIds.base && !runtime) {
         showAppSnackBar(context, message: l10n.workspaceSandboxRuntimeMissing);
       } else {
         showAppSnackBar(context, message: l10n.workspaceDepInstallDone);
@@ -501,10 +499,6 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     String depId,
   ) async {
     final l10n = AppLocalizations.of(context)!;
-    if (Platform.isIOS) {
-      showAppSnackBar(context, message: l10n.workspaceDepDeveloping);
-      return;
-    }
     final pref = ws.prefFor(depId);
     var sourceId = pref.sourceId;
     final customCtrl = TextEditingController(text: pref.customUrl ?? '');

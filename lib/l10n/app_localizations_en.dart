@@ -5422,9 +5422,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldWorkspaceIdLabel => 'Workspace ID';
 
   @override
-  String get ttsServicesSectionTitle => 'Text-to-Speech';
-
-  @override
   String get ttsServicesValidationInstructionRequired =>
       'A voice description is required';
 

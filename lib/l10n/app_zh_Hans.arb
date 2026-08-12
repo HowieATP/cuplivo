@@ -1820,7 +1820,6 @@
   "ttsServicesFieldTopPLabel": "Top P",
   "ttsServicesFieldVolumeLabel": "音量",
   "ttsServicesFieldWorkspaceIdLabel": "业务空间 ID",
-  "ttsServicesSectionTitle": "文字转语音",
   "ttsServicesValidationInstructionRequired": "音色描述不能为空",
   "ttsServicesValidationReferenceIdRequired": "音色／参考 ID 不能为空",
   "ttsServicesValidationSampleRate": "{format} 格式要求使用 {rates} Hz。",

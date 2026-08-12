@@ -9896,12 +9896,6 @@ abstract class AppLocalizations {
   /// **'Workspace ID'**
   String get ttsServicesFieldWorkspaceIdLabel;
 
-  /// No description provided for @ttsServicesSectionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Text-to-Speech'**
-  String get ttsServicesSectionTitle;
-
   /// No description provided for @ttsServicesValidationInstructionRequired.
   ///
   /// In en, this message translates to:

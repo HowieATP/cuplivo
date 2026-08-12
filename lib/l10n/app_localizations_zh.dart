@@ -5186,9 +5186,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
 
   @override
-  String get ttsServicesSectionTitle => '文字转语音';
-
-  @override
   String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
 
   @override
@@ -12774,9 +12771,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
 
   @override
-  String get ttsServicesSectionTitle => '文字转语音';
-
-  @override
   String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
 
   @override
@@ -20357,9 +20351,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesFieldWorkspaceIdLabel => '業務空間 ID';
-
-  @override
-  String get ttsServicesSectionTitle => '文字轉語音';
 
   @override
   String get ttsServicesValidationInstructionRequired => '音色描述不能為空';

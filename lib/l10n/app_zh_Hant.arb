@@ -1775,7 +1775,6 @@
   "ttsServicesFieldTopPLabel": "Top P",
   "ttsServicesFieldVolumeLabel": "音量",
   "ttsServicesFieldWorkspaceIdLabel": "業務空間 ID",
-  "ttsServicesSectionTitle": "文字轉語音",
   "ttsServicesValidationInstructionRequired": "音色描述不能為空",
   "ttsServicesValidationReferenceIdRequired": "音色／參考 ID 不能為空",
   "ttsServicesValidationSampleRate": "{format} 格式要求使用 {rates} Hz。",

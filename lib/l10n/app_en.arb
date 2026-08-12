@@ -2261,7 +2261,6 @@
   "ttsServicesFieldTopPLabel": "Top P",
   "ttsServicesFieldVolumeLabel": "Volume",
   "ttsServicesFieldWorkspaceIdLabel": "Workspace ID",
-  "ttsServicesSectionTitle": "Text-to-Speech",
   "ttsServicesValidationInstructionRequired": "A voice description is required",
   "ttsServicesValidationReferenceIdRequired": "Voice/reference ID is required",
   "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",

@@ -205,11 +205,12 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
   }
 
-  /** Minimal Android-friendly rootfs fixes (DNS / tmp). */
+  /** Minimal Android-friendly rootfs fixes (DNS / tmp / apt locks). */
   private fun patchRootfs(linuxDir: File) {
     try {
       patchDns(linuxDir)
       ensureGuestDirs(linuxDir)
+      writeAptConfig(linuxDir)
     } catch (e: Exception) {
       Log.w(TAG, "patchRootfs: ${e.message}")
     }
@@ -235,6 +236,22 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     listOf("tmp", "var/tmp", "root").forEach { path ->
       File(linuxDir, path).mkdirs()
     }
+  }
+
+  /**
+   * Make every apt invocation inside the guest wait for a held dpkg/apt lock
+   * instead of failing instantly. Covers commands run through the LLM shell
+   * tool (which bypasses the Dart-side install queue): a concurrent install
+   * just waits, then proceeds.
+   */
+  private fun writeAptConfig(linuxDir: File) {
+    val confDir = File(linuxDir, "etc/apt/apt.conf.d")
+    confDir.mkdirs()
+    File(confDir, "99cuplivo").writeText(
+      "// Cuplivo Linux sandbox: wait for dpkg/apt locks instead of failing.\n" +
+        "Acquire::Lock::Timeout \"600\";\n" +
+        "Acquire::Retries \"3\";\n",
+    )
   }
 }
 
@@ -416,6 +433,11 @@ private object OutputDrainer {
       // would leave orphan apt processes still holding /var/lib/dpkg locks.
       process.destroy()
       if (!process.waitFor(GRACE_AFTER_TERM_MS, TimeUnit.MILLISECONDS)) {
+        // SIGTERM did not finish the tree: kill surviving guest children
+        // (orphaned apt/dpkg that keep the dpkg lock) before the SIGKILL.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          killDescendants(process.pid())
+        }
         process.destroyForcibly()
       }
       stdout.joinFor(1_000)
@@ -435,6 +457,43 @@ private object OutputDrainer {
       "stderr" to stderr.text(),
       "timedOut" to false,
     )
+  }
+
+  /**
+   * Recursively SIGKILL all children of [pid] by walking /proc (the proot
+   * guest processes are host processes, so the host view sees them). Called
+   * before destroyForcibly so no apt/dpkg survives to hold the dpkg lock.
+   * API 26+ (Process.pid and stat scanning); older devices skip the cleanup.
+   */
+  private fun killDescendants(pid: Long) {
+    val children = mutableListOf<Long>()
+    try {
+      File("/proc").listFiles()?.forEach { dir ->
+        val pidText = dir.name.toLongOrNull() ?: return@forEach
+        val stat = File(dir, "stat")
+        if (!stat.isFile) return@forEach
+        val text = stat.readText()
+        val open = text.indexOf('(')
+        val close = text.lastIndexOf(')')
+        if (open < 0 || close <= open) return@forEach
+        val parts = text.substring(close + 1).trim().split(' ')
+        // parts[0] = state, parts[1] = ppid
+        if (parts.size > 1 && parts[1].toLongOrNull() == pid) {
+          children += pidText
+        }
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "killDescendants scan: ${e.message}")
+      return
+    }
+    children.forEach { child ->
+      killDescendants(child)
+      try {
+        Process.killProcess(child.toInt())
+      } catch (e: Exception) {
+        Log.w(TAG, "killDescendants kill $child: ${e.message}")
+      }
+    }
   }
 
   private class LineDrain(private val stream: java.io.InputStream) : Thread() {

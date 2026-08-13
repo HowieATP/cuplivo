@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../main.dart' show routeObserver;
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
@@ -14,6 +15,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../settings/pages/mount_files_page.dart';
+import '../controllers/dependency_install_controller.dart';
 
 class WorkspaceDetailPage extends StatefulWidget {
   const WorkspaceDetailPage({super.key, required this.workspaceId});
@@ -24,11 +26,10 @@ class WorkspaceDetailPage extends StatefulWidget {
   State<WorkspaceDetailPage> createState() => _WorkspaceDetailPageState();
 }
 
-class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
+class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
+    with RouteAware {
   bool _toolsExpanded = false;
   bool _depsExpanded = false;
-  String? _installingDepId;
-  double? _installProgress; // null = indeterminate
   final Map<String, bool> _depInstalled = <String, bool>{};
   bool _depStatusLoading = false;
   bool _hasRuntime = true;
@@ -36,9 +37,68 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
   @override
   void initState() {
     super.initState();
+    context.read<DependencyInstallController>().addListener(_onInstallChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_refreshDepStatus());
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Re-probe on every return to this page so dependencies installed by the
+    // LLM shell tool (or finished background queue items) show up.
+    if (mounted) unawaited(_refreshDepStatus());
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    context.read<DependencyInstallController>().removeListener(
+      _onInstallChanged,
+    );
+    super.dispose();
+  }
+
+  void _onInstallChanged() {
+    if (!mounted) return;
+    final controller = context.read<DependencyInstallController>();
+    final wp = context.read<WorkspaceProvider>();
+    final ws = wp.getById(widget.workspaceId);
+    if (ws == null) return;
+    final done = controller.takeCompleted(ws.id);
+    if (done.isNotEmpty) {
+      unawaited(_refreshDepStatus());
+      final l10n = AppLocalizations.of(context)!;
+      for (final e in done.entries) {
+        final error = e.value;
+        if (error != null) {
+          showAppSnackBar(context, message: error.toString());
+        } else if (e.key == WorkspaceDependencyIds.base) {
+          // Base install may succeed while the native runtime is missing.
+          LinuxSandboxService.instance.hasRuntime().then((runtime) {
+            if (!mounted) return;
+            showAppSnackBar(
+              context,
+              message: runtime
+                  ? l10n.workspaceDepInstallDone
+                  : l10n.workspaceSandboxRuntimeMissing,
+            );
+          });
+        } else {
+          showAppSnackBar(context, message: l10n.workspaceDepInstallDone);
+        }
+      }
+    }
+    setState(() {});
   }
 
   Future<void> _refreshDepStatus() async {
@@ -325,7 +385,12 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return const SizedBox.shrink();
     }
-    final installing = _installingDepId == depId;
+    final status = context.watch<DependencyInstallController>().statusFor(
+      ws.id,
+      depId,
+    );
+    final installing = status == DepInstallStatus.installing;
+    final queued = status == DepInstallStatus.queued;
     final installed = _depInstalled[depId] == true;
     final baseInstalled = _depInstalled[WorkspaceDependencyIds.base] == true;
     final needsBaseFirst =
@@ -342,6 +407,8 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
 
     final label = installing
         ? l10n.workspaceDepInstalling
+        : queued
+        ? l10n.workspaceDepQueued
         : installed
         ? l10n.workspaceDepInstalled
         : l10n.workspaceDepInstall;
@@ -389,12 +456,12 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
               IconButton(
                 tooltip: l10n.workspaceDepSettings,
                 icon: Icon(Lucide.Settings, size: 18, color: cs.primary),
-                onPressed: installing
+                onPressed: installing || queued
                     ? null
                     : () => _showDepSettings(context, ws, depId),
               ),
               TextButton(
-                onPressed: installing || _depStatusLoading
+                onPressed: installing || queued || _depStatusLoading
                     ? null
                     : () =>
                           _installDep(context, ws, depId, reinstall: installed),
@@ -402,22 +469,60 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
               ),
             ],
           ),
-          if (installing) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                minHeight: 3,
-                value: _installProgress,
-                backgroundColor: cs.primary.withValues(alpha: 0.12),
-                color: cs.primary,
-              ),
-            ),
-          ],
+          if (installing) ..._installProgressArea(context, ws, depId),
         ],
       ),
     );
   }
+
+  List<Widget> _installProgressArea(
+    BuildContext context,
+    Workspace ws,
+    String depId,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = context.read<DependencyInstallController>();
+    final progress = controller.progressFor(ws.id, depId);
+    final stage = controller.stageFor(ws.id, depId);
+    final stageLabel = _depStageLabel(l10n, stage);
+    final percent = progress != null ? '${(progress * 100).round()}%' : null;
+    return [
+      const SizedBox(height: 8),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: LinearProgressIndicator(
+          minHeight: 3,
+          value: progress,
+          backgroundColor: cs.primary.withValues(alpha: 0.12),
+          color: cs.primary,
+        ),
+      ),
+      if (stageLabel != null || percent != null) ...[
+        const SizedBox(height: 4),
+        Text(
+          [
+            if (stageLabel != null) stageLabel,
+            if (percent != null) percent,
+          ].join(' · '),
+          style: TextStyle(
+            fontSize: 11,
+            color: cs.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  String? _depStageLabel(AppLocalizations l10n, String? stage) =>
+      switch (stage) {
+        'downloading' => l10n.workspaceDepStageDownloading,
+        'extracting' => l10n.workspaceDepStageExtracting,
+        'recover' => l10n.workspaceDepStageRecover,
+        'update' => l10n.workspaceDepStageUpdate,
+        'install' || 'installing' => l10n.workspaceDepStageInstall,
+        _ => null,
+      };
 
   Future<void> _installDep(
     BuildContext context,
@@ -454,43 +559,12 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage> {
     final host = wp.hostPathFor(ws);
     if (host == null) return;
     final latest = wp.getById(ws.id) ?? ws;
-    setState(() {
-      _installingDepId = depId;
-      _installProgress = null;
-    });
-    try {
-      await LinuxSandboxService.instance.installPackage(
-        workspaceHostPath: host,
-        depId: depId,
-        pref: latest.prefFor(depId),
-        onProgress: (p) {
-          if (!mounted) return;
-          setState(() {
-            _installProgress = p.progress;
-          });
-        },
-      );
-      if (!context.mounted) return;
-      final runtime = await LinuxSandboxService.instance.hasRuntime();
-      if (!context.mounted) return;
-      if (depId == WorkspaceDependencyIds.base && !runtime) {
-        showAppSnackBar(context, message: l10n.workspaceSandboxRuntimeMissing);
-      } else {
-        showAppSnackBar(context, message: l10n.workspaceDepInstallDone);
-      }
-      await _refreshDepStatus();
-    } catch (e) {
-      if (context.mounted) {
-        showAppSnackBar(context, message: e.toString());
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _installingDepId = null;
-          _installProgress = null;
-        });
-      }
-    }
+    context.read<DependencyInstallController>().enqueue(
+      workspaceId: ws.id,
+      depId: depId,
+      hostPath: host,
+      pref: latest.prefFor(depId),
+    );
   }
 
   Future<void> _showDepSettings(

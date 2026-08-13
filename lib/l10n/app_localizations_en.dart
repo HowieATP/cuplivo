@@ -8098,6 +8098,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepReinstall => 'Reinstall';
 
   @override
+  String get workspaceDepQueued => 'Queued…';
+
+  @override
+  String get workspaceDepStageDownloading => 'Downloading…';
+
+  @override
+  String get workspaceDepStageExtracting => 'Extracting…';
+
+  @override
+  String get workspaceDepStageRecover => 'Repairing package state…';
+
+  @override
+  String get workspaceDepStageUpdate => 'Updating package lists…';
+
+  @override
+  String get workspaceDepStageInstall => 'Installing…';
+
+  @override
   String get workspaceSandboxRuntimeMissing =>
       'Sandbox runtime missing; reinstall this app build';
 

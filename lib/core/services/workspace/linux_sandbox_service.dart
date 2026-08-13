@@ -464,11 +464,15 @@ class LinuxSandboxService {
   /// The `recover` step repairs an interrupted dpkg state left behind by a
   /// killed transaction (install timeout, app process death) and clears
   /// stale lock files, so later installs do not fail with
-  /// "dpkg was interrupted". Exposed for tests.
+  /// "dpkg was interrupted". Every apt invocation carries
+  /// `Acquire::Lock::Timeout` so a transiently held dpkg lock (e.g. an
+  /// install triggered through the LLM shell tool) waits instead of failing.
+  /// Exposed for tests.
   static List<PackageInstallStep> buildAptInstallSteps({
     required String packages,
     String mirrorSetup = '',
   }) {
+    const lockTimeout = '-o Acquire::Lock::Timeout=600';
     return [
       PackageInstallStep(
         stage: 'recover',
@@ -477,21 +481,22 @@ class LinuxSandboxService {
             'export DEBIAN_FRONTEND=noninteractive; '
             'rm -f /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend '
             '/var/cache/apt/archives/lock /var/lib/apt/lists/lock; '
-            'dpkg --configure -a; apt-get -f install -y',
+            'dpkg --configure -a; '
+            'apt-get $lockTimeout -f install -y',
       ),
       PackageInstallStep(
         stage: 'update',
         timeoutSeconds: 600,
         command:
             '${mirrorSetup.isEmpty ? '' : mirrorSetup}'
-            'apt-get update -y',
+            'apt-get $lockTimeout update -y',
       ),
       PackageInstallStep(
         stage: 'install',
         timeoutSeconds: 1800,
         command:
             'export DEBIAN_FRONTEND=noninteractive; '
-            'apt-get install -y --no-install-recommends $packages '
+            'apt-get $lockTimeout install -y --no-install-recommends $packages '
             '&& apt-get clean',
       ),
     ];
@@ -596,6 +601,9 @@ class LinuxSandboxService {
         ? buildApkInstallSteps(packages: packages, mirrorSetup: mirrorSetup)
         : buildAptInstallSteps(packages: packages, mirrorSetup: mirrorSetup);
     for (final step in steps) {
+      onProgress?.call(
+        SandboxInstallProgress(stage: step.stage, progress: null),
+      );
       final r = await exec(
         workspaceHostPath: workspaceHostPath,
         command: step.command,

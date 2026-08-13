@@ -14640,6 +14640,42 @@ abstract class AppLocalizations {
   /// **'Reinstall'**
   String get workspaceDepReinstall;
 
+  /// No description provided for @workspaceDepQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued…'**
+  String get workspaceDepQueued;
+
+  /// No description provided for @workspaceDepStageDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get workspaceDepStageDownloading;
+
+  /// No description provided for @workspaceDepStageExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting…'**
+  String get workspaceDepStageExtracting;
+
+  /// No description provided for @workspaceDepStageRecover.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairing package state…'**
+  String get workspaceDepStageRecover;
+
+  /// No description provided for @workspaceDepStageUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating package lists…'**
+  String get workspaceDepStageUpdate;
+
+  /// No description provided for @workspaceDepStageInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get workspaceDepStageInstall;
+
   /// No description provided for @workspaceSandboxRuntimeMissing.
   ///
   /// In en, this message translates to:

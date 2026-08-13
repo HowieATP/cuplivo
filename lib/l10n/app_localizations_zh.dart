@@ -7743,6 +7743,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepReinstall => '重新安装';
 
   @override
+  String get workspaceDepQueued => '排队中…';
+
+  @override
+  String get workspaceDepStageDownloading => '正在下载…';
+
+  @override
+  String get workspaceDepStageExtracting => '正在解压…';
+
+  @override
+  String get workspaceDepStageRecover => '正在修复软件包状态…';
+
+  @override
+  String get workspaceDepStageUpdate => '正在更新软件源…';
+
+  @override
+  String get workspaceDepStageInstall => '正在安装…';
+
+  @override
   String get workspaceSandboxRuntimeMissing => '缺少沙箱运行时，请重装本应用构建包';
 
   @override
@@ -15614,6 +15632,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepReinstall => '重新安装';
 
   @override
+  String get workspaceDepQueued => '排队中…';
+
+  @override
+  String get workspaceDepStageDownloading => '正在下载…';
+
+  @override
+  String get workspaceDepStageExtracting => '正在解压…';
+
+  @override
+  String get workspaceDepStageRecover => '正在修复软件包状态…';
+
+  @override
+  String get workspaceDepStageUpdate => '正在更新软件源…';
+
+  @override
+  String get workspaceDepStageInstall => '正在安装…';
+
+  @override
   String get workspaceSandboxRuntimeMissing => '缺少沙箱运行时，请重装本应用构建包';
 
   @override
@@ -23483,6 +23519,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceDepReinstall => '重新安裝';
+
+  @override
+  String get workspaceDepQueued => '排隊中…';
+
+  @override
+  String get workspaceDepStageDownloading => '正在下載…';
+
+  @override
+  String get workspaceDepStageExtracting => '正在解壓…';
+
+  @override
+  String get workspaceDepStageRecover => '正在修復軟體包狀態…';
+
+  @override
+  String get workspaceDepStageUpdate => '正在更新軟體源…';
+
+  @override
+  String get workspaceDepStageInstall => '正在安裝…';
 
   @override
   String get workspaceSandboxRuntimeMissing => '缺少沙箱執行環境，請重裝本應用建置包';

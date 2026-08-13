@@ -3127,7 +3127,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerSearchHint => 'Search current assistant';
 
   @override
-  String get sideDrawerSearchAssistantsHint => 'Search assistants / group chats';
+  String get sideDrawerSearchAssistantsHint =>
+      'Search assistants / group chats';
 
   @override
   String get sideDrawerTopicSearchModeLabel => 'Topic mode';

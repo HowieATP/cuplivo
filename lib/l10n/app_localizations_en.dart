@@ -1742,6 +1742,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markdownTableCopyPngLabel => 'Copy as PNG image';
 
   @override
+  String get markdownMathCopyLatexLabel => 'Copy LaTeX';
+
+  @override
+  String get markdownMathCopyPngLabel => 'Copy as PNG';
+
+  @override
+  String get markdownMathDownloadPngLabel => 'Download PNG';
+
+  @override
+  String get markdownMathDefaultFileNameStem => 'math';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… $n lines folded';
   }

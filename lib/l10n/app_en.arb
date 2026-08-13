@@ -695,6 +695,10 @@
   "markdownTableCopyMarkdownLabel": "Copy as Markdown",
   "markdownTableCopyTsvLabel": "Copy as TSV (Excel)",
   "markdownTableCopyPngLabel": "Copy as PNG image",
+  "markdownMathCopyLatexLabel": "Copy LaTeX",
+  "markdownMathCopyPngLabel": "Copy as PNG",
+  "markdownMathDownloadPngLabel": "Download PNG",
+  "markdownMathDefaultFileNameStem": "math",
   "codeBlockCollapsedLines": "… {n} lines folded",
   "@codeBlockCollapsedLines": {
     "placeholders": {

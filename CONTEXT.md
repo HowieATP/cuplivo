@@ -61,6 +61,17 @@
 - **Markdown image SVG**: `imageBuilder` detects `.svg` extension in URL and `data:image/svg+xml;base64,...` pattern, routes to `SvgPicture.network()` or `SvgPicture.string()` respectively.
 - **Known limitation**: URLs without `.svg` extension (e.g. shields.io badges like `https://img.shields.io/badge/release-1.0.0-blue`) are not detected as SVG. The user must ensure LLM output includes `.svg` suffix, or append it manually. Deliberate trade-off: avoids an extra failing HTTP request for every extensionless URL.
 
+## Math Formula Export (公式导出)
+
+- **Trigger**: Display math only (`$$…$$` / `\[…\]`). Inline math (`$…$` / `\(…\)`) has no export gesture (deferred — WidgetSpan capture + baseline hit-testing is disproportionate for v1). Mobile = long-press, desktop = right-click on the formula.
+- **Menu (3 items, dual-shell)**: desktop `showDesktopContextMenuAt` / mobile bottom sheet with `IosCardPress` rows — 复制 LaTeX · 复制 PNG · 下载 PNG.
+- **复制 LaTeX**: copies the RAW `body` between delimiters (no delimiters, no `_normalizeMathTex` rewriting) — fidelity over WYSIWYG: the clipboard gets what the model emitted, not the `\tag`-approximated render input (see ADR-0023).
+- **PNG capture**: reuses the shared `_captureRepaintBoundaryPng` helper (extracted from the markdown table block): `RepaintBoundary.toImage(pixelRatio: 3.0)` → `rawStraightRgba` → `image_lib.encodePng` (8-bit, avoids iOS Impeller wide-gamut). The `Math.tex` output is wrapped in its own `RepaintBoundary` + a `cs.surface` background container (theme-matched — a transparent capture leaves dark glyphs invisible on dark viewers).
+- **复制 PNG**: `SystemClipboard`/super_clipboard `DataWriterItem(Formats.png)` with `ClipboardImages.setImagePath` desktop fallback (same as the table block).
+- **下载 PNG**: `FilePicker.saveFile` desktop / bytes mobile, filename stem `markdownMathDefaultFileNameStem`.
+- **Event capture order**: the formula's `GestureDetector` (`onLongPressStart` mobile / `onSecondaryTapDown` desktop) is the deepest hit target, so it wins the gesture arena over the assistant `SelectionArea` and the user bubble `GestureDetector`; a `RawGestureDetector` pointer-claim fallback is reserved if `SelectionArea` co-fires on secondary tap (pinned by widget test).
+- **Menu availability**: the gesture + boundary wrap whatever `_renderMath` returned, so 复制 LaTeX also works on parse-fallback `Text` and during streaming (no `ExportCaptureScope` gating — math has no WebView, unlike Mermaid/HtmlPreviewBlock).
+
 ## Input Draft Persistence
 
 - **InputDraftPersistence**: `lib/features/home/services/input_draft_persistence.dart`. Owns debounced (800ms) writes + lifecycle immediate save of chat input draft via `SharedPreferences`.

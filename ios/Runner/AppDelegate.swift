@@ -85,7 +85,6 @@ private final class IosBackgroundGenerationHandler {
   private var notificationsEnabled = false
   private var refreshEnabled = false
   private var liveActivity: Any?
-  private var liveActivityRefreshTimer: Timer?
   private var liveActivityDisplayTitle = ""
   private var liveActivityDetail = ""
   private var liveActivityTokenCount = 0
@@ -94,7 +93,7 @@ private final class IosBackgroundGenerationHandler {
   private var liveActivityFinishedAt: Date?
   private var liveActivityFinishedDetail = ""
   private var liveActivityFinished = false
-  private var liveActivityWavePhase = 0
+  private var liveActivityUpdateScheduled = false
 
   func registerBackgroundTasks() {
     BGTaskScheduler.shared.register(forTaskWithIdentifier: backgroundRefreshIdentifier, using: nil) { task in
@@ -295,7 +294,6 @@ private final class IosBackgroundGenerationHandler {
       liveActivityFinishedAt = nil
       liveActivityFinishedDetail = ""
       liveActivityFinished = false
-      liveActivityWavePhase = 0
       liveActivityTokenCount = tokenCount
       liveActivityTokenLabel = tokenLabel
       let state = liveActivityState(
@@ -312,7 +310,6 @@ private final class IosBackgroundGenerationHandler {
         } else {
           liveActivity = try Activity<CuplivoGenerationActivityAttributes>.request(attributes: CuplivoGenerationActivityAttributes(title: title), contentState: state, pushType: nil)
         }
-        startLiveActivityRefreshTimer()
       } catch {
         NSLog("Cuplivo live activity start failed: \(error)")
         liveActivity = nil
@@ -327,6 +324,41 @@ private final class IosBackgroundGenerationHandler {
     liveActivityDetail = detail
     liveActivityFinishedAt = nil
     liveActivityFinishedDetail = ""
+    pushLiveActivityUpdate()
+  }
+
+  /// Coalesces rapid Dart `update()` calls into a single system update per
+  /// runloop turn: the first change schedules one dispatch, later changes in
+  /// the same turn are picked up by the snapshot built in
+  /// `performLiveActivityUpdate`.
+  private func pushLiveActivityUpdate() {
+    guard isLiveActivityActive(), !liveActivityFinished else { return }
+    if liveActivityUpdateScheduled { return }
+    liveActivityUpdateScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      self?.liveActivityUpdateScheduled = false
+      self?.performLiveActivityUpdate()
+    }
+  }
+
+  private func performLiveActivityUpdate() {
+    guard #available(iOS 16.1, *), let activity = liveActivity as? Activity<CuplivoGenerationActivityAttributes> else { return }
+    guard !liveActivityFinished else { return }
+    let state = liveActivityState(
+      displayTitle: liveActivityDisplayTitle,
+      detail: liveActivityDetail,
+      tokenCount: liveActivityTokenCount,
+      tokenLabel: liveActivityTokenLabel,
+      finishedAt: nil,
+      isFinished: false
+    )
+    Task {
+      if #available(iOS 16.2, *) {
+        await activity.update(ActivityContent(state: state, staleDate: nil))
+      } else {
+        await activity.update(using: state)
+      }
+    }
   }
 
   func dismissFinishedLiveActivityIfNeeded() {
@@ -337,7 +369,6 @@ private final class IosBackgroundGenerationHandler {
   private func finishLiveActivity(title: String, detail: String) {
     liveActivityDisplayTitle = title
     liveActivityDetail = detail
-    stopLiveActivityRefreshTimer()
     if UIApplication.shared.applicationState == .active {
       liveActivityFinishedAt = Date()
       liveActivityFinishedDetail = detail
@@ -392,7 +423,6 @@ private final class IosBackgroundGenerationHandler {
         }
       }
       liveActivity = nil
-      stopLiveActivityRefreshTimer()
       liveActivityDisplayTitle = ""
       liveActivityDetail = ""
       liveActivityTokenCount = 0
@@ -401,42 +431,6 @@ private final class IosBackgroundGenerationHandler {
       liveActivityFinishedAt = nil
       liveActivityFinishedDetail = ""
       liveActivityFinished = false
-      liveActivityWavePhase = 0
-    }
-  }
-
-  private func startLiveActivityRefreshTimer() {
-    stopLiveActivityRefreshTimer()
-    let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-      self?.refreshLiveActivity()
-    }
-    liveActivityRefreshTimer = timer
-    RunLoop.main.add(timer, forMode: .common)
-  }
-
-  private func stopLiveActivityRefreshTimer() {
-    liveActivityRefreshTimer?.invalidate()
-    liveActivityRefreshTimer = nil
-  }
-
-  private func refreshLiveActivity() {
-    guard #available(iOS 16.1, *), let activity = liveActivity as? Activity<CuplivoGenerationActivityAttributes> else { return }
-    guard !liveActivityFinished else { return }
-    liveActivityWavePhase += 1
-    let state = liveActivityState(
-      displayTitle: liveActivityDisplayTitle,
-      detail: liveActivityDetail,
-      tokenCount: liveActivityTokenCount,
-      tokenLabel: liveActivityTokenLabel,
-      finishedAt: nil,
-      isFinished: false
-    )
-    Task {
-      if #available(iOS 16.2, *) {
-        await activity.update(ActivityContent(state: state, staleDate: nil))
-      } else {
-        await activity.update(using: state)
-      }
     }
   }
 
@@ -461,7 +455,6 @@ private final class IosBackgroundGenerationHandler {
       elapsedSeconds: isFinished
         ? elapsedSeconds(from: startedAt, to: effectiveFinishedAt)
         : elapsedSeconds(since: startedAt),
-      wavePhase: liveActivityWavePhase,
       isFinished: isFinished
     )
   }

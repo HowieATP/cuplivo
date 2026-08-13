@@ -52,14 +52,6 @@ android {
             }
         }
     }
-
-    // proot must be a real on-disk executable for ProcessBuilder (not only
-    // memory-mapped for System.loadLibrary). Legacy packaging extracts jniLibs.
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-        }
-    }
 }
 
 kotlin {

@@ -35,7 +35,14 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
-      "isSupported" -> result.success(hasProot())
+      "isSupported" -> {
+        Thread {
+          val supported = hasProot()
+          android.os.Handler(android.os.Looper.getMainLooper()).post {
+            result.success(supported)
+          }
+        }.start()
+      }
       "getAbi" -> result.success(primaryAbi())
       "extractRootfs" -> {
         val workspace = call.argument<String>("workspacePath")
@@ -140,8 +147,7 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     if (!ok) {
       Log.w(
         TAG,
-        "proot runtime missing: exec=${exec?.absolutePath} loader=${loader?.absolutePath} " +
-          "nativeLibraryDir=${appContext.applicationInfo.nativeLibraryDir}",
+        "proot runtime missing: exec=${exec?.absolutePath} loader=${loader?.absolutePath}",
       )
     }
     return ok
@@ -241,9 +247,7 @@ private class GuestCommandRunner(private val appContext: Context) {
     timeoutMs: Long,
   ): Map<String, Any?> {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
-      ?: throw IllegalStateException(
-        "proot missing (nativeLibraryDir=${appContext.applicationInfo.nativeLibraryDir})",
-      )
+      ?: throw IllegalStateException("proot missing (filesDir cache and APK copy both failed)")
     val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
       ?: throw IllegalStateException("proot loader missing")
     val linux = File(workspacePath, ".sandbox/linux")
@@ -273,15 +277,12 @@ private class GuestCommandRunner(private val appContext: Context) {
   }
 }
 
-/** Vendored proot native library resolution (installed lib dir → cached copy → APK). */
+/** Vendored proot native library resolution (cached copy → APK). */
 private object NativeLibResolver {
   fun resolve(appContext: Context, libFileName: String): File? {
     val candidates = mutableListOf<File>()
 
-    // 1) Extracted nativeLibraryDir (extractNativeLibs=true / legacy packaging)
-    candidates += File(appContext.applicationInfo.nativeLibraryDir, libFileName)
-
-    // 2) Previously copied fallback
+    // 1) Previously copied fallback (survives restarts and app updates)
     candidates += File(appContext.filesDir, "proot/$libFileName")
 
     for (f in candidates) {
@@ -291,7 +292,7 @@ private object NativeLibResolver {
       }
     }
 
-    // 3) Copy out of APK / split APKs into app filesDir
+    // 2) Copy out of APK / split APKs into app filesDir
     val copied = copyFromApk(appContext, libFileName)
     if (copied != null) {
       makeExecutable(copied)
@@ -343,6 +344,10 @@ private object NativeLibResolver {
         Log.w("LinuxSandbox", "copyFromApk($apk, $libFileName): ${e.message}")
       }
     }
+    Log.w(
+      "LinuxSandbox",
+      "copyFromApk: no $libFileName entry found (abi=$abi, entries=$entryNames, apks=$apkPaths)",
+    )
     return null
   }
 

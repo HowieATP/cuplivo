@@ -205,8 +205,9 @@ jobs:
           echo "版本号: $VERSION"
       - name: 🔧 安装 iSH 构建依赖 (iOS Linux 沙箱)
         run: |
-          brew install ninja llvm
-          pip3 install --quiet meson
+          # meson via brew (pip3 is PEP 668 blocked on current macOS runners);
+          # lld needed for the ish-arm64 guest VDSO link (-fuse-ld=lld), llvm 22+ ships it separately.
+          brew install ninja llvm lld meson
 
       - name: 🐧 构建 iSH 静态库 (iOS Linux 沙箱)
         run: ios/sandbox/build_ish.sh
@@ -683,7 +684,12 @@ jobs:
           Source0:        %{name}-%{version}.tar.gz
           BuildArch:      x86_64
           Requires:       gtk3, libstdc++ >= 6, mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
-          
+
+          # The app bundles its own libonnxruntime (sherpa-onnx ASR/TTS); drop the
+          # auto-generated versioned SONAME require that neither the bundle nor
+          # Fedora's system onnxruntime can satisfy.
+          %global __requires_exclude ^libonnxruntime\.so
+
           %description
           A Flutter application for Linux
           

@@ -3032,6 +3032,43 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => 'Export as Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => 'Batch actions';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport =>
+      'No conversations to export';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => 'Choose export folder';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '$exported conversations exported';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '$exported conversations exported, $skipped empty skipped';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '$exported exported, $failed failed';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '$exported exported, $failed failed, $skipped empty skipped';
+  }
+
+  @override
   String get sideDrawerSelectAll => 'Select All';
 
   @override

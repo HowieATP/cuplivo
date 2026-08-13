@@ -21,7 +21,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../settings/pages/trash_detail_page.dart';
-import '../widgets/subagent_panel.dart';
+import '../widgets/live_panel.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -1505,7 +1505,7 @@ class _HomePageState extends State<HomePage>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SubagentPanel(
+        LivePanel(
           onOpenChild: (childId) =>
               _controller.switchConversationAnimated(childId),
         ),

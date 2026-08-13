@@ -38,6 +38,8 @@ import 'core/providers/backup_provider.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
+import 'core/providers/download_progress_store.dart';
+import 'core/providers/input_status_provider.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
@@ -220,9 +222,13 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
+        ChangeNotifierProvider(create: (_) => DownloadProgressStore()),
+        ChangeNotifierProvider(create: (_) => InputStatusProvider()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              GenerationEngine(chatService: ctx.read<ChatService>()),
+          create: (ctx) => GenerationEngine(
+            chatService: ctx.read<ChatService>(),
+            downloadProgressStore: ctx.read<DownloadProgressStore>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (ctx) {

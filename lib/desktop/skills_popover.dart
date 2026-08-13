@@ -7,7 +7,6 @@ import '../core/providers/assistant_provider.dart';
 import '../features/skills/skill_manager.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
-import '../shared/widgets/ios_switch.dart';
 import '../theme/app_font_weights.dart';
 
 Future<void> showDesktopSkillsPopover(
@@ -283,7 +282,7 @@ class _SkillsPopoverContent extends StatelessWidget {
                 ),
                 for (final skill in groupSkills)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.only(bottom: 1),
                     child: _SkillsRowItem(
                       name: skill.name,
                       assistantId: assistantId,
@@ -521,8 +520,8 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
       alpha: isDark ? 0.12 : 0.10,
@@ -532,19 +531,7 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
         ? ap.getById(widget.assistantId!)
         : ap.currentAssistant;
     final enabled = assistant?.skillIds.contains(widget.name) ?? false;
-
-    void toggle(bool value) {
-      if (assistant == null) return;
-      final ids = assistant.skillIds.toSet();
-      if (value) {
-        ids.add(widget.name);
-      } else {
-        ids.remove(widget.name);
-      }
-      ap.updateAssistant(
-        assistant.copyWith(skillIds: ids.toList(growable: false)),
-      );
-    }
+    final onColor = enabled ? cs.primary : cs.onSurface;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -552,24 +539,42 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => toggle(!enabled),
+        onTap: () {
+          if (assistant == null) return;
+          final ids = assistant.skillIds.toSet();
+          if (enabled) {
+            ids.remove(widget.name);
+          } else {
+            ids.add(widget.name);
+          }
+          ap.updateAssistant(
+            assistant.copyWith(skillIds: ids.toList(growable: false)),
+          );
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: _hovered ? hoverBg : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(
-                Lucide.BookOpen,
-                size: 16,
-                color: enabled
-                    ? cs.primary
-                    : cs.onSurface.withValues(alpha: 0.7),
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Center(
+                  child: Icon(
+                    Lucide.BookOpen,
+                    size: 16,
+                    color: enabled
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   widget.name,
@@ -577,14 +582,22 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: AppFontWeights.medium,
-                    color: enabled ? cs.primary : cs.onSurface,
+                    fontWeight: AppFontWeights.regular,
                     decoration: TextDecoration.none,
-                  ),
+                  ).copyWith(color: onColor),
                 ),
               ),
-              const SizedBox(width: 8),
-              IosSwitch(value: enabled, onChanged: toggle),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                child: enabled
+                    ? Icon(
+                        Lucide.Check,
+                        key: const ValueKey('check'),
+                        size: 16,
+                        color: cs.primary,
+                      )
+                    : const SizedBox(width: 16, key: ValueKey('space')),
+              ),
             ],
           ),
         ),

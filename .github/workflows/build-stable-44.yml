@@ -684,7 +684,12 @@ jobs:
           Source0:        %{name}-%{version}.tar.gz
           BuildArch:      x86_64
           Requires:       gtk3, libstdc++ >= 6, mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
-          
+
+          # The app bundles its own libonnxruntime (sherpa-onnx ASR/TTS); drop the
+          # auto-generated versioned SONAME require that neither the bundle nor
+          # Fedora's system onnxruntime can satisfy.
+          %global __requires_exclude ^libonnxruntime\.so
+
           %description
           A Flutter application for Linux
           

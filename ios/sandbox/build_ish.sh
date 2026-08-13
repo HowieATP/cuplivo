@@ -124,6 +124,11 @@ build_ish() {
     BUILD_DIR="$ISH_DIR/build-ios"
     CROSS_FILE="$BUILD_DIR/ios-cross.txt"
 
+    # meson resolves the source directory from cwd (or an explicit second
+    # positional); run from $ISH_DIR so `meson setup "$BUILD_DIR"` works
+    # (mirrors OpenMinis/deps/build_ish.sh).
+    cd "$ISH_DIR"
+
     if [ ! -f "$BUILD_DIR/build.ninja" ]; then
         log_info "Configuring meson build ($BUILD_TYPE)..."
         meson setup "$BUILD_DIR" \
@@ -147,6 +152,8 @@ build_ish() {
         log_error "VDSO is empty — LLVM/clang with lld is required (brew install llvm)"
     fi
     log_success "Libraries built"
+
+    cd "$SCRIPT_DIR"
 }
 
 copy_outputs() {

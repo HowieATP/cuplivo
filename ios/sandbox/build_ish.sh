@@ -11,8 +11,10 @@ set -e
 #
 # Requirements (macOS only):
 #   - Xcode command line tools (xcrun iphoneos SDK)
-#   - meson (pip3 install meson) and ninja (brew install ninja)
-#   - LLVM/Clang with lld (brew install llvm) — required for the guest VDSO
+#   - meson and ninja (brew install meson ninja; meson ships ninja as a dep)
+#   - LLVM/Clang (brew install llvm) — required for the guest VDSO
+#   - lld (brew install lld; llvm 22+ ships it as a separate formula) —
+#     required for the guest VDSO link (-fuse-ld=lld)
 #
 # Usage:
 #   ios/sandbox/build_ish.sh [clean]
@@ -67,6 +69,9 @@ check_prerequisites() {
     log_info "LLVM clang: $LLVM_CLANG"
     # Expose lld for the VDSO link (-fuse-ld=lld)
     export PATH="$(dirname "$LLVM_CLANG"):$PATH"
+    # llvm 22+ no longer bundles lld (separate formula: brew install lld)
+    command -v ld.lld >/dev/null 2>&1 || log_error "ld.lld not found (brew install lld) — needed for the guest VDSO link (-fuse-ld=lld)"
+    log_info "ld.lld: $(command -v ld.lld)"
 }
 
 fetch_ish() {

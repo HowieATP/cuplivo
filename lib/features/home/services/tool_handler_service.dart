@@ -620,6 +620,17 @@ class ToolHandlerService {
               }),
             );
           },
+          onSkillsImported: (names) async {
+            final a = (assistant?.id != null)
+                ? assistantProvider.getById(assistant!.id)
+                : assistantProvider.currentAssistant;
+            if (a == null) return;
+            await assistantProvider.updateAssistant(
+              a.copyWith(
+                skillIds: {...a.skillIds, ...names}.toList(growable: false),
+              ),
+            );
+          },
         );
         if (localResult != null) {
           return localResult;

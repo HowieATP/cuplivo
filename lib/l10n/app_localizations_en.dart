@@ -5706,6 +5706,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.';
 
   @override
+  String get assistantEditSkillDownloadTitle => 'Download Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      'Let the assistant download and install skills from GitHub repository URLs.';
+
+  @override
+  String get assistantEditSkillCreateTitle => 'Create Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle =>
+      'Let the assistant create new skills from SKILL.md content.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override

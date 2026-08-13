@@ -13,7 +13,7 @@ Tier-A sweep only (issue #274):
 - **Renamed to Cuplivo**: notification strings, about-page app title, share text, Android background-notification fallback, `cuplivo-table-*` / `cuplivo-mermaid-*` / `cuplivo_tts_*` file prefixes, HTTP `User-Agent`, OpenRouter `X-OpenRouter-Title` + `HTTP-Referer` (both aligned with ADR-0003's original intent, which the code had never followed), and MCP client names (`Cuplivo MCP` / `Cuplivo App`).
 - **Kept as Kelivo by design** (see CONTEXT.md "Branding & Naming Boundary"):
   - `kelivo_*` MCP tool names and `@kelivo/*` server ids — model-facing protocol, persisted in `assistant.mcpServerIds`, recorded in tool events and conversation history; renaming breaks recorded calls and forces models to relearn tool names with zero user-visible branding benefit
-  - `KelivoIN` provider key — persisted provider config with special-cased defaults; label and key are one string
+  - `KelivoIN` provider key — persisted provider config with special-cased defaults; label and key are one string. **Superseded (2026-08):** removed from the built-in provider set and its special-cased defaults deleted; pre-existing persisted configs remain as ordinary user data.
   - `assets/icons/kelivo.png` + the `kelivo` brand regex — legacy provider icon references
   - `/kelivo/` path matching in `SandboxPathResolver` — resolves legacy Windows AppData paths in old messages/backups
   - `kelivo.psycheas.top` / `afdian.com/a/kelivo` / `kelivo-helper.netlify.app` URLs — external infrastructure Cuplivo does not control (ADR-0003 already decided these stay)

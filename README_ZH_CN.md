@@ -135,7 +135,7 @@ Cuplivo 与大多数个人定制 / 单功能 Fork 不同，旨在添加多特性
 
 ### ⚠️ 注意事项
 
-Cuplivo 是一个社区分支，尚未与原项目完全切割。QQ 群已归属 Cuplivo（群号 `1101061750`），赞赏码和 Discord 仍指向原作者。过渡期间部分地方可能存在名称混用。App 图标已更换为 Cuplivo 个性图片（由 @Pheobe-Southwood 约稿）。
+Cuplivo 是一个社区分支，尚未与原项目完全切割。QQ 群已归属 Cuplivo（群号 `1101061750`），赞赏码仍指向原作者。过渡期间部分地方可能存在名称混用。App 图标已更换为 Cuplivo 个性图片（由 @Pheobe-Southwood 约稿）。
 
 ---
 

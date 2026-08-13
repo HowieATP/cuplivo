@@ -706,7 +706,7 @@
 
 - **Legacy Kelivo surfaces (旧名保留面)**: Identifiers and surfaces that intentionally keep the original project's name despite the Cuplivo rebrand (ADR-0003, ADR-0029), because they are protocol, persistence, or external-infra identity — renaming them breaks data or model-facing behavior:
   - `kelivo_*` MCP tool names and `@kelivo/*` server ids (`kelivo_read`, `kelivo_write_file`, `kelivo_grep`, `kelivo_outline`, `kelivo_delete`, `kelivo_fetch`, `kelivo_handoff`, `kelivo_handoff_sync`) — model-facing protocol, persisted in `assistant.mcpServerIds`, recorded in tool events
-  - `KelivoIN` provider key — persisted provider config with special-cased defaults
+  - `KelivoIN` provider key — removed from the built-in provider set (2026-08); pre-existing persisted configs are kept as ordinary user data, and the special-cased defaults are gone
   - `assets/icons/kelivo.png` brand asset + `kelivo` brand regex — legacy provider icon references
   - `/kelivo/` path matching in `SandboxPathResolver` — legacy Windows AppData paths in old messages/backups
   - `kelivo.psycheas.top` / `afdian.com/a/kelivo` / `kelivo-helper.netlify.app` URLs — external infrastructure outside Cuplivo's control

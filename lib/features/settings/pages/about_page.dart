@@ -460,13 +460,6 @@ class _AboutPageState extends State<AboutPage> {
                 label: l10n.aboutPageJoinQQGroup,
                 onTap: () => showQQGroupJoinSheet(context: context),
               ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/discord.svg',
-                label: l10n.aboutPageJoinDiscord,
-                onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
-              ),
             ],
           ),
 

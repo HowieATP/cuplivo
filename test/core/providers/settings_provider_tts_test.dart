@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/core/services/tts/network_tts.dart';
 import 'package:Cuplivo/core/services/tts/tts_text_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,6 +39,76 @@ void main() {
     await _waitUntil(() => settings.ttsAutoPlayAssistantReplies);
 
     expect(settings.ttsTextSelectionMode, TtsTextSelectionMode.fullText);
+  });
+
+  test(
+    'migrates legacy TTS index to UUID and survives earlier deletion',
+    () async {
+      final services = <Map<String, dynamic>>[
+        {
+          'id': 'first-service',
+          'kind': 'openai',
+          'enabled': true,
+          'name': 'First',
+          'apiKey': 'key',
+        },
+        {
+          'id': 'second-service',
+          'kind': 'groq',
+          'enabled': true,
+          'name': 'Second',
+          'apiKey': 'key',
+        },
+      ];
+      SharedPreferences.setMockInitialValues({
+        'tts_services_v1': jsonEncode(services),
+        'tts_selected_v1': 1,
+      });
+      final settings = SettingsProvider();
+      await _waitUntil(() => settings.ttsServices.length == 2);
+
+      expect(settings.selectedTtsServiceId, 'second-service');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('tts_selected_service_id_v1'), 'second-service');
+      expect(prefs.getInt('tts_selected_v1'), isNull);
+
+      final selected = settings.ttsServices.singleWhere(
+        (service) => service.id == 'second-service',
+      );
+      await settings.setTtsServices(<TtsServiceOptions>[selected]);
+
+      expect(settings.selectedTtsServiceId, 'second-service');
+      expect(settings.selectedTtsService?.name, 'Second');
+    },
+  );
+
+  test('persists generated UUIDs for legacy TTS rows across reloads', () async {
+    SharedPreferences.setMockInitialValues({
+      'tts_services_v1': jsonEncode(<Map<String, dynamic>>[
+        {'kind': 'openai', 'enabled': true, 'name': 'First', 'apiKey': 'key'},
+        {'kind': 'groq', 'enabled': true, 'name': 'Second', 'apiKey': 'key'},
+      ]),
+      'tts_selected_v1': 1,
+    });
+    final firstLoad = SettingsProvider();
+    await _waitUntil(() => firstLoad.selectedTtsServiceId != null);
+    final selectedId = firstLoad.selectedTtsServiceId;
+
+    expect(selectedId, isNotNull);
+    expect(firstLoad.selectedTtsService?.name, 'Second');
+    final prefs = await SharedPreferences.getInstance();
+    final persistedRows =
+        jsonDecode(prefs.getString('tts_services_v1')!) as List<dynamic>;
+    expect(
+      persistedRows.every(
+        (row) => ((row as Map<String, dynamic>)['id'] as String).isNotEmpty,
+      ),
+      isTrue,
+    );
+
+    final secondLoad = SettingsProvider();
+    await _waitUntil(() => secondLoad.selectedTtsServiceId == selectedId);
+    expect(secondLoad.selectedTtsService?.name, 'Second');
   });
 }
 

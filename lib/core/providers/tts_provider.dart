@@ -14,6 +14,7 @@ import '../services/network/logging_http_client.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
+import '../services/backup/double_pref_keys.dart' show prefDouble;
 
 String ttsAudioFileExtensionForMime(String? mime) {
   switch ((mime ?? '').toLowerCase()) {
@@ -115,10 +116,8 @@ class TtsProvider extends ChangeNotifier {
     try {
       _tts = FlutterTts();
       final prefs = await SharedPreferences.getInstance();
-      _speechRate = (prefs.getDouble(_rateKey) ?? 0.5)
-          .clamp(0.1, 1.0)
-          .toDouble();
-      _pitch = (prefs.getDouble(_pitchKey) ?? 1.0).clamp(0.5, 2.0).toDouble();
+      _speechRate = prefDouble(prefs, _rateKey, 0.5).clamp(0.1, 1.0).toDouble();
+      _pitch = prefDouble(prefs, _pitchKey, 1.0).clamp(0.5, 2.0).toDouble();
       _cacheNetworkAudioForReplay =
           prefs.getBool(_cacheNetworkAudioForReplayKey) ?? false;
       _engineId = prefs.getString(_engineKey);

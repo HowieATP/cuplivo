@@ -150,6 +150,13 @@ abstract final class StorageUsageService {
       'other_logs': _MutableStats(),
     };
 
+    // Everything outside the known top-level directories lands in "other".
+    // Group it by top-level directory so users can actually see where the
+    // bytes went (workspaces, linux-sandbox, skills, fonts, root-level
+    // stray files, …). Key = top-level dir name; 'root_files' = loose files
+    // directly under appData.
+    final otherSubs = <String, _MutableStats>{};
+
     int totalBytes = 0;
     int totalFiles = 0;
 
@@ -198,6 +205,7 @@ abstract final class StorageUsageService {
             chatSubs[chatSubId]!.add(bytes);
           } else {
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            (otherSubs['root_files'] ??= _MutableStats()).add(bytes);
           }
           continue;
         }
@@ -242,6 +250,7 @@ abstract final class StorageUsageService {
             break;
           default:
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            (otherSubs[parts.first] ??= _MutableStats()).add(bytes);
             break;
         }
       }
@@ -406,6 +415,27 @@ abstract final class StorageUsageService {
               stats: logsSubs['other_logs']!.toStats(),
               path: logsDir.path,
             ),
+        ],
+      ),
+      // Everything not under upload/avatars/images/cache/logs. Previously the
+      // bytes were counted into totalBytes but the category was never added
+      // to this list, so total != sum(parts) and the usage bar was drawn
+      // against a fraction of the real total. Now surfaced with per-directory
+      // subcategories so users can see (and later manage) workspaces,
+      // linux-sandbox, skills, fonts and stray root files.
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.other,
+        stats: byCat[StorageUsageCategoryKey.other]!.toStats(),
+        subcategories: [
+          for (final e in otherSubs.entries)
+            if (e.value.bytes > 0 || e.value.fileCount > 0)
+              StorageUsageSubcategory(
+                id: e.key,
+                stats: e.value.toStats(),
+                path: e.key == 'root_files'
+                    ? root.path
+                    : p.join(root.path, e.key),
+              ),
         ],
       ),
       // Deleted records — informational entry (actual bytes loaded by the

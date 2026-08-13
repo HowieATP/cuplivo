@@ -314,15 +314,13 @@ private object NativeLibResolver {
 
     // 2) Previously copied fallback (survives restarts and app updates)
     val cached = File(appContext.filesDir, "proot/$libFileName")
-    if (cached.isFile && cached.length() > 0L) {
-      makeExecutable(cached)
+    if (cached.isFile && cached.length() > 0L && makeExecutable(cached)) {
       return cached
     }
 
     // 3) Copy out of APK / split APKs into app filesDir
     val copied = copyFromApk(appContext, libFileName)
-    if (copied != null) {
-      makeExecutable(copied)
+    if (copied != null && makeExecutable(copied)) {
       return copied
     }
     return null
@@ -331,20 +329,22 @@ private object NativeLibResolver {
   /**
    * Best-effort exec bit setup for the filesDir fallback path. setExecutable
    * silently no-ops on some Android versions/OEMs, so the result is verified
-   * and an explicit libcore chmod (0755) is tried before giving up.
+   * and an explicit libcore chmod (0755) is tried before giving up. Returns
+   * true only when the file is actually executable, so a binary that cannot
+   * be made runnable is reported as missing instead of failing at exec time.
    */
-  private fun makeExecutable(file: File) {
+  private fun makeExecutable(file: File): Boolean {
     try {
-      if (file.canExecute()) return
+      if (file.canExecute()) return true
       file.setExecutable(true, false)
-      if (file.canExecute()) return
+      if (file.canExecute()) return true
       android.system.Os.chmod(file.path, 0x1ED) // 0755
-      if (!file.canExecute()) {
-        Log.w(TAG, "makeExecutable: still not executable after chmod: ${file.absolutePath}")
-      }
+      if (file.canExecute()) return true
+      Log.w(TAG, "makeExecutable: still not executable after chmod: ${file.absolutePath}")
     } catch (e: Exception) {
       Log.w(TAG, "makeExecutable failed for ${file.absolutePath}: ${e.message}")
     }
+    return false
   }
 
   private fun copyFromApk(appContext: Context, libFileName: String): File? {

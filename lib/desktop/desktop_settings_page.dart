@@ -31,8 +31,12 @@ import '../shared/widgets/custom_key_value_editor.dart';
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
+import '../core/providers/group_chat_provider.dart';
 import '../core/models/assistant.dart';
+import '../core/models/group_chat.dart';
 import '../utils/avatar_cache.dart';
+import '../features/group_chat/pages/group_chat_settings_page.dart';
+import '../features/group_chat/widgets/group_avatar.dart';
 import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
@@ -290,7 +294,7 @@ class _SettingsMenu extends StatelessWidget {
       ),
       (
         _SettingsMenuItem.assistant,
-        lucide.Lucide.Bot,
+        lucide.Lucide.botMessageSquare,
         l10n.settingsPageAssistant,
       ),
       (

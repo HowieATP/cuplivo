@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/providers/tts_provider.dart';
-import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/generation_engine.dart';
 import 'package:Cuplivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Cuplivo/features/home/controllers/stream_controller.dart'
     as home_stream;
@@ -228,75 +228,38 @@ void main() {
           conversationId: 'conversation-search-same-id',
           isStreaming: true,
         );
-        final state = home_stream.StreamingState(
-          home_stream.GenerationContext(
-            assistantMessage: message,
-            apiMessages: const [],
-            userMediaPaths: const [],
-            allowImagesApiRouting: false,
-            providerKey: 'test',
-            modelId: 'test-model',
-            assistant: null,
-            settings: settings,
-            config: ProviderConfig(
-              id: 'test',
-              enabled: true,
-              name: 'Test',
-              apiKey: '',
-              baseUrl: '',
+
+        // Feed two engine-style UI snapshots: the same tool id with an
+        // incremental result — dedup must keep the LATEST content (the
+        // engine-side dedupeToolEvents runs inside syncEngineUiState).
+        List<Map<String, dynamic>> eventsWith(int itemCount) => [
+          {
+            'id': 'builtin_search',
+            'name': 'builtin_search',
+            'arguments': <String, dynamic>{},
+            'content':
+                '{"items":${jsonEncode([
+                  for (var i = 1; i <= itemCount; i++) {'title': 'Source $i', 'url': 'https://example.com/$i', 'text': 'Text $i'},
+                ])}}',
+          },
+        ];
+        void feed(int itemCount) {
+          controller.syncEngineUiState(
+            message.id,
+            GenerationSlotUiState(
+              reasoningText: '',
+              segments: const [],
+              contentSplitOffsets: const [],
+              reasoningCountAtSplit: const [],
+              toolCountAtSplit: const [],
+              toolEvents: eventsWith(itemCount),
+              totalTokens: 0,
             ),
-            toolDefs: const [],
-            supportsReasoning: true,
-            enableReasoning: true,
-            streamOutput: true,
-          ),
-        );
+          );
+        }
 
-        Future<void> upsertToolEventInDb(
-          String messageId, {
-          required String id,
-          required String name,
-          required Map<String, dynamic> arguments,
-          String? content,
-          Map<String, dynamic>? metadata,
-        }) async {}
-
-        await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
-              ),
-            ],
-          ),
-          state,
-          upsertToolEventInDb: upsertToolEventInDb,
-        );
-        await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
-              ),
-            ],
-          ),
-          state,
-          upsertToolEventInDb: upsertToolEventInDb,
-        );
+        feed(1);
+        feed(2);
 
         await tester.pumpWidget(
           _buildHarness(

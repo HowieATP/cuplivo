@@ -189,12 +189,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     onTap: () => showQQGroupJoinSheet(context: context),
                   ),
                   const _DeskRowDivider(),
-                  _DeskNavRowSvg(
-                    svgAsset: 'assets/icons/discord.svg',
-                    label: l10n.aboutPageJoinDiscord,
-                    onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
-                  ),
-                  const _DeskRowDivider(),
                   // Donation item (desktop): mirrors mobile "Sponsor"
                   _DeskNavRow(
                     icon: lucide.Lucide.Heart,

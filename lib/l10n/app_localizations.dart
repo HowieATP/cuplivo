@@ -2504,7 +2504,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundLimitNoticeBody.
   ///
   /// In en, this message translates to:
-  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.'**
+  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Cuplivo running forever.'**
   String get iosBackgroundLimitNoticeBody;
 
   /// No description provided for @iosBackgroundUnsupportedLiveActivity.
@@ -2552,7 +2552,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundGenerationActiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is generating'**
+  /// **'Cuplivo is generating'**
   String get iosBackgroundGenerationActiveTitle;
 
   /// No description provided for @iosBackgroundGenerationActiveDetail.
@@ -2654,7 +2654,7 @@ abstract class AppLocalizations {
   /// No description provided for @androidBackgroundNotificationTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is running'**
+  /// **'Cuplivo is running'**
   String get androidBackgroundNotificationTitle;
 
   /// No description provided for @androidBackgroundNotificationText.
@@ -5531,6 +5531,58 @@ abstract class AppLocalizations {
   /// **'{success} succeeded, {failed} failed'**
   String sideDrawerBatchPartialFailure(int success, int failed);
 
+  /// No description provided for @sideDrawerMenuBatchExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Markdown'**
+  String get sideDrawerMenuBatchExport;
+
+  /// No description provided for @sideDrawerBatchActionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch actions'**
+  String get sideDrawerBatchActionsTitle;
+
+  /// No description provided for @sideDrawerBatchExportNothingToExport.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations to export'**
+  String get sideDrawerBatchExportNothingToExport;
+
+  /// No description provided for @sideDrawerBatchExportPickDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose export folder'**
+  String get sideDrawerBatchExportPickDirectory;
+
+  /// Batch export completed successfully
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} conversations exported'**
+  String sideDrawerBatchExportSuccess(int exported);
+
+  /// Batch export completed successfully with empty conversations skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} conversations exported, {skipped} empty skipped'**
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped);
+
+  /// Batch export partially failed
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} exported, {failed} failed'**
+  String sideDrawerBatchExportPartialFailure(int exported, int failed);
+
+  /// Batch export partially failed with empty conversations skipped
+  ///
+  /// In en, this message translates to:
+  /// **'{exported} exported, {failed} failed, {skipped} empty skipped'**
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  );
+
   /// No description provided for @sideDrawerSelectAll.
   ///
   /// In en, this message translates to:
@@ -5932,6 +5984,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add'**
   String get chatInputBarMoreTooltip;
+
+  /// No description provided for @chatInputBarVoiceCancelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard recording'**
+  String get chatInputBarVoiceCancelTooltip;
+
+  /// No description provided for @chatInputBarVoiceInputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice input'**
+  String get chatInputBarVoiceInputTooltip;
+
+  /// No description provided for @chatInputBarVoiceSendTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe and send'**
+  String get chatInputBarVoiceSendTooltip;
+
+  /// No description provided for @chatInputBarVoiceStopTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and transcribe to input'**
+  String get chatInputBarVoiceStopTooltip;
+
+  /// No description provided for @chatInputBarVoiceTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognizing…'**
+  String get chatInputBarVoiceTranscribing;
 
   /// No description provided for @chatInputBarImageMode.
   ///
@@ -8516,12 +8598,6 @@ abstract class AppLocalizations {
   /// **'Cuplivo Group'**
   String get aboutPageQQGroup;
 
-  /// No description provided for @aboutPageJoinDiscord.
-  ///
-  /// In en, this message translates to:
-  /// **'Join us on Discord'**
-  String get aboutPageJoinDiscord;
-
   /// No description provided for @displaySettingsPageShowUserAvatarTitle.
   ///
   /// In en, this message translates to:
@@ -9209,8 +9285,14 @@ abstract class AppLocalizations {
   /// No description provided for @ttsServicesPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Text-to-Speech'**
+  /// **'Voice Services'**
   String get ttsServicesPageTitle;
+
+  /// No description provided for @ttsServicesSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Text-to-Speech'**
+  String get ttsServicesSectionTitle;
 
   /// No description provided for @ttsServicesPageSettingsTooltip.
   ///
@@ -9229,6 +9311,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add TTS service not implemented'**
   String get ttsServicesPageAddNotImplemented;
+
+  /// No description provided for @asrServicesAddAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get asrServicesAddAction;
+
+  /// No description provided for @asrServicesAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Speech Recognition'**
+  String get asrServicesAddTitle;
+
+  /// No description provided for @asrServicesAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add speech recognition service'**
+  String get asrServicesAddTooltip;
+
+  /// No description provided for @asrServicesApiKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get asrServicesApiKeyLabel;
+
+  /// No description provided for @asrServicesApiKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an API key to use this service.'**
+  String get asrServicesApiKeyRequired;
+
+  /// No description provided for @asrServicesAutomaticLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get asrServicesAutomaticLabel;
+
+  /// No description provided for @asrServicesCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get asrServicesCancelAction;
+
+  /// No description provided for @asrServicesChooseModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get asrServicesChooseModelTitle;
+
+  /// No description provided for @asrServicesCloudGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud'**
+  String get asrServicesCloudGroup;
+
+  /// No description provided for @asrServicesDashScopeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Qwen real-time transcription'**
+  String get asrServicesDashScopeSubtitle;
+
+  /// No description provided for @asrServicesDashScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DashScope'**
+  String get asrServicesDashScopeTitle;
+
+  /// No description provided for @asrServicesDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get asrServicesDeleteAction;
+
+  /// No description provided for @asrServicesDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Model download failed: {error}'**
+  String asrServicesDownloadFailed(Object error);
+
+  /// No description provided for @asrServicesEditAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get asrServicesEditAction;
+
+  /// No description provided for @asrServicesEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Speech Recognition'**
+  String get asrServicesEditTitle;
+
+  /// No description provided for @asrServicesEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add one to show the microphone in the chat input.'**
+  String get asrServicesEmptySubtitle;
+
+  /// No description provided for @asrServicesEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech recognition service'**
+  String get asrServicesEmptyTitle;
+
+  /// No description provided for @asrServicesEndpointLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get asrServicesEndpointLabel;
+
+  /// No description provided for @asrServicesLanguageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get asrServicesLanguageLabel;
+
+  /// No description provided for @asrServicesLocalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs offline on this device after download'**
+  String get asrServicesLocalSubtitle;
+
+  /// No description provided for @asrServicesLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Model'**
+  String get asrServicesLocalTitle;
+
+  /// No description provided for @asrServicesMicrophonePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission was not granted.'**
+  String get asrServicesMicrophonePermissionDenied;
+
+  /// No description provided for @asrServicesMimoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Segmented cloud transcription'**
+  String get asrServicesMimoSubtitle;
+
+  /// No description provided for @asrServicesMimoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'MiMo'**
+  String get asrServicesMimoTitle;
+
+  /// No description provided for @asrServicesModelDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove download'**
+  String get asrServicesModelDeleteAction;
+
+  /// No description provided for @asrServicesModelDownloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get asrServicesModelDownloadAction;
+
+  /// No description provided for @asrServicesModelDownloadedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get asrServicesModelDownloadedLabel;
+
+  /// No description provided for @asrServicesModelDownloadingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get asrServicesModelDownloadingLabel;
+
+  /// No description provided for @asrServicesModelLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get asrServicesModelLabel;
+
+  /// No description provided for @asrServicesModelNotDownloadedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Not downloaded'**
+  String get asrServicesModelNotDownloadedLabel;
+
+  /// No description provided for @asrServicesModelUseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Use model'**
+  String get asrServicesModelUseAction;
+
+  /// No description provided for @asrServicesNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get asrServicesNameLabel;
+
+  /// No description provided for @asrServicesNoSpeechDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech was detected.'**
+  String get asrServicesNoSpeechDetected;
+
+  /// No description provided for @asrServicesOnDeviceGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device'**
+  String get asrServicesOnDeviceGroup;
+
+  /// No description provided for @asrServicesOpenAiSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Low-latency streaming transcription'**
+  String get asrServicesOpenAiSubtitle;
+
+  /// No description provided for @asrServicesOpenAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Realtime'**
+  String get asrServicesOpenAiTitle;
+
+  /// No description provided for @asrServicesRecognitionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition failed: {error}'**
+  String asrServicesRecognitionFailed(Object error);
+
+  /// No description provided for @asrServicesResourceIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Resource ID'**
+  String get asrServicesResourceIdLabel;
+
+  /// No description provided for @asrServicesSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get asrServicesSaveAction;
+
+  /// No description provided for @asrServicesSectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn speech into text with an on-device, system, or cloud service.'**
+  String get asrServicesSectionDescription;
+
+  /// No description provided for @asrServicesSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech Recognition'**
+  String get asrServicesSectionTitle;
+
+  /// No description provided for @asrServicesSelectedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get asrServicesSelectedLabel;
+
+  /// No description provided for @asrServicesStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Step Audio segmented transcription'**
+  String get asrServicesStepSubtitle;
+
+  /// No description provided for @asrServicesStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get asrServicesStepTitle;
+
+  /// No description provided for @asrServicesSystemAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get asrServicesSystemAvailable;
+
+  /// No description provided for @asrServicesSystemCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'System speech recognition is unavailable on this device.'**
+  String get asrServicesSystemCheckFailed;
+
+  /// No description provided for @asrServicesSystemChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get asrServicesSystemChecking;
+
+  /// No description provided for @asrServicesSystemSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the device\'s built-in recognizer'**
+  String get asrServicesSystemSubtitle;
+
+  /// No description provided for @asrServicesSystemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get asrServicesSystemTitle;
+
+  /// No description provided for @asrServicesUnavailableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get asrServicesUnavailableLabel;
+
+  /// No description provided for @asrServicesVolcengineSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Doubao streaming transcription'**
+  String get asrServicesVolcengineSubtitle;
+
+  /// No description provided for @asrServicesVolcengineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volcengine'**
+  String get asrServicesVolcengineTitle;
 
   /// No description provided for @ttsServicesPageSystemTtsTitle.
   ///
@@ -9422,11 +9816,161 @@ abstract class AppLocalizations {
   /// **'Emotion'**
   String get ttsServicesFieldEmotionLabel;
 
-  /// No description provided for @ttsServicesEmotionAutoHint.
+  /// No description provided for @ttsServicesEmotionAutoLabel.
   ///
   /// In en, this message translates to:
-  /// **'Leave empty for auto emotion'**
-  String get ttsServicesEmotionAutoHint;
+  /// **'Auto match'**
+  String get ttsServicesEmotionAutoLabel;
+
+  /// No description provided for @ttsServicesFieldBitrateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bitrate'**
+  String get ttsServicesFieldBitrateLabel;
+
+  /// No description provided for @ttsServicesFieldChannelLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels'**
+  String get ttsServicesFieldChannelLabel;
+
+  /// No description provided for @ttsServicesFieldChooseReferenceAudioButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose reference audio'**
+  String get ttsServicesFieldChooseReferenceAudioButton;
+
+  /// No description provided for @ttsServicesFieldFormatLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio format'**
+  String get ttsServicesFieldFormatLabel;
+
+  /// No description provided for @ttsServicesFieldInstructionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Style / voice description'**
+  String get ttsServicesFieldInstructionLabel;
+
+  /// No description provided for @ttsServicesFieldLanguageBoostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language boost'**
+  String get ttsServicesFieldLanguageBoostLabel;
+
+  /// No description provided for @ttsServicesFieldLatencyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Latency'**
+  String get ttsServicesFieldLatencyLabel;
+
+  /// No description provided for @ttsServicesFieldOptimizeTextPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Optimize text preview'**
+  String get ttsServicesFieldOptimizeTextPreviewLabel;
+
+  /// No description provided for @ttsServicesFieldOutputFormatLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Output format'**
+  String get ttsServicesFieldOutputFormatLabel;
+
+  /// No description provided for @ttsServicesFieldPitchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch'**
+  String get ttsServicesFieldPitchLabel;
+
+  /// No description provided for @ttsServicesFieldPronunciationDictionaryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pronunciation dictionary (one entry per line)'**
+  String get ttsServicesFieldPronunciationDictionaryLabel;
+
+  /// No description provided for @ttsServicesFieldReferenceAudioLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference audio (WAV/MP3 data URI)'**
+  String get ttsServicesFieldReferenceAudioLabel;
+
+  /// No description provided for @ttsServicesFieldRegionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get ttsServicesFieldRegionLabel;
+
+  /// No description provided for @ttsServicesFieldSampleRateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample rate'**
+  String get ttsServicesFieldSampleRateLabel;
+
+  /// No description provided for @ttsServicesFieldStreamingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming'**
+  String get ttsServicesFieldStreamingLabel;
+
+  /// No description provided for @ttsServicesFieldSubtitlesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate subtitles'**
+  String get ttsServicesFieldSubtitlesLabel;
+
+  /// No description provided for @ttsServicesFieldTemperatureLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Temperature'**
+  String get ttsServicesFieldTemperatureLabel;
+
+  /// No description provided for @ttsServicesFieldTopPLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Top P'**
+  String get ttsServicesFieldTopPLabel;
+
+  /// No description provided for @ttsServicesFieldVolumeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get ttsServicesFieldVolumeLabel;
+
+  /// No description provided for @ttsServicesFieldWorkspaceIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace ID'**
+  String get ttsServicesFieldWorkspaceIdLabel;
+
+  /// No description provided for @ttsServicesValidationInstructionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A voice description is required'**
+  String get ttsServicesValidationInstructionRequired;
+
+  /// No description provided for @ttsServicesValidationReferenceIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice/reference ID is required'**
+  String get ttsServicesValidationReferenceIdRequired;
+
+  /// No description provided for @ttsServicesValidationSampleRate.
+  ///
+  /// In en, this message translates to:
+  /// **'{format} requires {rates} Hz.'**
+  String ttsServicesValidationSampleRate(String format, String rates);
+
+  /// No description provided for @ttsSettingsCacheReplayDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay generated network audio without requesting the TTS service again.'**
+  String get ttsSettingsCacheReplayDescription;
+
+  /// No description provided for @ttsSettingsCacheReplayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse Audio for Replay'**
+  String get ttsSettingsCacheReplayTitle;
 
   /// No description provided for @ttsServicesFieldSpeedLabel.
   ///
@@ -9779,7 +10323,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsShare.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo - Open Source AI Assistant'**
+  /// **'Cuplivo - Open Source AI Assistant'**
   String get settingsShare;
 
   /// No description provided for @searchProviderBingLocalDescription.
@@ -10393,6 +10937,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
+
+  /// No description provided for @assistantEditSkillDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Skills'**
+  String get assistantEditSkillDownloadTitle;
+
+  /// No description provided for @assistantEditSkillDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant download and install skills from GitHub repository URLs.'**
+  String get assistantEditSkillDownloadSubtitle;
+
+  /// No description provided for @assistantEditSkillCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Skills'**
+  String get assistantEditSkillCreateTitle;
+
+  /// No description provided for @assistantEditSkillCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant create new skills from SKILL.md content.'**
+  String get assistantEditSkillCreateSubtitle;
 
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///

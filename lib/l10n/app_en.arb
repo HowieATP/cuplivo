@@ -245,7 +245,11 @@
   "storageSpaceDeleteDraftWarning": "{count} files are still referenced by your unsaved draft",
   "@storageSpaceDeleteDraftWarning": {
     "description": "Storage delete guardrail: selected files are still referenced by the unsent input draft",
-    "placeholders": {"count": {"type": "int"}}
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "@storageSpaceDeleteRefWarning": {
     "placeholders": {
@@ -556,7 +560,7 @@
   "iosBackgroundNotificationsTitle": "Task Notifications",
   "iosBackgroundNotificationsSubtitle": "Send a local notification when a background reply completes or is interrupted.",
   "iosBackgroundLimitNoticeTitle": "iOS may still suspend work",
-  "iosBackgroundLimitNoticeBody": "These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.",
+  "iosBackgroundLimitNoticeBody": "These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Cuplivo running forever.",
   "iosBackgroundUnsupportedLiveActivity": "Requires iOS 16.1 or later and Live Activities enabled in Settings.",
   "iosBackgroundNativeStatusTitle": "System status",
   "iosBackgroundNativeStatusUnavailable": "Unavailable until running on iOS",
@@ -564,7 +568,7 @@
   "iosBackgroundLiveActivityUnavailable": "Live Activities unavailable",
   "iosBackgroundNotificationsAuthorized": "Notifications allowed",
   "iosBackgroundNotificationsNotAuthorized": "Notifications not allowed",
-  "iosBackgroundGenerationActiveTitle": "Kelivo is generating",
+  "iosBackgroundGenerationActiveTitle": "Cuplivo is generating",
   "iosBackgroundGenerationActiveDetail": "The assistant is replying in the background",
   "iosBackgroundGenerationStreamingDetail": "Receiving assistant response",
   "iosBackgroundGenerationTokenCount": "{count} tokens",
@@ -588,7 +592,7 @@
   "androidBackgroundOptionOff": "Off",
   "notificationChatCompletedTitle": "Generation complete",
   "notificationChatCompletedBody": "Assistant reply has been generated",
-  "androidBackgroundNotificationTitle": "Kelivo is running",
+  "androidBackgroundNotificationTitle": "Cuplivo is running",
   "androidBackgroundNotificationText": "Keeping chat generation alive in background",
   "assistantEditEmojiDialogTitle": "Choose Emoji",
   "assistantEditEmojiDialogHint": "Type or paste any emoji",
@@ -987,7 +991,23 @@
   "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
   "@compressContextEstimatePreview": {
     "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
-    "placeholders": {"summarized": {"type": "int"}, "kept": {"type": "int"}, "minTokens": {"type": "int"}, "maxTokens": {"type": "int"}, "totalTokens": {"type": "int"}}
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
   },
   "bottomToolsSheetLearningMode": "Learning Mode",
   "bottomToolsSheetLearningModeDescription": "Help you learn step by step",
@@ -1286,6 +1306,30 @@
     }
   },
   "sideDrawerBatchPartialFailure": "{success} succeeded, {failed} failed",
+  "sideDrawerMenuBatchExport": "Export as Markdown",
+  "sideDrawerBatchActionsTitle": "Batch actions",
+  "sideDrawerBatchExportNothingToExport": "No conversations to export",
+  "sideDrawerBatchExportPickDirectory": "Choose export folder",
+  "sideDrawerBatchExportSuccess": "{exported} conversations exported",
+  "@sideDrawerBatchExportSuccess": {
+    "description": "Batch export completed successfully",
+    "placeholders": {"exported": {"type": "int"}}
+  },
+  "sideDrawerBatchExportSuccessSkipped": "{exported} conversations exported, {skipped} empty skipped",
+  "@sideDrawerBatchExportSuccessSkipped": {
+    "description": "Batch export completed successfully with empty conversations skipped",
+    "placeholders": {"exported": {"type": "int"}, "skipped": {"type": "int"}}
+  },
+  "sideDrawerBatchExportPartialFailure": "{exported} exported, {failed} failed",
+  "@sideDrawerBatchExportPartialFailure": {
+    "description": "Batch export partially failed",
+    "placeholders": {"exported": {"type": "int"}, "failed": {"type": "int"}}
+  },
+  "sideDrawerBatchExportPartialFailureSkipped": "{exported} exported, {failed} failed, {skipped} empty skipped",
+  "@sideDrawerBatchExportPartialFailureSkipped": {
+    "description": "Batch export partially failed with empty conversations skipped",
+    "placeholders": {"exported": {"type": "int"}, "failed": {"type": "int"}, "skipped": {"type": "int"}}
+  },
   "@sideDrawerBatchPartialFailure": {
     "placeholders": {
       "success": {
@@ -1387,6 +1431,11 @@
   "chatInputBarReasoningStrengthTooltip": "Reasoning Strength",
   "chatInputBarMcpServersTooltip": "MCP Servers",
   "chatInputBarMoreTooltip": "Add",
+  "chatInputBarVoiceCancelTooltip": "Discard recording",
+  "chatInputBarVoiceInputTooltip": "Voice input",
+  "chatInputBarVoiceSendTooltip": "Transcribe and send",
+  "chatInputBarVoiceStopTooltip": "Stop and transcribe to input",
+  "chatInputBarVoiceTranscribing": "Recognizing…",
   "chatInputBarImageMode": "Image mode",
   "chatInputBarDisableImageModeTooltip": "Turn off image mode",
   "chatInputBarImageWarning": "Images will be ignored",
@@ -1953,7 +2002,6 @@
   "aboutPageLicense": "License",
   "aboutPageJoinQQGroup": "Join our QQ Group",
   "aboutPageQQGroup": "Cuplivo Group",
-  "aboutPageJoinDiscord": "Join us on Discord",
   "displaySettingsPageShowUserAvatarTitle": "Show User Avatar",
   "displaySettingsPageShowUserAvatarSubtitle": "Display user avatar in chat messages",
   "displaySettingsPageShowUserNameTimestampTitle": "Show User Name & Timestamp",
@@ -2034,9 +2082,15 @@
   "@oneClickCompressResult": {
     "description": "SnackBar message after one-click compression showing savings",
     "placeholders": {
-      "count": { "type": "int" },
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "oneClickCompressNone": "No compression needed",
@@ -2113,10 +2167,63 @@
   "themeSettingsPageCustomDynamicTitle": "Custom Dynamic",
   "themeSettingsPageSeedColorLabel": "Seed Color",
   "ttsServicesPageBackButton": "Back",
-  "ttsServicesPageTitle": "Text-to-Speech",
+  "ttsServicesPageTitle": "Voice Services",
+  "ttsServicesSectionTitle": "Text-to-Speech",
   "ttsServicesPageSettingsTooltip": "TTS settings",
   "ttsServicesPageAddTooltip": "Add",
   "ttsServicesPageAddNotImplemented": "Add TTS service not implemented",
+  "asrServicesAddAction": "Add",
+  "asrServicesAddTitle": "Add Speech Recognition",
+  "asrServicesAddTooltip": "Add speech recognition service",
+  "asrServicesApiKeyLabel": "API Key",
+  "asrServicesApiKeyRequired": "Enter an API key to use this service.",
+  "asrServicesAutomaticLabel": "Automatic",
+  "asrServicesCancelAction": "Cancel",
+  "asrServicesChooseModelTitle": "Model",
+  "asrServicesCloudGroup": "Cloud",
+  "asrServicesDashScopeSubtitle": "Qwen real-time transcription",
+  "asrServicesDashScopeTitle": "DashScope",
+  "asrServicesDeleteAction": "Delete",
+  "asrServicesDownloadFailed": "Model download failed: {error}",
+  "asrServicesEditAction": "Edit",
+  "asrServicesEditTitle": "Edit Speech Recognition",
+  "asrServicesEmptySubtitle": "Add one to show the microphone in the chat input.",
+  "asrServicesEmptyTitle": "No speech recognition service",
+  "asrServicesEndpointLabel": "Endpoint",
+  "asrServicesLanguageLabel": "Language",
+  "asrServicesLocalSubtitle": "Runs offline on this device after download",
+  "asrServicesLocalTitle": "Offline Model",
+  "asrServicesMicrophonePermissionDenied": "Microphone permission was not granted.",
+  "asrServicesMimoSubtitle": "Segmented cloud transcription",
+  "asrServicesMimoTitle": "MiMo",
+  "asrServicesModelDeleteAction": "Remove download",
+  "asrServicesModelDownloadAction": "Download",
+  "asrServicesModelDownloadedLabel": "Downloaded",
+  "asrServicesModelDownloadingLabel": "Downloading…",
+  "asrServicesModelLabel": "Model",
+  "asrServicesModelNotDownloadedLabel": "Not downloaded",
+  "asrServicesModelUseAction": "Use model",
+  "asrServicesNameLabel": "Name",
+  "asrServicesNoSpeechDetected": "No speech was detected.",
+  "asrServicesOnDeviceGroup": "On-device",
+  "asrServicesOpenAiSubtitle": "Low-latency streaming transcription",
+  "asrServicesOpenAiTitle": "OpenAI Realtime",
+  "asrServicesRecognitionFailed": "Speech recognition failed: {error}",
+  "asrServicesResourceIdLabel": "Resource ID",
+  "asrServicesSaveAction": "Save",
+  "asrServicesSectionDescription": "Turn speech into text with an on-device, system, or cloud service.",
+  "asrServicesSectionTitle": "Speech Recognition",
+  "asrServicesSelectedLabel": "Selected",
+  "asrServicesStepSubtitle": "Step Audio segmented transcription",
+  "asrServicesStepTitle": "Step",
+  "asrServicesSystemAvailable": "Available",
+  "asrServicesSystemCheckFailed": "System speech recognition is unavailable on this device.",
+  "asrServicesSystemChecking": "Checking…",
+  "asrServicesSystemSubtitle": "Uses the device's built-in recognizer",
+  "asrServicesSystemTitle": "System",
+  "asrServicesUnavailableLabel": "Unavailable",
+  "asrServicesVolcengineSubtitle": "Doubao streaming transcription",
+  "asrServicesVolcengineTitle": "Volcengine",
   "ttsServicesPageSystemTtsTitle": "System TTS",
   "ttsServicesPageSystemTtsAvailableSubtitle": "Use system built-in TTS",
   "ttsServicesPageSystemTtsUnavailableSubtitle": "Unavailable: {error}",
@@ -2156,7 +2263,42 @@
   "ttsServicesFieldVoiceLabel": "Voice",
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
-  "ttsServicesEmotionAutoHint": "Leave empty for auto emotion",
+  "ttsServicesEmotionAutoLabel": "Auto match",
+  "ttsServicesFieldBitrateLabel": "Bitrate",
+  "ttsServicesFieldChannelLabel": "Channels",
+  "ttsServicesFieldChooseReferenceAudioButton": "Choose reference audio",
+  "ttsServicesFieldFormatLabel": "Audio format",
+  "ttsServicesFieldInstructionLabel": "Style / voice description",
+  "ttsServicesFieldLanguageBoostLabel": "Language boost",
+  "ttsServicesFieldLatencyLabel": "Latency",
+  "ttsServicesFieldOptimizeTextPreviewLabel": "Optimize text preview",
+  "ttsServicesFieldOutputFormatLabel": "Output format",
+  "ttsServicesFieldPitchLabel": "Pitch",
+  "ttsServicesFieldPronunciationDictionaryLabel": "Pronunciation dictionary (one entry per line)",
+  "ttsServicesFieldReferenceAudioLabel": "Reference audio (WAV/MP3 data URI)",
+  "ttsServicesFieldRegionLabel": "Region",
+  "ttsServicesFieldSampleRateLabel": "Sample rate",
+  "ttsServicesFieldStreamingLabel": "Streaming",
+  "ttsServicesFieldSubtitlesLabel": "Generate subtitles",
+  "ttsServicesFieldTemperatureLabel": "Temperature",
+  "ttsServicesFieldTopPLabel": "Top P",
+  "ttsServicesFieldVolumeLabel": "Volume",
+  "ttsServicesFieldWorkspaceIdLabel": "Workspace ID",
+  "ttsServicesValidationInstructionRequired": "A voice description is required",
+  "ttsServicesValidationReferenceIdRequired": "Voice/reference ID is required",
+  "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
+  "@ttsServicesValidationSampleRate": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
+    }
+  },
+  "ttsSettingsCacheReplayDescription": "Replay generated network audio without requesting the TTS service again.",
+  "ttsSettingsCacheReplayTitle": "Reuse Audio for Replay",
   "ttsServicesFieldSpeedLabel": "Speed",
   "ttsServicesFieldLanguageTypeLabel": "Language type",
   "ttsServicesFieldLanguageLabel": "Language",
@@ -2263,7 +2405,7 @@
       }
     }
   },
-  "settingsShare": "Kelivo - Open Source AI Assistant",
+  "settingsShare": "Cuplivo - Open Source AI Assistant",
   "searchProviderBingLocalDescription": "Uses web scraping to fetch Bing results. No API key required; may be unstable.",
   "searchProviderDuckDuckGoDescription": "Privacy-focused DuckDuckGo search via DDGS. No API key required; supports region selection.",
   "searchProviderBraveDescription": "Independent search engine by Brave. Privacy-focused with no tracking or profiling.",
@@ -2373,6 +2515,10 @@
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditLocalToolCalculateTitle": "Calculator",
   "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.",
+  "assistantEditSkillDownloadTitle": "Download Skills",
+  "assistantEditSkillDownloadSubtitle": "Let the assistant download and install skills from GitHub repository URLs.",
+  "assistantEditSkillCreateTitle": "Create Skills",
+  "assistantEditSkillCreateSubtitle": "Let the assistant create new skills from SKILL.md content.",
   "assistantEditMemorySwitchTitle": "Memory",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditMemoryModeTitle": "Memory Mode",
@@ -2998,7 +3144,7 @@
     "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
   },
   "documentProcessingTitle": "Image & Document Processing",
-    "@documentProcessingTitle": {
+  "@documentProcessingTitle": {
     "description": "Title for the document processing configuration panel"
   },
   "documentProcessingImageOcr": "Image OCR",

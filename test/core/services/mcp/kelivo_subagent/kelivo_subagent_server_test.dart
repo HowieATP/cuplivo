@@ -8,7 +8,7 @@ import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
-import 'package:Cuplivo/core/services/headless_generation_service.dart';
+import 'package:Cuplivo/core/services/generation_engine.dart';
 import 'package:Cuplivo/core/services/mcp/kelivo_subagent/kelivo_subagent_server.dart';
 
 class _FakeBuildContext implements BuildContext {
@@ -91,8 +91,8 @@ class _FakeChatService extends ChatService {
 void main() {
   late _FakeChatService chatService;
   late _FakeAssistantProvider assistants;
-  late HeadlessGenerationService headlessGen;
-  late KelivoSubagentMcpServerEngine engine;
+  late GenerationEngine engine;
+  late KelivoSubagentMcpServerEngine serverEngine;
 
   Assistant discoverable(String handoffId, {String? description}) {
     return Assistant(
@@ -110,11 +110,11 @@ void main() {
       discoverable('research-bot', description: 'researches topics'),
       discoverable('code-helper'),
     ]);
-    headlessGen = HeadlessGenerationService(chatService: chatService);
-    engine = KelivoSubagentMcpServerEngine(
+    engine = GenerationEngine(chatService: chatService);
+    serverEngine = KelivoSubagentMcpServerEngine(
       assistants: assistants,
       chatService: chatService,
-      headlessGen: headlessGen,
+      engine: engine,
       contextProvider: () => _FakeBuildContext(),
     );
   });
@@ -123,7 +123,7 @@ void main() {
     String name,
     Map<String, dynamic> args,
   ) async {
-    final resp = await engine.handleMessage({
+    final resp = await serverEngine.handleMessage({
       'jsonrpc': '2.0',
       'id': 1,
       'method': 'tools/call',
@@ -143,7 +143,7 @@ void main() {
 
   group('KelivoSubagentMcpServerEngine wait-mode', () {
     test('tools/list exposes both handoff and handoff_sync', () async {
-      final resp = await engine.handleMessage({
+      final resp = await serverEngine.handleMessage({
         'jsonrpc': '2.0',
         'id': 1,
         'method': 'tools/list',
@@ -196,7 +196,7 @@ void main() {
         expect(decoded['conversation'], isNotEmpty);
 
         // In this test env the generation pipeline fails synchronously and
-        // failJob cleans up the record; the prepareJob-before-response
+        // failRound cleans up the record; the prepareRound-before-response
         // ordering guarantee is covered by the service-level tests.
 
         // The child conversation got the task as its first user message.
@@ -228,7 +228,7 @@ void main() {
       // In this test env the generation pipeline fails synchronously
       // (the fake BuildContext throws on the first provider read). The
       // waiter must still resolve with an error, not hang forever.
-      final waitResult = await headlessGen.waitFor(decoded['conversation']);
+      final waitResult = await engine.waitFor(decoded['conversation']);
       expect(waitResult.cancelled, isFalse);
       expect(waitResult.error, isNotNull);
     });

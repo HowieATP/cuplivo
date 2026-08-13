@@ -49,6 +49,7 @@ import '../../../features/search/services/global_session_search_service.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 import '../../../shared/dialogs/update_changelog_dialog.dart';
+import '../../chat/widgets/message_export_sheet.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -786,6 +787,290 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       nextConversationId: nextId,
     );
     _exitSelectMode();
+  }
+
+  Future<void> _batchExport() async {
+    if (_batchBusy) return;
+    final count = _selectedIds.length;
+    if (count == 0) return;
+    _batchBusy = true;
+    bool completed;
+    try {
+      completed = await exportConversationsMarkdownBatch(
+        context,
+        conversationIds: _selectedIds.toList(),
+      );
+    } finally {
+      _batchBusy = false;
+    }
+    if (!mounted) return;
+    // Keep the selection when the user cancelled the destination picker —
+    // same semantics as _batchMove / _batchDelete (cancel keeps select mode).
+    if (completed) _exitSelectMode();
+  }
+
+  Future<void> _showBatchActionsSheet() async {
+    if (_selectedIds.isEmpty || _batchBusy) return;
+    final l10n = AppLocalizations.of(context)!;
+    final isDesktop =
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    if (isDesktop) {
+      final cs = Theme.of(context).colorScheme;
+      Future<void> rowAction(
+        BuildContext ctx,
+        Future<void> Function() action,
+      ) async {
+        Navigator.of(ctx).maybePop();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await action();
+      }
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => Dialog(
+          elevation: 12,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+            child: Material(
+              color: cs.surface,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.sideDrawerBatchActionsTitle,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: l10n.mcpPageClose,
+                          icon: Icon(
+                            Lucide.X,
+                            size: 18,
+                            color: cs.onSurface.withValues(alpha: 0.75),
+                          ),
+                          onPressed: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Column(
+                      children: [
+                        IosCardPress(
+                          borderRadius: BorderRadius.circular(14),
+                          baseColor: cs.surface,
+                          duration: const Duration(milliseconds: 260),
+                          onTap: () => rowAction(ctx, _batchExport),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Lucide.BookOpenText,
+                                size: 20,
+                                color: cs.onSurface,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                l10n.sideDrawerMenuBatchExport,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: AppFontWeights.medium,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IosCardPress(
+                          borderRadius: BorderRadius.circular(14),
+                          baseColor: cs.surface,
+                          duration: const Duration(milliseconds: 260),
+                          onTap: () => rowAction(ctx, _batchMove),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Lucide.Shuffle,
+                                size: 20,
+                                color: cs.onSurface,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                l10n.sideDrawerMenuMoveTo,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: AppFontWeights.medium,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IosCardPress(
+                          borderRadius: BorderRadius.circular(14),
+                          baseColor: cs.surface,
+                          duration: const Duration(milliseconds: 260),
+                          onTap: () => rowAction(ctx, _batchDelete),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Lucide.Trash2,
+                                size: 20,
+                                color: Colors.redAccent,
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                l10n.sideDrawerMenuDelete,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: AppFontWeights.medium,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.5;
+        Widget row({
+          required IconData icon,
+          required String label,
+          Color? color,
+          required Future<void> Function() action,
+        }) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              height: 48,
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(14),
+                baseColor: cs.surface,
+                duration: const Duration(milliseconds: 260),
+                onTap: () async {
+                  Haptics.light();
+                  Navigator.of(ctx).pop();
+                  await Future<void>.delayed(const Duration(milliseconds: 10));
+                  await action();
+                },
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: color ?? cs.onSurface),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: AppFontWeights.medium,
+                          color: color ?? cs.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    row(
+                      icon: Lucide.BookOpenText,
+                      label: l10n.sideDrawerMenuBatchExport,
+                      action: _batchExport,
+                    ),
+                    row(
+                      icon: Lucide.Shuffle,
+                      label: l10n.sideDrawerMenuMoveTo,
+                      action: _batchMove,
+                    ),
+                    row(
+                      icon: Lucide.Trash2,
+                      label: l10n.sideDrawerMenuDelete,
+                      color: Colors.redAccent,
+                      action: _batchDelete,
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _renameChat(BuildContext context, ChatItem chat) async {
@@ -3608,25 +3893,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 ),
               ),
               IosIconButton(
-                icon: Lucide.Shuffle,
+                icon: Lucide.Ellipsis,
                 size: 18,
                 color: _selectedIds.isEmpty
                     ? cs.onSurface.withValues(alpha: 0.3)
                     : cs.primary,
-                semanticLabel: l10n.sideDrawerMenuMoveTo,
+                semanticLabel: l10n.sideDrawerBatchActionsTitle,
                 enabled: _selectedIds.isNotEmpty,
-                onTap: _batchMove,
-              ),
-              const SizedBox(width: 4),
-              IosIconButton(
-                icon: Lucide.Trash2,
-                size: 18,
-                color: _selectedIds.isEmpty
-                    ? cs.onSurface.withValues(alpha: 0.3)
-                    : Colors.redAccent,
-                semanticLabel: l10n.sideDrawerMenuDelete,
-                enabled: _selectedIds.isNotEmpty,
-                onTap: _batchDelete,
+                onTap: _showBatchActionsSheet,
               ),
               const SizedBox(width: 4),
               IosIconButton(

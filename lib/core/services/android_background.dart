@@ -15,7 +15,7 @@ class AndroidBackgroundManager {
     if (_initialized) return true;
     try {
       final androidConfig = FlutterBackgroundAndroidConfig(
-        notificationTitle: notificationTitle ?? 'Kelivo is running',
+        notificationTitle: notificationTitle ?? 'Cuplivo is running',
         notificationText:
             notificationText ?? 'Keeping chat generation alive in background',
         notificationImportance: AndroidNotificationImportance.normal,

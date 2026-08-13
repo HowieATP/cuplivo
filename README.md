@@ -134,7 +134,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ## ⚠️ Note
 
-Cuplivo is a community fork and has not been fully separated from the upstream project. The QQ group now belongs to Cuplivo (group `1101061750`); donation QR codes and Discord still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
+Cuplivo is a community fork and has not been fully separated from the upstream project. The QQ group now belongs to Cuplivo (group `1101061750`); donation QR codes still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
 
 ---
 

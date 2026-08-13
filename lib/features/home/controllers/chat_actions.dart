@@ -1,24 +1,21 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import '../../../utils/assistant_regex.dart';
-import '../../../core/models/assistant_regex.dart';
-import '../../../utils/markdown_media_sanitizer.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
-import '../../../core/services/logging/flutter_logger.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
@@ -105,10 +102,6 @@ class ChatActions {
   /// Called when chat suggestions may need to be generated.
   void Function(String conversationId)? onMaybeGenerateSuggestions;
 
-  /// Called to schedule inline image sanitization.
-  void Function(String messageId, String content, {bool immediate})?
-  onScheduleImageSanitize;
-
   /// Called when streaming finishes.
   VoidCallback? onStreamFinished;
 
@@ -160,16 +153,14 @@ class ChatActions {
     }
   }
 
-  Future<void> _updateIosBackgroundGeneration(
-    stream_ctrl.StreamingState state,
-  ) async {
+  Future<void> _updateIosBackgroundGeneration(int totalTokens) async {
     final l10n = _l10n;
     if (l10n == null) return;
     try {
       await IosBackgroundGenerationService.instance.update(
         detail: l10n.iosBackgroundGenerationStreamingDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(state.totalTokens),
-        tokenCount: state.totalTokens,
+        tokenLabel: l10n.iosBackgroundGenerationTokenCount(totalTokens),
+        tokenCount: totalTokens,
       );
     } catch (error, stackTrace) {
       _logIosBackgroundGenerationFailure('update', error, stackTrace);
@@ -210,24 +201,11 @@ class ChatActions {
     }
   }
 
-  /// Track in-flight _finishStreaming futures so _handleStreamDone can await
-  /// completion before removing notifiers or triggering rebuild.
-  final Map<String, Future<void>> _finishStreamingFutures =
-      <String, Future<void>>{};
-
   List<ChatMessage> get _messages => chatController.messages;
   Map<String, int> get _versionSelections => chatController.versionSelections;
-  Conversation? get _currentConversation => chatController.currentConversation;
-  Set<String> get _loadingConversationIds =>
-      chatController.loadingConversationIds;
-  Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
-      chatController.conversationStreams;
-
-  /// Track multi-model stream messageIds per conversation (for cancel cleanup).
-  final Map<String, Set<String>> _multiAIStreamKeys = <String, Set<String>>{};
 
   /// Guard against re-entrant cancelStreaming calls and
-  /// concurrent _handleStreamError cleanup.
+  /// concurrent engine slot-error cleanup.
   bool _isCancelling = false;
 
   void _setConversationLoading(String conversationId, bool loading) {
@@ -286,63 +264,6 @@ class ChatActions {
       return conversation;
     }
     return conversation.copyWith(truncateIndex: -1);
-  }
-
-  @visibleForTesting
-  static StreamSubscription<T> listenSequentiallyToStream<T>({
-    required Stream<T> stream,
-    required Future<void> Function(T chunk) onData,
-    required Future<void> Function(Object error, StackTrace stackTrace) onError,
-    required Future<void> Function() onDone,
-  }) {
-    late final StreamSubscription<T> subscription;
-    var terminalStarted = false;
-
-    Future<void> handleError(Object error, StackTrace stackTrace) async {
-      if (terminalStarted) return;
-      terminalStarted = true;
-      try {
-        await onError(error, stackTrace);
-      } finally {
-        await subscription.cancel();
-      }
-    }
-
-    Future<void> handleDone() async {
-      if (terminalStarted) return;
-      terminalStarted = true;
-      try {
-        await onDone();
-      } catch (error, stackTrace) {
-        terminalStarted = false;
-        await handleError(error, stackTrace);
-      }
-    }
-
-    subscription = stream.listen(
-      (chunk) {
-        if (terminalStarted) return;
-        subscription.pause();
-        Future<void>.sync(() => onData(chunk)).then(
-          (_) {
-            if (!terminalStarted) {
-              subscription.resume();
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            unawaited(handleError(error, stackTrace));
-          },
-        );
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        unawaited(handleError(error, stackTrace));
-      },
-      onDone: () {
-        unawaited(handleDone());
-      },
-      cancelOnError: true,
-    );
-    return subscription;
   }
 
   bool _supportsAudioAttachmentsForProvider(
@@ -446,19 +367,6 @@ class ChatActions {
       ),
       assistantPlaceholder,
     ];
-  }
-
-  /// Transform raw content using assistant regexes.
-  String _transformAssistantContent(
-    stream_ctrl.StreamingState state, [
-    String? raw,
-  ]) {
-    return applyAssistantRegexes(
-      raw ?? state.fullContentRaw,
-      assistant: state.ctx.assistant,
-      scope: AssistantRegexScope.assistant,
-      target: AssistantRegexTransformTarget.persist,
-    );
   }
 
   // ============================================================================
@@ -630,7 +538,6 @@ class ChatActions {
       // Ensure file processing indicator is cleared on error
       onFileProcessingFinished?.call();
       await _cleanupStreamingError(assistantMessage, conversation.id);
-      streamController.cleanupTimers(assistantMessage.id);
       return ChatActionResult.error(e.toString());
     }
   }
@@ -961,6 +868,12 @@ class ChatActions {
   // ============================================================================
 
   /// Cancel the active streaming for the current conversation.
+  ///
+  /// Delegates to the GenerationEngine: cancelling the conversation cancels
+  /// every slot (normal chat + Multi-AI threads + cascading wait-mode
+  /// sub-agents). Each slot's stream errors out, the engine persists the
+  /// partial content with `isStreaming: false`, and the page's per-slot
+  /// error handler (see [_onEngineSlotError]) finalizes the in-memory list.
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null || _isCancelling) {
@@ -987,133 +900,19 @@ class ChatActions {
       // Reset file processing state on cancel
       onFileProcessingFinished?.call();
 
-      // Cancel all multi-AI streams for this conversation
-      final multiKeys = _multiAIStreamKeys.remove(cid);
-      if (multiKeys != null) {
-        for (final key in multiKeys) {
-          ChatApiService.cancelRequest(key);
-          try {
-            await _conversationStreams.remove(key)?.cancel();
-          } catch (_) {}
-        }
-      }
-
-      // Cancel active stream for current conversation only
-      ChatApiService.cancelRequest(cid);
-      // Cascading cancellation: a wait-mode sub-agent spawned by this
-      // conversation is cancelled too (fire-and-forget keeps running).
-      // No-op when this conversation has no headless jobs.
+      // Cascading cancellation: the conversation's slots (including
+      // wait-mode sub-agents spawned by it) are cancelled; fire-and-forget
+      // sub-agents keep running. No-op when nothing runs here.
       try {
         // ignore: use_build_context_synchronously (root context)
-        contextProvider.read<HeadlessGenerationService>().cancel(cid);
+        contextProvider.read<GenerationEngine>().cancelConversation(cid);
       } catch (e) {
-        debugPrint('[CancelTrace] headless cascade cancel failed: $e');
-      }
-      final sub = _conversationStreams.remove(cid);
-      try {
-        await sub?.cancel();
-      } catch (e) {
-        debugPrint('[CancelTrace] sub.cancel() threw (ignored): $e');
+        debugPrint('[CancelTrace] engine cancel failed: $e');
       }
 
-      // Find all assistant streaming messages within current conversation and mark them finished
-      final streamingMessages = <ChatMessage>[];
-      for (var i = _messages.length - 1; i >= 0; i--) {
-        final m = _messages[i];
-        if (m.role == 'assistant' && m.isStreaming) {
-          streamingMessages.add(m);
-        }
-      }
-      debugPrint(
-        '[CancelTrace] cancelStreaming: streamingMessages=${streamingMessages.length} cntBefore=${chatController.loadingConversationIds.contains(cid)}',
-      );
-      if (streamingMessages.isNotEmpty) {
-        for (final streaming in streamingMessages) {
-          // Mark streaming as ended to allow UI rebuilds again
-          streamController.markStreamingEnded(streaming.id);
-          streamController.cleanupTimers(streaming.id);
-
-          final idx = _messages.indexWhere((m) => m.id == streaming.id);
-          final latestStreaming = idx == -1 ? streaming : _messages[idx];
-
-          debugPrint(
-            '[CancelTrace] cancelStreaming before updateMessage: msg=${latestStreaming.id}',
-          );
-          try {
-            await chatService.updateMessage(
-              latestStreaming.id,
-              content: latestStreaming.content,
-              isStreaming: false,
-              totalTokens: latestStreaming.totalTokens,
-            );
-          } catch (e, st) {
-            debugPrint(
-              '[CancelTrace] cancelStreaming updateMessage THREW: $e\n$st',
-            );
-            rethrow;
-          }
-          debugPrint(
-            '[CancelTrace] cancelStreaming after updateMessage: msg=${latestStreaming.id}',
-          );
-
-          if (idx != -1) {
-            _messages[idx] = latestStreaming.copyWith(isStreaming: false);
-            onMessagesChanged?.call();
-          }
-
-          streamController.removeStreamingNotifier(streaming.id);
-
-          // Use unified reasoning completion method
-          debugPrint(
-            '[CancelTrace] cancelStreaming before finishReasoningAndPersist: msg=${streaming.id}',
-          );
-          try {
-            await streamController.finishReasoningAndPersist(
-              streaming.id,
-              updateReasoningInDb:
-                  (
-                    String messageId, {
-                    String? reasoningText,
-                    DateTime? reasoningStartAt,
-                    DateTime? reasoningFinishedAt,
-                    String? reasoningSegmentsJson,
-                  }) async {
-                    await chatService.updateMessage(
-                      messageId,
-                      reasoningText: reasoningText,
-                      reasoningStartAt: reasoningStartAt,
-                      reasoningFinishedAt: reasoningFinishedAt,
-                      reasoningSegmentsJson: reasoningSegmentsJson,
-                    );
-                  },
-            );
-          } catch (e, st) {
-            debugPrint(
-              '[CancelTrace] cancelStreaming finishReasoningAndPersist THREW: $e\n$st',
-            );
-            rethrow;
-          }
-          debugPrint(
-            '[CancelTrace] cancelStreaming after finishReasoningAndPersist: msg=${streaming.id}',
-          );
-
-          // If streaming output included inline base64 images, sanitize them even on manual cancel
-          onScheduleImageSanitize?.call(
-            streaming.id,
-            latestStreaming.content,
-            immediate: true,
-          );
-        }
-        debugPrint('[CancelTrace] cancelStreaming BEFORE forceClear');
-        chatController.forceClearConversationLoading(cid);
-        onLoadingChanged?.call(cid, false);
-        debugPrint('[CancelTrace] cancelStreaming AFTER forceClear');
-        await _cancelIosBackgroundGeneration();
-      } else {
-        debugPrint('[CancelTrace] cancelStreaming else-branch forceClear');
-        chatController.forceClearConversationLoading(cid);
-        onLoadingChanged?.call(cid, false);
-      }
+      chatController.forceClearConversationLoading(cid);
+      onLoadingChanged?.call(cid, false);
+      await _cancelIosBackgroundGeneration();
     } finally {
       debugPrint(
         '[CancelTrace] cancelStreaming EXIT: cid=$cid _isCancelling->false',
@@ -1139,744 +938,226 @@ class ChatActions {
     );
   }
 
-  /// Execute generation with the given context.
-  /// If [streamKeyOverride] is provided, use it as the stream subscription
-  /// key instead of conversationId (for multi-model concurrent streams).
+  /// Execute generation with the given context via the GenerationEngine
+  /// (ADR-0028: the page path streams into engine slots; the engine owns the
+  /// chunk pipeline, persistence, reasoning segments, sanitization and the
+  /// smooth live ramp).
+  ///
+  /// If [streamKeyOverride]/[requestIdOverride] are provided they are
+  /// ignored — the engine keys slots by `assistantMessageId` (Multi-AI: N
+  /// slots share one conversation round, each with its own CancelToken).
   Future<void> _executeGeneration(
     stream_ctrl.GenerationContext ctx, {
     String? streamKeyOverride,
     String? requestIdOverride,
   }) async {
-    debugPrint(
-      '[MultiAIDebug] _executeGeneration ENTERED msgId=${ctx.assistantMessage.id} modelId=${ctx.modelId} streamKeyOverride=$streamKeyOverride',
-    );
-    final state = stream_ctrl.StreamingState(ctx);
     final assistant = ctx.assistant;
-    final conversationId = state.conversationId;
-    final existingSplit = streamController.getContentSplitData(state.messageId);
-    if (existingSplit != null) {
-      state.contentSplitOffsets = List<int>.of(existingSplit.offsets);
-      state.reasoningCountAtSplit = List<int>.of(existingSplit.reasoningCounts);
-      state.toolCountAtSplit = List<int>.of(existingSplit.toolCounts);
-    }
-    if (streamController.getToolPartsCount(state.messageId) > 0) {
-      state.hadThinkingBlock = true;
-    }
+    final mid = ctx.assistantMessage.id;
+    final cid = ctx.assistantMessage.conversationId;
+    final settings = ctx.settings;
 
-    // Mark this message as actively streaming to suppress UI rebuilds
-    streamController.markStreamingStarted(state.messageId);
+    // Mark this message as actively streaming + pre-create its notifier so
+    // MessageListView's streaming gate detects it.
+    streamController.markStreamingStarted(mid);
 
     try {
       await _startIosBackgroundGeneration(ctx);
       debugPrint(
-        '[MultiAIDebug] CALLING ChatApiService.sendMessageStream modelId=${ctx.modelId} providerKey=${ctx.providerKey} apiMessages=${ctx.apiMessages.length}',
+        '[GenerationEngine] page slot start: msgId=$mid modelId=${ctx.modelId} providerKey=${ctx.providerKey}',
       );
-      final stream = ChatApiService.sendMessageStream(
-        config: ctx.config,
-        modelId: ctx.modelId,
-        messages: ctx.apiMessages,
-        userMediaPaths: ctx.userMediaPaths,
-        thinkingBudget:
-            assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
-        temperature: assistant?.temperature,
-        topP: assistant?.topP,
-        maxTokens: assistant?.maxTokens,
-        tools: ctx.toolDefs.isEmpty ? null : ctx.toolDefs,
-        onToolCall: ctx.onToolCall,
-        extraHeaders: ctx.extraHeaders,
-        extraBody: ctx.extraBody,
-        stream: ctx.streamOutput,
-        requestId: requestIdOverride ?? conversationId,
-        allowImagesApiRouting: ctx.allowImagesApiRouting,
-        ocrActive: ctx.ocrActive,
-        partialImageNotice: _l10n == null
-            ? null
-            : (received, requested) =>
-                  _l10n!.imageGenPartialNotice('$received', '$requested'),
+      // ignore: use_build_context_synchronously (root context, valid for app lifetime)
+      final engine = contextProvider.read<GenerationEngine>();
+      final notifier = streamController.streamingContentNotifier;
+      engine.startRound(
+        conversationId: cid,
+        slots: [
+          GenerationSlotRequest(
+            assistantMessageId: mid,
+            apiMessages: ctx.apiMessages,
+            config: ctx.config,
+            modelId: ctx.modelId,
+            toolDefs: ctx.toolDefs,
+            onToolCall: ctx.onToolCall,
+            assistant: assistant is Assistant ? assistant : null,
+            thinkingBudget:
+                assistant?.thinkingBudget ?? settings.thinkingBudget,
+            temperature: assistant?.temperature,
+            topP: assistant?.topP,
+            maxTokens: assistant?.maxTokens,
+            stream: ctx.streamOutput,
+            userMediaPaths: ctx.userMediaPaths,
+            allowImagesApiRouting: ctx.allowImagesApiRouting,
+            ocrActive: ctx.ocrActive,
+            extraHeaders: ctx.extraHeaders,
+            extraBody: ctx.extraBody,
+            supportsReasoning: ctx.supportsReasoning,
+            autoCollapseThinking: settings.autoCollapseThinking,
+            partialImageNotice: _l10n == null
+                ? null
+                : (received, requested) =>
+                      _l10n!.imageGenPartialNotice('$received', '$requested'),
+            onContentUpdated: (id, content, tokens) {
+              onContentUpdated?.call(id, content, tokens);
+              unawaited(_updateIosBackgroundGeneration(tokens));
+            },
+            onStreamTick: () => streamController.onStreamTick?.call(),
+            onSlotComplete: () => _onEngineSlotComplete(ctx, mid, cid),
+            onSlotError: (error) =>
+                unawaited(_onEngineSlotError(ctx, mid, cid, error)),
+            onUiState: (state) =>
+                streamController.syncEngineUiState(mid, state),
+          ),
+        ],
       );
-
-      final streamKey = streamKeyOverride ?? conversationId;
-      debugPrint(
-        '[CancelTrace] _executeGeneration: streamKey=$streamKey requestId=${requestIdOverride ?? conversationId} priorSub=${_conversationStreams[streamKey] != null}',
-      );
-      await _conversationStreams[streamKey]?.cancel();
-      final sub = listenSequentiallyToStream<ChatStreamChunk>(
-        stream: stream,
-        onData: (chunk) => _handleStreamChunk(chunk, state),
-        onError: (error, stackTrace) => _handleStreamError(error, state),
-        onDone: () => _handleStreamDone(state),
-      );
-      _conversationStreams[streamKey] = sub;
-      if (streamKeyOverride != null) {
-        _multiAIStreamKeys
-            .putIfAbsent(conversationId, () => <String>{})
-            .add(streamKeyOverride);
+      // Register the page notifier for live rendering (the engine's ramp
+      // publishes to it; safe to register after start — the ramp syncs on
+      // attach and the accumulated state is seeded on demand).
+      final slot = engine.slotForMessage(mid);
+      if (slot != null) {
+        slot.uiNotifier = notifier;
+        final text = slot.streamedText.toString();
+        if (text.isNotEmpty) {
+          notifier.updateContent(mid, text, 0);
+        }
       }
     } catch (e, st) {
       debugPrint('[MultiAIDebug] _executeGeneration CAUGHT: $e');
       debugPrint('[MultiAIDebug] _executeGeneration stack: $st');
-      await _handleStreamError(e, state);
-    }
-  }
-
-  // ============================================================================
-  // Stream Chunk Handlers
-  // ============================================================================
-
-  /// Dispatch stream chunk to appropriate handler.
-  Future<void> _handleStreamChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-  ) async {
-    final chunkContent = chunk.content.isNotEmpty
-        ? streamController.captureGeminiThoughtSignature(
-            chunk.content,
-            state.messageId,
-          )
-        : '';
-
-    // Persist vendor reasoning details (may carry thinking signatures) so
-    // they can be echoed back on subsequent turns.
-    if (chunk.reasoningDetails != null) {
-      streamController.setReasoningDetails(
-        state.messageId,
-        chunk.reasoningDetails,
-      );
-    }
-
-    // Handle reasoning
-    if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
-      await _handleReasoningChunk(chunk, state);
-    }
-
-    // Handle tool calls
-    if ((chunk.toolCalls ?? const []).isNotEmpty) {
-      await _handleToolCallsChunk(chunk, state);
-    }
-
-    // Handle tool results
-    if ((chunk.toolResults ?? const []).isNotEmpty) {
-      await _handleToolResultsChunk(chunk, state);
-    }
-
-    // Handle finish or content
-    if (chunk.isDone) {
-      await _handleStreamFinish(chunk, state, chunkContent);
-    } else {
-      await _handleContentChunk(chunk, state, chunkContent);
-    }
-  }
-
-  /// Handle reasoning chunk from stream.
-  Future<void> _handleReasoningChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleReasoningChunk(
-      chunk,
-      state,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningStartAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            // Use silent update during streaming to avoid UI rebuilds
-            await chatService.updateMessageSilent(
-              messageId,
-              reasoningText: reasoningText,
-              reasoningStartAt: reasoningStartAt,
-              reasoningSegmentsJson: reasoningSegmentsJson,
-            );
-          },
-    );
-  }
-
-  /// Handle tool calls chunk from stream.
-  Future<void> _handleToolCallsChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleToolCallsChunk(
-      chunk,
-      state,
-      updateReasoningSegmentsInDb: (String messageId, String json) async {
-        // Use silent update during streaming to avoid UI rebuilds
-        await chatService.updateMessageSilent(
-          messageId,
-          reasoningSegmentsJson: json,
-        );
-      },
-      setToolEventsInDb:
-          (String messageId, List<Map<String, dynamic>> events) async {
-            await chatService.setToolEvents(messageId, events);
-          },
-      getToolEventsFromDb: (String messageId) =>
-          chatService.getToolEvents(messageId),
-    );
-  }
-
-  /// Handle tool results chunk from stream.
-  Future<void> _handleToolResultsChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.handleToolResultsChunk(
-      chunk,
-      state,
-      upsertToolEventInDb:
-          (
-            String messageId, {
-            required String id,
-            required String name,
-            required Map<String, dynamic> arguments,
-            String? content,
-            Map<String, dynamic>? metadata,
-          }) async {
-            await chatService.upsertToolEvent(
-              messageId,
-              id: id,
-              name: name,
-              arguments: arguments,
-              content: content,
-              metadata: metadata,
-            );
-          },
-    );
-  }
-
-  /// Handle content chunk from stream (non-done).
-  Future<void> _handleContentChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-    String chunkContent,
-  ) async {
-    // Fast bail-out: if _finishStreaming already ran, don't touch state at all.
-    if (state.finishHandled) return;
-
-    final messageId = state.messageId;
-    final conversationId = state.conversationId;
-
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-      await chatService.updateMessageSilent(
-        messageId,
-        reasoningSegmentsJson: stream_ctrl.serializeReasoningSegmentsWithSplits(
-          streamController.getReasoningSegments(messageId) ?? const [],
-          contentSplitOffsets: state.contentSplitOffsets,
-          reasoningCountAtSplit: state.reasoningCountAtSplit,
-          toolCountAtSplit: state.toolCountAtSplit,
-          reasoningDetails: streamController.reasoningDetails[messageId],
-        ),
-      );
-    }
-
-    state.fullContentRaw += chunkContent;
-    state.streamStartedAt ??= DateTime.now();
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    // Last-wins (replace): providers emit the CURRENT round's cumulative
-    // usage, so the latest chunk is the exact context at this moment.
-    if (chunk.usage != null) {
-      state.usage = chunk.usage;
-      state.totalTokens = state.usage!.totalTokens;
-    }
-    if (chunk.consumedUsage != null) {
-      state.consumedUsage = chunk.consumedUsage;
-    }
-
-    String streamingProcessed = _transformAssistantContent(state);
-    if (streamingProcessed.contains('data:image') &&
-        streamingProcessed.contains('base64,')) {
+      // The engine never touched the row on a synchronous start failure —
+      // release the streaming flag so the placeholder is not stuck forever.
       try {
-        final sanitized =
-            await MarkdownMediaSanitizer.replaceInlineBase64Images(
-              streamingProcessed,
-            );
-        if (sanitized != streamingProcessed) {
-          streamingProcessed = sanitized;
-          state.fullContentRaw = sanitized;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // After any await point, _finishStreaming may have already run and
-    // updated _messages[index] with the FULL final content. If we continue
-    // with this stale streamingProcessed we would overwrite the final content
-    // with a partial snapshot. Bail out early to prevent that.
-    if (state.finishHandled) return;
-
-    onScheduleImageSanitize?.call(
-      messageId,
-      streamingProcessed,
-      immediate: true,
-    );
-    // Use silent update to avoid triggering ChatService.notifyListeners()
-    // which would cause side_drawer and other widgets to rebuild
-    await chatService.updateMessageSilent(
-      messageId,
-      content: streamingProcessed,
-      totalTokens: state.totalTokens,
-    );
-
-    // Re-check after await: _finishStreaming may have completed during the
-    // DB write above and already set the definitive content on _messages[index].
-    if (state.finishHandled) return;
-
-    if (state.ctx.streamOutput && _currentConversation?.id == conversationId) {
-      final index = _messages.indexWhere((m) => m.id == messageId);
-      if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
-          content: streamingProcessed,
-          totalTokens: state.totalTokens,
+        await chatService.updateMessage(mid, isStreaming: false);
+      } catch (persistError) {
+        debugPrint(
+          '[GenerationEngine] start-failure cleanup persist failed: '
+          '$persistError',
         );
       }
-    }
-
-    // End reasoning when content starts
-    if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
-      await _finishReasoningOnContent(state);
-    }
-
-    await _updateIosBackgroundGeneration(state);
-
-    // Re-check before scheduling timer — timer creation after _finishStreaming
-    // would create a new timer that periodically overwrites _messages[index]
-    // with stale partial content.
-    if (state.finishHandled) return;
-
-    // Schedule throttled UI update via StreamController
-    if (state.ctx.streamOutput) {
-      streamController.scheduleThrottledUpdate(
-        messageId,
-        conversationId,
-        streamingProcessed,
-        totalTokens: state.totalTokens,
-        contentSplitOffsets: state.contentSplitOffsets,
-        reasoningCountAtSplit: state.reasoningCountAtSplit,
-        toolCountAtSplit: state.toolCountAtSplit,
-        promptTokens: state.usage?.promptTokens,
-        completionTokens: state.usage?.completionTokens,
-        cachedTokens: state.usage?.cachedTokens,
-        durationMs: state.streamStartedAt != null
-            ? DateTime.now().difference(state.streamStartedAt!).inMilliseconds
-            : null,
-        updateMessageInList: (id, content, tokens) {
-          onContentUpdated?.call(id, content, tokens);
-        },
-      );
+      await _onEngineSlotError(ctx, mid, cid, e);
     }
   }
 
-  /// Finish reasoning segment when content starts arriving.
-  Future<void> _finishReasoningOnContent(
-    stream_ctrl.StreamingState state,
-  ) async {
-    await streamController.finishReasoningAndPersist(
-      state.messageId,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningStartAt,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            // Use silent update during streaming to avoid UI rebuilds
-            await chatService.updateMessageSilent(
-              messageId,
-              reasoningText: reasoningText,
-              reasoningStartAt: reasoningStartAt,
-              reasoningFinishedAt: reasoningFinishedAt,
-              reasoningSegmentsJson: reasoningSegmentsJson,
-            );
-          },
-    );
-  }
-
-  /// Handle stream finish (isDone == true).
-  Future<void> _handleStreamFinish(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-    String chunkContent,
-  ) async {
-    final messageId = state.messageId;
-    final conversationId = state.conversationId;
-    final autoCollapseThinking =
-        (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty)
-        ? contextProvider.read<SettingsProvider>().autoCollapseThinking
-        : null;
-
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-    }
-
-    if (chunkContent.isNotEmpty) {
-      state.fullContentRaw += chunkContent;
-    }
-
-    // Don't finish if tools are still loading
-    final hasLoadingTool =
-        (streamController.toolParts[messageId]?.any((p) => p.loading) ?? false);
-    if (hasLoadingTool) {
-      return;
-    }
-
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    // Last-wins (replace): see _handleContentChunk.
-    if (chunk.usage != null) {
-      state.usage = chunk.usage;
-      state.totalTokens = state.usage!.totalTokens;
-    }
-    if (chunk.consumedUsage != null) {
-      state.consumedUsage = chunk.consumedUsage;
-    }
-
-    // Track the _finishStreaming future so _handleStreamDone can await it
-    // if it fires concurrently (stream.onDone can fire while we're still
-    // awaiting async work inside _finishStreaming).
-    final finishFuture = _finishStreaming(state);
-    _finishStreamingFutures[messageId] = finishFuture;
-    await finishFuture;
-    _finishStreamingFutures.remove(messageId);
-
-    // Notify for background notification if needed
-    if (!state.finishHandled) {
-      onStreamFinished?.call();
-    }
-
-    // Handle buffered reasoning for non-streaming mode
-    if (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty) {
-      final now = DateTime.now();
-      final startAt = state.reasoningStartAt ?? now;
-      await chatService.updateMessage(
-        messageId,
-        reasoningText: state.bufferedReasoning,
-        reasoningStartAt: startAt,
-        reasoningFinishedAt: now,
-      );
-      streamController.reasoning[messageId] = stream_ctrl.ReasoningData()
-        ..text = state.bufferedReasoning
-        ..startAt = startAt
-        ..finishedAt = now
-        ..expanded = !(autoCollapseThinking ?? false);
-    }
-
-    await _conversationStreams.remove(conversationId)?.cancel();
-    await _conversationStreams.remove(messageId)?.cancel();
-
-    // Ensure reasoning is finished
-    final r = streamController.reasoning[messageId];
-    if (r != null && r.finishedAt == null) {
-      r.finishedAt = DateTime.now();
-      await chatService.updateMessage(
-        messageId,
-        reasoningText: r.text,
-        reasoningFinishedAt: r.finishedAt,
-      );
-    }
-
-    // Show truncation warning if the response was cut off
-    final tr = chunk.truncationReason;
-    if (tr != null) {
-      if (!contextProvider.mounted) return;
-      final l10n = _l10n;
-      if (l10n == null) return;
-      final reasonText = tr == 'max_tokens'
-          ? l10n.truncationReasonMaxTokens
-          : l10n.truncationReasonContextExceeded;
-      showAppSnackBar(
-        contextProvider,
-        message: l10n.responseTruncated(reasonText),
-        type: NotificationType.warning,
-        duration: const Duration(seconds: 30),
-      );
-    }
-  }
-
-  /// Finish streaming and persist final state.
-  Future<void> _finishStreaming(
-    stream_ctrl.StreamingState state, {
-    bool generateTitle = true,
-  }) async {
-    final messageId = state.messageId;
-    final conversationId = state.conversationId;
-
-    // Mark streaming as ended to allow UI rebuilds again
-    streamController.markStreamingEnded(messageId);
-
-    // Clean up stream throttle timer and flush final content
-    streamController.cleanupTimers(messageId);
-
-    final shouldGenerateTitle =
-        generateTitle && state.ctx.generateTitleOnFinish && !state.titleQueued;
-    if (state.finishHandled) {
-      if (shouldGenerateTitle) {
-        state.titleQueued = true;
-        onMaybeGenerateTitle?.call(conversationId);
-      }
-      return;
-    }
-    state.finishHandled = true;
-    if (shouldGenerateTitle) {
-      state.titleQueued = true;
-    }
-
-    // Replace extremely long inline base64 images with local files to avoid jank
-    final processedContent = _transformAssistantContent(state);
-
-    // Compute final duration
-    final finalDurationMs = state.streamStartedAt != null
-        ? DateTime.now().difference(state.streamStartedAt!).inMilliseconds
-        : null;
-    // Consumed semantics (sum across rounds) — persisted to the token fields.
-    final finalPromptTokens = state.consumedUsage?.promptTokens;
-    final finalCompletionTokens = state.consumedUsage?.completionTokens;
-    final finalCachedTokens = state.consumedUsage?.cachedTokens;
-    final finalTotalTokens =
-        state.consumedUsage?.totalTokens ?? state.totalTokens;
-    // Context semantics (last request round) — what the token display shows.
-    final finalContextTokens = state.usage?.totalTokens ?? state.totalTokens;
-
-    // Flush final content to the streaming notifier before async operations.
-    // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
-    // or onDone firing concurrently) still shows the correct content via the
-    // notifier-based streaming path.
-    streamController.streamingContentNotifier.updateContent(
-      messageId,
-      processedContent,
-      state.totalTokens,
-      contentSplitOffsets: state.contentSplitOffsets,
-      reasoningCountAtSplit: state.reasoningCountAtSplit,
-      toolCountAtSplit: state.toolCountAtSplit,
-      promptTokens: finalPromptTokens,
-      completionTokens: finalCompletionTokens,
-      cachedTokens: finalCachedTokens,
-      durationMs: finalDurationMs,
-    );
-
-    final sanitizedContent =
-        await MarkdownMediaSanitizer.replaceInlineBase64Images(
-          processedContent,
-        );
-    await chatService.updateMessage(
-      messageId,
-      content: sanitizedContent,
-      totalTokens: finalTotalTokens,
-      contextTokens: finalContextTokens,
-      isStreaming: false,
-      promptTokens: finalPromptTokens,
-      completionTokens: finalCompletionTokens,
-      cachedTokens: finalCachedTokens,
-      durationMs: finalDurationMs,
-    );
-
-    final finalizedMessage = state.ctx.assistantMessage.copyWith(
-      content: sanitizedContent,
-      totalTokens: finalTotalTokens,
-      contextTokens: finalContextTokens,
-      isStreaming: false,
-      promptTokens: finalPromptTokens,
-      completionTokens: finalCompletionTokens,
-      cachedTokens: finalCachedTokens,
-      durationMs: finalDurationMs,
-    );
-
-    final index = _messages.indexWhere((m) => m.id == messageId);
+  /// Engine slot finished successfully: finalize the page-side state (list
+  /// row, notifier teardown, loading flags, follow-up hooks).
+  void _onEngineSlotComplete(
+    stream_ctrl.GenerationContext ctx,
+    String mid,
+    String cid,
+  ) {
+    debugPrint('[GenerationEngine] page slot done: msgId=$mid');
+    final engine = contextProvider.read<GenerationEngine>();
+    final slot = engine.slotForMessage(mid);
+    final content = slot?.finalText ?? '';
+    final ui = slot?.finalUiState;
+    final index = _messages.indexWhere((m) => m.id == mid);
     if (index != -1) {
-      _messages[index] = finalizedMessage;
+      _messages[index] = _finalizedRow(
+        _messages[index],
+        content: content,
+        ui: ui,
+      );
       onMessagesChanged?.call();
     }
-
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
-
-    _setConversationLoading(conversationId, false);
-    onAssistantMessageFinished?.call(finalizedMessage);
-    onMaybeUpdateProactiveCare?.call(conversationId);
-
-    // Use unified reasoning completion method
-    await streamController.finishReasoningAndPersist(
-      messageId,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningStartAt,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            await chatService.updateMessage(
-              messageId,
-              reasoningText: reasoningText,
-              reasoningStartAt: reasoningStartAt,
-              reasoningFinishedAt: reasoningFinishedAt,
-              reasoningSegmentsJson: reasoningSegmentsJson,
-            );
-          },
-    );
-
-    if (shouldGenerateTitle) {
-      onMaybeGenerateTitle?.call(conversationId);
-    }
-
-    // Trigger summary generation check (actual logic in HomeViewModel)
-    onMaybeGenerateSummary?.call(conversationId);
-
-    // Trigger follow-up suggestions after the final assistant reply is stored.
-    onMaybeGenerateSuggestions?.call(conversationId);
-
-    await _finishIosBackgroundGeneration(success: true);
-  }
-
-  /// Handle stream error.
-  Future<void> _handleStreamError(
-    dynamic e,
-    stream_ctrl.StreamingState state,
-  ) async {
-    final messageId = state.messageId;
-    final conversationId = state.conversationId;
-    final errorText = e.toString();
-    debugPrint(
-      '[CancelTrace] _handleStreamError ENTER: cid=$conversationId _isCancelling=$_isCancelling errorType=${e.runtimeType}',
-    );
-
-    // Reset file processing state on error
+    streamController.removeStreamingNotifier(mid);
+    streamController.markStreamingEnded(mid);
+    _setConversationLoading(cid, false);
     onFileProcessingFinished?.call();
+    _showTruncationWarning(ui?.truncationReason);
+    final finalized = index != -1 ? _messages[index] : null;
+    if (finalized != null) {
+      onAssistantMessageFinished?.call(finalized);
+    }
+    onStreamFinished?.call();
+    onMaybeUpdateProactiveCare?.call(cid);
+    if (ctx.generateTitleOnFinish) {
+      onMaybeGenerateTitle?.call(cid);
+    }
+    onMaybeGenerateSummary?.call(cid);
+    onMaybeGenerateSuggestions?.call(cid);
+    unawaited(_finishIosBackgroundGeneration(success: true));
+  }
 
-    // Mark streaming as ended to allow UI rebuilds again
-    streamController.markStreamingEnded(messageId);
-
-    streamController.cleanupTimers(messageId);
-    final rawContent = state.fullContentRaw.isNotEmpty
-        ? state.fullContentRaw
-        : errorText;
-    final processed = _transformAssistantContent(state, rawContent);
-    // Let UI provide the localized error message
-    final displayContent = processed.isNotEmpty ? processed : errorText;
-    await chatService.updateMessage(
-      messageId,
-      content: displayContent,
-      totalTokens: state.totalTokens,
+  /// Copies the settled slot state into the in-memory list row (the DB row is
+  /// authoritative; this keeps the list row consistent without a reload).
+  /// Without a settled snapshot only content/isStreaming are touched — the
+  /// sentinel-pattern copyWith would otherwise CLEAR the token fields.
+  ChatMessage _finalizedRow(
+    ChatMessage row, {
+    required String content,
+    GenerationSlotUiState? ui,
+  }) {
+    if (ui == null) {
+      return row.copyWith(content: content, isStreaming: false);
+    }
+    return row.copyWith(
+      content: content,
       isStreaming: false,
+      totalTokens: ui.totalTokens,
+      contextTokens: ui.contextTokens,
+      promptTokens: ui.promptTokens,
+      completionTokens: ui.completionTokens,
+      cachedTokens: ui.cachedTokens,
+      durationMs: ui.durationMs > 0 ? ui.durationMs : null,
+      reasoningText: ui.reasoningText.isNotEmpty ? ui.reasoningText : null,
+    );
+  }
+
+  /// Surfaces the response-truncated warning (page policy; mirrors the
+  /// pre-engine `_handleStreamFinish` behavior).
+  void _showTruncationWarning(String? truncationReason) {
+    if (truncationReason == null) return;
+    if (!contextProvider.mounted) return;
+    final l10n = _l10n;
+    if (l10n == null) return;
+    final reasonText = truncationReason == 'max_tokens'
+        ? l10n.truncationReasonMaxTokens
+        : l10n.truncationReasonContextExceeded;
+    showAppSnackBar(
+      contextProvider,
+      message: l10n.responseTruncated(reasonText),
+      type: NotificationType.warning,
+      duration: const Duration(seconds: 30),
+    );
+  }
+
+  /// Engine slot failed or was cancelled: the engine already persisted the
+  /// partial/'Error' content with `isStreaming: false`; finalize the
+  /// page-side state and surface the error (suppressed for user cancels).
+  Future<void> _onEngineSlotError(
+    stream_ctrl.GenerationContext ctx,
+    String mid,
+    String cid,
+    Object error,
+  ) async {
+    onFileProcessingFinished?.call();
+    final engine = contextProvider.read<GenerationEngine>();
+    final slot = engine.slotForMessage(mid);
+    final cancelled = slot?.status == SlotStatus.cancelled;
+    final errorText = error.toString();
+    debugPrint(
+      '[GenerationEngine] page slot error: msgId=$mid cancelled=$cancelled $errorText',
     );
 
-    final index = _messages.indexWhere((m) => m.id == messageId);
+    streamController.markStreamingEnded(mid);
+    final content = slot?.finalText ?? '';
+    final ui = slot?.finalUiState;
+    final index = _messages.indexWhere((m) => m.id == mid);
     if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
-        content: displayContent,
-        isStreaming: false,
-        totalTokens: state.totalTokens,
+      _messages[index] = _finalizedRow(
+        _messages[index],
+        content: content.isNotEmpty ? content : errorText,
+        ui: ui,
       );
       onMessagesChanged?.call();
     }
+    streamController.removeStreamingNotifier(mid);
 
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
-
-    if (_isCancelling) {
-      debugPrint(
-        '[CancelTrace] _handleStreamError early-return (isCancelling)',
-      );
-      return;
+    if (!cancelled) {
+      _setConversationLoading(cid, false);
+      onStreamError?.call(errorText);
     }
-
-    _setConversationLoading(conversationId, false);
-
-    // Use unified reasoning completion method on error
-    await streamController.finishReasoningAndPersist(
-      messageId,
-      updateReasoningInDb:
-          (
-            String messageId, {
-            String? reasoningText,
-            DateTime? reasoningStartAt,
-            DateTime? reasoningFinishedAt,
-            String? reasoningSegmentsJson,
-          }) async {
-            await chatService.updateMessage(
-              messageId,
-              reasoningText: reasoningText,
-              reasoningStartAt: reasoningStartAt,
-              reasoningFinishedAt: reasoningFinishedAt,
-              reasoningSegmentsJson: reasoningSegmentsJson,
-            );
-          },
-    );
-
-    await _conversationStreams.remove(conversationId)?.cancel();
-    await _conversationStreams.remove(messageId)?.cancel();
-    onStreamError?.call(errorText);
     onStreamFinished?.call();
     await _finishIosBackgroundGeneration(success: false, detail: errorText);
-  }
-
-  /// Handle stream done callback.
-  Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
-    // Reset file processing state on done (just in case)
-    onFileProcessingFinished?.call();
-
-    final conversationId = state.conversationId;
-    final messageId = state.messageId;
-    debugPrint(
-      '[CancelTrace] _handleStreamDone ENTER: cid=$conversationId _isCancelling=$_isCancelling loadingContains=${_loadingConversationIds.contains(conversationId)} inFlight=${_finishStreamingFutures[messageId] != null}',
-    );
-
-    // Ensure streaming is marked as ended
-    streamController.markStreamingEnded(messageId);
-
-    streamController.cleanupTimers(messageId);
-
-    // If _finishStreaming is already in-flight (started by _handleStreamFinish),
-    // wait for it to complete before removing notifiers or triggering rebuild.
-    // This prevents a race where the notifier is removed and a rebuild is
-    // triggered while _finishStreaming hasn't yet updated _messages[index].
-    final inFlight = _finishStreamingFutures[messageId];
-    if (inFlight != null) {
-      await inFlight;
-    } else if (_loadingConversationIds.contains(conversationId)) {
-      await _finishStreaming(
-        state,
-        generateTitle: state.ctx.generateTitleOnFinish,
-      );
-    }
-    // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
-    streamController.removeStreamingNotifier(messageId);
-    onStreamFinished?.call();
-    await _conversationStreams.remove(conversationId)?.cancel();
-    await _conversationStreams.remove(messageId)?.cancel();
   }
 
   // ============================================================================
@@ -1954,12 +1235,6 @@ class ChatActions {
               ),
         );
       }
-      // Ensure any inline data URLs get converted even if the user navigates away mid-stream
-      onScheduleImageSanitize?.call(
-        streaming.id,
-        latestContent,
-        immediate: true,
-      );
     } catch (_) {}
   }
 

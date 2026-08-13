@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
-import 'package:Cuplivo/core/services/headless_generation_service.dart';
+import 'package:Cuplivo/core/services/generation_engine.dart';
 import 'package:Cuplivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Cuplivo/features/home/services/tool_approval_service.dart';
 import 'package:Cuplivo/features/home/widgets/subagent_panel.dart';
@@ -19,7 +19,7 @@ class _FakeChatService extends ChatService {
 
 void main() {
   late _FakeChatService chatService;
-  late HeadlessGenerationService headlessGen;
+  late GenerationEngine engine;
   late ToolApprovalService approvalService;
   late AskUserInteractionService askUserService;
 
@@ -33,9 +33,7 @@ void main() {
               create: (_) => SettingsProvider(),
             ),
             ChangeNotifierProvider<ChatService>.value(value: chatService),
-            ChangeNotifierProvider<HeadlessGenerationService>.value(
-              value: headlessGen,
-            ),
+            ChangeNotifierProvider<GenerationEngine>.value(value: engine),
             ChangeNotifierProvider<ToolApprovalService>.value(
               value: approvalService,
             ),
@@ -51,7 +49,7 @@ void main() {
 
   setUp(() {
     chatService = _FakeChatService('parent-conv');
-    headlessGen = HeadlessGenerationService(chatService: chatService);
+    engine = GenerationEngine(chatService: chatService);
     approvalService = ToolApprovalService();
     askUserService = AskUserInteractionService();
   });
@@ -64,14 +62,16 @@ void main() {
     });
 
     testWidgets('renders one card per concurrent wait job', (tester) async {
-      headlessGen.prepareJob(
+      engine.prepareRound(
         conversationId: 'child-a',
+        assistantMessageId: 'msg-child-a',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Agent A',
       );
-      headlessGen.prepareJob(
+      engine.prepareRound(
         conversationId: 'child-b',
+        assistantMessageId: 'msg-child-b',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Agent B',
@@ -86,8 +86,9 @@ void main() {
 
     testWidgets('renders the pill for an active wait job keyed to the current '
         'conversation', (tester) async {
-      headlessGen.prepareJob(
+      engine.prepareRound(
         conversationId: 'child-conv',
+        assistantMessageId: 'msg-child-conv',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Research Bot',
@@ -103,16 +104,16 @@ void main() {
     testWidgets('expanded row shows tool calls and opens the child', (
       tester,
     ) async {
-      headlessGen.prepareJob(
+      final job = engine.prepareRound(
         conversationId: 'child-conv',
+        assistantMessageId: 'msg-child-conv',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Research Bot',
       );
-      final job = headlessGen.jobFor('child-conv')!;
       job.toolCallCount = 3;
       job.lastStep = 'kelivo_read';
-      job.lastStepKind = SubagentLastStepKind.done;
+      job.lastStepKind = SlotLastStepKind.done;
       String? openedChildId;
       await tester.pumpWidget(
         MaterialApp(
@@ -123,9 +124,7 @@ void main() {
                 create: (_) => SettingsProvider(),
               ),
               ChangeNotifierProvider<ChatService>.value(value: chatService),
-              ChangeNotifierProvider<HeadlessGenerationService>.value(
-                value: headlessGen,
-              ),
+              ChangeNotifierProvider<GenerationEngine>.value(value: engine),
               ChangeNotifierProvider<ToolApprovalService>.value(
                 value: approvalService,
               ),
@@ -158,8 +157,9 @@ void main() {
       // Regression: the handoff used to move ChatService.currentConversationId
       // to the child (setAsCurrent default). The panel keys off the current
       // conversation, so a mismatched key must not show the job.
-      headlessGen.prepareJob(
+      engine.prepareRound(
         conversationId: 'child-conv',
+        assistantMessageId: 'msg-child-conv',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Research Bot',
@@ -175,8 +175,9 @@ void main() {
       '✕ cancels the sub-agent and resolves its pending approval after '
       'confirmation',
       (tester) async {
-        headlessGen.prepareJob(
+        engine.prepareRound(
           conversationId: 'child-conv',
+          assistantMessageId: 'msg-child-conv',
           parentConversationId: 'parent-conv',
           wait: true,
           targetName: 'Research Bot',
@@ -206,7 +207,7 @@ void main() {
         expect(approval.approved, isFalse);
         expect(approval.denyReason, 'cancelled');
         // The waiter was resolved as cancelled and the record cleaned up.
-        final waitResult = await headlessGen
+        final waitResult = await engine
             .waitFor('child-conv')
             .timeout(const Duration(seconds: 1));
         expect(waitResult.cancelled, isTrue);
@@ -216,8 +217,9 @@ void main() {
     testWidgets('approval pending auto-expands and Approve completes it', (
       tester,
     ) async {
-      headlessGen.prepareJob(
+      engine.prepareRound(
         conversationId: 'child-conv',
+        assistantMessageId: 'msg-child-conv',
         parentConversationId: 'parent-conv',
         wait: true,
         targetName: 'Research Bot',

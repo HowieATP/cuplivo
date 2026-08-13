@@ -149,7 +149,7 @@ build_ish() {
     log_info "Building guest VDSO..."
     ninja -C "$BUILD_DIR" vdso/arm64/libvdso.so.elf
     if [ ! -s "$BUILD_DIR/vdso/arm64/libvdso.so.elf" ]; then
-        log_error "VDSO is empty — LLVM/clang with lld is required (brew install llvm)"
+        log_error "VDSO is empty — LLVM/clang with lld is required (brew install llvm lld)"
     fi
     log_success "Libraries built"
 

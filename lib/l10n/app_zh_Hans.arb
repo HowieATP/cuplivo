@@ -2830,6 +2830,7 @@
   },
   "skillsSelectAll": "全选",
   "skillsDeselectAll": "全不选",
+  "skillsClearAll": "全部清除",
   "skillsEnableImportedTitle": "启用 skills？",
   "skillsEnableImportedMessage": "为“{assistantName}”启用 {count} 个已导入的 skills？",
   "@skillsEnableImportedMessage": {

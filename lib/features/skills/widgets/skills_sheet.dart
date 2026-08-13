@@ -56,6 +56,24 @@ class _SkillsSheetState extends State<SkillsSheet> {
     );
   }
 
+  bool _isAllSelected(Assistant assistant) =>
+      _skills.isNotEmpty &&
+      _skills.every((s) => assistant.skillIds.contains(s.name));
+
+  void _toggleSelectAll(Assistant assistant) {
+    if (_isAllSelected(assistant)) {
+      context.read<AssistantProvider>().updateAssistant(
+        assistant.copyWith(skillIds: const <String>[]),
+      );
+    } else {
+      final ids = assistant.skillIds.toSet()
+        ..addAll(_skills.map((s) => s.name));
+      context.read<AssistantProvider>().updateAssistant(
+        assistant.copyWith(skillIds: ids.toList(growable: false)),
+      );
+    }
+  }
+
   void _openManagePage() {
     Navigator.of(
       context,
@@ -85,8 +103,13 @@ class _SkillsSheetState extends State<SkillsSheet> {
                 title: l10n.skillsTitle,
                 onBack: () => Navigator.of(ctx).maybePop(),
                 onManage: _openManagePage,
+                showSelectAll: _skills.isNotEmpty && assistant != null,
+                allSelected: assistant != null && _isAllSelected(assistant),
+                onSelectAll: () {
+                  final a = assistant;
+                  if (a != null) _toggleSelectAll(a);
+                },
               ),
-              const Divider(height: 1, thickness: 0.5),
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
@@ -121,10 +144,9 @@ class _SkillsSheetState extends State<SkillsSheet> {
                             ),
                             for (final skill in skills)
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.only(bottom: 10),
                                 child: _SkillSheetRow(
                                   name: skill.name,
-                                  description: skill.description,
                                   enabled: assistant.skillIds.contains(
                                     skill.name,
                                   ),
@@ -149,11 +171,17 @@ class _SheetTopBar extends StatelessWidget {
     required this.title,
     required this.onBack,
     required this.onManage,
+    required this.showSelectAll,
+    required this.allSelected,
+    required this.onSelectAll,
   });
 
   final String title;
   final VoidCallback onBack;
   final VoidCallback onManage;
+  final bool showSelectAll;
+  final bool allSelected;
+  final VoidCallback onSelectAll;
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +208,17 @@ class _SheetTopBar extends StatelessWidget {
                 ),
               ),
             ),
+            if (showSelectAll)
+              Tooltip(
+                message: allSelected
+                    ? l10n.skillsClearAll
+                    : l10n.skillsSelectAll,
+                child: _NavIconButton(
+                  icon: Lucide.ListChecks,
+                  onTap: onSelectAll,
+                  color: allSelected ? cs.primary : cs.onSurface,
+                ),
+              ),
             Tooltip(
               message: l10n.skillsSheetManageAction,
               child: _NavIconButton(icon: Lucide.BookOpen, onTap: onManage),
@@ -192,10 +231,11 @@ class _SheetTopBar extends StatelessWidget {
 }
 
 class _NavIconButton extends StatelessWidget {
-  const _NavIconButton({required this.icon, required this.onTap});
+  const _NavIconButton({required this.icon, required this.onTap, this.color});
 
   final IconData icon;
   final VoidCallback onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +252,9 @@ class _NavIconButton extends StatelessWidget {
           Haptics.light();
           onTap();
         },
-        child: Center(child: Icon(icon, size: 20, color: cs.onSurface)),
+        child: Center(
+          child: Icon(icon, size: 20, color: color ?? cs.onSurface),
+        ),
       ),
     );
   }
@@ -221,13 +263,11 @@ class _NavIconButton extends StatelessWidget {
 class _SkillSheetRow extends StatelessWidget {
   const _SkillSheetRow({
     required this.name,
-    required this.description,
     required this.enabled,
     required this.onChanged,
   });
 
   final String name;
-  final String description;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
@@ -242,38 +282,21 @@ class _SkillSheetRow extends StatelessWidget {
       baseColor: cs.surface,
       duration: const Duration(milliseconds: 260),
       onTap: () => onChanged(!enabled),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          Icon(Lucide.BookOpen, size: 20, color: iconColor),
+          Icon(Lucide.BookOpen, size: 18, color: iconColor),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.medium,
-                    color: cs.onSurface,
-                  ),
-                ),
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ],
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: AppFontWeights.medium,
+                color: cs.onSurface,
+              ),
             ),
           ),
           const SizedBox(width: 10),

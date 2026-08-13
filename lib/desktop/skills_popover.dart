@@ -225,6 +225,15 @@ class _SkillsPopoverContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ap = context.watch<AssistantProvider>();
+    final assistant = assistantId != null
+        ? ap.getById(assistantId!)
+        : ap.currentAssistant;
+    final allSelected =
+        skills.isNotEmpty &&
+        assistant != null &&
+        skills.every((s) => assistant.skillIds.contains(s.name));
+
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 420),
       child: SingleChildScrollView(
@@ -238,6 +247,23 @@ class _SkillsPopoverContent extends StatelessWidget {
                   : () {
                       onClose();
                       onManageSkills?.call();
+                    },
+              showSelectAll: skills.isNotEmpty && assistant != null,
+              allSelected: allSelected,
+              onSelectAll: assistant == null
+                  ? null
+                  : () {
+                      final ids = assistant.skillIds.toSet();
+                      if (allSelected) {
+                        ids.clear();
+                      } else {
+                        ids.addAll(skills.map((s) => s.name));
+                      }
+                      ap.updateAssistant(
+                        assistant.copyWith(
+                          skillIds: ids.toList(growable: false),
+                        ),
+                      );
                     },
             ),
             if (skills.isEmpty)
@@ -259,7 +285,6 @@ class _SkillsPopoverContent extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 1),
                     child: _SkillsRowItem(
                       name: skill.name,
-                      description: skill.description,
                       assistantId: assistantId,
                     ),
                   ),
@@ -272,9 +297,17 @@ class _SkillsPopoverContent extends StatelessWidget {
 }
 
 class _SkillsPopoverHeader extends StatefulWidget {
-  const _SkillsPopoverHeader({required this.onManageSkills});
+  const _SkillsPopoverHeader({
+    required this.onManageSkills,
+    required this.showSelectAll,
+    required this.allSelected,
+    required this.onSelectAll,
+  });
 
   final VoidCallback? onManageSkills;
+  final bool showSelectAll;
+  final bool allSelected;
+  final VoidCallback? onSelectAll;
 
   @override
   State<_SkillsPopoverHeader> createState() => _SkillsPopoverHeaderState();
@@ -282,6 +315,7 @@ class _SkillsPopoverHeader extends StatefulWidget {
 
 class _SkillsPopoverHeaderState extends State<_SkillsPopoverHeader> {
   bool _hovered = false;
+  bool _selectHovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +350,39 @@ class _SkillsPopoverHeaderState extends State<_SkillsPopoverHeader> {
               ),
             ),
           ),
+          if (widget.showSelectAll)
+            Tooltip(
+              message: widget.allSelected
+                  ? l10n.skillsClearAll
+                  : l10n.skillsSelectAll,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _selectHovered = true),
+                onExit: (_) => setState(() => _selectHovered = false),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    widget.onSelectAll?.call();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: _selectHovered ? hoverBg : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Lucide.ListChecks,
+                      size: 15,
+                      color: widget.allSelected
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (widget.onManageSkills != null)
             MouseRegion(
               cursor: SystemMouseCursors.click,
@@ -439,14 +506,9 @@ class _GroupHeaderRow extends StatelessWidget {
 }
 
 class _SkillsRowItem extends StatefulWidget {
-  const _SkillsRowItem({
-    required this.name,
-    required this.description,
-    required this.assistantId,
-  });
+  const _SkillsRowItem({required this.name, required this.assistantId});
 
   final String name;
-  final String description;
   final String? assistantId;
 
   @override
@@ -458,8 +520,8 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
       alpha: isDark ? 0.12 : 0.10,
@@ -469,6 +531,7 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
         ? ap.getById(widget.assistantId!)
         : ap.currentAssistant;
     final enabled = assistant?.skillIds.contains(widget.name) ?? false;
+    final onColor = enabled ? cs.primary : cs.onSurface;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -490,58 +553,51 @@ class _SkillsRowItemState extends State<_SkillsRowItem> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: _hovered ? hoverBg : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(
-                Lucide.BookOpen,
-                size: 16,
-                color: enabled
-                    ? cs.primary
-                    : cs.onSurface.withValues(alpha: 0.7),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: AppFontWeights.medium,
-                        color: enabled ? cs.primary : cs.onSurface,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    if (widget.description.isNotEmpty) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        widget.description,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: AppFontWeights.regular,
-                          color: cs.onSurface.withValues(alpha: 0.65),
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ],
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Center(
+                  child: Icon(
+                    Lucide.BookOpen,
+                    size: 16,
+                    color: enabled
+                        ? cs.primary
+                        : cs.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (enabled)
-                Icon(Lucide.Check, size: 14, color: cs.primary)
-              else
-                const SizedBox(width: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  widget.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.regular,
+                    decoration: TextDecoration.none,
+                  ).copyWith(color: onColor),
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                child: enabled
+                    ? Icon(
+                        Lucide.Check,
+                        key: const ValueKey('check'),
+                        size: 16,
+                        color: cs.primary,
+                      )
+                    : const SizedBox(width: 16, key: ValueKey('space')),
+              ),
             ],
           ),
         ),

@@ -7059,6 +7059,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsDeselectAll => '全不选';
 
   @override
+  String get skillsClearAll => '全部清除';
+
+  @override
   String get skillsEnableImportedTitle => '启用 skills？';
 
   @override
@@ -14927,6 +14930,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsDeselectAll => '全不选';
 
   @override
+  String get skillsClearAll => '全部清除';
+
+  @override
   String get skillsEnableImportedTitle => '启用 skills？';
 
   @override
@@ -22792,6 +22798,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get skillsDeselectAll => '全不選';
+
+  @override
+  String get skillsClearAll => '全部清除';
 
   @override
   String get skillsEnableImportedTitle => '啟用 skills？';

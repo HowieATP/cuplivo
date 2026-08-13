@@ -23,7 +23,7 @@ import '../services/assistant_private_context_builder.dart';
 import '../services/director_context_builder.dart';
 import '../services/director_runner.dart';
 import '../services/director_tool_protocol.dart';
-import 'group_chat_stream_executor.dart';
+import '../services/group_chat_slot_runner.dart';
 
 typedef GroupChatUiFeedback = void Function(String messageKey);
 
@@ -38,7 +38,7 @@ class GroupChatOrchestrator {
     required this.streamController,
     required this.generationController,
     required this.messageGenerationService,
-    required this.streamExecutor,
+    required this.slotRunner,
     required this.approvalService,
     required this.askUserService,
     required this.onUiFeedback,
@@ -55,7 +55,7 @@ class GroupChatOrchestrator {
       messageGenerationService: messageGenerationService,
       streamController: streamController,
       generationController: generationController,
-      executeStream: streamExecutor.executeStream,
+      executeStream: slotRunner.executeStream,
     );
   }
 
@@ -67,7 +67,7 @@ class GroupChatOrchestrator {
   final stream_ctrl.StreamController streamController;
   final GenerationController generationController;
   final MessageGenerationService messageGenerationService;
-  final GroupChatStreamExecutor streamExecutor;
+  final GroupChatSlotRunner slotRunner;
   final ToolApprovalService? approvalService;
   final AskUserInteractionService? askUserService;
   final GroupChatUiFeedback onUiFeedback;
@@ -92,7 +92,7 @@ class GroupChatOrchestrator {
     _stopRequested = true;
     final key = _activeStreamKey;
     if (key != null) {
-      unawaited(streamExecutor.cancel(key));
+      slotRunner.cancel(key);
     }
   }
 
@@ -207,7 +207,7 @@ class GroupChatOrchestrator {
     try {
       final key = _activeStreamKey;
       if (key != null) {
-        await streamExecutor.cancel(key);
+        slotRunner.cancel(key);
       }
 
       final providerKey =
@@ -340,7 +340,7 @@ class GroupChatOrchestrator {
     try {
       final key = _activeStreamKey;
       if (key != null) {
-        await streamExecutor.cancel(key);
+        slotRunner.cancel(key);
       }
 
       await _truncateAfterMessageGroup(

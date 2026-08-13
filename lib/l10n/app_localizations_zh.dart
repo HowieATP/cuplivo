@@ -1306,7 +1306,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Cuplivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1331,7 +1331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Cuplivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -1384,7 +1384,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'Cuplivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -2920,6 +2920,42 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => '批量导出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '没有可导出的对话';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '选择导出文件夹';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已导出 $exported 个对话';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已导出 $exported 个对话，跳过 $skipped 个空对话';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '导出 $exported 个对话，$failed 个失败';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '导出 $exported 个对话，$failed 个失败，跳过 $skipped 个空对话';
+  }
+
+  @override
   String get sideDrawerSelectAll => '全选';
 
   @override
@@ -3126,6 +3162,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputBarMoreTooltip => '更多';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
   String get chatInputBarImageMode => '绘图模式';
@@ -4477,9 +4528,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
-
-  @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
 
   @override
@@ -4842,6 +4890,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
@@ -4849,6 +4900,166 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '语音识别失败：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系统TTS';
@@ -4949,7 +5160,84 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldEmotionLabel => '情感';
 
   @override
-  String get ttsServicesEmotionAutoHint => '留空即自动';
+  String get ttsServicesEmotionAutoLabel => '自动匹配';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '比特率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '声道数';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '选择参考音频';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音频格式';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '风格／音色描述';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '语言增强';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延迟模式';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '优化播报文本';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '输出格式';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音调';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '发音词典（每行一项）';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '参考音频（WAV/MP3 数据 URI）';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '采样率';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '流式输出';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '生成字幕';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '随机度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／参考 ID 不能为空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
 
   @override
   String get ttsServicesFieldSpeedLabel => '语速';
@@ -5142,7 +5430,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 开源AI助手';
+  String get settingsShare => 'Cuplivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -5479,6 +5767,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get assistantEditLocalToolHandoffSyncSubtitle =>
       '委派任务并等待子助手的完整输出作为工具结果。';
+
+  @override
+  String get assistantEditSkillDownloadTitle => '下载 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '创建 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
 
   @override
   String get assistantEditMemorySwitchTitle => '记忆';
@@ -8861,7 +9162,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Cuplivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -8886,7 +9187,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Cuplivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -8939,7 +9240,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'Cuplivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -10475,6 +10776,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => '批量导出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '没有可导出的对话';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '选择导出文件夹';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已导出 $exported 个对话';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已导出 $exported 个对话，跳过 $skipped 个空对话';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '导出 $exported 个对话，$failed 个失败';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '导出 $exported 个对话，$failed 个失败，跳过 $skipped 个空对话';
+  }
+
+  @override
   String get sideDrawerSelectAll => '全选';
 
   @override
@@ -10681,6 +11018,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMoreTooltip => '更多';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
   String get chatInputBarImageMode => '绘图模式';
@@ -12032,9 +12384,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
-
-  @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
 
   @override
@@ -12397,6 +12746,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
@@ -12404,6 +12756,166 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '语音识别失败：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系统TTS';
@@ -12504,7 +13016,84 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldEmotionLabel => '情感';
 
   @override
-  String get ttsServicesEmotionAutoHint => '留空即自动';
+  String get ttsServicesEmotionAutoLabel => '自动匹配';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '比特率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '声道数';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '选择参考音频';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音频格式';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '风格／音色描述';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '语言增强';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延迟模式';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '优化播报文本';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '输出格式';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音调';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '发音词典（每行一项）';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '参考音频（WAV/MP3 数据 URI）';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '采样率';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '流式输出';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '生成字幕';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '随机度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／参考 ID 不能为空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
 
   @override
   String get ttsServicesFieldSpeedLabel => '语速';
@@ -12697,7 +13286,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 开源AI助手';
+  String get settingsShare => 'Cuplivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -13034,6 +13623,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolHandoffSyncSubtitle =>
       '委派任务并等待子助手的完整输出作为工具结果。';
+
+  @override
+  String get assistantEditSkillDownloadTitle => '下载 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '创建 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
 
   @override
   String get assistantEditMemorySwitchTitle => '记忆';
@@ -16415,7 +17017,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
+      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Cuplivo 運行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -16440,7 +17042,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Cuplivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
@@ -16493,7 +17095,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回覆已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在運行';
+  String get androidBackgroundNotificationTitle => 'Cuplivo 正在運行';
 
   @override
   String get androidBackgroundNotificationText => '後台保持聊天生成';
@@ -18028,6 +18630,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => '批量匯出 Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => '批量操作';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport => '沒有可匯出的對話';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => '選擇匯出資料夾';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '已匯出 $exported 個對話';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '已匯出 $exported 個對話，跳過 $skipped 個空對話';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '匯出 $exported 個對話，$failed 個失敗';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '匯出 $exported 個對話，$failed 個失敗，跳過 $skipped 個空對話';
+  }
+
+  @override
   String get sideDrawerSelectAll => '全選';
 
   @override
@@ -18234,6 +18872,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMoreTooltip => '更多';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消錄音';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '語音輸入';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '轉文字並發送';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止並轉為文字';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在辨識…';
 
   @override
   String get chatInputBarImageMode => '繪圖模式';
@@ -19584,9 +20237,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageQQGroup => 'Cuplivo 群';
 
   @override
-  String get aboutPageJoinDiscord => '加入我們的 Discord';
-
-  @override
   String get displaySettingsPageShowUserAvatarTitle => '顯示使用者頭像';
 
   @override
@@ -19949,6 +20599,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '語音服務';
 
   @override
+  String get ttsServicesSectionTitle => '文字轉語音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 設定';
 
   @override
@@ -19956,6 +20609,166 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服務暫未實現';
+
+  @override
+  String get asrServicesAddAction => '新增';
+
+  @override
+  String get asrServicesAddTitle => '新增語音辨識';
+
+  @override
+  String get asrServicesAddTooltip => '新增語音辨識服務';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired => '請輸入 API Key 後再使用此服務。';
+
+  @override
+  String get asrServicesAutomaticLabel => '自動';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesCloudGroup => '雲端';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 即時轉寫';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => '刪除';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return '模型下載失敗：$error';
+  }
+
+  @override
+  String get asrServicesEditAction => '編輯';
+
+  @override
+  String get asrServicesEditTitle => '編輯語音辨識';
+
+  @override
+  String get asrServicesEmptySubtitle => '新增後，聊天輸入框才會顯示麥克風。';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未新增語音辨識服務';
+
+  @override
+  String get asrServicesEndpointLabel => '服務位址';
+
+  @override
+  String get asrServicesLanguageLabel => '語言';
+
+  @override
+  String get asrServicesLocalSubtitle => '下載後在裝置上離線執行';
+
+  @override
+  String get asrServicesLocalTitle => '本機模型';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未取得麥克風權限。';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段雲端轉寫';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => '刪除下載';
+
+  @override
+  String get asrServicesModelDownloadAction => '下載';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下載';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下載…';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下載';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesNameLabel => '名稱';
+
+  @override
+  String get asrServicesNoSpeechDetected => '沒有辨識到語音。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '裝置端';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return '語音辨識失敗：$error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => '資源 ID';
+
+  @override
+  String get asrServicesSaveAction => '儲存';
+
+  @override
+  String get asrServicesSectionDescription => '使用本機、系統或雲端服務將語音轉換為文字。';
+
+  @override
+  String get asrServicesSectionTitle => '語音辨識';
+
+  @override
+  String get asrServicesSelectedLabel => '已選擇';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段雲端轉寫';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '這台裝置沒有可用的系統語音辨識服務。';
+
+  @override
+  String get asrServicesSystemChecking => '正在檢查…';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用裝置內建能力';
+
+  @override
+  String get asrServicesSystemTitle => '系統';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包語音串流轉寫';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
 
   @override
   String get ttsServicesPageSystemTtsTitle => '系統TTS';
@@ -20056,7 +20869,84 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesFieldEmotionLabel => '情感';
 
   @override
-  String get ttsServicesEmotionAutoHint => '留空即自動';
+  String get ttsServicesEmotionAutoLabel => '自動配對';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '位元率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '聲道數';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '選擇參考音訊';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音訊格式';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '風格／音色描述';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '語言增強';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延遲模式';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '最佳化播報文字';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '輸出格式';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音調';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '發音詞典（每行一項）';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '參考音訊（WAV/MP3 資料 URI）';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '取樣率';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '串流輸出';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '產生字幕';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '隨機度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldWorkspaceIdLabel => '業務空間 ID';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能為空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／參考 ID 不能為空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放網路語音時使用已產生的音訊，不再請求語音服務。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用快取重播';
 
   @override
   String get ttsServicesFieldSpeedLabel => '語速';
@@ -20249,7 +21139,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 開源AI助理';
+  String get settingsShare => 'Cuplivo - 開源AI助理';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -20588,6 +21478,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolHandoffSyncSubtitle =>
       '委派任務並等待子助手的完整輸出作為工具結果。';
+
+  @override
+  String get assistantEditSkillDownloadTitle => '下載 Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      '允許助手透過 GitHub 儲存庫 URL 下載並安裝技能。';
+
+  @override
+  String get assistantEditSkillCreateTitle => '建立 Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle => '允許助手根據 SKILL.md 內容建立新技能。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

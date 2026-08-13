@@ -176,7 +176,6 @@ class MessagePipeline {
     } catch (e) {
       // Preparation error — clean up the placeholder
       _streamController.markStreamingEnded(assistantMessage.id);
-      _streamController.cleanupTimers(assistantMessage.id);
       await _chatService.updateMessage(assistantMessage.id, isStreaming: false);
       onStreamComplete?.call();
       debugPrint('[MessagePipeline][$modelId] preparation error: $e');

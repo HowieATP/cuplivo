@@ -373,7 +373,7 @@ class _AboutPageState extends State<AboutPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Kelivo',
+                            l10n.aboutPageAppName,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: AppFontWeights.semibold,
@@ -459,13 +459,6 @@ class _AboutPageState extends State<AboutPage> {
                 svgAsset: 'assets/icons/tencent-qq.svg',
                 label: l10n.aboutPageJoinQQGroup,
                 onTap: () => showQQGroupJoinSheet(context: context),
-              ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/discord.svg',
-                label: l10n.aboutPageJoinDiscord,
-                onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
               ),
             ],
           ),

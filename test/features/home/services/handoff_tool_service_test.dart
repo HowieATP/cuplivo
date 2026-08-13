@@ -16,7 +16,7 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/providers/world_book_provider.dart';
 import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
-import 'package:Cuplivo/core/services/headless_generation_service.dart';
+import 'package:Cuplivo/core/services/generation_engine.dart';
 import 'package:Cuplivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Cuplivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Cuplivo/features/home/services/handoff_tool_service.dart';
@@ -162,7 +162,7 @@ void main() {
 
   late _FakeChatService chatService;
   late _FakeAssistantProvider assistants;
-  late HeadlessGenerationService headlessGen;
+  late GenerationEngine engine;
 
   Assistant discoverable(String handoffId, {String? description}) {
     return Assistant(
@@ -180,7 +180,7 @@ void main() {
       discoverable('research-bot', description: 'researches topics'),
       discoverable('code-helper'),
     ]);
-    headlessGen = HeadlessGenerationService(chatService: chatService);
+    engine = GenerationEngine(chatService: chatService);
   });
 
   Future<String> callTool(
@@ -193,7 +193,7 @@ void main() {
       args: args,
       assistants: assistants,
       chatService: chatService,
-      headlessGen: headlessGen,
+      engine: engine,
       delegatingAssistant: delegatingAssistant,
       context: _FakeBuildContext(),
     );
@@ -260,7 +260,7 @@ void main() {
         });
 
         // In this test env the generation pipeline fails synchronously (the
-        // fake BuildContext throws on the first provider read); failJob
+        // fake BuildContext throws on the first provider read); failRound
         // resolves the waiter, so execute returns a subagent_error marker
         // instead of hanging.
         final err = decoded(result);
@@ -306,23 +306,29 @@ void main() {
     ) async {
       SharedPreferences.setMockInitialValues({});
       final streamControllers = <String, StreamController<ChatStreamChunk>>{};
-      final gen = HeadlessGenerationService(
+      final gen = GenerationEngine(
         chatService: chatService,
-        chatStreamProvider:
+        streamProvider:
             ({
               required config,
               required modelId,
               required messages,
+              userMediaPaths,
               tools,
               onToolCall,
               thinkingBudget,
               temperature,
               topP,
               maxTokens,
+              extraHeaders,
+              extraBody,
               required stream,
-              required requestId,
+              String? requestId,
+              required allowImagesApiRouting,
+              required ocrActive,
+              partialImageNotice,
             }) {
-              return (streamControllers[requestId] ??=
+              return (streamControllers[requestId ?? ''] ??=
                       StreamController<ChatStreamChunk>())
                   .stream;
             },
@@ -361,7 +367,7 @@ void main() {
         args: {'assistant': 'research-bot', 'task': 'research flutter drift'},
         assistants: assistants,
         chatService: chatService,
-        headlessGen: gen,
+        engine: gen,
         context: context,
       );
 
@@ -373,11 +379,16 @@ void main() {
         await tester.pump(const Duration(milliseconds: 10));
       }
 
+      // The engine streams into the pre-created assistant placeholder and
+      // keys its stream provider by the placeholder's message id (not the
+      // conversation id).
       final childId = chatService.lastCreatedId!;
-      streamControllers[childId]!.add(
+      final placeholderId =
+          chatService.messagesByConversation[childId]!.last.id;
+      streamControllers[placeholderId]!.add(
         ChatStreamChunk(content: 'final answer', isDone: false, totalTokens: 0),
       );
-      await streamControllers[childId]!.close();
+      await streamControllers[placeholderId]!.close();
 
       final result = await future;
       expect(result, 'final answer');

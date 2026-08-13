@@ -10,7 +10,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
@@ -35,7 +35,7 @@ class HandoffToolService {
     required Map<String, dynamic> args,
     required AssistantProvider assistants,
     required ChatService chatService,
-    required HeadlessGenerationService headlessGen,
+    required GenerationEngine engine,
     required BuildContext context,
     Assistant? delegatingAssistant,
   }) async {
@@ -122,13 +122,28 @@ class HandoffToolService {
       '(parent: $parentConversationId, assistant: ${target.name})',
     );
 
+    // The caller creates the assistant placeholder (ADR-0028 slot model: the
+    // engine streams into a pre-created message row and never creates rows
+    // itself). For wait-mode it is created NOW so the round/slot registered
+    // below carries the row id — the 子代理面板 binds to the slot from the
+    // dispatch moment, before the async pipeline build.
+    String? preparedAssistantMessageId;
     if (waitForResult) {
-      // Register the job record BEFORE starting the generation: the
-      // generation's synchronous section may fail immediately (failJob below
-      // must find the record) and the waitFor below must find the job in
-      // both the synchronous and suspended-start cases.
-      headlessGen.prepareJob(
+      final assistantMsg = await chatService.addMessage(
         conversationId: conversation.id,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      preparedAssistantMessageId = assistantMsg.id;
+
+      // Register the round BEFORE starting the generation: the generation's
+      // synchronous section may fail immediately (failRound below must find
+      // the round), and the waitFor below must find the round in both the
+      // synchronous and suspended-start cases.
+      engine.prepareRound(
+        conversationId: conversation.id,
+        assistantMessageId: assistantMsg.id,
         parentConversationId: parentConversationId,
         wait: true,
         targetName: target.name,
@@ -140,10 +155,11 @@ class HandoffToolService {
         // ignore: use_build_context_synchronously (root context, valid for app lifetime)
         context,
         chatService,
-        headlessGen,
+        engine,
         conversation,
         target,
         waitForResult: waitForResult,
+        preparedAssistantMessageId: preparedAssistantMessageId,
       ),
     );
 
@@ -153,7 +169,7 @@ class HandoffToolService {
 
     // No MCP JSON-RPC boundary anymore: await the child generation directly.
     // waitFor always resolves (normal, error, or cancelled) — never hangs.
-    final result = await headlessGen.waitFor(conversation.id);
+    final result = await engine.waitFor(conversation.id);
     if (result.cancelled) {
       return _toolError(
         error: 'subagent_cancelled',
@@ -177,10 +193,11 @@ class HandoffToolService {
   static Future<void> _startGeneration(
     BuildContext context,
     ChatService chatService,
-    HeadlessGenerationService headlessGen,
+    GenerationEngine engine,
     Conversation conversation,
     Assistant target, {
     bool waitForResult = false,
+    String? preparedAssistantMessageId,
   }) async {
     try {
       // ignore: use_build_context_synchronously (root context, valid for app lifetime)
@@ -254,21 +271,38 @@ class HandoffToolService {
         '(${apiMessages.length} messages, ${toolDefs.length} tools)',
       );
 
-      headlessGen.start(
+      // Fire-and-forget creates its placeholder here (wait-mode already
+      // created it in execute for panel visibility).
+      final assistantMsgId =
+          preparedAssistantMessageId ??
+          (await chatService.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            content: '',
+            isStreaming: true,
+          )).id;
+
+      engine.startRound(
         conversationId: conversation.id,
-        assistantId: target.id,
-        apiMessages: apiMessages,
-        config: config,
-        modelId: modelId,
-        toolDefs: toolDefs.isEmpty ? null : toolDefs,
-        onToolCall: onToolCall,
-        thinkingBudget: target.thinkingBudget ?? settings.thinkingBudget,
-        temperature: target.temperature,
-        topP: target.topP,
-        maxTokens: target.maxTokens,
-        stream: target.streamOutput,
-        onComplete: () =>
-            _generateTitle(context, chatService, conversation.id, target),
+        slots: [
+          GenerationSlotRequest(
+            assistantMessageId: assistantMsgId,
+            apiMessages: apiMessages,
+            config: config,
+            modelId: modelId,
+            toolDefs: toolDefs.isEmpty ? null : toolDefs,
+            onToolCall: onToolCall,
+            assistant: target,
+            thinkingBudget: target.thinkingBudget ?? settings.thinkingBudget,
+            temperature: target.temperature,
+            topP: target.topP,
+            maxTokens: target.maxTokens,
+            stream: target.streamOutput,
+            autoCollapseThinking: settings.autoCollapseThinking,
+            onSlotComplete: () =>
+                _generateTitle(context, chatService, conversation.id, target),
+          ),
+        ],
         parentConversationId: conversation.parentConversationId,
         wait: waitForResult,
         targetName: target.name,
@@ -277,10 +311,19 @@ class HandoffToolService {
       debugPrint(
         '[HandoffTool] generation failed for ${conversation.id}: $e\n$st',
       );
+      // The wait-mode placeholder was created in execute but never streamed
+      // into — remove the empty row (build failure before start).
+      if (preparedAssistantMessageId != null) {
+        try {
+          await chatService.deleteMessage(preparedAssistantMessageId);
+        } catch (cleanupError) {
+          debugPrint('[HandoffTool] placeholder cleanup failed: $cleanupError');
+        }
+      }
       // Resolve the waiter: a wait-mode handoff must never leave the
-      // orchestrator's await hanging. No-op for fire-and-forget (nothing
-      // listens to the completer).
-      headlessGen.failJob(conversation.id, e);
+      // orchestrator's await hanging (see ADR-0026 iron rule). No-op for
+      // fire-and-forget (nothing listens to the completer).
+      engine.failRound(conversation.id, e);
     }
   }
 

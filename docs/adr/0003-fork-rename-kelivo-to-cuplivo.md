@@ -43,7 +43,7 @@ Key constraints:
 ### About Page & Community Links
 
 - QQ group entries kept but **labelled as "原项目 / Original"** to avoid implying the fork maintains them
-- Discord link retained
+- Discord link retained — **superseded (2026-08):** Cuplivo has no Discord community of its own, and the link pointed to the upstream (now unmaintained) server, so it was removed from both About pages in the rebrand residue cleanup.
 - Original website link (`kelivo.psycheas.top`) kept as-is (user may not control it)
 - Sponsor page **removed** (fetches from original server, not controllable)
 - Added fork-specific GitHub link pointing to `cup113/cuplivo`

@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 import '../services/search/search_service.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
+import '../services/asr/asr_service_options.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../models/api_keys.dart';
@@ -64,7 +65,6 @@ class SettingsProvider extends ChangeNotifier {
     'SiliconFlow',
     'Gemini',
     'OpenRouter',
-    'KelivoIN',
     'Tensdaq',
     'AIhubmix',
     'Aliyun',
@@ -317,10 +317,14 @@ class SettingsProvider extends ChangeNotifier {
       'localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1';
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
+  static const String _ttsSelectedServiceIdKey = 'tts_selected_service_id_v1';
+  // Legacy index key, read once during migration.
   static const String _ttsSelectedKey = 'tts_selected_v1';
   static const String _ttsAutoPlayAssistantRepliesKey =
       'tts_auto_play_assistant_replies_v1';
   static const String _ttsTextSelectionModeKey = 'tts_text_selection_mode_v1';
+  static const String _asrServicesKey = 'asr_services_v1';
+  static const String _asrSelectedServiceIdKey = 'asr_selected_service_id_v1';
   // Desktop UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
@@ -329,18 +333,42 @@ class SettingsProvider extends ChangeNotifier {
 
   // ===== Network TTS services =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
-  int _ttsServiceSelected = -1; // -1 => use System TTS
+  String? _selectedTtsServiceId; // null => use System TTS
   bool _ttsAutoPlayAssistantReplies = false;
   TtsTextSelectionMode _ttsTextSelectionMode = TtsTextSelectionMode.fullText;
   List<TtsServiceOptions> get ttsServices => _ttsServices;
-  int get ttsServiceSelected => _ttsServiceSelected;
-  bool get usingSystemTts => _ttsServiceSelected < 0;
+  String? get selectedTtsServiceId => _selectedTtsServiceId;
+  int get ttsServiceSelected {
+    final selectedId = _selectedTtsServiceId;
+    if (selectedId == null) return -1;
+    return _ttsServices.indexWhere((service) => service.id == selectedId);
+  }
+
+  bool get usingSystemTts => _selectedTtsServiceId == null;
   bool get ttsAutoPlayAssistantReplies => _ttsAutoPlayAssistantReplies;
   TtsTextSelectionMode get ttsTextSelectionMode => _ttsTextSelectionMode;
-  TtsServiceOptions? get selectedTtsService =>
-      (_ttsServiceSelected >= 0 && _ttsServiceSelected < _ttsServices.length)
-      ? _ttsServices[_ttsServiceSelected]
-      : null;
+  TtsServiceOptions? get selectedTtsService {
+    final selectedId = _selectedTtsServiceId;
+    if (selectedId == null) return null;
+    for (final service in _ttsServices) {
+      if (service.id == selectedId) return service;
+    }
+    return null;
+  }
+
+  // ASR is opt-in. An empty list intentionally keeps voice input hidden.
+  List<AsrServiceOptions> _asrServices = const <AsrServiceOptions>[];
+  String? _selectedAsrServiceId;
+  List<AsrServiceOptions> get asrServices => _asrServices;
+  String? get selectedAsrServiceId => _selectedAsrServiceId;
+  AsrServiceOptions? get selectedAsrService {
+    final selectedId = _selectedAsrServiceId;
+    if (selectedId == null) return null;
+    for (final service in _asrServices) {
+      if (service.id == selectedId) return service;
+    }
+    return null;
+  }
 
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
@@ -1320,29 +1348,87 @@ class SettingsProvider extends ChangeNotifier {
       final ttsStr = prefs.getString(_ttsServicesKey) ?? '';
       if (ttsStr.isNotEmpty) {
         final list = jsonDecode(ttsStr) as List;
+        var generatedMissingIds = false;
         _ttsServices = [
-          for (final e in list)
-            if (e is Map<String, dynamic>)
-              TtsServiceOptions.fromJson(e)
-            else
-              TtsServiceOptions.fromJson(Map<String, dynamic>.from(e as Map)),
+          for (final value in list)
+            TtsServiceOptions.fromJson(() {
+              final map = value is Map<String, dynamic>
+                  ? value
+                  : Map<String, dynamic>.from(value as Map);
+              if ((map['id'] ?? '').toString().trim().isEmpty) {
+                generatedMissingIds = true;
+              }
+              return map;
+            }()),
         ];
+        // Legacy rows had no stable identifier. Persist generated IDs before
+        // migrating the selected index so the UUID remains valid next launch.
+        if (generatedMissingIds) {
+          await prefs.setString(
+            _ttsServicesKey,
+            jsonEncode(
+              _ttsServices.map((service) => service.toJson()).toList(),
+            ),
+          );
+        }
       } else {
         _ttsServices = const <TtsServiceOptions>[];
       }
     } catch (_) {
       _ttsServices = const <TtsServiceOptions>[];
     }
-    _ttsServiceSelected = prefs.getInt(_ttsSelectedKey) ?? -1;
-    if (_ttsServiceSelected >= _ttsServices.length) {
-      _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
-      await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+    final storedTtsId = prefs.getString(_ttsSelectedServiceIdKey);
+    if (storedTtsId != null) {
+      _selectedTtsServiceId =
+          _ttsServices.any((service) => service.id == storedTtsId)
+          ? storedTtsId
+          : (_ttsServices.isEmpty ? null : _ttsServices.first.id);
+    } else {
+      final legacyIndex = prefs.getInt(_ttsSelectedKey) ?? -1;
+      _selectedTtsServiceId =
+          legacyIndex >= 0 && legacyIndex < _ttsServices.length
+          ? _ttsServices[legacyIndex].id
+          : null;
     }
+    await _persistSelectedTtsServiceId(prefs);
+    await prefs.remove(_ttsSelectedKey);
     _ttsAutoPlayAssistantReplies =
         prefs.getBool(_ttsAutoPlayAssistantRepliesKey) ?? false;
     _ttsTextSelectionMode = TtsTextSelectionModeStorage.fromStorageValue(
       prefs.getString(_ttsTextSelectionModeKey),
     );
+    // ASR has no implicit system default: users explicitly add a provider.
+    final decodedAsrServices = <AsrServiceOptions>[];
+    try {
+      final raw = prefs.getString(_asrServicesKey) ?? '';
+      if (raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List<dynamic>;
+        for (final value in list) {
+          try {
+            decodedAsrServices.add(
+              AsrServiceOptions.fromJson(
+                Map<String, dynamic>.from(value as Map),
+              ),
+            );
+          } catch (_) {
+            // Preserve other valid services when one legacy row is malformed.
+          }
+        }
+      }
+    } catch (_) {}
+    _asrServices = List<AsrServiceOptions>.unmodifiable(decodedAsrServices);
+    final storedAsrId = prefs.getString(_asrSelectedServiceIdKey);
+    _selectedAsrServiceId =
+        decodedAsrServices.any((service) => service.id == storedAsrId)
+        ? storedAsrId
+        : (decodedAsrServices.isEmpty ? null : decodedAsrServices.first.id);
+    if (_selectedAsrServiceId != storedAsrId) {
+      if (_selectedAsrServiceId == null) {
+        await prefs.remove(_asrSelectedServiceIdKey);
+      } else {
+        await prefs.setString(_asrSelectedServiceIdKey, _selectedAsrServiceId!);
+      }
+    }
     // webdav config
     final webdavStr = prefs.getString(_webDavConfigKey);
     if (webdavStr != null && webdavStr.isNotEmpty) {
@@ -1364,7 +1450,6 @@ class SettingsProvider extends ChangeNotifier {
     if (_providerConfigs.isEmpty) {
       // Seed a couple of sensible defaults on first launch, but do not recreate
       // providers implicitly during later reads (e.g., when switching chats).
-      ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
       ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
       ensureProviderConfig('AIhubmix', defaultName: 'AIhubmix');
@@ -1488,21 +1573,44 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setTtsServices(List<TtsServiceOptions> v) async {
     _ttsServices = List.unmodifiable(v);
-    notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     final list = v.map((e) => e.toJson()).toList();
     await prefs.setString(_ttsServicesKey, jsonEncode(list));
-    if (_ttsServiceSelected >= _ttsServices.length) {
-      _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
-      await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+    if (_selectedTtsServiceId != null &&
+        !_ttsServices.any((service) => service.id == _selectedTtsServiceId)) {
+      _selectedTtsServiceId = _ttsServices.isEmpty
+          ? null
+          : _ttsServices.first.id;
+      await _persistSelectedTtsServiceId(prefs);
     }
+    notifyListeners();
   }
 
   Future<void> setTtsServiceSelected(int index) async {
-    _ttsServiceSelected = index;
-    notifyListeners();
+    await setSelectedTtsServiceId(
+      index >= 0 && index < _ttsServices.length ? _ttsServices[index].id : null,
+    );
+  }
+
+  Future<void> setSelectedTtsServiceId(String? id) async {
+    final normalized =
+        id != null && _ttsServices.any((service) => service.id == id)
+        ? id
+        : null;
+    if (_selectedTtsServiceId == normalized) return;
+    _selectedTtsServiceId = normalized;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+    await _persistSelectedTtsServiceId(prefs);
+    notifyListeners();
+  }
+
+  Future<void> _persistSelectedTtsServiceId(SharedPreferences prefs) async {
+    final selectedId = _selectedTtsServiceId;
+    if (selectedId == null) {
+      await prefs.remove(_ttsSelectedServiceIdKey);
+    } else {
+      await prefs.setString(_ttsSelectedServiceIdKey, selectedId);
+    }
   }
 
   Future<void> setTtsAutoPlayAssistantReplies(bool value) async {
@@ -1519,6 +1627,42 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_ttsTextSelectionModeKey, mode.storageValue);
+  }
+
+  Future<void> setAsrServices(List<AsrServiceOptions> value) async {
+    _asrServices = List<AsrServiceOptions>.unmodifiable(value);
+    if (!_asrServices.any((service) => service.id == _selectedAsrServiceId)) {
+      _selectedAsrServiceId = _asrServices.isEmpty
+          ? null
+          : _asrServices.first.id;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _asrServicesKey,
+      jsonEncode(_asrServices.map((service) => service.toJson()).toList()),
+    );
+    await _persistSelectedAsrServiceId(prefs);
+    notifyListeners();
+  }
+
+  Future<void> setSelectedAsrServiceId(String? id) async {
+    final normalized =
+        id != null && _asrServices.any((service) => service.id == id)
+        ? id
+        : null;
+    if (_selectedAsrServiceId == normalized) return;
+    _selectedAsrServiceId = normalized;
+    await _persistSelectedAsrServiceId(await SharedPreferences.getInstance());
+    notifyListeners();
+  }
+
+  Future<void> _persistSelectedAsrServiceId(SharedPreferences prefs) async {
+    final selectedId = _selectedAsrServiceId;
+    if (selectedId == null) {
+      await prefs.remove(_asrSelectedServiceIdKey);
+    } else {
+      await prefs.setString(_asrSelectedServiceIdKey, selectedId);
+    }
   }
 
   // ===== User Font Settings =====
@@ -4547,9 +4691,11 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._searchAutoTestOnLaunch =
         searchAutoTestOnLaunch ?? _searchAutoTestOnLaunch;
     copy._ttsServices = _ttsServices;
-    copy._ttsServiceSelected = _ttsServiceSelected;
+    copy._selectedTtsServiceId = _selectedTtsServiceId;
     copy._ttsAutoPlayAssistantReplies = _ttsAutoPlayAssistantReplies;
     copy._ttsTextSelectionMode = _ttsTextSelectionMode;
+    copy._asrServices = _asrServices;
+    copy._selectedAsrServiceId = _selectedAsrServiceId;
     // Copy other fields
     copy._providersOrder = _providersOrder;
     copy._themeMode = _themeMode;
@@ -5211,7 +5357,6 @@ class ProviderConfig {
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
-    if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (RegExp(r'qwen|aliyun|dashscope').hasMatch(k)) {
@@ -5249,7 +5394,6 @@ class ProviderConfig {
       if (s.contains('gemini') || s.contains('google')) return true;
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;
-      if (s.contains('kelivoin')) return true;
       return false; // others disabled by default
     }
 
@@ -5309,58 +5453,6 @@ class ProviderConfig {
           claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
-        // Special-case KelivoIN default models and overrides
-        if (lowerKey.contains('kelivoin')) {
-          return ProviderConfig(
-            id: key,
-            enabled: defaultEnabled(key),
-            name: displayName ?? key,
-            apiKey: 'kelivo',
-            baseUrl: _defaultBase(key),
-            providerType: ProviderKind.openai,
-            chatPath:
-                null, // keep empty in UI; code uses default '/chat/completions'
-            useResponseApi: false,
-            models: const [
-              // 'openai-fast',
-              'mistral',
-              'qwen-coder',
-            ],
-            modelOverrides: const {
-              // 'openai-fast': {
-              //   'type': 'chat',
-              //   'input': ['text'],
-              //   'output': ['text'],
-              //   'abilities': ['tool'],
-              // },
-              'mistral': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-              'qwen-coder': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-            },
-            proxyEnabled: false,
-            proxyHost: '',
-            proxyPort: '8080',
-            proxyUsername: '',
-            proxyPassword: '',
-            multiKeyEnabled: false,
-            apiKeys: const [],
-            keyManagement: const KeyManagementConfig(),
-            aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
-            balanceApiPath: _defaultBalanceApiPath(key),
-            balanceResultPath: _defaultBalanceResultPath(key),
-            claudePromptCachingEnabled: false,
-          );
-        }
         // Special-case SiliconFlow: prefill two partnered models
         if (lowerKey.contains('silicon')) {
           return ProviderConfig(

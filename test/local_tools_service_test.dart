@@ -1,10 +1,31 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/features/home/services/local_tools_service.dart';
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.root);
+
+  final String root;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => root;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$root/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$root/tmp';
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -395,6 +416,206 @@ void main() {
           'unknown_local_tool',
           const {},
           localToolsAssistant,
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('Skill download/create tools', () {
+    final skillToolsAssistant = Assistant(
+      id: 'a2',
+      name: 'Assistant',
+      localToolIds: [LocalToolNames.downloadSkill, LocalToolNames.createSkill],
+    );
+    late Directory root;
+
+    setUpAll(() async {
+      root = await Directory.systemTemp.createTemp('skill_tools_test_');
+      PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
+    });
+
+    tearDownAll(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    setUp(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    test(
+      'builds download/create definitions only when their switches are on',
+      () {
+        final enabled = LocalToolsService.buildToolDefinitions(
+          assistant: skillToolsAssistant,
+          supportsTools: true,
+        );
+        final disabled = LocalToolsService.buildToolDefinitions(
+          assistant: Assistant(
+            id: 'a3',
+            name: 'Assistant',
+            skillIds: ['alpha'],
+          ),
+          supportsTools: true,
+        );
+
+        final names = enabled.map((tool) => tool['function']['name']).toSet();
+        expect(
+          names,
+          containsAll([
+            LocalToolNames.downloadSkill,
+            LocalToolNames.createSkill,
+          ]),
+        );
+
+        final downloadDef = enabled.firstWhere(
+          (t) => t['function']['name'] == LocalToolNames.downloadSkill,
+        );
+        expect(
+          (downloadDef['function']['parameters'] as Map)['required'],
+          const ['url'],
+        );
+        final createDef = enabled.firstWhere(
+          (t) => t['function']['name'] == LocalToolNames.createSkill,
+        );
+        expect((createDef['function']['parameters'] as Map)['required'], const [
+          'content',
+        ]);
+
+        expect(
+          disabled.any(
+            (t) => t['function']['name'] == LocalToolNames.downloadSkill,
+          ),
+          isFalse,
+        );
+        expect(
+          disabled.any(
+            (t) => t['function']['name'] == LocalToolNames.createSkill,
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('create_skill saves the skill and reports it as enabled', () async {
+      final imported = <List<String>>[];
+      final content =
+          '---\nname: alpha\ndescription: test skill\n---\nbody text';
+
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.createSkill,
+        {'content': content},
+        skillToolsAssistant,
+        onSkillsImported: (names) async => imported.add(names),
+      );
+
+      expect(imported, const [
+        ['alpha'],
+      ]);
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['success'], isTrue);
+      expect(payload['name'], 'alpha');
+    });
+
+    test('create_skill rejects empty content', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.createSkill,
+        const {},
+        skillToolsAssistant,
+      );
+
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['error'], 'missing_content');
+    });
+
+    test('create_skill rejects content without YAML frontmatter', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.createSkill,
+        const {'content': 'plain body without frontmatter'},
+        skillToolsAssistant,
+      );
+
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['error'], 'invalid_frontmatter');
+    });
+
+    test('create_skill rejects frontmatter without a name field', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.createSkill,
+        const {'content': '---\ndescription: no name here\n---\nbody'},
+        skillToolsAssistant,
+      );
+
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['error'], 'name_missing');
+    });
+
+    test('create_skill reports save failures back to the model', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.createSkill,
+        const {
+          // uppercase name fails SkillPaths.validateName
+          'content': '---\nname: ALPHA\n---\nbody',
+        },
+        skillToolsAssistant,
+      );
+
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['error'], 'save_failed');
+    });
+
+    test('download_skill requires a url', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.downloadSkill,
+        const {},
+        skillToolsAssistant,
+      );
+
+      expect(result, isNotNull);
+      final payload = jsonDecode(result!) as Map<String, dynamic>;
+      expect(payload['error'], 'missing_url');
+    });
+
+    test(
+      'download_skill rejects non-GitHub urls before any network call',
+      () async {
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.downloadSkill,
+          const {'url': 'https://example.com/not-github'},
+          skillToolsAssistant,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['error'], 'invalid_url');
+      },
+    );
+
+    test('download_skill is not handled when its switch is off', () async {
+      final assistant = Assistant(
+        id: 'a4',
+        name: 'Assistant',
+        localToolIds: [LocalToolNames.createSkill],
+      );
+
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.downloadSkill,
+          const {'url': 'https://github.com/o/r'},
+          assistant,
         ),
         isNull,
       );

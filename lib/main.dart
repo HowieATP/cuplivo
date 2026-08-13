@@ -24,6 +24,7 @@ import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/workspace_provider.dart';
 import 'core/providers/tts_provider.dart';
+import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/group_chat_provider.dart';
 import 'core/providers/tag_provider.dart';
@@ -40,7 +41,7 @@ import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
-import 'core/services/headless_generation_service.dart';
+import 'core/services/generation_engine.dart';
 import 'core/services/network/dio_http_client.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
@@ -221,7 +222,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
           create: (ctx) =>
-              HeadlessGenerationService(chatService: ctx.read<ChatService>()),
+              GenerationEngine(chatService: ctx.read<ChatService>()),
         ),
         ChangeNotifierProvider(
           create: (ctx) {
@@ -235,6 +236,10 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              AsrProvider(settingsProvider: ctx.read<SettingsProvider>()),
+        ),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(
           create: (ctx) =>

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/plain_text_collector.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 
@@ -115,28 +115,18 @@ class TranslationService {
         assistant?.thinkingBudget,
       );
 
-      final translationStream = ChatApiService.sendMessageStream(
+      final translation = await PlainTextCollector().collect(
         config: provider,
         modelId: translateModelId,
         messages: [
           {'role': 'user', 'content': prompt},
         ],
         thinkingBudget: budget,
+        onAccumulated: onTranslationUpdate,
       );
-
-      final buffer = StringBuffer();
-
-      await for (final chunk in translationStream) {
-        buffer.write(chunk.content);
-        // 实时更新翻译
-        onTranslationUpdate(buffer.toString());
-      }
 
       // 保存最终翻译结果
-      await chatService.updateMessage(
-        message.id,
-        translation: buffer.toString(),
-      );
+      await chatService.updateMessage(message.id, translation: translation);
 
       return TranslationResult(type: TranslationResultType.success);
     } catch (e) {

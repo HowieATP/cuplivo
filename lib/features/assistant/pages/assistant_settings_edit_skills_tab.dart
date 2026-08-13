@@ -38,22 +38,20 @@ class _SkillsTabState extends State<_SkillsTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_skills.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            l10n.skillsEmptyMessage,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
-        ),
-      );
+    Future<void> updateTool(String toolId, bool value) async {
+      final ids = assistant.localToolIds.toSet();
+      if (value) {
+        ids.add(toolId);
+      } else {
+        ids.remove(toolId);
+      }
+      try {
+        await context.read<AssistantProvider>().updateAssistant(
+          assistant.copyWith(localToolIds: ids.toList(growable: false)),
+        );
+      } catch (e) {
+        debugPrint('Failed to persist skill tool switch: $e');
+      }
     }
 
     return ListView(
@@ -61,56 +59,100 @@ class _SkillsTabState extends State<_SkillsTab> {
       children: [
         _iosSectionCard(
           children: [
-            _SkillsMasterRow(
-              enabledCount: _skills
-                  .where((s) => assistant.skillIds.contains(s.name))
-                  .length,
-              total: _skills.length,
-              allEnabled:
-                  _skills.isNotEmpty &&
-                  _skills.every((s) => assistant.skillIds.contains(s.name)),
-              onChanged: (value) {
-                final ids = value
-                    ? _skills.map((s) => s.name).toSet()
-                    : <String>{};
-                context.read<AssistantProvider>().updateAssistant(
-                  assistant.copyWith(skillIds: ids.toList(growable: false)),
-                );
-              },
+            _LocalToolRow(
+              icon: Lucide.Download,
+              title: l10n.assistantEditSkillDownloadTitle,
+              subtitle: l10n.assistantEditSkillDownloadSubtitle,
+              enabled: assistant.localToolIds.contains(
+                LocalToolNames.downloadSkill,
+              ),
+              onChanged: (value) =>
+                  updateTool(LocalToolNames.downloadSkill, value),
             ),
             _iosDivider(context),
-            for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
+            _LocalToolRow(
+              icon: Lucide.SquarePen,
+              title: l10n.assistantEditSkillCreateTitle,
+              subtitle: l10n.assistantEditSkillCreateSubtitle,
+              enabled: assistant.localToolIds.contains(
+                LocalToolNames.createSkill,
+              ),
+              onChanged: (value) =>
+                  updateTool(LocalToolNames.createSkill, value),
+            ),
+            if (_skills.isEmpty) ...[
+              _iosDivider(context),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
+                ),
                 child: Text(
-                  group ?? l10n.skillsUncategorizedGroup,
+                  l10n.skillsEmptyMessage,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: AppFontWeights.semibold,
+                    fontSize: 14,
                     color: Theme.of(
                       context,
                     ).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ),
-              for (int i = 0; i < skills.length; i++) ...[
-                if (i > 0) _iosDivider(context),
-                _SkillRow(
-                  name: skills[i].name,
-                  description: skills[i].description,
-                  enabled: assistant.skillIds.contains(skills[i].name),
-                  onChanged: (value) {
-                    final ids = assistant.skillIds.toSet();
-                    if (value) {
-                      ids.add(skills[i].name);
-                    } else {
-                      ids.remove(skills[i].name);
-                    }
-                    context.read<AssistantProvider>().updateAssistant(
-                      assistant.copyWith(skillIds: ids.toList(growable: false)),
-                    );
-                  },
+            ] else ...[
+              _iosDivider(context),
+              _SkillsMasterRow(
+                enabledCount: _skills
+                    .where((s) => assistant.skillIds.contains(s.name))
+                    .length,
+                total: _skills.length,
+                allEnabled:
+                    _skills.isNotEmpty &&
+                    _skills.every((s) => assistant.skillIds.contains(s.name)),
+                onChanged: (value) {
+                  final ids = value
+                      ? _skills.map((s) => s.name).toSet()
+                      : <String>{};
+                  context.read<AssistantProvider>().updateAssistant(
+                    assistant.copyWith(skillIds: ids.toList(growable: false)),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                  child: Text(
+                    group ?? l10n.skillsUncategorizedGroup,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: AppFontWeights.semibold,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
                 ),
+                for (int i = 0; i < skills.length; i++) ...[
+                  if (i > 0) _iosDivider(context),
+                  _SkillRow(
+                    name: skills[i].name,
+                    description: skills[i].description,
+                    enabled: assistant.skillIds.contains(skills[i].name),
+                    onChanged: (value) {
+                      final ids = assistant.skillIds.toSet();
+                      if (value) {
+                        ids.add(skills[i].name);
+                      } else {
+                        ids.remove(skills[i].name);
+                      }
+                      context.read<AssistantProvider>().updateAssistant(
+                        assistant.copyWith(
+                          skillIds: ids.toList(growable: false),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ],
           ],

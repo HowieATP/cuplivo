@@ -14,7 +14,7 @@ import '../../../core/providers/tts_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
@@ -674,6 +674,17 @@ class ToolHandlerService {
               }),
             );
           },
+          onSkillsImported: (names) async {
+            final a = (assistant?.id != null)
+                ? assistantProvider.getById(assistant!.id)
+                : assistantProvider.currentAssistant;
+            if (a == null) return;
+            await assistantProvider.updateAssistant(
+              a.copyWith(
+                skillIds: {...a.skillIds, ...names}.toList(growable: false),
+              ),
+            );
+          },
         );
         if (localResult != null) {
           return localResult;
@@ -701,7 +712,7 @@ class ToolHandlerService {
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)
             chatService: contextProvider.read<ChatService>(),
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)
-            headlessGen: contextProvider.read<HeadlessGenerationService>(),
+            engine: contextProvider.read<GenerationEngine>(),
             delegatingAssistant: assistant,
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)
             context: contextProvider,

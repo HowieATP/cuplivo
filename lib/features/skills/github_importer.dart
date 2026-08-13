@@ -3,6 +3,11 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+/// Hard cap for a downloaded repository archive, protecting the in-memory
+/// buffer and the later zip scan (see SkillImporter caps) from zip-bomb
+/// style archives. Skill repositories are far smaller than this.
+const int maxArchiveDownloadBytes = 64 * 1024 * 1024;
+
 class GitHubRepoInfo {
   final String owner;
   final String repo;
@@ -66,6 +71,11 @@ Future<File?> downloadGitHubArchive(
         .get(Uri.parse(info.archiveUrl))
         .timeout(const Duration(seconds: 60));
     if (response.statusCode != 200) return null;
+    if (response.contentLength != null &&
+        response.contentLength! > maxArchiveDownloadBytes) {
+      return null;
+    }
+    if (response.bodyBytes.length > maxArchiveDownloadBytes) return null;
 
     final tmpDir = Directory.systemTemp;
     final tmpFile = File(

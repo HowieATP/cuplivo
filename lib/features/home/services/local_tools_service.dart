@@ -4,9 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../features/skills/github_importer.dart';
+import '../../../features/skills/skill_importer.dart';
 import '../../../features/skills/skill_manager.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
+typedef SkillsImportedCallback = Future<void> Function(List<String> names);
 
 class LocalToolNames {
   const LocalToolNames._();
@@ -20,6 +23,8 @@ class LocalToolNames {
   static const String readSkillFile = 'read_skill_file';
   static const String handoff = 'kelivo_handoff';
   static const String handoffSync = 'kelivo_handoff_sync';
+  static const String downloadSkill = 'download_skill';
+  static const String createSkill = 'create_skill';
 }
 
 class LocalToolsService {
@@ -232,6 +237,48 @@ class LocalToolsService {
         },
       });
     }
+    if (assistant.localToolIds.contains(LocalToolNames.downloadSkill)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.downloadSkill,
+          'description':
+              'Download and install one or more skills from a GitHub repository. Use this when the user asks you to install a skill from a GitHub URL or provides a repository link, or when the task needs a capability that an installable skill provides. Use the /tree/<branch>/<path> URL form to target a specific subdirectory when the repository contains many skills.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'url': {
+                'type': 'string',
+                'description':
+                    'GitHub repository URL, e.g. https://github.com/owner/repo or https://github.com/owner/repo/tree/main/skills/foo',
+              },
+            },
+            'required': ['url'],
+          },
+        },
+      });
+    }
+    if (assistant.localToolIds.contains(LocalToolNames.createSkill)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.createSkill,
+          'description':
+              'Create a new skill from its full SKILL.md content, including the YAML frontmatter with a name field. Use this when the user asks you to create or save a skill, or provides SKILL.md content to store as a skill.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'content': {
+                'type': 'string',
+                'description':
+                    'The complete SKILL.md content, including YAML frontmatter (name, description, optional category) and the instruction body.',
+              },
+            },
+            'required': ['content'],
+          },
+        },
+      });
+    }
     return tools;
   }
 
@@ -316,6 +363,7 @@ class LocalToolsService {
     Map<String, dynamic> args,
     Assistant? assistant, {
     TextToSpeechStarter? onSpeakText,
+    SkillsImportedCallback? onSkillsImported,
   }) async {
     if (assistant == null) return null;
 
@@ -341,6 +389,12 @@ class LocalToolsService {
     }
     if (name == LocalToolNames.calculate) {
       return _handleCalculateTool(args);
+    }
+    if (name == LocalToolNames.downloadSkill) {
+      return _handleDownloadSkill(args, onSkillsImported);
+    }
+    if (name == LocalToolNames.createSkill) {
+      return _handleCreateSkill(args, onSkillsImported);
     }
     return null;
   }
@@ -536,5 +590,167 @@ class LocalToolsService {
       });
     }
     return result.content;
+  }
+
+  static Future<String> _handleCreateSkill(
+    Map<String, dynamic> args,
+    SkillsImportedCallback? onSkillsImported,
+  ) async {
+    final content = (args['content'] ?? '').toString().trim();
+    if (content.isEmpty) {
+      return jsonEncode({
+        'error': 'missing_content',
+        'message':
+            'Please provide the complete SKILL.md content, including the YAML frontmatter.',
+      });
+    }
+
+    final parsed = SkillManager.parseFrontmatter(content);
+    if (parsed == null) {
+      return jsonEncode({
+        'error': 'invalid_frontmatter',
+        'message':
+            'SKILL.md content must start with YAML frontmatter containing a name field.',
+      });
+    }
+    final name = (parsed.fields['name'] ?? '').trim();
+    if (name.isEmpty) {
+      return jsonEncode({
+        'error': 'name_missing',
+        'message': 'The YAML frontmatter must contain a "name" field.',
+      });
+    }
+
+    if (await SkillManager.skillExists(name)) {
+      return jsonEncode({
+        'error': 'already_exists',
+        'name': name,
+        'message':
+            'A skill named "$name" already exists and would be overwritten. '
+            'Do not call create_skill with this name again; use load_skill '
+            'to read the existing skill or ask the user for a new name.',
+      });
+    }
+
+    final error = await SkillManager.saveSkill(name: name, content: content);
+    if (error != null) {
+      return jsonEncode({
+        'error': 'save_failed',
+        'message':
+            'Failed to save skill: ${error.params['detail'] ?? error.code}',
+      });
+    }
+
+    final enabled = onSkillsImported != null;
+    if (onSkillsImported != null) {
+      await onSkillsImported([name]);
+    }
+    return jsonEncode({
+      'success': true,
+      'name': name,
+      'message':
+          'Skill "$name" has been created'
+          '${enabled ? ' and enabled for this assistant' : ''}. '
+          'Call load_skill with this name to read its instructions before use.',
+    });
+  }
+
+  static Future<String> _handleDownloadSkill(
+    Map<String, dynamic> args,
+    SkillsImportedCallback? onSkillsImported,
+  ) async {
+    final url = (args['url'] ?? '').toString().trim();
+    if (url.isEmpty) {
+      return jsonEncode({
+        'error': 'missing_url',
+        'message': 'Please provide a GitHub repository URL.',
+      });
+    }
+
+    final info = parseGitHubUrl(url);
+    if (info == null) {
+      return jsonEncode({
+        'error': 'invalid_url',
+        'message':
+            'Invalid GitHub URL. Expected https://github.com/owner/repo or '
+            'https://github.com/owner/repo/tree/<branch>/<path>.',
+      });
+    }
+
+    final zipFile = await downloadGitHubArchive(info);
+    if (zipFile == null) {
+      return jsonEncode({
+        'error': 'download_failed',
+        'message':
+            'Failed to download the repository. It may not exist, is private, '
+            'or the network request failed.',
+      });
+    }
+
+    try {
+      final outcome = await SkillImporter.importFromZip(
+        zipFile,
+        subPath: info.subPath,
+        stripPrefix: info.stripPrefix,
+      );
+      if (outcome.error == SkillZipError.scanFailed) {
+        return jsonEncode({
+          'error': 'scan_failed',
+          'message':
+              'Failed to scan the downloaded archive. It may be corrupted, '
+              'too large, or contain too many files.',
+        });
+      }
+      if (outcome.error == SkillZipError.noSkillsFound) {
+        return jsonEncode({
+          'error': 'no_skills_found',
+          'message':
+              'No skills (SKILL.md files with a name field) were found in the repository.',
+        });
+      }
+      if (outcome.error == SkillZipError.tooManySkills) {
+        return jsonEncode({
+          'error': 'too_many_skills',
+          'count': outcome.discoveredCount,
+          'message':
+              'The repository contains ${outcome.discoveredCount} skills. '
+              'Provide a more specific URL using /tree/<branch>/<path> to '
+              'narrow down to fewer than 5 skills.',
+        });
+      }
+
+      final result = outcome.result!;
+      if (result.imported == 0) {
+        return jsonEncode({
+          'error': 'import_failed',
+          'failed': result.failed,
+          'message':
+              'None of the discovered skills could be imported '
+              '(${result.failed} failed).',
+        });
+      }
+
+      final enabled = onSkillsImported != null;
+      if (onSkillsImported != null) {
+        await onSkillsImported(result.importedNames);
+      }
+      return jsonEncode({
+        'success': true,
+        'imported': result.imported,
+        'failed': result.failed,
+        'names': result.importedNames,
+        'message':
+            'Imported ${result.imported} skill(s): '
+            '${result.importedNames.join(', ')}'
+            '${result.failed > 0 ? ' (${result.failed} failed)' : ''}.'
+            '${enabled ? ' All imported skills are enabled for this assistant.' : ''} '
+            'Call load_skill with a skill name to read its instructions '
+            'before use.',
+      });
+    } finally {
+      try {
+        await zipFile.delete();
+      } catch (_) {}
+    }
   }
 }

@@ -1352,7 +1352,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.';
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Cuplivo running forever.';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1380,7 +1380,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Notifications not allowed';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo is generating';
+  String get iosBackgroundGenerationActiveTitle => 'Cuplivo is generating';
 
   @override
   String get iosBackgroundGenerationActiveDetail =>
@@ -1439,7 +1439,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant reply has been generated';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo is running';
+  String get androidBackgroundNotificationTitle => 'Cuplivo is running';
 
   @override
   String get androidBackgroundNotificationText =>
@@ -3032,6 +3032,43 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sideDrawerMenuBatchExport => 'Export as Markdown';
+
+  @override
+  String get sideDrawerBatchActionsTitle => 'Batch actions';
+
+  @override
+  String get sideDrawerBatchExportNothingToExport =>
+      'No conversations to export';
+
+  @override
+  String get sideDrawerBatchExportPickDirectory => 'Choose export folder';
+
+  @override
+  String sideDrawerBatchExportSuccess(int exported) {
+    return '$exported conversations exported';
+  }
+
+  @override
+  String sideDrawerBatchExportSuccessSkipped(int exported, int skipped) {
+    return '$exported conversations exported, $skipped empty skipped';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailure(int exported, int failed) {
+    return '$exported exported, $failed failed';
+  }
+
+  @override
+  String sideDrawerBatchExportPartialFailureSkipped(
+    int exported,
+    int failed,
+    int skipped,
+  ) {
+    return '$exported exported, $failed failed, $skipped empty skipped';
+  }
+
+  @override
   String get sideDrawerSelectAll => 'Select All';
 
   @override
@@ -3245,6 +3282,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarMoreTooltip => 'Add';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => 'Discard recording';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => 'Voice input';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => 'Transcribe and send';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => 'Stop and transcribe to input';
+
+  @override
+  String get chatInputBarVoiceTranscribing => 'Recognizing…';
 
   @override
   String get chatInputBarImageMode => 'Image mode';
@@ -4660,9 +4712,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageQQGroup => 'Cuplivo Group';
 
   @override
-  String get aboutPageJoinDiscord => 'Join us on Discord';
-
-  @override
   String get displaySettingsPageShowUserAvatarTitle => 'Show User Avatar';
 
   @override
@@ -5061,7 +5110,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesPageBackButton => 'Back';
 
   @override
-  String get ttsServicesPageTitle => 'Text-to-Speech';
+  String get ttsServicesPageTitle => 'Voice Services';
+
+  @override
+  String get ttsServicesSectionTitle => 'Text-to-Speech';
 
   @override
   String get ttsServicesPageSettingsTooltip => 'TTS settings';
@@ -5072,6 +5124,173 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get ttsServicesPageAddNotImplemented =>
       'Add TTS service not implemented';
+
+  @override
+  String get asrServicesAddAction => 'Add';
+
+  @override
+  String get asrServicesAddTitle => 'Add Speech Recognition';
+
+  @override
+  String get asrServicesAddTooltip => 'Add speech recognition service';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesApiKeyRequired =>
+      'Enter an API key to use this service.';
+
+  @override
+  String get asrServicesAutomaticLabel => 'Automatic';
+
+  @override
+  String get asrServicesCancelAction => 'Cancel';
+
+  @override
+  String get asrServicesChooseModelTitle => 'Model';
+
+  @override
+  String get asrServicesCloudGroup => 'Cloud';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen real-time transcription';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDeleteAction => 'Delete';
+
+  @override
+  String asrServicesDownloadFailed(Object error) {
+    return 'Model download failed: $error';
+  }
+
+  @override
+  String get asrServicesEditAction => 'Edit';
+
+  @override
+  String get asrServicesEditTitle => 'Edit Speech Recognition';
+
+  @override
+  String get asrServicesEmptySubtitle =>
+      'Add one to show the microphone in the chat input.';
+
+  @override
+  String get asrServicesEmptyTitle => 'No speech recognition service';
+
+  @override
+  String get asrServicesEndpointLabel => 'Endpoint';
+
+  @override
+  String get asrServicesLanguageLabel => 'Language';
+
+  @override
+  String get asrServicesLocalSubtitle =>
+      'Runs offline on this device after download';
+
+  @override
+  String get asrServicesLocalTitle => 'Offline Model';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied =>
+      'Microphone permission was not granted.';
+
+  @override
+  String get asrServicesMimoSubtitle => 'Segmented cloud transcription';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesModelDeleteAction => 'Remove download';
+
+  @override
+  String get asrServicesModelDownloadAction => 'Download';
+
+  @override
+  String get asrServicesModelDownloadedLabel => 'Downloaded';
+
+  @override
+  String get asrServicesModelDownloadingLabel => 'Downloading…';
+
+  @override
+  String get asrServicesModelLabel => 'Model';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => 'Not downloaded';
+
+  @override
+  String get asrServicesModelUseAction => 'Use model';
+
+  @override
+  String get asrServicesNameLabel => 'Name';
+
+  @override
+  String get asrServicesNoSpeechDetected => 'No speech was detected.';
+
+  @override
+  String get asrServicesOnDeviceGroup => 'On-device';
+
+  @override
+  String get asrServicesOpenAiSubtitle => 'Low-latency streaming transcription';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String asrServicesRecognitionFailed(Object error) {
+    return 'Speech recognition failed: $error';
+  }
+
+  @override
+  String get asrServicesResourceIdLabel => 'Resource ID';
+
+  @override
+  String get asrServicesSaveAction => 'Save';
+
+  @override
+  String get asrServicesSectionDescription =>
+      'Turn speech into text with an on-device, system, or cloud service.';
+
+  @override
+  String get asrServicesSectionTitle => 'Speech Recognition';
+
+  @override
+  String get asrServicesSelectedLabel => 'Selected';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio segmented transcription';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesSystemAvailable => 'Available';
+
+  @override
+  String get asrServicesSystemCheckFailed =>
+      'System speech recognition is unavailable on this device.';
+
+  @override
+  String get asrServicesSystemChecking => 'Checking…';
+
+  @override
+  String get asrServicesSystemSubtitle =>
+      'Uses the device\'s built-in recognizer';
+
+  @override
+  String get asrServicesSystemTitle => 'System';
+
+  @override
+  String get asrServicesUnavailableLabel => 'Unavailable';
+
+  @override
+  String get asrServicesVolcengineSubtitle => 'Doubao streaming transcription';
+
+  @override
+  String get asrServicesVolcengineTitle => 'Volcengine';
 
   @override
   String get ttsServicesPageSystemTtsTitle => 'System TTS';
@@ -5174,7 +5393,91 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldEmotionLabel => 'Emotion';
 
   @override
-  String get ttsServicesEmotionAutoHint => 'Leave empty for auto emotion';
+  String get ttsServicesEmotionAutoLabel => 'Auto match';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => 'Bitrate';
+
+  @override
+  String get ttsServicesFieldChannelLabel => 'Channels';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton =>
+      'Choose reference audio';
+
+  @override
+  String get ttsServicesFieldFormatLabel => 'Audio format';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => 'Style / voice description';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => 'Language boost';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => 'Latency';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel =>
+      'Optimize text preview';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => 'Output format';
+
+  @override
+  String get ttsServicesFieldPitchLabel => 'Pitch';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel =>
+      'Pronunciation dictionary (one entry per line)';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel =>
+      'Reference audio (WAV/MP3 data URI)';
+
+  @override
+  String get ttsServicesFieldRegionLabel => 'Region';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => 'Sample rate';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => 'Streaming';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => 'Generate subtitles';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => 'Temperature';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => 'Volume';
+
+  @override
+  String get ttsServicesFieldWorkspaceIdLabel => 'Workspace ID';
+
+  @override
+  String get ttsServicesValidationInstructionRequired =>
+      'A voice description is required';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired =>
+      'Voice/reference ID is required';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format requires $rates Hz.';
+  }
+
+  @override
+  String get ttsSettingsCacheReplayDescription =>
+      'Replay generated network audio without requesting the TTS service again.';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => 'Reuse Audio for Replay';
 
   @override
   String get ttsServicesFieldSpeedLabel => 'Speed';
@@ -5371,7 +5674,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - Open Source AI Assistant';
+  String get settingsShare => 'Cuplivo - Open Source AI Assistant';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -5722,6 +6025,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantEditLocalToolHandoffSyncSubtitle =>
       'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.';
+
+  @override
+  String get assistantEditSkillDownloadTitle => 'Download Skills';
+
+  @override
+  String get assistantEditSkillDownloadSubtitle =>
+      'Let the assistant download and install skills from GitHub repository URLs.';
+
+  @override
+  String get assistantEditSkillCreateTitle => 'Create Skills';
+
+  @override
+  String get assistantEditSkillCreateSubtitle =>
+      'Let the assistant create new skills from SKILL.md content.';
 
   @override
   String get assistantEditMemorySwitchTitle => 'Memory';

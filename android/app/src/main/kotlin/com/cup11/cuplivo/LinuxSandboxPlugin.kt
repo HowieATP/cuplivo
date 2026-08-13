@@ -2,6 +2,7 @@ package com.cup11.cuplivo
 
 import android.content.Context
 import android.os.Build
+import android.os.Process as AndroidProcess
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -435,9 +436,7 @@ private object OutputDrainer {
       if (!process.waitFor(GRACE_AFTER_TERM_MS, TimeUnit.MILLISECONDS)) {
         // SIGTERM did not finish the tree: kill surviving guest children
         // (orphaned apt/dpkg that keep the dpkg lock) before the SIGKILL.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          killDescendants(process.pid())
-        }
+        pidOf(process)?.let { killDescendants(it) }
         process.destroyForcibly()
       }
       stdout.joinFor(1_000)
@@ -460,10 +459,19 @@ private object OutputDrainer {
   }
 
   /**
+   * Android's java.lang.Process has no `pid()` (Java 9 API). Parse it from
+   * ProcessImpl.toString(), whose "Process[pid=NNNN]" format is stable
+   * across API levels. Returns null when parsing fails (cleanup skipped).
+   */
+  private fun pidOf(process: Process): Long? {
+    val m = Regex("pid=(\\d+)").find(process.toString())
+    return m?.groupValues?.get(1)?.toLongOrNull()
+  }
+
+  /**
    * Recursively SIGKILL all children of [pid] by walking /proc (the proot
    * guest processes are host processes, so the host view sees them). Called
    * before destroyForcibly so no apt/dpkg survives to hold the dpkg lock.
-   * API 26+ (Process.pid and stat scanning); older devices skip the cleanup.
    */
   private fun killDescendants(pid: Long) {
     val children = mutableListOf<Long>()
@@ -489,7 +497,7 @@ private object OutputDrainer {
     children.forEach { child ->
       killDescendants(child)
       try {
-        Process.killProcess(child.toInt())
+        AndroidProcess.killProcess(child.toInt())
       } catch (e: Exception) {
         Log.w(TAG, "killDescendants kill $child: ${e.message}")
       }

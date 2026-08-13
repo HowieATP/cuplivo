@@ -41,7 +41,7 @@ import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
-import 'core/services/headless_generation_service.dart';
+import 'core/services/generation_engine.dart';
 import 'core/services/network/dio_http_client.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
@@ -222,7 +222,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
           create: (ctx) =>
-              HeadlessGenerationService(chatService: ctx.read<ChatService>()),
+              GenerationEngine(chatService: ctx.read<ChatService>()),
         ),
         ChangeNotifierProvider(
           create: (ctx) {
@@ -230,7 +230,7 @@ class MyApp extends StatelessWidget {
             return McpProvider(
               chatService: ctx.read<ChatService>(),
               assistantProvider: ctx.read<AssistantProvider>(),
-              headlessGen: ctx.read<HeadlessGenerationService>(),
+              generationEngine: ctx.read<GenerationEngine>(),
               filesystemMounts: ctx.read<FilesystemMountsProvider>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),

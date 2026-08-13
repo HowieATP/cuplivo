@@ -21,7 +21,7 @@ import '../../chat/pages/reading_mode_page.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
-import '../controllers/streaming_content_notifier.dart';
+import '../../../core/services/streaming_content_notifier.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';

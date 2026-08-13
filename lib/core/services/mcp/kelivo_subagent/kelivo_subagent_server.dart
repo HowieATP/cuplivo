@@ -17,20 +17,20 @@ import '../../../../features/home/services/tool_approval_service.dart';
 import '../../../../features/home/services/tool_handler_service.dart';
 import '../../api/chat_api_service.dart';
 import '../../chat/chat_service.dart';
-import '../../headless_generation_service.dart';
+import '../../generation_engine.dart';
 
 /// @kelivo/subagent — In-memory MCP server engine and transport (Flutter/Dart)
 class KelivoSubagentMcpServerEngine {
   KelivoSubagentMcpServerEngine({
     required this._assistants,
     required this._chatService,
-    required this._headlessGen,
+    required this._engine,
     required this._contextProvider,
   });
 
   final AssistantProvider _assistants;
   final ChatService _chatService;
-  final HeadlessGenerationService _headlessGen;
+  final GenerationEngine _engine;
   final BuildContext Function() _contextProvider;
   bool _closed = false;
 
@@ -171,14 +171,29 @@ class KelivoSubagentMcpServerEngine {
       '(parent: $parentConversationId, assistant: ${target.name})',
     );
 
+    // The caller creates the assistant placeholder (ADR-0028 slot model: the
+    // engine streams into a pre-created message row and never creates rows
+    // itself). For wait-mode it is created NOW so the round/slot registered
+    // below carries the row id — the 子代理面板 binds to the slot from the
+    // dispatch moment, before the async pipeline build.
+    String? preparedAssistantMessageId;
     if (waitForResult) {
-      // Register the job record BEFORE starting the generation: the
-      // generation's synchronous section may fail immediately (failJob below
-      // must find the record), and the `started` JSON response travels back
-      // through pure microtasks while the generation suspends on real I/O —
-      // the handler's waitFor must find the job in both cases.
-      _headlessGen.prepareJob(
+      final assistantMsg = await _chatService.addMessage(
         conversationId: conversation.id,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      preparedAssistantMessageId = assistantMsg.id;
+
+      // Register the round BEFORE starting the generation: the generation's
+      // synchronous section may fail immediately (failRound below must find
+      // the round), and the `started` JSON response travels back through pure
+      // microtasks while the generation suspends on real I/O — the handler's
+      // waitFor must find the round in both cases.
+      _engine.prepareRound(
+        conversationId: conversation.id,
+        assistantMessageId: assistantMsg.id,
         parentConversationId: parentConversationId,
         wait: true,
         targetName: target.name,
@@ -186,7 +201,12 @@ class KelivoSubagentMcpServerEngine {
     }
 
     unawaited(
-      _startGeneration(conversation, target, waitForResult: waitForResult),
+      _startGeneration(
+        conversation,
+        target,
+        waitForResult: waitForResult,
+        preparedAssistantMessageId: preparedAssistantMessageId,
+      ),
     );
 
     if (waitForResult) {
@@ -209,6 +229,7 @@ class KelivoSubagentMcpServerEngine {
     Conversation conversation,
     Assistant target, {
     bool waitForResult = false,
+    String? preparedAssistantMessageId,
   }) async {
     try {
       // ignore: use_build_context_synchronously (root context, valid for app lifetime)
@@ -285,20 +306,37 @@ class KelivoSubagentMcpServerEngine {
         '(${apiMessages.length} messages, ${toolDefs.length} tools)',
       );
 
-      _headlessGen.start(
+      // Fire-and-forget creates its placeholder here (wait-mode already
+      // created it in _handleHandoff for panel visibility).
+      final assistantMsgId =
+          preparedAssistantMessageId ??
+          (await _chatService.addMessage(
+            conversationId: conversation.id,
+            role: 'assistant',
+            content: '',
+            isStreaming: true,
+          )).id;
+
+      _engine.startRound(
         conversationId: conversation.id,
-        assistantId: target.id,
-        apiMessages: apiMessages,
-        config: config,
-        modelId: modelId,
-        toolDefs: toolDefs.isEmpty ? null : toolDefs,
-        onToolCall: onToolCall,
-        thinkingBudget: target.thinkingBudget ?? settings.thinkingBudget,
-        temperature: target.temperature,
-        topP: target.topP,
-        maxTokens: target.maxTokens,
-        stream: target.streamOutput,
-        onComplete: () => _generateTitle(conversation.id, target),
+        slots: [
+          GenerationSlotRequest(
+            assistantMessageId: assistantMsgId,
+            apiMessages: apiMessages,
+            config: config,
+            modelId: modelId,
+            toolDefs: toolDefs.isEmpty ? null : toolDefs,
+            onToolCall: onToolCall,
+            assistant: target,
+            thinkingBudget: target.thinkingBudget ?? settings.thinkingBudget,
+            temperature: target.temperature,
+            topP: target.topP,
+            maxTokens: target.maxTokens,
+            stream: target.streamOutput,
+            autoCollapseThinking: settings.autoCollapseThinking,
+            onSlotComplete: () => _generateTitle(conversation.id, target),
+          ),
+        ],
         parentConversationId: conversation.parentConversationId,
         wait: waitForResult,
         targetName: target.name,
@@ -307,10 +345,19 @@ class KelivoSubagentMcpServerEngine {
       debugPrint(
         '[Subagent] generation failed for ${conversation.id}: $e\n$st',
       );
+      // The wait-mode placeholder was created in _handleHandoff but never
+      // streamed into — remove the empty row (build failure before start).
+      if (preparedAssistantMessageId != null) {
+        try {
+          await _chatService.deleteMessage(preparedAssistantMessageId);
+        } catch (cleanupError) {
+          debugPrint('[Subagent] placeholder cleanup failed: $cleanupError');
+        }
+      }
       // Resolve the waiter: a wait-mode handoff must never leave the
-      // orchestrator's await hanging (see ADR-0024 iron rule). No-op for
+      // orchestrator's await hanging (see ADR-0026 iron rule). No-op for
       // fire-and-forget (nothing listens to the completer).
-      _headlessGen.failJob(conversation.id, e);
+      _engine.failRound(conversation.id, e);
     }
   }
 

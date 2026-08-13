@@ -11,7 +11,7 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import 'ask_user_interaction_service.dart';
@@ -734,8 +734,8 @@ class ToolHandlerService {
       );
     }
 
-    final headlessGen = contextProvider.read<HeadlessGenerationService>();
-    final result = await headlessGen.waitFor(childId);
+    final engine = contextProvider.read<GenerationEngine>();
+    final result = await engine.waitFor(childId);
     if (result.cancelled) {
       return _toolError(
         error: 'subagent_cancelled',

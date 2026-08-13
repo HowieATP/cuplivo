@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +10,7 @@ import '../utils/brand_assets.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
+import '../core/services/api/plain_text_collector.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
@@ -32,8 +32,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   String? _modelProviderKey;
   String? _modelId;
 
-  StreamSubscription? _subscription;
   bool _translating = false;
+  bool _stopped = false;
   String? _requestId;
 
   @override
@@ -46,7 +46,6 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   @override
   void dispose() {
     ChatApiService.cancelRequest(_requestId ?? '');
-    _subscription?.cancel();
     _source.dispose();
     _output.dispose();
     super.dispose();
@@ -168,44 +167,30 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _translating = true;
       _output.text = '';
     });
+    _stopped = false;
 
     try {
       _requestId = 'translate_${DateTime.now().millisecondsSinceEpoch}';
-      final stream = ChatApiService.sendMessageStream(
+      // Layer-① collector (ADR-0028): accumulate + live-update the output.
+      await PlainTextCollector().collect(
         config: cfg,
         modelId: modelId,
         messages: [
           {'role': 'user', 'content': prompt},
         ],
         requestId: _requestId,
+        onAccumulated: (t) {
+          if (!mounted || _stopped) return;
+          setState(() {
+            // Remove leading whitespace on the first chunk to avoid top gap.
+            _output.text = t.replaceFirst(RegExp(r'^\s+'), '');
+          });
+        },
       );
-
-      _subscription = stream.listen(
-        (chunk) {
-          // live update; remove leading whitespace on first chunk to avoid top gap
-          final s = chunk.content;
-          if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
-          } else {
-            _output.text += s;
-          }
-        },
-        onDone: () {
-          if (!mounted) return;
-          setState(() => _translating = false);
-        },
-        onError: (e) {
-          if (!mounted) return;
-          setState(() => _translating = false);
-          showAppSnackBar(
-            context,
-            message: l10n.homePageTranslateFailed(e.toString()),
-            type: NotificationType.error,
-          );
-        },
-        cancelOnError: true,
-      );
+      if (!mounted || _stopped) return;
+      setState(() => _translating = false);
     } catch (e) {
+      if (!mounted || _stopped) return;
       setState(() => _translating = false);
       showAppSnackBar(
         context,
@@ -216,10 +201,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _stopTranslate() async {
+    _stopped = true;
     ChatApiService.cancelRequest(_requestId ?? '');
-    try {
-      await _subscription?.cancel();
-    } catch (_) {}
     if (mounted) setState(() => _translating = false);
   }
 

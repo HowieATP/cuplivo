@@ -11,7 +11,6 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/quick_phrase.dart';
-import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -20,7 +19,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/headless_generation_service.dart';
+import '../../../core/services/generation_engine.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
@@ -29,7 +28,6 @@ import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
-import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/widgets/message_edit_sheet.dart';
@@ -151,7 +149,7 @@ class HomePageController extends ChangeNotifier {
   late scroll_ctrl.ChatScrollController _scrollCtrl;
 
   McpProvider? _mcpProvider;
-  HeadlessGenerationService? _headlessGen;
+  GenerationEngine? _generationEngine;
   String? _headlessChunkMessageId;
   bool _wasCurrentHeadlessActive = false;
   StreamSubscription<ChatAction>? _chatActionSub;
@@ -295,7 +293,7 @@ class HomePageController extends ChangeNotifier {
     final cid = currentConversation?.id;
     if (cid == null) return false;
     return loadingConversationIds.contains(cid) ||
-        (_headlessGen?.isActive(cid) ?? false);
+        (_generationEngine?.isActive(cid) ?? false);
   }
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
@@ -500,14 +498,6 @@ class HomePageController extends ChangeNotifier {
         if (settings.hapticsOnGenerate) Haptics.light();
       } catch (_) {}
     };
-    _viewModel.onScheduleImageSanitize =
-        (messageId, content, {bool immediate = false}) {
-          _scheduleInlineImageSanitize(
-            messageId,
-            latestContent: content,
-            immediate: immediate,
-          );
-        };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
       _scrollToBottom(animate: false);
@@ -569,11 +559,11 @@ class HomePageController extends ChangeNotifier {
       _mcpProvider!.addListener(_onMcpChanged);
     } catch (_) {}
     try {
-      _headlessGen = _context.read<HeadlessGenerationService>();
-      _headlessGen!.addListener(_onHeadlessGenChanged);
-      debugPrint('[HeadlessGen] listener attached');
+      _generationEngine = _context.read<GenerationEngine>();
+      _generationEngine!.addListener(_onHeadlessGenChanged);
+      debugPrint('[GenerationEngine] listener attached');
     } catch (e) {
-      debugPrint('[HeadlessGen] listener FAILED: $e');
+      debugPrint('[GenerationEngine] listener FAILED: $e');
     }
   }
 
@@ -1101,8 +1091,8 @@ class HomePageController extends ChangeNotifier {
   Future<void> cancelStreaming() async {
     debugPrint('[CancelTrace] HomePageController.cancelStreaming ENTER');
     final cid = currentConversation?.id;
-    if (cid != null && (_headlessGen?.isActive(cid) ?? false)) {
-      _headlessGen!.cancel(cid);
+    if (cid != null && (_generationEngine?.isActive(cid) ?? false)) {
+      _generationEngine!.cancelConversation(cid);
     }
     await _viewModel.cancelStreaming();
     notifyListeners();
@@ -2544,19 +2534,6 @@ class HomePageController extends ChangeNotifier {
     return true;
   }
 
-  /// Transform raw content using assistant regexes.
-  String transformAssistantContent(
-    stream_ctrl.StreamingState state, [
-    String? raw,
-  ]) {
-    return applyAssistantRegexes(
-      raw ?? state.fullContentRaw,
-      assistant: state.ctx.assistant,
-      scope: AssistantRegexScope.assistant,
-      target: AssistantRegexTransformTarget.persist,
-    );
-  }
-
   // ============================================================================
   // Lifecycle Management
   // ============================================================================
@@ -2619,12 +2596,6 @@ class HomePageController extends ChangeNotifier {
           messages[i] = updated;
           unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
         }
-
-        _scheduleInlineImageSanitize(
-          m.id,
-          latestContent: messages[i].content,
-          immediate: true,
-        );
       }
 
       if (m.translation != null && m.translation!.isNotEmpty) {
@@ -2633,38 +2604,6 @@ class HomePageController extends ChangeNotifier {
         _translations[m.id] = td;
       }
     }
-  }
-
-  void _scheduleInlineImageSanitize(
-    String messageId, {
-    String? latestContent,
-    bool immediate = false,
-  }) {
-    final snapshot =
-        latestContent ??
-        (() {
-          final idx = messages.indexWhere((m) => m.id == messageId);
-          return idx == -1 ? '' : messages[idx].content;
-        })();
-    if (snapshot.isEmpty ||
-        !snapshot.contains('data:image') ||
-        !snapshot.contains('base64,')) {
-      return;
-    }
-
-    _streamController.scheduleInlineImageSanitize(
-      messageId,
-      latestContent: snapshot,
-      immediate: immediate,
-      onSanitized: (id, sanitized) async {
-        await _chatService.updateMessage(id, content: sanitized);
-        final i = messages.indexWhere((m) => m.id == id);
-        if (i != -1) {
-          messages[i] = messages[i].copyWith(content: sanitized);
-        }
-        notifyListeners();
-      },
-    );
   }
 
   String _appendGeminiThoughtSignatureForApi(
@@ -2684,7 +2623,10 @@ class HomePageController extends ChangeNotifier {
   void _onHeadlessGenChanged() {
     final cid = currentConversation?.id;
     if (cid == null) return;
-    final isNowActive = _headlessGen?.isActive(cid) ?? false;
+    // WAIT-mode (subagent) rounds only: page-path rounds complete through
+    // their own callbacks, and treating them here would trigger a full
+    // message-window reload after every chat message.
+    final isNowActive = _generationEngine?.isWaitActive(cid) ?? false;
     if (_wasCurrentHeadlessActive && !isNowActive) {
       _chatController.setCurrentConversation(currentConversation);
     }
@@ -2704,12 +2646,12 @@ class HomePageController extends ChangeNotifier {
       _cancelHeadlessChunkSub();
       return;
     }
-    final active = _headlessGen?.isActive(cid) ?? false;
+    final active = _generationEngine?.isActive(cid) ?? false;
     if (!active) {
       _cancelHeadlessChunkSub();
       return;
     }
-    final job = _headlessGen?.jobFor(cid);
+    final job = _generationEngine?.slotFor(cid);
     final mid = job?.assistantMessageId;
     if (mid == null || mid.isEmpty) {
       // Placeholder not created yet (addMessage still in flight); the
@@ -2750,7 +2692,7 @@ class HomePageController extends ChangeNotifier {
     // conversation (generation continues; the DB write stays one-shot).
     final cid = currentConversation?.id;
     if (cid != null) {
-      final job = _headlessGen?.jobFor(cid);
+      final job = _generationEngine?.slotFor(cid);
       if (job?.uiNotifier == streamingContentNotifier) {
         job?.uiNotifier = null;
       }
@@ -2767,7 +2709,7 @@ class HomePageController extends ChangeNotifier {
     IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
-    _headlessGen?.removeListener(_onHeadlessGenChanged);
+    _generationEngine?.removeListener(_onHeadlessGenChanged);
     _cancelHeadlessChunkSub();
     _scrollCtrl.dispose();
     try {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/assistant.dart';
 import '../../core/providers/assistant_provider.dart';
 import '../../core/providers/mcp_provider.dart';
+import '../../core/services/search/search_tool_service.dart';
 import '../../features/home/services/tool_handler_service.dart';
 import '../../features/home/services/local_tools_service.dart';
 import '../../l10n/app_localizations.dart';
@@ -182,7 +183,8 @@ class _ToolCollisionDialogBodyState extends State<_ToolCollisionDialogBody> {
             continue;
           }
           final toolName = collision.toolName;
-          if (toolName == 'search_web') {
+          if (toolName == SearchToolService.toolName ||
+              toolName == SearchToolService.fetchToolName) {
             modified = modified.copyWith(searchEnabled: false);
           } else if (toolName == 'create_memory' ||
               toolName == 'edit_memory' ||

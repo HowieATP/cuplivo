@@ -11,6 +11,7 @@ private let backgroundProcessingIdentifier = "psyche.cuplivo.background-generati
 @objc class AppDelegate: FlutterAppDelegate {
   private let fileSaveHandler = NativeFileSaveHandler()
   private let backgroundGenerationHandler = IosBackgroundGenerationHandler()
+  private var linuxSandboxPlugin: CuplivoLinuxSandboxPlugin?
 
   override func application(
     _ application: UIApplication,
@@ -19,6 +20,7 @@ private let backgroundProcessingIdentifier = "psyche.cuplivo.background-generati
     GeneratedPluginRegistrant.register(with: self)
     backgroundGenerationHandler.registerBackgroundTasks()
     if let controller = window?.rootViewController as? FlutterViewController {
+      linuxSandboxPlugin = CuplivoLinuxSandboxPlugin.register(messenger: controller.binaryMessenger)
       let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
       clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         if call.method == "getClipboardImages" {

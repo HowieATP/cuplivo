@@ -21,6 +21,8 @@ class LocalToolNames {
   static const String calculate = 'calculate';
   static const String loadSkill = 'load_skill';
   static const String readSkillFile = 'read_skill_file';
+  static const String handoff = 'kelivo_handoff';
+  static const String handoffSync = 'kelivo_handoff_sync';
   static const String downloadSkill = 'download_skill';
   static const String createSkill = 'create_skill';
 }
@@ -31,6 +33,7 @@ class LocalToolsService {
   static List<Map<String, dynamic>> buildToolDefinitions({
     required Assistant? assistant,
     required bool supportsTools,
+    List<Assistant>? discoverableAssistants,
   }) {
     if (!supportsTools || assistant == null) {
       return const <Map<String, dynamic>>[];
@@ -206,6 +209,34 @@ class LocalToolsService {
         },
       });
     }
+    if (assistant.localToolIds.contains(LocalToolNames.handoff)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.handoff,
+          'description': _handoffDescription(
+            sync: false,
+            discoverableAssistants: discoverableAssistants,
+            excludeId: assistant.id,
+          ),
+          'parameters': _handoffParameters(),
+        },
+      });
+    }
+    if (assistant.localToolIds.contains(LocalToolNames.handoffSync)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.handoffSync,
+          'description': _handoffDescription(
+            sync: true,
+            discoverableAssistants: discoverableAssistants,
+            excludeId: assistant.id,
+          ),
+          'parameters': _handoffParameters(),
+        },
+      });
+    }
     if (assistant.localToolIds.contains(LocalToolNames.downloadSkill)) {
       tools.add(const {
         'type': 'function',
@@ -249,6 +280,82 @@ class LocalToolsService {
       });
     }
     return tools;
+  }
+
+  static List<Assistant> _handoffTargets(
+    List<Assistant>? discoverable, {
+    String? excludeId,
+  }) {
+    return (discoverable ?? const <Assistant>[])
+        .where(
+          (a) =>
+              a.discoverable &&
+              a.handoffId != null &&
+              a.handoffId!.isNotEmpty &&
+              // Self-delegation would enable unbounded recursion — the
+              // delegating assistant is never a valid target.
+              a.id != excludeId,
+        )
+        .toList();
+  }
+
+  static String _handoffDescription({
+    required bool sync,
+    required List<Assistant>? discoverableAssistants,
+    String? excludeId,
+  }) {
+    final buffer = StringBuffer();
+    if (sync) {
+      buffer.write(
+        'Delegate a task to another specialized assistant AND WAIT for it to '
+        'finish. The sub-agent\'s complete output is returned as the tool '
+        'result, so you can synthesize from it. Unlike kelivo_handoff, the '
+        'result may be long and this call may take minutes. '
+        'The user can watch progress in the panel and visit the sub-conversation.\n',
+      );
+    } else {
+      buffer.write(
+        'Delegate a task to another specialized assistant. '
+        'A new conversation is created with full tool access. '
+        'The user can navigate to it from the conversation list.\n',
+      );
+    }
+    final targets = _handoffTargets(
+      discoverableAssistants,
+      excludeId: excludeId,
+    );
+    if (targets.isEmpty) {
+      buffer.write(
+        'No assistants are currently available. '
+        'Ask the user to enable "discoverable" on a target assistant.',
+      );
+    } else {
+      buffer.write('Available targets:\n');
+      for (final t in targets) {
+        buffer.write('- ${t.handoffId}: ${t.handoffDescription ?? t.name}\n');
+      }
+    }
+    return buffer.toString();
+  }
+
+  static Map<String, dynamic> _handoffParameters() {
+    return {
+      'type': 'object',
+      'properties': {
+        'assistant': {
+          'type': 'string',
+          'description': 'The handoff ID of the target assistant',
+        },
+        'task': {
+          'type': 'string',
+          'description':
+              'The complete task prompt for the target assistant. '
+              'Include all necessary context — the target has no access '
+              'to this conversation\'s history.',
+        },
+      },
+      'required': ['assistant', 'task'],
+    };
   }
 
   static Future<String?> tryHandleToolCall(

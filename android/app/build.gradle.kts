@@ -52,6 +52,14 @@ android {
             }
         }
     }
+
+    // proot must be a real on-disk executable for ProcessBuilder (not only
+    // memory-mapped for System.loadLibrary). Legacy packaging extracts jniLibs.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {
@@ -67,4 +75,5 @@ flutter {
 dependencies {
     // Required for core library desugaring (used by flutter_local_notifications)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    testImplementation("junit:junit:4.13.2")
 }

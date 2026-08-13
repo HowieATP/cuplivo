@@ -4,6 +4,7 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Cuplivo/core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
+import 'package:Cuplivo/core/services/workspace/workspace_path_presentation.dart';
 
 Future<Map<String, dynamic>> callTool(
   KelivoFilesystemMcpServerEngine engine,
@@ -27,17 +28,13 @@ String textOf(Map<String, dynamic> result) {
 void main() {
   group('Filesystem wire format', () {
     final mounts = [
-      const FilesystemMount(
-        alias: 'workspaces',
-        path: '/tmp/ws',
-        readOnly: false,
-      ),
+      const FilesystemMount(alias: 'default', path: '/tmp/ws', readOnly: false),
       const FilesystemMount(alias: 'docs', path: '/tmp/docs', readOnly: true),
     ];
 
     test('resolves valid mount-relative paths', () {
-      final r = resolveWirePath('@workspaces/a/b.txt', mounts);
-      expect(r.mount.alias, 'workspaces');
+      final r = resolveWirePath('@default/a/b.txt', mounts);
+      expect(r.mount.alias, 'default');
       expect(r.segments, ['a', 'b.txt']);
       expect(r.isRoot, isFalse);
     });
@@ -61,23 +58,23 @@ void main() {
 
     test('rejects traversal and malformed segments', () {
       for (final bad in [
-        '@workspaces/../x',
-        '@workspaces/./x',
-        '@workspaces//x',
-        '@workspaces/a/',
-        '@workspaces/a\\b',
+        '@default/../x',
+        '@default/./x',
+        '@default//x',
+        '@default/a/',
+        '@default/a\\b',
         '@unknown/x',
-        '@workspaces/a:b',
+        '@default/a:b',
         // Win32 normalization hazards: trailing dots/spaces and all-dot
         // names resolve outside the mount on Windows.
-        '@workspaces/.. ',
-        '@workspaces/...',
-        '@workspaces/.. .',
-        '@workspaces/. ',
-        '@workspaces/ ',
-        '@workspaces/foo. ',
-        '@workspaces/foo.',
-        '@workspaces/foo ',
+        '@default/.. ',
+        '@default/...',
+        '@default/.. .',
+        '@default/. ',
+        '@default/ ',
+        '@default/foo. ',
+        '@default/foo.',
+        '@default/foo ',
       ]) {
         expect(
           () => resolveWirePath(bad, mounts),
@@ -122,7 +119,7 @@ void main() {
       wsDir = Directory('${root.path}/ws')..createSync();
       docsDir = Directory('${root.path}/docs')..createSync();
       mounts = [
-        FilesystemMount(alias: 'workspaces', path: wsDir.path, readOnly: false),
+        FilesystemMount(alias: 'default', path: wsDir.path, readOnly: false),
         FilesystemMount(alias: 'docs', path: docsDir.path, readOnly: true),
       ];
       deleted.clear();
@@ -139,13 +136,13 @@ void main() {
       } catch (_) {}
     });
 
-    String ws(String rel) => '@workspaces/$rel';
+    String ws(String rel) => '@default/$rel';
 
     test('read("/") lists mounts', () async {
-      final r = await callTool(engine, 'kelivo_read', {'path': '/'});
+      final r = await callTool(engine, 'read', {'path': '/'});
       expect(r['isError'], false);
       final text = textOf(r);
-      expect(text, contains('@workspaces (rw)'));
+      expect(text, contains('@default (rw)'));
       expect(text, contains('@docs (ro)'));
       // Host paths never enter the model context (ADR-0022).
       expect(text, isNot(contains(wsDir.path)));
@@ -153,16 +150,14 @@ void main() {
     });
 
     test('write_file creates a file, read returns numbered lines', () async {
-      final w = await callTool(engine, 'kelivo_write_file', {
+      final w = await callTool(engine, 'write', {
         'path': ws('notes/a.md'),
         'content': 'line one\nline two\nline three\n',
       });
       expect(w['isError'], false);
       expect(File('${wsDir.path}/notes/a.md').existsSync(), isTrue);
 
-      final r = await callTool(engine, 'kelivo_read', {
-        'path': ws('notes/a.md'),
-      });
+      final r = await callTool(engine, 'read', {'path': ws('notes/a.md')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text, contains('1: line one'));
@@ -171,7 +166,7 @@ void main() {
 
     test('read rejects binary files', () async {
       File('${wsDir.path}/bin.dat').writeAsBytesSync([1, 2, 0, 3, 4]);
-      final r = await callTool(engine, 'kelivo_read', {'path': ws('bin.dat')});
+      final r = await callTool(engine, 'read', {'path': ws('bin.dat')});
       expect(r['isError'], true);
       expect(textOf(r), contains('Binary'));
     });
@@ -179,13 +174,13 @@ void main() {
     test('read paginates with start_line', () async {
       final content = List.generate(5000, (i) => 'line ${i + 1}').join('\n');
       File('${wsDir.path}/big.txt').writeAsStringSync(content);
-      final r = await callTool(engine, 'kelivo_read', {'path': ws('big.txt')});
+      final r = await callTool(engine, 'read', {'path': ws('big.txt')});
       final text = textOf(r);
       expect(r['isError'], false);
       expect(text, contains('1: line 1'));
       expect(text, contains('start_line='));
 
-      final r2 = await callTool(engine, 'kelivo_read', {
+      final r2 = await callTool(engine, 'read', {
         'path': ws('big.txt'),
         'start_line': 1500,
       });
@@ -194,7 +189,7 @@ void main() {
     });
 
     test('write_file on read-only mount fails', () async {
-      final r = await callTool(engine, 'kelivo_write_file', {
+      final r = await callTool(engine, 'write', {
         'path': '@docs/x.txt',
         'content': 'hi',
       });
@@ -204,7 +199,7 @@ void main() {
 
     test('patch_file replaces first occurrence', () async {
       File('${wsDir.path}/p.txt').writeAsStringSync('aaa bbb aaa');
-      final r = await callTool(engine, 'kelivo_patch_file', {
+      final r = await callTool(engine, 'patch', {
         'path': ws('p.txt'),
         'old_string': 'aaa',
         'new_string': 'zzz',
@@ -212,7 +207,7 @@ void main() {
       expect(r['isError'], false);
       expect(File('${wsDir.path}/p.txt').readAsStringSync(), 'zzz bbb aaa');
 
-      final miss = await callTool(engine, 'kelivo_patch_file', {
+      final miss = await callTool(engine, 'patch', {
         'path': ws('p.txt'),
         'old_string': 'nope',
         'new_string': 'x',
@@ -222,19 +217,15 @@ void main() {
 
     test('delete file records workspaceFile marker', () async {
       File('${wsDir.path}/del.txt').writeAsStringSync('x');
-      final r = await callTool(engine, 'kelivo_delete', {
-        'path': ws('del.txt'),
-      });
+      final r = await callTool(engine, 'delete', {'path': ws('del.txt')});
       expect(r['isError'], false);
       expect(File('${wsDir.path}/del.txt').existsSync(), isFalse);
-      expect(deleted, contains('@workspaces/del.txt'));
+      expect(deleted, contains('@default/del.txt'));
     });
 
     test('delete on a read-only mount fails with read-only error', () async {
       File('${docsDir.path}/keep.txt').writeAsStringSync('x');
-      final r = await callTool(engine, 'kelivo_delete', {
-        'path': '@docs/keep.txt',
-      });
+      final r = await callTool(engine, 'delete', {'path': '@docs/keep.txt'});
       expect(r['isError'], true);
       expect(textOf(r), contains('read-only'));
       expect(File('${docsDir.path}/keep.txt').existsSync(), isTrue);
@@ -242,9 +233,7 @@ void main() {
     });
 
     test('delete mount root is rejected', () async {
-      final r = await callTool(engine, 'kelivo_delete', {
-        'path': '@workspaces',
-      });
+      final r = await callTool(engine, 'delete', {'path': '@default'});
       expect(r['isError'], true);
       expect(textOf(r), contains('mount root'));
     });
@@ -252,11 +241,11 @@ void main() {
     test('delete non-empty dir requires recursive', () async {
       Directory('${wsDir.path}/d').createSync();
       File('${wsDir.path}/d/f').writeAsStringSync('x');
-      final r = await callTool(engine, 'kelivo_delete', {'path': ws('d')});
+      final r = await callTool(engine, 'delete', {'path': ws('d')});
       expect(r['isError'], true);
       expect(textOf(r), contains('recursive'));
 
-      final r2 = await callTool(engine, 'kelivo_delete', {
+      final r2 = await callTool(engine, 'delete', {
         'path': ws('d'),
         'recursive': true,
       });
@@ -264,13 +253,13 @@ void main() {
       expect(Directory('${wsDir.path}/d').existsSync(), isFalse);
       // A recursive directory deletion propagates as a single directory mark
       // (peers apply it as a user-confirmed recursive local delete).
-      expect(deleted, contains('@workspaces/d'));
+      expect(deleted, contains('@default/d'));
     });
 
     test('delete inside dot-prefixed paths records no marker', () async {
       Directory('${wsDir.path}/.fetch_cache').createSync();
       File('${wsDir.path}/.fetch_cache/cache.bin').writeAsStringSync('x');
-      final r = await callTool(engine, 'kelivo_delete', {
+      final r = await callTool(engine, 'delete', {
         'path': ws('.fetch_cache/cache.bin'),
       });
       expect(r['isError'], false);
@@ -288,13 +277,13 @@ void main() {
         );
         Directory('${wsDir.path}/proj').createSync();
         File('${wsDir.path}/proj/a.txt').writeAsStringSync('x');
-        final r = await callTool(engine, 'kelivo_move', {
+        final r = await callTool(engine, 'move', {
           'source': ws('proj'),
           'destination': '@docs/proj',
         });
         expect(r['isError'], false);
         expect(Directory('${docsDir.path}/proj').existsSync(), isTrue);
-        expect(deleted, contains('@workspaces/proj'));
+        expect(deleted, contains('@default/proj'));
       },
     );
 
@@ -306,21 +295,21 @@ void main() {
       File('${wsDir.path}/src/.hidden').writeAsStringSync('');
       File('${wsDir.path}/src/.dir/h.txt').writeAsStringSync('');
 
-      final r = await callTool(engine, 'kelivo_glob', {
-        'path': '@workspaces',
+      final r = await callTool(engine, 'glob', {
+        'path': '@default',
         'pattern': 'src/**/*.dart',
       });
       expect(r['isError'], false);
       final text = textOf(r);
-      expect(text, contains('@workspaces/src/a.dart'));
+      expect(text, contains('@default/src/a.dart'));
       expect(text, isNot(contains('.hidden')));
       expect(text, isNot(contains('.dir')));
 
-      final all = await callTool(engine, 'kelivo_glob', {
-        'path': '@workspaces',
+      final all = await callTool(engine, 'glob', {
+        'path': '@default',
         'pattern': '**/*.md',
       });
-      expect(textOf(all), contains('@workspaces/src/b.md'));
+      expect(textOf(all), contains('@default/src/b.md'));
     });
 
     test('grep matches with line numbers and skips binary', () async {
@@ -328,36 +317,36 @@ void main() {
         '${wsDir.path}/g.txt',
       ).writeAsStringSync('alpha\nbeta gamma\nalpha again\n');
       File('${wsDir.path}/bin.dat').writeAsBytesSync([1, 2, 0, 3]);
-      final r = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final r = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'alpha',
       });
       expect(r['isError'], false);
       final text = textOf(r);
-      expect(text, contains('@workspaces/g.txt:1: alpha'));
-      expect(text, contains('@workspaces/g.txt:3: alpha again'));
+      expect(text, contains('@default/g.txt:1: alpha'));
+      expect(text, contains('@default/g.txt:3: alpha again'));
       expect(text, isNot(contains('bin.dat')));
     });
 
     test('grep result paths keep the searched subdirectory', () async {
       Directory('${wsDir.path}/src/nested').createSync(recursive: true);
       File('${wsDir.path}/src/nested/hit.txt').writeAsStringSync('needle here');
-      final r = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces/src',
+      final r = await callTool(engine, 'grep', {
+        'path': '@default/src',
         'regex': r'needle',
       });
       expect(r['isError'], false);
       final text = textOf(r);
       // The result path must be the full searchable path, not just @workspaces.
-      expect(text, contains('@workspaces/src/nested/hit.txt:1: needle here'));
-      expect(text, isNot(contains('@workspaces/nested/hit.txt')));
+      expect(text, contains('@default/src/nested/hit.txt:1: needle here'));
+      expect(text, isNot(contains('@default/nested/hit.txt')));
     });
 
     test('mkdir recursive and non-recursive', () async {
-      final nr = await callTool(engine, 'kelivo_mkdir', {'path': ws('a/b')});
+      final nr = await callTool(engine, 'mkdir', {'path': ws('a/b')});
       expect(nr['isError'], true);
 
-      final r = await callTool(engine, 'kelivo_mkdir', {
+      final r = await callTool(engine, 'mkdir', {
         'path': ws('a/b'),
         'recursive': true,
       });
@@ -369,14 +358,14 @@ void main() {
       File('${wsDir.path}/m.txt').writeAsStringSync('x');
       File('${wsDir.path}/exists.txt').writeAsStringSync('y');
 
-      final dup = await callTool(engine, 'kelivo_move', {
+      final dup = await callTool(engine, 'move', {
         'source': ws('m.txt'),
         'destination': ws('exists.txt'),
       });
       expect(dup['isError'], true);
       expect(textOf(dup), contains('already exists'));
 
-      final r = await callTool(engine, 'kelivo_move', {
+      final r = await callTool(engine, 'move', {
         'source': ws('m.txt'),
         'destination': ws('sub/m.txt'),
       });
@@ -384,12 +373,12 @@ void main() {
       expect(File('${wsDir.path}/m.txt').existsSync(), isFalse);
       expect(File('${wsDir.path}/sub/m.txt').existsSync(), isTrue);
       // Source deletion inside @workspaces records a marker.
-      expect(deleted, contains('@workspaces/m.txt'));
+      expect(deleted, contains('@default/m.txt'));
     });
 
     test('move into a read-only mount fails', () async {
       File('${wsDir.path}/x.txt').writeAsStringSync('data');
-      final r = await callTool(engine, 'kelivo_move', {
+      final r = await callTool(engine, 'move', {
         'source': ws('x.txt'),
         'destination': '@docs/x.txt',
       });
@@ -408,7 +397,7 @@ void main() {
         readOnly: false,
       );
       File('${wsDir.path}/x.txt').writeAsStringSync('data');
-      final r = await callTool(engine, 'kelivo_move', {
+      final r = await callTool(engine, 'move', {
         'source': ws('x.txt'),
         'destination': '@docs/x.txt',
       });
@@ -416,7 +405,7 @@ void main() {
       expect(File('${wsDir.path}/x.txt').existsSync(), isFalse);
       expect(File('${docsDir.path}/x.txt').existsSync(), isTrue);
       // Target outside workspaces preserves mtime; source marker recorded.
-      expect(deleted, contains('@workspaces/x.txt'));
+      expect(deleted, contains('@default/x.txt'));
     });
 
     test('move into workspaces sets mtime to now', () async {
@@ -428,7 +417,7 @@ void main() {
       final src = File('${docsDir.path}/y.txt')
         ..writeAsStringSync('data')
         ..setLastModifiedSync(DateTime(2020, 1, 1));
-      final r = await callTool(engine, 'kelivo_move', {
+      final r = await callTool(engine, 'move', {
         'source': '@docs/y.txt',
         'destination': ws('y.txt'),
       });
@@ -449,7 +438,7 @@ void main() {
         ..writeAsStringSync('x')
         ..setLastModifiedSync(DateTime(2020, 1, 1));
 
-      final r = await callTool(engine, 'kelivo_move', {
+      final r = await callTool(engine, 'move', {
         'source': ws('old'),
         'destination': ws('new'),
       });
@@ -470,14 +459,14 @@ void main() {
       File('${wsDir.path}/z/a.txt').writeAsStringSync('hello');
       File('${wsDir.path}/z/b.txt').writeAsStringSync('world');
 
-      final z = await callTool(engine, 'kelivo_zip', {
+      final z = await callTool(engine, 'zip', {
         'source': ws('z'),
         'destination': ws('z.zip'),
       });
       expect(z['isError'], false);
       expect(File('${wsDir.path}/z.zip').existsSync(), isTrue);
 
-      final u = await callTool(engine, 'kelivo_unzip', {
+      final u = await callTool(engine, 'unzip', {
         'source': ws('z.zip'),
         'destination': ws('out'),
       });
@@ -491,13 +480,13 @@ void main() {
       final archived = File('${wsDir.path}/z2/old.txt')
         ..writeAsStringSync('x')
         ..setLastModifiedSync(DateTime(2020, 1, 1));
-      final z = await callTool(engine, 'kelivo_zip', {
+      final z = await callTool(engine, 'zip', {
         'source': ws('z2'),
         'destination': ws('z2.zip'),
       });
       expect(z['isError'], false);
 
-      final u = await callTool(engine, 'kelivo_unzip', {
+      final u = await callTool(engine, 'unzip', {
         'source': ws('z2.zip'),
         'destination': ws('out2'),
       });
@@ -529,25 +518,25 @@ void main() {
         }
 
         // glob terminates (would hang forever if the cycle were followed).
-        final g = await callTool(engine, 'kelivo_glob', {
-          'path': '@workspaces',
+        final g = await callTool(engine, 'glob', {
+          'path': '@default',
           'pattern': '**/*',
         });
         expect(g['isError'], false);
         final globText = textOf(g);
-        expect(globText, contains('@workspaces/tree/real.txt'));
+        expect(globText, contains('@default/tree/real.txt'));
         // Links themselves are skipped entirely.
         expect(globText, isNot(contains('cycle')));
         expect(globText, isNot(contains('escape')));
         expect(globText, isNot(contains('outside.txt')));
 
         // zip must not pack the escaped target either.
-        final z = await callTool(engine, 'kelivo_zip', {
+        final z = await callTool(engine, 'zip', {
           'source': ws('tree'),
           'destination': ws('tree.zip'),
         });
         expect(z['isError'], false);
-        final u = await callTool(engine, 'kelivo_unzip', {
+        final u = await callTool(engine, 'unzip', {
           'source': ws('tree.zip'),
           'destination': ws('tree_out'),
         });
@@ -570,7 +559,7 @@ void main() {
       encoder.addFileSync(evil, '../evil.txt');
       encoder.closeSync();
 
-      final r = await callTool(engine, 'kelivo_unzip', {
+      final r = await callTool(engine, 'unzip', {
         'source': ws('evil.zip'),
         'destination': ws('out2'),
       });
@@ -588,7 +577,7 @@ void main() {
       encoder.addFileSync(evil, '.. ');
       encoder.closeSync();
 
-      final r = await callTool(engine, 'kelivo_unzip', {
+      final r = await callTool(engine, 'unzip', {
         'source': ws('evil2.zip'),
         'destination': ws('out3'),
       });
@@ -596,7 +585,7 @@ void main() {
       expect(textOf(r), contains('Unsafe zip entry'));
     });
 
-    test('tools/list advertises the 11 tool definitions', () async {
+    test('tools/list advertises the 12 tool definitions', () async {
       final resp = await engine.handleMessage({
         'jsonrpc': '2.0',
         'id': 1,
@@ -607,17 +596,18 @@ void main() {
       expect(
         names,
         containsAll([
-          'kelivo_read',
-          'kelivo_write_file',
-          'kelivo_patch_file',
-          'kelivo_delete',
-          'kelivo_glob',
-          'kelivo_grep',
-          'kelivo_outline',
-          'kelivo_mkdir',
-          'kelivo_move',
-          'kelivo_zip',
-          'kelivo_unzip',
+          'read',
+          'write',
+          'patch',
+          'delete',
+          'glob',
+          'grep',
+          'outline',
+          'mkdir',
+          'move',
+          'zip',
+          'unzip',
+          'download',
         ]),
       );
     });
@@ -625,15 +615,11 @@ void main() {
     test('read tolerates a single trailing slash (directory intent)', () async {
       Directory('${wsDir.path}/notes').createSync();
       File('${wsDir.path}/notes/a.md').writeAsStringSync('hello');
-      final r = await callTool(engine, 'kelivo_read', {
-        'path': '@workspaces/notes/',
-      });
+      final r = await callTool(engine, 'read', {'path': '@default/notes/'});
       expect(r['isError'], false);
       expect(textOf(r), contains('a.md'));
 
-      final root = await callTool(engine, 'kelivo_read', {
-        'path': '@workspaces/',
-      });
+      final root = await callTool(engine, 'read', {'path': '@default/'});
       expect(root['isError'], false);
       expect(textOf(root), contains('notes'));
     });
@@ -641,16 +627,14 @@ void main() {
     test(
       'trailing slash tolerance is read-only — other tools stay strict',
       () async {
-        final w = await callTool(engine, 'kelivo_write_file', {
-          'path': '@workspaces/x/',
+        final w = await callTool(engine, 'write', {
+          'path': '@default/x/',
           'content': 'hi',
         });
         expect(w['isError'], true);
         expect(textOf(w), contains('trailing slash'));
 
-        final d = await callTool(engine, 'kelivo_delete', {
-          'path': '@workspaces/x/',
-        });
+        final d = await callTool(engine, 'delete', {'path': '@default/x/'});
         expect(d['isError'], true);
         expect(textOf(d), contains('trailing slash'));
       },
@@ -662,8 +646,8 @@ void main() {
         File('${wsDir.path}/many.txt').writeAsStringSync(
           List.generate(250, (i) => 'hit line ${i + 1}').join('\n'),
         );
-        final page1 = await callTool(engine, 'kelivo_grep', {
-          'path': '@workspaces',
+        final page1 = await callTool(engine, 'grep', {
+          'path': '@default',
           'regex': r'hit',
         });
         expect(page1['isError'], false);
@@ -672,8 +656,8 @@ void main() {
         expect(text1, isNot(contains('many.txt:101: hit line 101')));
         expect(text1, contains('offset=100'));
 
-        final page2 = await callTool(engine, 'kelivo_grep', {
-          'path': '@workspaces',
+        final page2 = await callTool(engine, 'grep', {
+          'path': '@default',
           'regex': r'hit',
           'offset': 100,
         });
@@ -682,8 +666,8 @@ void main() {
         expect(text2, isNot(contains('many.txt:1: hit line 1')));
         expect(text2, contains('offset=200'));
 
-        final last = await callTool(engine, 'kelivo_grep', {
-          'path': '@workspaces',
+        final last = await callTool(engine, 'grep', {
+          'path': '@default',
           'regex': r'hit',
           'offset': 200,
         });
@@ -694,22 +678,22 @@ void main() {
     );
 
     test('grep validates pagination and context bounds', () async {
-      final badLimit = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final badLimit = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x',
         'limit': 501,
       });
       expect(badLimit['isError'], true);
 
-      final badOffset = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final badOffset = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x',
         'offset': -1,
       });
       expect(badOffset['isError'], true);
 
-      final badContext = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final badContext = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x',
         'before_context': 6,
       });
@@ -722,8 +706,8 @@ void main() {
         File(
           '${wsDir.path}/ctx.txt',
         ).writeAsStringSync('a\nb\ntarget1\nc\nd\ne\ntarget2\nf\ng\n');
-        final r = await callTool(engine, 'kelivo_grep', {
-          'path': '@workspaces',
+        final r = await callTool(engine, 'grep', {
+          'path': '@default',
           'regex': r'target',
           'before_context': 2,
           'after_context': 1,
@@ -746,8 +730,8 @@ void main() {
       File(
         '${wsDir.path}/pg.txt',
       ).writeAsStringSync(List.generate(60, (i) => 'x line $i').join('\n'));
-      final r = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final r = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x line (0|20|40)$',
         'before_context': 1,
         'after_context': 1,
@@ -768,8 +752,8 @@ void main() {
       File(
         '${wsDir.path}/exact.txt',
       ).writeAsStringSync(List.generate(100, (i) => 'needle $i').join('\n'));
-      final exact = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final exact = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'needle',
       });
       expect(exact['isError'], false);
@@ -780,8 +764,8 @@ void main() {
       File(
         '${wsDir.path}/over.txt',
       ).writeAsStringSync(List.generate(101, (i) => 'needle $i').join('\n'));
-      final over = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final over = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'needle',
       });
       expect(over['isError'], false);
@@ -794,21 +778,21 @@ void main() {
       Directory('${wsDir.path}/d2').createSync();
       File('${wsDir.path}/d2/b.txt').writeAsStringSync('hit\n' * 3);
       File('${wsDir.path}/d1/a.txt').writeAsStringSync('hit\n' * 3);
-      final r1 = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final r1 = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'hit',
         'offset': 2,
       });
-      final r2 = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final r2 = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'hit',
         'offset': 2,
       });
       expect(textOf(r1), textOf(r2));
       // Deterministic walk order: directories first, then by lowercase
       // name — d1's file precedes d2's file.
-      final r3 = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final r3 = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'hit',
         'limit': 2,
       });
@@ -834,9 +818,7 @@ void main() {
         "  return 'ok';\n"
         '}\n',
       );
-      final r = await callTool(engine, 'kelivo_outline', {
-        'path': ws('app.dart'),
-      });
+      final r = await callTool(engine, 'outline', {'path': ws('app.dart')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text, contains('(4 symbols)'));
@@ -857,27 +839,21 @@ void main() {
         // rejected without reading; binary rejection applies to supported
         // extensions only.
         File('${wsDir.path}/bin.dart').writeAsBytesSync([1, 2, 0, 3]);
-        final b = await callTool(engine, 'kelivo_outline', {
-          'path': ws('bin.dart'),
-        });
+        final b = await callTool(engine, 'outline', {'path': ws('bin.dart')});
         expect(b['isError'], true);
         expect(textOf(b), contains('Binary'));
 
         File('${wsDir.path}/bin.dat').writeAsBytesSync([1, 2, 0, 3]);
-        final b2 = await callTool(engine, 'kelivo_outline', {
-          'path': ws('bin.dat'),
-        });
+        final b2 = await callTool(engine, 'outline', {'path': ws('bin.dat')});
         expect(b2['isError'], true);
         expect(textOf(b2), contains('Unsupported'));
 
         File('${wsDir.path}/data.xyz').writeAsStringSync('x');
-        final u = await callTool(engine, 'kelivo_outline', {
-          'path': ws('data.xyz'),
-        });
+        final u = await callTool(engine, 'outline', {'path': ws('data.xyz')});
         expect(u['isError'], true);
         expect(textOf(u), contains('Unsupported'));
 
-        final m = await callTool(engine, 'kelivo_outline', {
+        final m = await callTool(engine, 'outline', {
           'path': ws('missing.dart'),
         });
         expect(m['isError'], true);
@@ -894,9 +870,7 @@ void main() {
         '    def method(self):\n'
         '        pass\n',
       );
-      final r = await callTool(engine, 'kelivo_outline', {
-        'path': ws('mod.py'),
-      });
+      final r = await callTool(engine, 'outline', {'path': ws('mod.py')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text, contains('def top (1)'));
@@ -911,9 +885,7 @@ void main() {
         content.writeln('void fn$i() {}');
       }
       File('${wsDir.path}/huge.dart').writeAsStringSync(content.toString());
-      final r = await callTool(engine, 'kelivo_outline', {
-        'path': ws('huge.dart'),
-      });
+      final r = await callTool(engine, 'outline', {'path': ws('huge.dart')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text, contains('(200 symbols)'));
@@ -938,9 +910,7 @@ void main() {
           '\treturn 0\n'
           '}\n',
         );
-        final r = await callTool(engine, 'kelivo_outline', {
-          'path': ws('srv.go'),
-        });
+        final r = await callTool(engine, 'outline', {'path': ws('srv.go')});
         expect(r['isError'], false);
         final text = textOf(r);
         expect(text, contains('type Server (3)'));
@@ -963,9 +933,7 @@ void main() {
           '  }\n'
           '}\n',
         );
-        final r = await callTool(engine, 'kelivo_outline', {
-          'path': ws('async.dart'),
-        });
+        final r = await callTool(engine, 'outline', {'path': ws('async.dart')});
         expect(r['isError'], false);
         final text = textOf(r);
         expect(text, contains('class Loader (1)'));
@@ -980,9 +948,7 @@ void main() {
           '  return 1;\n'
           '}\n',
         );
-        final r2 = await callTool(engine, 'kelivo_outline', {
-          'path': ws('n.cc'),
-        });
+        final r2 = await callTool(engine, 'outline', {'path': ws('n.cc')});
         expect(r2['isError'], false);
         final text2 = textOf(r2);
         expect(text2, contains('run (1)'));
@@ -1003,9 +969,7 @@ void main() {
         '  }\n'
         '}\n',
       );
-      final r = await callTool(engine, 'kelivo_outline', {
-        'path': ws('locker.java'),
-      });
+      final r = await callTool(engine, 'outline', {'path': ws('locker.java')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text, contains('class Locker (1)'));
@@ -1017,7 +981,7 @@ void main() {
     test('read truncates an over-budget single line', () async {
       // 64 KB single line, no newline — must not blow the 32 KB budget.
       File('${wsDir.path}/min.js').writeAsStringSync('x' * (64 * 1024));
-      final r = await callTool(engine, 'kelivo_read', {'path': ws('min.js')});
+      final r = await callTool(engine, 'read', {'path': ws('min.js')});
       expect(r['isError'], false);
       final text = textOf(r);
       expect(text.length, lessThan(64 * 1024));
@@ -1026,23 +990,23 @@ void main() {
     });
 
     test('grep and read reject non-integer numeric args', () async {
-      final badLimit = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final badLimit = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x',
         'limit': '10',
       });
       expect(badLimit['isError'], true);
       expect(textOf(badLimit), contains('expected an integer'));
 
-      final badOffset = await callTool(engine, 'kelivo_grep', {
-        'path': '@workspaces',
+      final badOffset = await callTool(engine, 'grep', {
+        'path': '@default',
         'regex': r'x',
         'offset': 1.5,
       });
       expect(badOffset['isError'], true);
 
       File('${wsDir.path}/a.txt').writeAsStringSync('x');
-      final badStart = await callTool(engine, 'kelivo_read', {
+      final badStart = await callTool(engine, 'read', {
         'path': ws('a.txt'),
         'start_line': 'abc',
       });
@@ -1052,7 +1016,7 @@ void main() {
       // start_line validation applies to directories too — never silently
       // ignored.
       Directory('${wsDir.path}/adir').createSync();
-      final dirStart = await callTool(engine, 'kelivo_read', {
+      final dirStart = await callTool(engine, 'read', {
         'path': ws('adir'),
         'start_line': 'abc',
       });
@@ -1068,14 +1032,82 @@ void main() {
           content.writeln('void fn$i() {}');
         }
         File('${wsDir.path}/exact.dart').writeAsStringSync(content.toString());
-        final r = await callTool(engine, 'kelivo_outline', {
-          'path': ws('exact.dart'),
-        });
+        final r = await callTool(engine, 'outline', {'path': ws('exact.dart')});
         expect(r['isError'], false);
         final text = textOf(r);
         expect(text, contains('(200 symbols)'));
         expect(text, isNot(contains('cap 200')));
         expect(text, contains('fn199'));
+      },
+    );
+  });
+
+  group('KelivoFilesystemMcpServerEngine pathPresenter', () {
+    late Directory root;
+    late Directory wsDir;
+    late List<FilesystemMount> mounts;
+    final deleted = <String>[];
+    late KelivoFilesystemMcpServerEngine engine;
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('kelivo_fs_presenter_');
+      wsDir = Directory('${root.path}/ws')..createSync();
+      mounts = [
+        FilesystemMount(alias: 'default', path: wsDir.path, readOnly: false),
+      ];
+      deleted.clear();
+      engine = KelivoFilesystemMcpServerEngine(
+        mountsProvider: () => mounts,
+        pathPresenter: (wire) => presentWirePath(wire, 'default'),
+        onWorkspaceFileDeleted: (wirePath) async => deleted.add(wirePath),
+      );
+    });
+
+    tearDown(() {
+      engine.close();
+      try {
+        root.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    test('write result echoes /workspace, never @alias', () async {
+      final w = await callTool(engine, 'write', {
+        'path': '@default/a.md',
+        'content': 'hi',
+      });
+      expect(w['isError'], false);
+      expect(textOf(w), contains('/workspace/a.md'));
+      expect(textOf(w), isNot(contains('@default')));
+    });
+
+    test('read("/") lists mounts as /workspace', () async {
+      final r = await callTool(engine, 'read', {'path': '/'});
+      expect(r['isError'], false);
+      final text = textOf(r);
+      expect(text, contains('/workspace (rw)'));
+      expect(text, isNot(contains('@default')));
+    });
+
+    test('directory listing header uses /workspace', () async {
+      Directory('${wsDir.path}/sub').createSync();
+      File('${wsDir.path}/sub/f.txt').writeAsStringSync('x');
+      final r = await callTool(engine, 'read', {'path': '@default/sub'});
+      expect(r['isError'], false);
+      final text = textOf(r);
+      expect(text, contains('/workspace/sub (1 entries)'));
+      expect(text, isNot(contains('@default')));
+    });
+
+    test(
+      'deletion marker keeps canonical wire path (identity red line)',
+      () async {
+        File('${wsDir.path}/del.txt').writeAsStringSync('x');
+        final r = await callTool(engine, 'delete', {
+          'path': '@default/del.txt',
+        });
+        expect(r['isError'], false);
+        expect(textOf(r), contains('/workspace/del.txt'));
+        expect(deleted, ['@default/del.txt']);
       },
     );
   });

@@ -11,7 +11,6 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/providers/filesystem_mounts_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -64,8 +63,8 @@ class _MountFilesPageState extends State<MountFilesPage> {
   bool _loading = true;
   int _loadGen = 0;
 
-  bool get _isWorkspaces =>
-      widget.mount.alias == FilesystemMountsProvider.workspacesAlias;
+  /// All multi-workspace mounts participate in deletion markers.
+  bool get _isWorkspaces => true;
 
   String get _currentHostDir => _segments.isEmpty
       ? widget.mount.path

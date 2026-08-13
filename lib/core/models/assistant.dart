@@ -59,6 +59,11 @@ Do **not** store sensitive information, including:
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
   final List<String> skillIds; // enabled skill names
+  /// When true, workspace filesystem/shell tools for [workspaceId] are exposed.
+  final bool workspaceEnabled;
+
+  /// Bound workspace entity id (single bind).
+  final String? workspaceId;
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -119,6 +124,8 @@ Do **not** store sensitive information, including:
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
     this.skillIds = const <String>[],
+    this.workspaceEnabled = false,
+    this.workspaceId,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -167,6 +174,9 @@ Do **not** store sensitive information, including:
     List<String>? mcpServerIds,
     List<String>? localToolIds,
     List<String>? skillIds,
+    bool? workspaceEnabled,
+    String? workspaceId,
+    bool clearWorkspaceId = false,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -227,6 +237,8 @@ Do **not** store sensitive information, including:
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
       skillIds: skillIds ?? this.skillIds,
+      workspaceEnabled: workspaceEnabled ?? this.workspaceEnabled,
+      workspaceId: clearWorkspaceId ? null : (workspaceId ?? this.workspaceId),
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -282,6 +294,8 @@ Do **not** store sensitive information, including:
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
     'skillIds': skillIds,
+    'workspaceEnabled': workspaceEnabled,
+    'workspaceId': workspaceId,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -331,6 +345,8 @@ Do **not** store sensitive information, including:
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
     skillIds: (json['skillIds'] as List?)?.cast<String>() ?? const <String>[],
+    workspaceEnabled: json['workspaceEnabled'] as bool? ?? false,
+    workspaceId: json['workspaceId'] as String?,
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

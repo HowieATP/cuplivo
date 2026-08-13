@@ -4447,6 +4447,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesPageGeneralOptions => 'General Options';
 
   @override
+  String get searchServicesPageEnableFallbackFetchTitle =>
+      'Enable fetch for providers without native fetch';
+
+  @override
   String get searchServicesPageAutoTestTitle =>
       'Auto-test connections on launch';
 
@@ -6007,6 +6011,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
       'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.';
+
+  @override
+  String get assistantEditLocalToolHandoffTitle => 'Task Handoff';
+
+  @override
+  String get assistantEditLocalToolHandoffSubtitle =>
+      'Delegate a task to another assistant in a new conversation without waiting for the result.';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncTitle => 'Sync Handoff';
+
+  @override
+  String get assistantEditLocalToolHandoffSyncSubtitle =>
+      'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.';
 
   @override
   String get assistantEditSkillDownloadTitle => 'Download Skills';
@@ -7985,4 +8003,220 @@ class AppLocalizationsEn extends AppLocalizations {
   String imageGenPartialNotice(Object received, Object requested) {
     return 'Only $received/$requested images were generated.';
   }
+
+  @override
+  String get settingsPageWorkspace => 'Workspaces';
+
+  @override
+  String get workspaceListEmpty => 'No workspaces yet';
+
+  @override
+  String get workspaceAdd => 'Add workspace';
+
+  @override
+  String get workspaceNameHint => 'Workspace name';
+
+  @override
+  String get workspaceCancel => 'Cancel';
+
+  @override
+  String get workspaceConfirm => 'OK';
+
+  @override
+  String get workspaceCannotDeleteDefault =>
+      'The default workspace cannot be deleted';
+
+  @override
+  String get workspaceNotFound => 'Workspace not found';
+
+  @override
+  String get workspaceRename => 'Rename';
+
+  @override
+  String get workspaceFilesEntry => 'Workspace files';
+
+  @override
+  String get workspaceFilesystemTools => 'Filesystem tools';
+
+  @override
+  String get workspaceInstallDeps => 'Install dependencies';
+
+  @override
+  String get workspaceEnableTitle => 'Enable workspace';
+
+  @override
+  String get workspaceBindTitle => 'Bound workspace';
+
+  @override
+  String get workspaceEntryTitle => 'Workspace';
+
+  @override
+  String get workspaceEntrySubtitleOff => 'Off';
+
+  @override
+  String get workspaceShellMobileOnly =>
+      'Shell is only available on Android or iOS';
+
+  @override
+  String get workspaceToolShellTitle => 'Shell';
+
+  @override
+  String get workspaceToolShellUserDesc =>
+      'Run commands in the Linux sandbox (Android or iOS, requires base dependency)';
+
+  @override
+  String get workspaceDepSettings => 'Source settings';
+
+  @override
+  String get workspaceDepInstall => 'Install';
+
+  @override
+  String get workspaceDepInstalling => 'Installing…';
+
+  @override
+  String get workspaceDepInstallDone => 'Installed';
+
+  @override
+  String get workspaceDepInstalled => 'Installed';
+
+  @override
+  String get workspaceDepReinstall => 'Reinstall';
+
+  @override
+  String get workspaceSandboxRuntimeMissing =>
+      'Sandbox runtime missing; reinstall this app build';
+
+  @override
+  String get workspaceSandboxBaseRequired =>
+      'Install the base dependency first';
+
+  @override
+  String get workspaceDepSource => 'Install source';
+
+  @override
+  String get workspaceDepSourceAuto => 'Auto (fallback)';
+
+  @override
+  String get workspaceDepSourceOfficial => 'Official';
+
+  @override
+  String get workspaceDepSourceTuna => 'Tsinghua TUNA';
+
+  @override
+  String get workspaceDepSourceAliyun => 'Aliyun';
+
+  @override
+  String get workspaceDepSourceCustom => 'Custom URL';
+
+  @override
+  String get workspaceDepCustomUrlHint => 'https://…';
+
+  @override
+  String get workspaceDepBaseTitle => 'Base (Linux rootfs)';
+
+  @override
+  String get workspaceDepBaseDesc => 'Required root filesystem for the sandbox';
+
+  @override
+  String get workspaceDepPythonTitle => 'Python';
+
+  @override
+  String get workspaceDepPythonDesc => 'python3 and pip';
+
+  @override
+  String get workspaceDepNodeTitle => 'Node.js';
+
+  @override
+  String get workspaceDepNodeDesc => 'nodejs and npm';
+
+  @override
+  String get workspaceDepGitTitle => 'Git';
+
+  @override
+  String get workspaceDepGitDesc => 'Version control tools';
+
+  @override
+  String get workspaceDepBuildTitle => 'Build tools';
+
+  @override
+  String get workspaceDepBuildDesc => 'gcc, make, and related packages';
+
+  @override
+  String get workspaceToolReadTitle => 'Read';
+
+  @override
+  String get workspaceToolReadUserDesc =>
+      'Read files or list directories in the workspace';
+
+  @override
+  String get workspaceToolWriteTitle => 'Write';
+
+  @override
+  String get workspaceToolWriteUserDesc => 'Create or overwrite files';
+
+  @override
+  String get workspaceToolPatchTitle => 'Patch';
+
+  @override
+  String get workspaceToolPatchUserDesc => 'Replace text inside a file';
+
+  @override
+  String get workspaceToolDeleteTitle => 'Delete';
+
+  @override
+  String get workspaceToolDeleteUserDesc =>
+      'Delete files or directories (requires approval)';
+
+  @override
+  String get workspaceToolGlobTitle => 'Glob';
+
+  @override
+  String get workspaceToolGlobUserDesc => 'Find files by pattern';
+
+  @override
+  String get workspaceToolGrepTitle => 'Grep';
+
+  @override
+  String get workspaceToolGrepUserDesc => 'Search file contents with regex';
+
+  @override
+  String get workspaceToolOutlineTitle => 'Outline';
+
+  @override
+  String get workspaceToolOutlineUserDesc =>
+      'Show code structure of a source file';
+
+  @override
+  String get workspaceToolMkdirTitle => 'Mkdir';
+
+  @override
+  String get workspaceToolMkdirUserDesc => 'Create directories';
+
+  @override
+  String get workspaceToolMoveTitle => 'Move';
+
+  @override
+  String get workspaceToolMoveUserDesc => 'Move or rename files';
+
+  @override
+  String get workspaceToolZipTitle => 'Zip';
+
+  @override
+  String get workspaceToolZipUserDesc => 'Create zip archives';
+
+  @override
+  String get workspaceToolUnzipTitle => 'Unzip';
+
+  @override
+  String get workspaceToolUnzipUserDesc => 'Extract zip archives';
+
+  @override
+  String get workspaceToolDownloadTitle => 'Download';
+
+  @override
+  String get workspaceToolDownloadUserDesc =>
+      'Download a URL into the workspace';
+
+  @override
+  String get assistantEditLocalToolWorkspaceTitle => 'Workspace';
 }

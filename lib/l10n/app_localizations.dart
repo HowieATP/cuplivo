@@ -8124,6 +8124,12 @@ abstract class AppLocalizations {
   /// **'General Options'**
   String get searchServicesPageGeneralOptions;
 
+  /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fetch for providers without native fetch'**
+  String get searchServicesPageEnableFallbackFetchTitle;
+
   /// No description provided for @searchServicesPageAutoTestTitle.
   ///
   /// In en, this message translates to:
@@ -10937,6 +10943,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Task Handoff'**
+  String get assistantEditLocalToolHandoffTitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate a task to another assistant in a new conversation without waiting for the result.'**
+  String get assistantEditLocalToolHandoffSubtitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Handoff'**
+  String get assistantEditLocalToolHandoffSyncTitle;
+
+  /// No description provided for @assistantEditLocalToolHandoffSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.'**
+  String get assistantEditLocalToolHandoffSyncSubtitle;
 
   /// No description provided for @assistantEditSkillDownloadTitle.
   ///
@@ -14429,6 +14459,420 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only {received}/{requested} images were generated.'**
   String imageGenPartialNotice(Object received, Object requested);
+
+  /// No description provided for @settingsPageWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspaces'**
+  String get settingsPageWorkspace;
+
+  /// No description provided for @workspaceListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspaces yet'**
+  String get workspaceListEmpty;
+
+  /// No description provided for @workspaceAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add workspace'**
+  String get workspaceAdd;
+
+  /// No description provided for @workspaceNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace name'**
+  String get workspaceNameHint;
+
+  /// No description provided for @workspaceCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workspaceCancel;
+
+  /// No description provided for @workspaceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get workspaceConfirm;
+
+  /// No description provided for @workspaceCannotDeleteDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'The default workspace cannot be deleted'**
+  String get workspaceCannotDeleteDefault;
+
+  /// No description provided for @workspaceNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace not found'**
+  String get workspaceNotFound;
+
+  /// No description provided for @workspaceRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get workspaceRename;
+
+  /// No description provided for @workspaceFilesEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace files'**
+  String get workspaceFilesEntry;
+
+  /// No description provided for @workspaceFilesystemTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Filesystem tools'**
+  String get workspaceFilesystemTools;
+
+  /// No description provided for @workspaceInstallDeps.
+  ///
+  /// In en, this message translates to:
+  /// **'Install dependencies'**
+  String get workspaceInstallDeps;
+
+  /// No description provided for @workspaceEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable workspace'**
+  String get workspaceEnableTitle;
+
+  /// No description provided for @workspaceBindTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bound workspace'**
+  String get workspaceBindTitle;
+
+  /// No description provided for @workspaceEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get workspaceEntryTitle;
+
+  /// No description provided for @workspaceEntrySubtitleOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get workspaceEntrySubtitleOff;
+
+  /// No description provided for @workspaceShellMobileOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell is only available on Android or iOS'**
+  String get workspaceShellMobileOnly;
+
+  /// No description provided for @workspaceToolShellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell'**
+  String get workspaceToolShellTitle;
+
+  /// No description provided for @workspaceToolShellUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Run commands in the Linux sandbox (Android or iOS, requires base dependency)'**
+  String get workspaceToolShellUserDesc;
+
+  /// No description provided for @workspaceDepSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Source settings'**
+  String get workspaceDepSettings;
+
+  /// No description provided for @workspaceDepInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get workspaceDepInstall;
+
+  /// No description provided for @workspaceDepInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get workspaceDepInstalling;
+
+  /// No description provided for @workspaceDepInstallDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get workspaceDepInstallDone;
+
+  /// No description provided for @workspaceDepInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get workspaceDepInstalled;
+
+  /// No description provided for @workspaceDepReinstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Reinstall'**
+  String get workspaceDepReinstall;
+
+  /// No description provided for @workspaceSandboxRuntimeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox runtime missing; reinstall this app build'**
+  String get workspaceSandboxRuntimeMissing;
+
+  /// No description provided for @workspaceSandboxBaseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the base dependency first'**
+  String get workspaceSandboxBaseRequired;
+
+  /// No description provided for @workspaceDepSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Install source'**
+  String get workspaceDepSource;
+
+  /// No description provided for @workspaceDepSourceAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (fallback)'**
+  String get workspaceDepSourceAuto;
+
+  /// No description provided for @workspaceDepSourceOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Official'**
+  String get workspaceDepSourceOfficial;
+
+  /// No description provided for @workspaceDepSourceTuna.
+  ///
+  /// In en, this message translates to:
+  /// **'Tsinghua TUNA'**
+  String get workspaceDepSourceTuna;
+
+  /// No description provided for @workspaceDepSourceAliyun.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliyun'**
+  String get workspaceDepSourceAliyun;
+
+  /// No description provided for @workspaceDepSourceCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom URL'**
+  String get workspaceDepSourceCustom;
+
+  /// No description provided for @workspaceDepCustomUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://…'**
+  String get workspaceDepCustomUrlHint;
+
+  /// No description provided for @workspaceDepBaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Base (Linux rootfs)'**
+  String get workspaceDepBaseTitle;
+
+  /// No description provided for @workspaceDepBaseDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Required root filesystem for the sandbox'**
+  String get workspaceDepBaseDesc;
+
+  /// No description provided for @workspaceDepPythonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Python'**
+  String get workspaceDepPythonTitle;
+
+  /// No description provided for @workspaceDepPythonDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'python3 and pip'**
+  String get workspaceDepPythonDesc;
+
+  /// No description provided for @workspaceDepNodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Node.js'**
+  String get workspaceDepNodeTitle;
+
+  /// No description provided for @workspaceDepNodeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'nodejs and npm'**
+  String get workspaceDepNodeDesc;
+
+  /// No description provided for @workspaceDepGitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Git'**
+  String get workspaceDepGitTitle;
+
+  /// No description provided for @workspaceDepGitDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Version control tools'**
+  String get workspaceDepGitDesc;
+
+  /// No description provided for @workspaceDepBuildTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Build tools'**
+  String get workspaceDepBuildTitle;
+
+  /// No description provided for @workspaceDepBuildDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'gcc, make, and related packages'**
+  String get workspaceDepBuildDesc;
+
+  /// No description provided for @workspaceToolReadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get workspaceToolReadTitle;
+
+  /// No description provided for @workspaceToolReadUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Read files or list directories in the workspace'**
+  String get workspaceToolReadUserDesc;
+
+  /// No description provided for @workspaceToolWriteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Write'**
+  String get workspaceToolWriteTitle;
+
+  /// No description provided for @workspaceToolWriteUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or overwrite files'**
+  String get workspaceToolWriteUserDesc;
+
+  /// No description provided for @workspaceToolPatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Patch'**
+  String get workspaceToolPatchTitle;
+
+  /// No description provided for @workspaceToolPatchUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace text inside a file'**
+  String get workspaceToolPatchUserDesc;
+
+  /// No description provided for @workspaceToolDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get workspaceToolDeleteTitle;
+
+  /// No description provided for @workspaceToolDeleteUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete files or directories (requires approval)'**
+  String get workspaceToolDeleteUserDesc;
+
+  /// No description provided for @workspaceToolGlobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Glob'**
+  String get workspaceToolGlobTitle;
+
+  /// No description provided for @workspaceToolGlobUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Find files by pattern'**
+  String get workspaceToolGlobUserDesc;
+
+  /// No description provided for @workspaceToolGrepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grep'**
+  String get workspaceToolGrepTitle;
+
+  /// No description provided for @workspaceToolGrepUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Search file contents with regex'**
+  String get workspaceToolGrepUserDesc;
+
+  /// No description provided for @workspaceToolOutlineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline'**
+  String get workspaceToolOutlineTitle;
+
+  /// No description provided for @workspaceToolOutlineUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show code structure of a source file'**
+  String get workspaceToolOutlineUserDesc;
+
+  /// No description provided for @workspaceToolMkdirTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mkdir'**
+  String get workspaceToolMkdirTitle;
+
+  /// No description provided for @workspaceToolMkdirUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create directories'**
+  String get workspaceToolMkdirUserDesc;
+
+  /// No description provided for @workspaceToolMoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get workspaceToolMoveTitle;
+
+  /// No description provided for @workspaceToolMoveUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Move or rename files'**
+  String get workspaceToolMoveUserDesc;
+
+  /// No description provided for @workspaceToolZipTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zip'**
+  String get workspaceToolZipTitle;
+
+  /// No description provided for @workspaceToolZipUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create zip archives'**
+  String get workspaceToolZipUserDesc;
+
+  /// No description provided for @workspaceToolUnzipTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unzip'**
+  String get workspaceToolUnzipTitle;
+
+  /// No description provided for @workspaceToolUnzipUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract zip archives'**
+  String get workspaceToolUnzipUserDesc;
+
+  /// No description provided for @workspaceToolDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get workspaceToolDownloadTitle;
+
+  /// No description provided for @workspaceToolDownloadUserDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Download a URL into the workspace'**
+  String get workspaceToolDownloadUserDesc;
+
+  /// No description provided for @assistantEditLocalToolWorkspaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get assistantEditLocalToolWorkspaceTitle;
 }
 
 class _AppLocalizationsDelegate

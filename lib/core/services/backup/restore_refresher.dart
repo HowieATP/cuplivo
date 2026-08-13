@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/assistant_provider.dart';
 import '../../providers/group_chat_provider.dart';
 import '../../providers/mcp_provider.dart';
+import '../../providers/workspace_provider.dart';
 import '../chat/chat_service.dart';
 
 /// Re-reads every provider that mirrors persisted state after a restore /
@@ -19,18 +20,24 @@ Future<void> refreshProvidersAfterRestore(BuildContext context) async {
   final assistantProvider = context.read<AssistantProvider>();
   final groupChatProvider = context.read<GroupChatProvider>();
   final mcpProvider = context.read<McpProvider>();
+  final workspaceProvider = context.read<WorkspaceProvider>();
   try {
     await chatService.reloadCachesFromDb();
   } catch (e) {
     debugPrint('refreshProvidersAfterRestore: ChatService: $e');
   }
   try {
-    // Reload MCP BEFORE assistants: reloading assistants fires
-    // McpProvider._onAssistantsChanged -> refreshTools('kelivo_subagent'),
-    // which persists the whole server list. If the old client were still
-    // live at that point it would write the pre-restore list over the
-    // restored mcp_servers_v1; reloading MCP first means any such refresh
-    // runs against the new client (or no client) and stays harmless.
+    await workspaceProvider.reloadFromPrefs();
+  } catch (e) {
+    debugPrint('refreshProvidersAfterRestore: WorkspaceProvider: $e');
+  }
+  try {
+    // Reload MCP BEFORE assistants: reloading assistants can fire provider
+    // change notifications that read the server list. If the old client
+    // were still live at that point it would write the pre-restore list
+    // over the restored mcp_servers_v1; reloading MCP first means any such
+    // refresh runs against the new client (or no client) and stays
+    // harmless.
     await mcpProvider.reloadFromPrefs();
   } catch (e) {
     debugPrint('refreshProvidersAfterRestore: McpProvider: $e');

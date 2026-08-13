@@ -165,6 +165,19 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                 child: _sectionCard(
                   children: [
                     _ToggleRow(
+                      icon: lucide.Lucide.Download,
+                      label: l10n.searchServicesPageEnableFallbackFetchTitle,
+                      value: common.enableFetchForUnsupportedProviders,
+                      onChanged: (v) => context
+                          .read<SettingsProvider>()
+                          .setSearchCommonOptions(
+                            common.copyWith(
+                              enableFetchForUnsupportedProviders: v,
+                            ),
+                          ),
+                    ),
+                    _divider(context),
+                    _ToggleRow(
                       icon: lucide.Lucide.HeartPulse,
                       label: l10n.searchServicesPageAutoTestTitle,
                       value: settings.searchAutoTestOnLaunch,
@@ -181,9 +194,8 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
-                                  SearchCommonOptions(
+                                  common.copyWith(
                                     resultSize: common.resultSize - 1,
-                                    timeout: common.timeout,
                                   ),
                                 )
                           : null,
@@ -191,9 +203,8 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
-                                  SearchCommonOptions(
+                                  common.copyWith(
                                     resultSize: common.resultSize + 1,
-                                    timeout: common.timeout,
                                   ),
                                 )
                           : null,
@@ -207,8 +218,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
-                                  SearchCommonOptions(
-                                    resultSize: common.resultSize,
+                                  common.copyWith(
                                     timeout: common.timeout - 1000,
                                   ),
                                 )
@@ -217,8 +227,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
-                                  SearchCommonOptions(
-                                    resultSize: common.resultSize,
+                                  common.copyWith(
                                     timeout: common.timeout + 1000,
                                   ),
                                 )

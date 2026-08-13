@@ -157,6 +157,126 @@ void main() {
       },
     );
 
+    test('builds handoff definitions only when enabled and lists targets', () {
+      final handoffAssistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [LocalToolNames.handoff, LocalToolNames.handoffSync],
+      );
+      final targets = [
+        Assistant(
+          id: 'target-1',
+          name: 'Research Bot',
+          discoverable: true,
+          handoffId: 'research-bot',
+          handoffDescription: 'researches topics',
+        ),
+        Assistant(id: 'target-2', name: 'Code Helper', discoverable: true),
+      ];
+
+      final noTargets = LocalToolsService.buildToolDefinitions(
+        assistant: handoffAssistant,
+        supportsTools: true,
+      );
+      final withTargets = LocalToolsService.buildToolDefinitions(
+        assistant: handoffAssistant,
+        supportsTools: true,
+        discoverableAssistants: targets,
+      );
+
+      expect(noTargets.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+        LocalToolNames.handoffSync,
+      ]);
+      expect(
+        (noTargets.first['function']['description'] as String),
+        contains('No assistants are currently available'),
+      );
+      expect(withTargets.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+        LocalToolNames.handoffSync,
+      ]);
+      for (final tool in withTargets) {
+        final fn = tool['function'] as Map<String, dynamic>;
+        final params = fn['parameters'] as Map<String, dynamic>;
+        expect(params['required'], const ['assistant', 'task']);
+        final props = params['properties'] as Map<String, dynamic>;
+        expect(props['assistant']['type'], 'string');
+        expect(props['task']['type'], 'string');
+      }
+      final handoffDesc =
+          withTargets.first['function']['description'] as String;
+      final syncDesc = withTargets.last['function']['description'] as String;
+      expect(handoffDesc, contains('research-bot'));
+      expect(syncDesc, contains('research-bot'));
+      expect(syncDesc, contains('AND WAIT'));
+    });
+
+    test(
+      'handoff definitions are absent when only one of the two is enabled',
+      () {
+        final onlyHandoff = LocalToolsService.buildToolDefinitions(
+          assistant: Assistant(
+            id: 'a1',
+            name: 'Assistant',
+            localToolIds: [LocalToolNames.handoff],
+          ),
+          supportsTools: true,
+          discoverableAssistants: const [],
+        );
+        expect(onlyHandoff.map((tool) => tool['function']['name']), const [
+          LocalToolNames.handoff,
+        ]);
+        expect(
+          (onlyHandoff.first['function']['description'] as String),
+          contains('No assistants are currently available'),
+        );
+
+        final onlySync = LocalToolsService.buildToolDefinitions(
+          assistant: Assistant(
+            id: 'a1',
+            name: 'Assistant',
+            localToolIds: [LocalToolNames.handoffSync],
+          ),
+          supportsTools: true,
+          discoverableAssistants: const [],
+        );
+        expect(onlySync.map((tool) => tool['function']['name']), const [
+          LocalToolNames.handoffSync,
+        ]);
+        expect(
+          (onlySync.first['function']['description'] as String),
+          contains('AND WAIT'),
+        );
+      },
+    );
+
+    test('handoff target lists exclude the delegating assistant itself', () {
+      final delegating = Assistant(
+        id: 'delegator',
+        name: 'Delegator',
+        discoverable: true,
+        handoffId: 'delegator',
+        localToolIds: [LocalToolNames.handoff],
+      );
+      final defs = LocalToolsService.buildToolDefinitions(
+        assistant: delegating,
+        supportsTools: true,
+        discoverableAssistants: [
+          delegating,
+          Assistant(
+            id: 'other',
+            name: 'Other',
+            discoverable: true,
+            handoffId: 'other-bot',
+          ),
+        ],
+      );
+      final desc = defs.first['function']['description'] as String;
+      expect(desc, contains('other-bot'));
+      expect(desc, isNot(contains('delegator')));
+    });
+
     test('text to speech call starts playback and returns success', () async {
       final spokenTexts = <String>[];
 

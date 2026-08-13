@@ -13,6 +13,27 @@ McpServerConfig _server(String id, String name) => McpServerConfig(
   url: 'http://127.0.0.1:1/$id',
 );
 
+McpServerConfig _retiredFetchServer() => McpServerConfig(
+  id: 'kelivo_fetch',
+  name: '@kelivo/fetch',
+  enabled: true,
+  transport: McpTransportType.inmemory,
+);
+
+McpServerConfig _retiredFilesystemServer() => McpServerConfig(
+  id: 'kelivo_filesystem',
+  name: '@kelivo/filesystem',
+  enabled: true,
+  transport: McpTransportType.inmemory,
+);
+
+McpServerConfig _retiredSubagentServer() => McpServerConfig(
+  id: 'kelivo_subagent',
+  name: '@kelivo/subagent',
+  enabled: true,
+  transport: McpTransportType.inmemory,
+);
+
 Future<Set<String>> _persistedServerIds() async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString('mcp_servers_v1');
@@ -25,6 +46,187 @@ Future<Set<String>> _persistedServerIds() async {
 }
 
 void main() {
+  test(
+    'startup removes the retired fetch, filesystem and subagent servers without touching others',
+    () async {
+      final untouched = _server('srv-a', 'Server A').copyWith(
+        toolPrefix: 'safe_',
+        tools: [McpToolConfig(enabled: false, name: 'remote_tool')],
+      );
+      SharedPreferences.setMockInitialValues({
+        'mcp_servers_v1': jsonEncode([
+          _retiredFetchServer().toJson(),
+          _retiredFilesystemServer().toJson(),
+          _retiredSubagentServer().toJson(),
+          untouched.toJson(),
+        ]),
+      });
+
+      final provider = McpProvider(
+        contextProvider: () => throw UnimplementedError(),
+      );
+      await pumpEventQueue();
+
+      expect(provider.servers.map((server) => server.id), contains('srv-a'));
+      expect(
+        provider.servers.map((server) => server.id),
+        isNot(contains('kelivo_fetch')),
+      );
+      expect(
+        provider.servers.map((server) => server.id),
+        isNot(contains('kelivo_filesystem')),
+      );
+      expect(
+        provider.servers.map((server) => server.id),
+        isNot(contains('kelivo_subagent')),
+      );
+      final preserved = provider.getById('srv-a')!;
+      expect(preserved.toolPrefix, 'safe_');
+      expect(preserved.tools.single.name, 'remote_tool');
+      expect(preserved.tools.single.enabled, isFalse);
+      expect(await _persistedServerIds(), contains('srv-a'));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_fetch')));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_filesystem')));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_subagent')));
+    },
+  );
+
+  test(
+    'backup reload removes and persists the retired fetch, filesystem and subagent servers',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'mcp_servers_v1': jsonEncode([_server('before', 'Before').toJson()]),
+      });
+      final provider = McpProvider(
+        contextProvider: () => throw UnimplementedError(),
+      );
+      await pumpEventQueue();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'mcp_servers_v1',
+        jsonEncode([
+          _retiredFetchServer().toJson(),
+          _retiredFilesystemServer().toJson(),
+          _retiredSubagentServer().toJson(),
+          _server('restored', 'Restored').toJson(),
+        ]),
+      );
+      await provider.reloadFromPrefs();
+
+      final ids = provider.servers.map((server) => server.id).toSet();
+      expect(ids, contains('restored'));
+      expect(ids, isNot(contains('before')));
+      expect(ids, isNot(contains('kelivo_fetch')));
+      expect(ids, isNot(contains('kelivo_filesystem')));
+      expect(ids, isNot(contains('kelivo_subagent')));
+      expect(await _persistedServerIds(), contains('restored'));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_fetch')));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_filesystem')));
+      expect(await _persistedServerIds(), isNot(contains('kelivo_subagent')));
+    },
+  );
+
+  test(
+    'all supported MCP JSON shapes discard only retired fetch, filesystem and subagent',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final provider = McpProvider(
+        contextProvider: () => throw UnimplementedError(),
+      );
+      await pumpEventQueue();
+
+      final remote = _server('remote', 'Remote').toJson();
+      final retiredFetch = _retiredFetchServer().toJson();
+      final retiredFilesystem = _retiredFilesystemServer().toJson();
+      final retiredSubagent = _retiredSubagentServer().toJson();
+      final inputs = <String>[
+        jsonEncode({
+          'mcpServers': {
+            'kelivo_fetch': {
+              'name': '@kelivo/fetch',
+              'type': 'inmemory',
+              'isActive': true,
+            },
+            'kelivo_filesystem': {
+              'name': '@kelivo/filesystem',
+              'type': 'inmemory',
+              'isActive': true,
+            },
+            'kelivo_subagent': {
+              'name': '@kelivo/subagent',
+              'type': 'inmemory',
+              'isActive': true,
+            },
+            'remote': {
+              'name': 'Remote',
+              'type': 'streamableHttp',
+              'baseUrl': 'http://127.0.0.1:1/remote',
+              'isActive': false,
+            },
+          },
+        }),
+        jsonEncode([retiredFetch, retiredFilesystem, retiredSubagent, remote]),
+        jsonEncode({
+          'servers': [retiredFetch, retiredFilesystem, retiredSubagent, remote],
+        }),
+      ];
+
+      for (final input in inputs) {
+        await provider.replaceAllFromJson(input);
+        final ids = provider.servers.map((server) => server.id).toSet();
+        expect(ids, contains('remote'));
+        expect(ids, isNot(contains('kelivo_fetch')));
+        expect(ids, isNot(contains('kelivo_filesystem')));
+        expect(ids, isNot(contains('kelivo_subagent')));
+        expect(
+          provider.exportServersAsUiJson(),
+          isNot(contains('@kelivo/fetch')),
+        );
+        expect(
+          provider.exportServersAsUiJson(),
+          isNot(contains('@kelivo/filesystem')),
+        );
+        expect(
+          provider.exportServersAsUiJson(),
+          isNot(contains('@kelivo/subagent')),
+        );
+      }
+    },
+  );
+
+  test('unknown in-memory JSON does not become a fetch server', () async {
+    SharedPreferences.setMockInitialValues({});
+    final provider = McpProvider(
+      contextProvider: () => throw UnimplementedError(),
+    );
+    await pumpEventQueue();
+
+    await provider.replaceAllFromJson(
+      jsonEncode({
+        'mcpServers': {
+          'unknown': {'name': '@example/unknown', 'type': 'inmemory'},
+          'remote': {
+            'name': 'Remote',
+            'type': 'streamableHttp',
+            'baseUrl': 'http://127.0.0.1:1/remote',
+            'isActive': false,
+          },
+        },
+      }),
+    );
+
+    expect(provider.servers.map((server) => server.id), contains('remote'));
+    expect(
+      provider.servers.map((server) => server.id),
+      isNot(contains('unknown')),
+    );
+    expect(
+      provider.servers.map((server) => server.id),
+      isNot(contains('kelivo_fetch')),
+    );
+  });
+
   test(
     'reloadFromPrefs rebuilds the server list and timeout from SharedPreferences',
     () async {
@@ -82,8 +284,8 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'mcp_servers_v1': jsonEncode([_server('srv-b', 'Server B').toJson()]),
       });
-      await provider.disconnect('kelivo_subagent');
-      await provider.refreshTools('kelivo_subagent');
+      await provider.disconnect('ghost-server');
+      await provider.refreshTools('ghost-server');
 
       expect(await _persistedServerIds(), contains('srv-b'));
       expect(await _persistedServerIds(), isNot(contains('srv-a')));
@@ -112,7 +314,7 @@ void main() {
 
     // A refresh triggered after the reload runs against the new client (or
     // none) and must not resurrect the pre-restore servers on disk.
-    await provider.refreshTools('kelivo_subagent');
+    await provider.refreshTools('ghost-server');
     await pumpEventQueue();
 
     expect(await _persistedServerIds(), contains('srv-b'));

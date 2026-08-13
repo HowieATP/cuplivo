@@ -8,6 +8,9 @@ import 'package:archive/archive_io.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:path/path.dart' as p;
 
+import '../../workspace/workspace_download_service.dart';
+import '../../fetch/web_fetch_target_guard.dart' show WebFetchTargetGuard;
+
 /// A named root directory bound into the `@kelivo/filesystem` MCP server.
 ///
 /// External mounts are desktop-only and never sync. The built-in `@workspaces`
@@ -51,7 +54,7 @@ class FilesystemMount {
 /// Rules: `@[a-z0-9][a-z0-9_-]*`, max 32 chars, `workspaces` reserved.
 bool isValidMountAlias(String alias) {
   if (alias.isEmpty || alias.length > 32) return false;
-  if (alias == 'workspaces') return false; // reserved built-in
+  if (alias == 'workspaces') return false; // legacy reserved
   final first = alias.codeUnitAt(0);
   final lower = first >= 0x61 && first <= 0x7a;
   final digit = first >= 0x30 && first <= 0x39;
@@ -121,7 +124,7 @@ ResolvedWirePath resolveWirePath(String raw, List<FilesystemMount> mounts) {
   if (!trimmed.startsWith('@')) {
     throw WirePathException(
       'Invalid path: absolute paths are not allowed. Use a mount-relative '
-      'path like @workspaces/notes.md',
+      'path like @default/notes.md',
     );
   }
   if (trimmed.endsWith('/')) {
@@ -135,9 +138,13 @@ ResolvedWirePath resolveWirePath(String raw, List<FilesystemMount> mounts) {
     );
   }
   final parts = trimmed.split('/');
-  final alias = parts.first.substring(1);
+  var alias = parts.first.substring(1);
   if (alias.isEmpty) {
     throw WirePathException('Invalid path: missing mount alias: $raw');
+  }
+  // Legacy single-sandbox alias → @default
+  if (alias == 'workspaces') {
+    alias = 'default';
   }
   final mount = mounts.where((m) => m.alias == alias).firstOrNull;
   if (mount == null) {
@@ -156,7 +163,8 @@ ResolvedWirePath resolveWirePath(String raw, List<FilesystemMount> mounts) {
     }
     segments.add(seg);
   }
-  return ResolvedWirePath(mount: mount, segments: segments, wirePath: trimmed);
+  final wire = segments.isEmpty ? '@$alias' : '@$alias/${segments.join('/')}';
+  return ResolvedWirePath(mount: mount, segments: segments, wirePath: wire);
 }
 
 /// Depth discipline for a symbol-outline language: brace-counted (C-like)
@@ -168,9 +176,9 @@ class _OutlineLanguage {
   const _OutlineLanguage(this.depth);
 }
 
-/// @kelivo/filesystem — In-memory MCP server engine and transport (Flutter/Dart)
+/// Workspace filesystem engine (local tools; optional in-memory MCP transport)
 ///
-/// Provides token-conscious file tools over mount-relative wire paths.
+/// Provides token-conscious file tools over mount-relative wire paths (@alias/rel).
 /// See `docs/adr/0022-filesystem-mount-relative-wire-format.md` and the
 /// CONTEXT.md "Filesystem MCP" section.
 ///
@@ -180,6 +188,7 @@ class KelivoFilesystemMcpServerEngine {
   KelivoFilesystemMcpServerEngine({
     required this.mountsProvider,
     this.onWorkspaceFileDeleted,
+    this.pathPresenter,
   });
 
   static const int readCharBudget = 32 * 1024;
@@ -194,6 +203,24 @@ class KelivoFilesystemMcpServerEngine {
 
   final List<FilesystemMount> Function() mountsProvider;
   final Future<void> Function(String wirePath)? onWorkspaceFileDeleted;
+
+  /// Optional model-facing path presentation (see
+  /// `workspace_path_presentation.dart`). When set, every path ECHO site
+  /// (error messages, listings, glob/grep/outline prefixes, the mount list)
+  /// renders through it. Identity sites — the deletion marker delivered to
+  /// [onWorkspaceFileDeleted] — always keep the canonical wire path.
+  final String Function(String wirePath)? pathPresenter;
+
+  String _display(String wirePath) =>
+      pathPresenter == null ? wirePath : pathPresenter!(wirePath);
+
+  /// Tool schemas for the model, filtered by [enabledNames].
+  List<Map<String, dynamic>> toolDefinitionsFor(Set<String> enabledNames) {
+    return [
+      for (final t in _toolDefinitions())
+        if (enabledNames.contains(t['name'])) t,
+    ];
+  }
 
   bool _closed = false;
 
@@ -242,7 +269,7 @@ class KelivoFilesystemMcpServerEngine {
           final arguments = (params['arguments'] is Map)
               ? (params['arguments'] as Map).cast<String, dynamic>()
               : <String, dynamic>{};
-          return _ok(id, result: await _callTool(name, arguments));
+          return _ok(id, result: await callTool(name, arguments));
 
         default:
           if (id == null) {
@@ -263,34 +290,37 @@ class KelivoFilesystemMcpServerEngine {
   // Tool dispatch
   // =====================================================================
 
-  Future<Map<String, dynamic>> _callTool(
+  /// Public entry for local-tools dispatch (non-MCP).
+  Future<Map<String, dynamic>> callTool(
     String name,
     Map<String, dynamic> args,
   ) async {
     try {
       switch (name) {
-        case 'kelivo_read':
+        case 'read':
           return await _read(args);
-        case 'kelivo_write_file':
+        case 'write':
           return await _writeFile(args);
-        case 'kelivo_patch_file':
+        case 'patch':
           return await _patchFile(args);
-        case 'kelivo_delete':
+        case 'delete':
           return await _delete(args);
-        case 'kelivo_glob':
+        case 'glob':
           return await _glob(args);
-        case 'kelivo_grep':
+        case 'grep':
           return await _grep(args);
-        case 'kelivo_outline':
+        case 'outline':
           return await _outline(args);
-        case 'kelivo_mkdir':
+        case 'mkdir':
           return await _mkdir(args);
-        case 'kelivo_move':
+        case 'move':
           return await _move(args);
-        case 'kelivo_zip':
+        case 'zip':
           return await _zip(args);
-        case 'kelivo_unzip':
+        case 'unzip':
           return await _unzip(args);
+        case 'download':
+          return await _download(args);
         default:
           return _toolErr('Tool not found: $name');
       }
@@ -316,7 +346,7 @@ class KelivoFilesystemMcpServerEngine {
       for (final m in _mounts()) {
         // Alias + mode only — host paths never enter the model context
         // (ADR-0022: host layout stays out of prompts and request logs).
-        buf.writeln('${m.wireName} (${m.readOnly ? 'ro' : 'rw'})');
+        buf.writeln('${_display(m.wireName)} (${m.readOnly ? 'ro' : 'rw'})');
       }
       return _toolOk(buf.toString().trim());
     }
@@ -359,13 +389,13 @@ class KelivoFilesystemMcpServerEngine {
       if (stat.size > readWindowBytes) {
         return _toolErr(
           'File too large to read (${stat.size} bytes > '
-          '${readWindowBytes ~/ (1024 * 1024)} MB): ${resolved.wirePath}',
+          '${readWindowBytes ~/ (1024 * 1024)} MB): ${_display(resolved.wirePath)}',
         );
       }
       final window = await raf.read(stat.size);
       if (_looksBinary(window)) {
         return _toolErr(
-          'Binary file — cannot read as text: ${resolved.wirePath}',
+          'Binary file — cannot read as text: ${_display(resolved.wirePath)}',
         );
       }
       final text = utf8.decode(window, allowMalformed: true);
@@ -401,7 +431,7 @@ class KelivoFilesystemMcpServerEngine {
       if (truncated) {
         out =
             '$out\n[Content truncated: showing lines $startLine-${lineNo - 1} '
-            'of ${lines.length}. Call kelivo_read with '
+            'of ${lines.length}. Call read with '
             'start_line=$lineNo to continue.]';
       }
       return _toolOk(out);
@@ -425,7 +455,7 @@ class KelivoFilesystemMcpServerEngine {
           .compareTo(p.basename(b.path).toLowerCase());
     });
     final buf = StringBuffer();
-    buf.writeln('${resolved.wirePath} (${children.length} entries):');
+    buf.writeln('${_display(resolved.wirePath)} (${children.length} entries):');
     for (final c in children) {
       final name = p.basename(c.path);
       if (c is Directory) {
@@ -452,7 +482,7 @@ class KelivoFilesystemMcpServerEngine {
     await file.parent.create(recursive: true);
     await file.writeAsString(content, flush: true);
     return _toolOk(
-      'Wrote ${utf8.encode(content).length} bytes to ${resolved.wirePath}',
+      'Wrote ${utf8.encode(content).length} bytes to ${_display(resolved.wirePath)}',
     );
   }
 
@@ -466,25 +496,29 @@ class KelivoFilesystemMcpServerEngine {
     }
     final file = File(resolved.hostPath);
     if (!await file.exists()) {
-      return _toolErr('Not found: ${resolved.wirePath}');
+      return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     final original = await file.readAsString();
     final idx = original.indexOf(oldString);
     if (idx < 0) {
-      return _toolErr('old_string not found in ${resolved.wirePath}');
+      return _toolErr('old_string not found in ${_display(resolved.wirePath)}');
     }
     final patched =
         original.substring(0, idx) +
         newString +
         original.substring(idx + oldString.length);
     await file.writeAsString(patched, flush: true);
-    return _toolOk('Patched ${resolved.wirePath} (replaced 1 occurrence)');
+    return _toolOk(
+      'Patched ${_display(resolved.wirePath)} (replaced 1 occurrence)',
+    );
   }
 
   Future<Map<String, dynamic>> _delete(Map<String, dynamic> args) async {
     final resolved = _resolve((args['path'] ?? '').toString());
     if (resolved.isRoot) {
-      return _toolErr('Cannot delete mount root: ${resolved.wirePath}');
+      return _toolErr(
+        'Cannot delete mount root: ${_display(resolved.wirePath)}',
+      );
     }
     _requireWritable(resolved);
     final recursive = (args['recursive'] as bool?) ?? false;
@@ -496,16 +530,16 @@ class KelivoFilesystemMcpServerEngine {
       final children = await dir.list().toList();
       if (children.isNotEmpty && !recursive) {
         return _toolErr(
-          'Directory not empty: ${resolved.wirePath}. Set recursive=true to '
+          'Directory not empty: ${_display(resolved.wirePath)}. Set recursive=true to '
           'delete it with its contents',
         );
       }
       await dir.delete(recursive: recursive);
     } else {
-      return _toolErr('Not found: ${resolved.wirePath}');
+      return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     await _recordDeletionIfWorkspaces(resolved);
-    return _toolOk('Deleted ${resolved.wirePath}');
+    return _toolOk('Deleted ${_display(resolved.wirePath)}');
   }
 
   Future<Map<String, dynamic>> _glob(Map<String, dynamic> args) async {
@@ -516,7 +550,7 @@ class KelivoFilesystemMcpServerEngine {
     }
     final dir = Directory(resolved.hostPath);
     if (!await dir.exists()) {
-      return _toolErr('Not found: ${resolved.wirePath}');
+      return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     final regex = _globToRegex(pattern);
     final dotTargets = pattern.startsWith('.');
@@ -525,7 +559,7 @@ class KelivoFilesystemMcpServerEngine {
       if (results.length >= globResultCap) return;
       if (!dotTargets && rel.split('/').any((s) => s.startsWith('.'))) return;
       if (regex.hasMatch(rel)) {
-        results.add('${resolved.wirePath}/$rel');
+        results.add('${_display(resolved.wirePath)}/$rel');
       }
     });
     if (results.length >= globResultCap) {
@@ -576,7 +610,7 @@ class KelivoFilesystemMcpServerEngine {
     }
     final dir = Directory(resolved.hostPath);
     if (!await dir.exists()) {
-      return _toolErr('Not found: ${resolved.wirePath}');
+      return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     // The pagination window covers BOTH match lines and context lines: the
     // walk emits selected lines, then the page is sliced by offset. To make
@@ -602,7 +636,7 @@ class KelivoFilesystemMcpServerEngine {
             if (regex.hasMatch(lines[i])) matchLines.add(i);
           }
           if (matchLines.isEmpty) return;
-          final prefix = '${resolved.wirePath}/$rel';
+          final prefix = '${_display(resolved.wirePath)}/$rel';
           final matchSet = matchLines.toSet();
           // Merge per-match context windows [m-before, m+after] into
           // disjoint ranges so overlapping context is emitted once.
@@ -658,7 +692,7 @@ class KelivoFilesystemMcpServerEngine {
     var out = page.join('\n');
     if (capped) {
       final hint =
-          '... (results truncated; call kelivo_grep with '
+          '... (results truncated; call grep with '
           'offset=$window to continue)';
       out = out.isEmpty ? hint : '$out\n$hint';
     }
@@ -775,24 +809,24 @@ class KelivoFilesystemMcpServerEngine {
     final fsPath = resolved.hostPath;
     final file = File(fsPath);
     if (!await file.exists()) {
-      return _toolErr('Not found: ${resolved.wirePath}');
+      return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     final stat = await file.stat();
     if (stat.size > readWindowBytes) {
       return _toolErr(
         'File too large to outline (${stat.size} bytes > '
-        '${readWindowBytes ~/ (1024 * 1024)} MB): ${resolved.wirePath}',
+        '${readWindowBytes ~/ (1024 * 1024)} MB): ${_display(resolved.wirePath)}',
       );
     }
     if (stat.size == 0) {
-      return _toolOk('${resolved.wirePath}: (empty file)');
+      return _toolOk('${_display(resolved.wirePath)}: (empty file)');
     }
     // Extension check BEFORE reading: an unsupported 30 MB file must not
     // pay a full read + binary probe just to be rejected.
     final lang = _outlineLanguages[p.extension(fsPath).toLowerCase()];
     if (lang == null) {
       return _toolErr(
-        'Unsupported file type for outline: ${resolved.wirePath} '
+        'Unsupported file type for outline: ${_display(resolved.wirePath)} '
         '(supported: ${_outlineLanguages.keys.join(', ')})',
       );
     }
@@ -800,7 +834,9 @@ class KelivoFilesystemMcpServerEngine {
     try {
       final bytes = await raf.read(stat.size);
       if (_looksBinary(bytes)) {
-        return _toolErr('Binary file — cannot outline: ${resolved.wirePath}');
+        return _toolErr(
+          'Binary file — cannot outline: ${_display(resolved.wirePath)}',
+        );
       }
       final lines = utf8.decode(bytes, allowMalformed: true).split('\n');
       final symbols = <String>[];
@@ -839,7 +875,7 @@ class KelivoFilesystemMcpServerEngine {
       final shown = symbols.length > outlineResultCap
           ? outlineResultCap
           : symbols.length;
-      buf.writeln('${resolved.wirePath} ($shown symbols):');
+      buf.writeln('${_display(resolved.wirePath)} ($shown symbols):');
       for (final s in symbols.take(outlineResultCap)) {
         buf.writeln(s);
       }
@@ -855,13 +891,15 @@ class KelivoFilesystemMcpServerEngine {
   Future<Map<String, dynamic>> _mkdir(Map<String, dynamic> args) async {
     final resolved = _resolve((args['path'] ?? '').toString());
     if (resolved.isRoot) {
-      return _toolErr('Cannot mkdir mount root: ${resolved.wirePath}');
+      return _toolErr(
+        'Cannot mkdir mount root: ${_display(resolved.wirePath)}',
+      );
     }
     _requireWritable(resolved);
     final recursive = (args['recursive'] as bool?) ?? false;
     final dir = Directory(resolved.hostPath);
     if (await dir.exists()) {
-      return _toolErr('Already exists: ${resolved.wirePath}');
+      return _toolErr('Already exists: ${_display(resolved.wirePath)}');
     }
     if (!recursive) {
       final parent = dir.parent;
@@ -873,17 +911,17 @@ class KelivoFilesystemMcpServerEngine {
       }
     }
     await dir.create(recursive: recursive);
-    return _toolOk('Created directory ${resolved.wirePath}');
+    return _toolOk('Created directory ${_display(resolved.wirePath)}');
   }
 
   Future<Map<String, dynamic>> _move(Map<String, dynamic> args) async {
     final source = _resolve((args['source'] ?? '').toString());
     final dest = _resolve((args['destination'] ?? '').toString());
     if (source.isRoot) {
-      return _toolErr('Cannot move mount root: ${source.wirePath}');
+      return _toolErr('Cannot move mount root: ${_display(source.wirePath)}');
     }
     if (dest.isRoot) {
-      return _toolErr('Cannot move to mount root: ${dest.wirePath}');
+      return _toolErr('Cannot move to mount root: ${_display(dest.wirePath)}');
     }
     // A move both deletes the source and writes the destination — a read-only
     // mount blocks either side.
@@ -891,16 +929,16 @@ class KelivoFilesystemMcpServerEngine {
     _requireWritable(dest);
     if (!await File(source.hostPath).exists() &&
         !await Directory(source.hostPath).exists()) {
-      return _toolErr('Not found: ${source.wirePath}');
+      return _toolErr('Not found: ${_display(source.wirePath)}');
     }
     if (await File(dest.hostPath).exists() ||
         await Directory(dest.hostPath).exists()) {
       return _toolErr(
-        'Destination already exists — no silent overwrite: ${dest.wirePath}',
+        'Destination already exists — no silent overwrite: ${_display(dest.wirePath)}',
       );
     }
     final sameMount = source.mount.alias == dest.mount.alias;
-    final destUnderWorkspaces = dest.mount.alias == 'workspaces';
+    final destUnderWorkspaces = _isSyncedWorkspaceMount(dest.mount);
     final srcMtime = await _lastModified(source.hostPath);
     var fullyMoved = false;
     try {
@@ -924,7 +962,7 @@ class KelivoFilesystemMcpServerEngine {
           await _removeRecursive(dest.hostPath);
           return _toolErr('Move failed: $e');
         }
-        final tombstone = '${source.hostPath}.kelivo_move_tmp';
+        final tombstone = '${source.hostPath}.move_tmp';
         try {
           if (await File(source.hostPath).exists()) {
             await File(source.hostPath).rename(tombstone);
@@ -940,7 +978,7 @@ class KelivoFilesystemMcpServerEngine {
           await _removeRecursive(tombstone);
         } catch (e) {
           return _toolErr(
-            'Moved to ${dest.wirePath} but could not remove the source: '
+            'Moved to ${_display(dest.wirePath)} but could not remove the source: '
             'original data preserved at $tombstone. Retry or remove it '
             'manually.',
           );
@@ -959,23 +997,25 @@ class KelivoFilesystemMcpServerEngine {
       }
       await _recordDeletionIfWorkspaces(source);
     }
-    return _toolOk('Moved ${source.wirePath} -> ${dest.wirePath}');
+    return _toolOk(
+      'Moved ${_display(source.wirePath)} -> ${_display(dest.wirePath)}',
+    );
   }
 
   Future<Map<String, dynamic>> _zip(Map<String, dynamic> args) async {
     final source = _resolve((args['source'] ?? '').toString());
     final dest = _resolve((args['destination'] ?? '').toString());
     if (source.isRoot) {
-      return _toolErr('Cannot zip mount root: ${source.wirePath}');
+      return _toolErr('Cannot zip mount root: ${_display(source.wirePath)}');
     }
     if (dest.isRoot) {
-      return _toolErr('Cannot zip to mount root: ${dest.wirePath}');
+      return _toolErr('Cannot zip to mount root: ${_display(dest.wirePath)}');
     }
     _requireWritable(dest);
     if (await File(dest.hostPath).exists() ||
         await Directory(dest.hostPath).exists()) {
       return _toolErr(
-        'Destination already exists — no silent overwrite: ${dest.wirePath}',
+        'Destination already exists — no silent overwrite: ${_display(dest.wirePath)}',
       );
     }
     var totalBytes = 0;
@@ -1003,7 +1043,7 @@ class KelivoFilesystemMcpServerEngine {
         }
       }
     } else {
-      return _toolErr('Not found: ${source.wirePath}');
+      return _toolErr('Not found: ${_display(source.wirePath)}');
     }
     if (totalBytes > maxZipUncompressedBytes) {
       return _toolErr(
@@ -1027,7 +1067,7 @@ class KelivoFilesystemMcpServerEngine {
     }
     return _toolOk(
       'Zipped $fileCount files ($totalBytes bytes) to '
-      '${dest.wirePath}',
+      '${_display(dest.wirePath)}',
     );
   }
 
@@ -1035,17 +1075,17 @@ class KelivoFilesystemMcpServerEngine {
     final source = _resolve((args['source'] ?? '').toString());
     final dest = _resolve((args['destination'] ?? '').toString());
     if (dest.isRoot) {
-      return _toolErr('Cannot unzip to mount root: ${dest.wirePath}');
+      return _toolErr('Cannot unzip to mount root: ${_display(dest.wirePath)}');
     }
     _requireWritable(dest);
     final zipFile = File(source.hostPath);
     if (!await zipFile.exists()) {
-      return _toolErr('Not found: ${source.wirePath}');
+      return _toolErr('Not found: ${_display(source.wirePath)}');
     }
     final destDir = Directory(dest.hostPath);
     if (await destDir.exists()) {
       return _toolErr(
-        'Destination already exists — no silent overwrite: ${dest.wirePath}',
+        'Destination already exists — no silent overwrite: ${_display(dest.wirePath)}',
       );
     }
 
@@ -1134,8 +1174,8 @@ class KelivoFilesystemMcpServerEngine {
       }
       // Restored entry mtimes would make the new content invisible to
       // since-filtered backups — protocol rule: everything entering
-      // @workspaces gets mtime=now.
-      if (dest.mount.alias == 'workspaces') {
+      // @default gets mtime=now.
+      if (_isSyncedWorkspaceMount(dest.mount)) {
         await _bumpTreeMtimes(destDir.path);
       }
     } catch (e) {
@@ -1143,8 +1183,61 @@ class KelivoFilesystemMcpServerEngine {
     }
     return _toolOk(
       'Extracted ${planned.length} files ($totalBytes bytes) to '
-      '${dest.wirePath}',
+      '${_display(dest.wirePath)}',
     );
+  }
+
+  Future<Map<String, dynamic>> _download(Map<String, dynamic> args) async {
+    final resolved = _resolve((args['path'] ?? '').toString());
+    if (resolved.isRoot) {
+      return _toolErr(
+        'download target must be a full file path, not a mount root: '
+        '${_display(resolved.wirePath)}',
+      );
+    }
+    _requireWritable(resolved);
+    final urlRaw = (args['url'] ?? '').toString().trim();
+    final url = Uri.tryParse(urlRaw);
+    if (url == null ||
+        !url.hasAuthority ||
+        url.host.isEmpty ||
+        !(url.isScheme('http') || url.isScheme('https'))) {
+      return _toolErr('Invalid url: expected an absolute http(s) URL');
+    }
+    final blockReason = WebFetchTargetGuard.literalBlockReason(url);
+    if (blockReason != null) {
+      return _toolErr('Invalid url: $blockReason');
+    }
+    final target = File(resolved.hostPath);
+    if (await Directory(target.path).exists()) {
+      return _toolErr(
+        'Invalid path: a directory already exists at '
+        '${_display(resolved.wirePath)}. download must target a full file '
+        'path, not a directory.',
+      );
+    }
+    final cacheDir = Directory(p.join(resolved.mount.path, '.fetch_cache'));
+    try {
+      final result = await WorkspaceDownloadService.download(
+        url: url,
+        target: target,
+        cacheDir: cacheDir,
+        wirePath: _display(resolved.wirePath),
+      );
+      if (_isSyncedWorkspaceMount(resolved.mount)) {
+        try {
+          await target.setLastModified(DateTime.now());
+        } catch (_) {}
+      }
+      return _toolOk(
+        'Downloaded ${result.downloadedBytes} bytes to '
+        '${_display(resolved.wirePath)}',
+      );
+    } on WorkspaceDownloadException catch (e) {
+      return _toolErr(e.message);
+    } catch (e) {
+      return _toolErr(e.toString());
+    }
   }
 
   // =====================================================================
@@ -1157,11 +1250,19 @@ class KelivoFilesystemMcpServerEngine {
     }
   }
 
+  /// Managed multi-workspace mounts that participate in backup/sync.
+  static bool _isSyncedWorkspaceMount(FilesystemMount m) {
+    final a = m.alias;
+    if (a == 'default' || a == 'workspaces') return true;
+    final mNum = RegExp(r'^workspace_(\d+)$').firstMatch(a);
+    return mNum != null;
+  }
+
   Future<void> _recordDeletionIfWorkspaces(ResolvedWirePath resolved) async {
     // Dot-prefixed entries (e.g. .fetch_cache/) never sync, so their markers
     // would be meaningless noise on peers — one dotfile rule, both planes
     // (content and markers). See ADR-0021.
-    if (resolved.mount.alias == 'workspaces' &&
+    if (_isSyncedWorkspaceMount(resolved.mount) &&
         !resolved.segments.any((s) => s.startsWith('.'))) {
       final cb = onWorkspaceFileDeleted;
       if (cb != null) {
@@ -1171,7 +1272,7 @@ class KelivoFilesystemMcpServerEngine {
           // Marker protocol is advisory (ADR-0021): a marker failure must
           // not fail the deletion itself, but it must be visible in logs.
           // ignore: avoid_print
-          print('kelivo_filesystem: failed to record deletion marker: $e');
+          print('workspace_fs: failed to record deletion marker: $e');
         }
       }
     }
@@ -1202,7 +1303,7 @@ class KelivoFilesystemMcpServerEngine {
       await File(path).setLastModified(mtime);
     } catch (_) {
       // Directory mtimes are not settable through dart:io on all platforms;
-      // moving a directory into @workspaces keeps its mtime — incremental
+      // moving a directory into workspaces keeps its mtime — incremental
       // backup picks it up via the mtime of its contents, which is set
       // during the copy itself.
     }
@@ -1389,17 +1490,17 @@ class KelivoFilesystemMcpServerEngine {
 
   List<Map<String, dynamic>> _toolDefinitions() {
     return {
-      'kelivo_read': {
-        'name': 'kelivo_read',
+      'read': {
+        'name': 'read',
         'description':
             'Read a file, list a directory, or list all mounts. '
             'path="/" lists all mounts. A mount-relative path (e.g. '
-            '@workspaces/notes.md) reads a file with line numbers; a path '
+            '@default/notes.md) reads a file with line numbers; a path '
             'pointing to a directory lists its entries. A single trailing '
             'slash on the path is tolerated and stripped (no directory '
             'intent verification). '
             'Output is capped at '
-            '32 KB; continuation hint: call kelivo_read with start_line=N to '
+            '32 KB; continuation hint: call read with start_line=N to '
             'continue. Binary files are rejected.',
         'inputSchema': {
           'type': 'object',
@@ -1419,8 +1520,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path'],
         },
       },
-      'kelivo_write_file': {
-        'name': 'kelivo_write_file',
+      'write': {
+        'name': 'write',
         'description':
             'Write (create or overwrite) a file. Parent directories are '
             'created automatically. Fails on read-only mounts.',
@@ -1436,8 +1537,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path', 'content'],
         },
       },
-      'kelivo_patch_file': {
-        'name': 'kelivo_patch_file',
+      'patch': {
+        'name': 'patch',
         'description':
             'Replace the first occurrence of old_string with new_string in a '
             'file. Errors when old_string is not found. Fails on read-only '
@@ -1455,11 +1556,11 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path', 'old_string', 'new_string'],
         },
       },
-      'kelivo_delete': {
-        'name': 'kelivo_delete',
+      'delete': {
+        'name': 'delete',
         'description':
             'Delete a file, or a directory (empty, or with recursive=true). '
-            'Deleting a mount root is rejected. Deletions inside @workspaces '
+            'Deleting a mount root is rejected. Deletions inside workspaces '
             'are recorded and propagate to synced devices as deletion marks '
             '(advisory, never auto-deleted).',
         'inputSchema': {
@@ -1480,8 +1581,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path'],
         },
       },
-      'kelivo_glob': {
-        'name': 'kelivo_glob',
+      'glob': {
+        'name': 'glob',
         'description':
             'List files matching a glob pattern under a directory. Dotfiles '
             'and dot-directories are ignored unless the pattern starts with '
@@ -1501,8 +1602,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path', 'pattern'],
         },
       },
-      'kelivo_grep': {
-        'name': 'kelivo_grep',
+      'grep': {
+        'name': 'grep',
         'description':
             'Search files under a directory for lines matching a regular '
             'expression. Dotfiles/dot-directories are skipped (ripgrep '
@@ -1566,8 +1667,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path', 'regex'],
         },
       },
-      'kelivo_outline': {
-        'name': 'kelivo_outline',
+      'outline': {
+        'name': 'outline',
         'description':
             'List the STRUCTURE of a single text file: type declarations '
             '(class/struct/interface/enum/...) and function/method '
@@ -1589,8 +1690,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path'],
         },
       },
-      'kelivo_mkdir': {
-        'name': 'kelivo_mkdir',
+      'mkdir': {
+        'name': 'mkdir',
         'description':
             'Create a directory. Without recursive=true the parent must '
             'already exist. Fails on read-only mounts.',
@@ -1610,12 +1711,12 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['path'],
         },
       },
-      'kelivo_move': {
-        'name': 'kelivo_move',
+      'move': {
+        'name': 'move',
         'description':
             'Move a file or directory to a new location. Cross-mount moves '
             'are allowed. Never overwrites an existing destination. Files '
-            'moved into @workspaces get mtime=now so incremental backups '
+            'moved into @default get mtime=now so incremental backups '
             'pick them up; the source path records a deletion mark.',
         'inputSchema': {
           'type': 'object',
@@ -1633,8 +1734,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['source', 'destination'],
         },
       },
-      'kelivo_zip': {
-        'name': 'kelivo_zip',
+      'zip': {
+        'name': 'zip',
         'description':
             'Create a ZIP archive of a file or directory. Uncompressed size '
             'is capped at 4 GB. The destination must not exist. Fails on '
@@ -1656,8 +1757,8 @@ class KelivoFilesystemMcpServerEngine {
           'required': ['source', 'destination'],
         },
       },
-      'kelivo_unzip': {
-        'name': 'kelivo_unzip',
+      'unzip': {
+        'name': 'unzip',
         'description':
             'Extract a ZIP archive into a directory. Entries are pre-scanned '
             'for path traversal (zip-slip) and the uncompressed size is '
@@ -1676,6 +1777,30 @@ class KelivoFilesystemMcpServerEngine {
             },
           },
           'required': ['source', 'destination'],
+        },
+      },
+      'download': {
+        'name': 'download',
+        'description':
+            'Download a file from a URL into the workspace, saving the '
+            'response bytes as-is (binary allowed). The target must be a '
+            'full file path — the directory must already exist and '
+            'directories are never created by download. Fails on read-only '
+            'mounts.',
+        'inputSchema': {
+          'type': 'object',
+          'properties': {
+            'url': {
+              'type': 'string',
+              'description': 'Absolute http:// or https:// URL to download',
+            },
+            'path': {
+              'type': 'string',
+              'description':
+                  'Target file path (mount-relative, e.g. @default/reports/q3.pdf)',
+            },
+          },
+          'required': ['url', 'path'],
         },
       },
     }.values.toList();

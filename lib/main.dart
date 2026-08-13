@@ -22,7 +22,7 @@ import 'core/providers/settings_provider.dart';
 import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
-import 'core/providers/filesystem_mounts_provider.dart';
+import 'core/providers/workspace_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
@@ -209,7 +209,7 @@ class MyApp extends StatelessWidget {
           value: InputDraftPersistence.instance,
         ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
-        ChangeNotifierProvider(create: (_) => FilesystemMountsProvider()),
+        ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
         ChangeNotifierProvider(
           create: (ctx) =>
               AssistantProvider(chatService: ctx.read<ChatService>()),
@@ -229,9 +229,6 @@ class MyApp extends StatelessWidget {
             final sp = ctx.read<SettingsProvider>();
             return McpProvider(
               chatService: ctx.read<ChatService>(),
-              assistantProvider: ctx.read<AssistantProvider>(),
-              generationEngine: ctx.read<GenerationEngine>(),
-              filesystemMounts: ctx.read<FilesystemMountsProvider>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),
             );

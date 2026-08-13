@@ -128,6 +128,9 @@ class AssistantRows extends Table {
   TextColumn get mcpServerIdsJson => text().withDefault(const Constant('[]'))();
   TextColumn get localToolIdsJson => text().withDefault(const Constant('[]'))();
   TextColumn get skillIdsJson => text().withDefault(const Constant('[]'))();
+  BoolColumn get workspaceEnabled =>
+      boolean().withDefault(const Constant(false))();
+  TextColumn get workspaceId => text().nullable()();
   TextColumn get regexRulesJson => text().withDefault(const Constant('[]'))();
 
   // --- Proactive Care ("Ta的来信") ---
@@ -375,7 +378,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0019-schema-self-heal.md.
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -511,6 +514,17 @@ class AppDatabase extends _$AppDatabase {
       'assistant_rows',
       'handoff_description',
       'ALTER TABLE assistant_rows ADD COLUMN handoff_description TEXT NULL',
+    );
+    // Multi-workspace bind (schema v19)
+    await _ensureColumn(
+      'assistant_rows',
+      'workspace_enabled',
+      'ALTER TABLE assistant_rows ADD COLUMN workspace_enabled INTEGER NOT NULL DEFAULT 0',
+    );
+    await _ensureColumn(
+      'assistant_rows',
+      'workspace_id',
+      'ALTER TABLE assistant_rows ADD COLUMN workspace_id TEXT NULL',
     );
 
     // --- message_rows ---
@@ -801,6 +815,17 @@ class AppDatabase extends _$AppDatabase {
         } catch (_) {
           // column may already exist on migration replay
         }
+      }
+      if (from < 19) {
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.workspaceEnabled,
+          );
+        } catch (_) {}
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.workspaceId);
+        } catch (_) {}
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

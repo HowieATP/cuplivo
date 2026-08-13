@@ -5,16 +5,22 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_memory.dart';
+import '../../../core/models/workspace.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/generation_engine.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/workspace/linux_sandbox_service.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import 'ask_user_interaction_service.dart';
+import 'handoff_tool_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
 
@@ -211,11 +217,17 @@ class ToolHandlerService {
     return null;
   }
 
-  static Set<String> _getBuiltinToolNames(Assistant? assistant) {
+  static Set<String> _getBuiltinToolNames(
+    Assistant? assistant,
+    SettingsProvider settings,
+  ) {
     final names = <String>{};
     if (assistant == null) return names;
     if (assistant.searchEnabled == true) {
       names.add(SearchToolService.toolName);
+      if (SearchToolService.shouldExposeFetchTool(settings)) {
+        names.add(SearchToolService.fetchToolName);
+      }
     }
     if (assistant.enableMemory == true) {
       names.add('create_memory');
@@ -232,6 +244,9 @@ class ToolHandlerService {
       names.add(LocalToolNames.loadSkill);
       names.add(LocalToolNames.readSkillFile);
     }
+    if (assistant.workspaceEnabled) {
+      names.addAll(WorkspaceToolNames.allTools);
+    }
     return names;
   }
 
@@ -242,11 +257,12 @@ class ToolHandlerService {
   static List<ToolNameCollision> detectToolNameCollisions({
     required McpProvider mcp,
     required Assistant? assistant,
+    required SettingsProvider settings,
   }) {
     final collisions = <ToolNameCollision>[];
     if (assistant == null) return collisions;
 
-    final builtinNames = _getBuiltinToolNames(assistant);
+    final builtinNames = _getBuiltinToolNames(assistant, settings);
     final selectedIds = assistant.mcpServerIds.toSet();
     final boundServers = mcp.connectedServers
         .where((s) => selectedIds.contains(s.id) && s.enabled)
@@ -316,12 +332,22 @@ class ToolHandlerService {
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
+    final assistantProvider = contextProvider.read<AssistantProvider>();
 
     // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
         !hasBuiltInSearch &&
         supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
+      if (SearchToolService.shouldExposeFetchTool(settings)) {
+        toolDefs.add(
+          SearchToolService.getFetchToolDefinition(
+            includeBuiltInOptions: SearchToolService.shouldUseBuiltInFetch(
+              settings,
+            ),
+          ),
+        );
+      }
     }
 
     // Memory tools
@@ -336,8 +362,24 @@ class ToolHandlerService {
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+        discoverableAssistants: assistantProvider.assistants,
       ),
     );
+
+    // Workspace filesystem + shell tools
+    try {
+      final wp = contextProvider.read<WorkspaceProvider>();
+      toolDefs.addAll(
+        WorkspaceToolsService.buildToolDefinitions(
+          assistant: assistant,
+          workspaces: wp,
+          supportsTools: supportsTools,
+          sandbox: LinuxSandboxService.instance,
+        ),
+      );
+    } on ProviderNotFoundException catch (e) {
+      debugPrint('workspace tools defs skipped: $e');
+    }
 
     // MCP tools
     final mcpTools = _buildMcpToolDefinitions(
@@ -519,9 +561,17 @@ class ToolHandlerService {
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
-    // Capture AssistantProvider reference before async gap to avoid
+    // Capture provider references before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    WorkspaceProvider? workspaceProvider;
+    ChatService? chatService;
+    try {
+      workspaceProvider = contextProvider.read<WorkspaceProvider>();
+      chatService = contextProvider.read<ChatService>();
+    } catch (_) {
+      // Headless / tests without WorkspaceProvider.
+    }
 
     return (name, args, {toolCallId}) async {
       try {
@@ -581,7 +631,7 @@ class ToolHandlerService {
             arguments: args,
             targetServerId: mcpServer!.id,
           );
-          return await _afterSyncHandoff(resolvedName, text);
+          return text;
         }
 
         // Search tool
@@ -589,6 +639,10 @@ class ToolHandlerService {
             assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
+        }
+        if (name == SearchToolService.fetchToolName &&
+            assistant?.searchEnabled == true) {
+          return await SearchToolService.executeFetch(args, settings);
         }
 
         // Memory tools
@@ -634,6 +688,86 @@ class ToolHandlerService {
         );
         if (localResult != null) {
           return localResult;
+        }
+
+        // Handoff tools (kelivo_handoff / kelivo_handoff_sync) need chat /
+        // headless providers, so they are dispatched here instead of inside
+        // LocalToolsService (same precedent as ask_user). The providers are
+        // read lazily — only when the tool actually fires — so harnesses
+        // without chat/headless providers can still exercise other
+        // built-in tools.
+        if (name == LocalToolNames.handoff ||
+            name == LocalToolNames.handoffSync) {
+          if (assistant == null || !assistant.localToolIds.contains(name)) {
+            return _toolError(
+              error: 'handoff_disabled',
+              message: 'The handoff tool is not enabled for this assistant.',
+              tool: name,
+            );
+          }
+          return await HandoffToolService.execute(
+            toolName: name,
+            args: args,
+            assistants: assistantProvider,
+            // ignore: use_build_context_synchronously (root context, valid for app lifetime)
+            chatService: contextProvider.read<ChatService>(),
+            // ignore: use_build_context_synchronously (root context, valid for app lifetime)
+            engine: contextProvider.read<GenerationEngine>(),
+            delegatingAssistant: assistant,
+            // ignore: use_build_context_synchronously (root context, valid for app lifetime)
+            context: contextProvider,
+          );
+        }
+
+        // Workspace tools (filesystem + shell)
+        if (WorkspaceToolNames.isWorkspaceTool(name) &&
+            assistant?.workspaceEnabled == true) {
+          final wp = workspaceProvider;
+          if (wp == null) {
+            return _toolError(
+              error: 'workspace_unavailable',
+              message: 'WorkspaceProvider is not available',
+              tool: name,
+            );
+          }
+          final boundId = assistant?.workspaceId;
+          final boundWs = boundId != null ? wp.getById(boundId) : null;
+          final needsApproval =
+              boundWs?.isToolNeedsApproval(name) ??
+              WorkspaceToolNames.defaultApprovalFor(name);
+          if (approvalService != null && needsApproval) {
+            final callId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+            final result = await approvalService.requestApproval(
+              toolCallId: callId,
+              toolName: name,
+              arguments: args,
+              conversationId: conversationId,
+            );
+            if (!result.approved) {
+              return _toolError(
+                error: 'approval_denied',
+                message: result.denyReason ?? 'User denied the tool call',
+                tool: name,
+              );
+            }
+          }
+          try {
+            final wsResult = await WorkspaceToolsService.tryHandleToolCall(
+              name: name,
+              args: args,
+              assistant: assistant,
+              workspaces: wp,
+              chatService: chatService,
+              sandbox: LinuxSandboxService.instance,
+            );
+            if (wsResult != null) return wsResult;
+          } catch (e) {
+            return _toolError(
+              error: 'workspace_tool_error',
+              message: e.toString(),
+              tool: name,
+            );
+          }
         }
 
         if (name == LocalToolNames.askUser &&
@@ -691,7 +825,7 @@ class ToolHandlerService {
           toolName: name,
           arguments: args,
         );
-        return await _afterSyncHandoff(name, text);
+        return text;
       } catch (e) {
         // Catch unexpected exceptions and return error JSON to LLM
         // This prevents tool failures from terminating the chat flow
@@ -704,56 +838,6 @@ class ToolHandlerService {
         );
       }
     };
-  }
-
-  /// Wait-mode handoff (`kelivo_handoff_sync`): the fast MCP response carries
-  /// the child conversation UUID; block ABOVE the MCP layer until the
-  /// sub-generation completes, then return its full output (or a
-  /// cancellation/error marker) as the tool result. Any other tool passes
-  /// through unchanged.
-  Future<String> _afterSyncHandoff(String name, String mcpText) async {
-    if (name != 'kelivo_handoff_sync') return mcpText;
-
-    String? childId;
-    try {
-      final decoded = jsonDecode(mcpText);
-      if (decoded is Map) {
-        final id = (decoded['conversation'] ?? '').toString();
-        if (id.isNotEmpty) childId = id;
-      }
-    } catch (e) {
-      debugPrint('[SyncHandoff] unparseable result: $e');
-    }
-    if (childId == null) {
-      return _toolError(
-        error: 'subagent_bad_result',
-        message:
-            'kelivo_handoff_sync returned an unparseable result: '
-            '$mcpText',
-        tool: name,
-      );
-    }
-
-    final engine = contextProvider.read<GenerationEngine>();
-    final result = await engine.waitFor(childId);
-    if (result.cancelled) {
-      return _toolError(
-        error: 'subagent_cancelled',
-        message: 'The sub-agent was cancelled by the user before finishing.',
-        tool: name,
-        instruction:
-            'The sub-agent did not finish. Summarize what was accomplished '
-            'or ask the user whether to retry.',
-      );
-    }
-    if (result.error != null) {
-      return _toolError(
-        error: 'subagent_error',
-        message: result.error!,
-        tool: name,
-      );
-    }
-    return result.text;
   }
 
   /// Handle memory tool calls (create/edit/delete).

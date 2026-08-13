@@ -265,7 +265,7 @@ private class GuestCommandRunner(private val appContext: Context) {
     timeoutMs: Long,
   ): Map<String, Any?> {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
-      ?: throw IllegalStateException("proot missing (filesDir cache and APK copy both failed)")
+      ?: throw IllegalStateException("proot missing (system lib dir, filesDir cache and APK copy all failed)")
     val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
       ?: throw IllegalStateException("proot loader missing")
     val linux = File(workspacePath, ".sandbox/linux")
@@ -295,22 +295,31 @@ private class GuestCommandRunner(private val appContext: Context) {
   }
 }
 
-/** Vendored proot native library resolution (cached copy → APK). */
+/**
+ * Vendored proot native library resolution.
+ *
+ * Preferred source is the platform-extracted native library directory
+ * (`applicationInfo.nativeLibraryDir`): the system writes those files with
+ * the exec bit and the right SELinux label already in place, so the binary
+ * can be spawned directly without copying or chmod. The filesDir copy chain
+ * below is kept only for installs where that directory is unavailable.
+ */
 private object NativeLibResolver {
   fun resolve(appContext: Context, libFileName: String): File? {
-    val candidates = mutableListOf<File>()
-
-    // 1) Previously copied fallback (survives restarts and app updates)
-    candidates += File(appContext.filesDir, "proot/$libFileName")
-
-    for (f in candidates) {
-      if (f.isFile && f.length() > 0L) {
-        makeExecutable(f)
-        return f
-      }
+    // 1) System-extracted native lib dir: executable out of the box.
+    val systemLib = File(appContext.applicationInfo.nativeLibraryDir, libFileName)
+    if (systemLib.isFile && systemLib.length() > 0L) {
+      return systemLib
     }
 
-    // 2) Copy out of APK / split APKs into app filesDir
+    // 2) Previously copied fallback (survives restarts and app updates)
+    val cached = File(appContext.filesDir, "proot/$libFileName")
+    if (cached.isFile && cached.length() > 0L) {
+      makeExecutable(cached)
+      return cached
+    }
+
+    // 3) Copy out of APK / split APKs into app filesDir
     val copied = copyFromApk(appContext, libFileName)
     if (copied != null) {
       makeExecutable(copied)
@@ -319,13 +328,22 @@ private object NativeLibResolver {
     return null
   }
 
+  /**
+   * Best-effort exec bit setup for the filesDir fallback path. setExecutable
+   * silently no-ops on some Android versions/OEMs, so the result is verified
+   * and an explicit libcore chmod (0755) is tried before giving up.
+   */
   private fun makeExecutable(file: File) {
     try {
+      if (file.canExecute()) return
+      file.setExecutable(true, false)
+      if (file.canExecute()) return
+      android.system.Os.chmod(file.path, 0x1ED) // 0755
       if (!file.canExecute()) {
-        file.setExecutable(true, false)
+        Log.w(TAG, "makeExecutable: still not executable after chmod: ${file.absolutePath}")
       }
     } catch (e: Exception) {
-      Log.w("LinuxSandbox", "setExecutable failed for ${file.absolutePath}: ${e.message}")
+      Log.w(TAG, "makeExecutable failed for ${file.absolutePath}: ${e.message}")
     }
   }
 

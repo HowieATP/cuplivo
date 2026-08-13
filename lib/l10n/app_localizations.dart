@@ -13284,6 +13284,12 @@ abstract class AppLocalizations {
   /// **'Deselect all'**
   String get skillsDeselectAll;
 
+  /// No description provided for @skillsClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get skillsClearAll;
+
   /// No description provided for @skillsEnableImportedTitle.
   ///
   /// In en, this message translates to:

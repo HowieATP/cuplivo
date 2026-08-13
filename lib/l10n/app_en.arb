@@ -3404,6 +3404,7 @@
   },
   "skillsSelectAll": "Select all",
   "skillsDeselectAll": "Deselect all",
+  "skillsClearAll": "Clear all",
   "skillsEnableImportedTitle": "Enable skills?",
   "skillsEnableImportedMessage": "Enable {count} imported skill(s) for \"{assistantName}\"?",
   "@skillsEnableImportedMessage": {

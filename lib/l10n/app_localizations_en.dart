@@ -7347,6 +7347,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skillsDeselectAll => 'Deselect all';
 
   @override
+  String get skillsClearAll => 'Clear all';
+
+  @override
   String get skillsEnableImportedTitle => 'Enable skills?';
 
   @override

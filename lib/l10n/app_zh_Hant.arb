@@ -2821,6 +2821,7 @@
   },
   "skillsSelectAll": "全選",
   "skillsDeselectAll": "全不選",
+  "skillsClearAll": "全部清除",
   "skillsEnableImportedTitle": "啟用 skills？",
   "skillsEnableImportedMessage": "為「{assistantName}」啟用 {count} 個已匯入的 skills？",
   "@skillsEnableImportedMessage": {

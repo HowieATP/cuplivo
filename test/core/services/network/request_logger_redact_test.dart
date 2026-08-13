@@ -18,11 +18,11 @@ void main() {
     test('leaves non-credential headers untouched', () {
       final redacted = RequestLogger.redactHeaders(<String, String>{
         'Content-Type': 'application/json',
-        'User-Agent': 'Kelivo',
+        'User-Agent': 'Cuplivo',
       });
 
       expect(redacted['Content-Type'], 'application/json');
-      expect(redacted['User-Agent'], 'Kelivo');
+      expect(redacted['User-Agent'], 'Cuplivo');
     });
 
     test('matches credential header names case-insensitively', () {

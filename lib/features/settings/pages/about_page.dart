@@ -373,7 +373,7 @@ class _AboutPageState extends State<AboutPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Kelivo',
+                            l10n.aboutPageAppName,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: AppFontWeights.semibold,

@@ -3170,7 +3170,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     final result = await ImageGallerySaverPlus.saveImage(
       bytes,
       quality: 100,
-      name: 'kelivo-table-${DateTime.now().millisecondsSinceEpoch}',
+      name: 'cuplivo-table-${DateTime.now().millisecondsSinceEpoch}',
     );
     if (result is Map) {
       final isSuccess = result['isSuccess'] == true || result['isSuccess'] == 1;
@@ -3234,7 +3234,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     final file = File(
       p.join(
         dir.path,
-        'kelivo-table-${DateTime.now().millisecondsSinceEpoch}.png',
+        'cuplivo-table-${DateTime.now().millisecondsSinceEpoch}.png',
       ),
     );
     await file.writeAsBytes(bytes, flush: true);
@@ -3272,7 +3272,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     try {
       final clipboard = SystemClipboard.instance;
       if (clipboard != null) {
-        final item = DataWriterItem(suggestedName: 'kelivo-table.png');
+        final item = DataWriterItem(suggestedName: 'cuplivo-table.png');
         item.add(Formats.png(bytes));
         await clipboard.write([item]);
         return true;
@@ -4318,7 +4318,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       final result = await ImageGallerySaverPlus.saveImage(
         bytes,
         quality: 100,
-        name: 'kelivo-mermaid-${DateTime.now().millisecondsSinceEpoch}',
+        name: 'cuplivo-mermaid-${DateTime.now().millisecondsSinceEpoch}',
       );
       if (result is Map) {
         final isSuccess =

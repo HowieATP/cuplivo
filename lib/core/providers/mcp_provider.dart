@@ -1214,7 +1214,7 @@ class McpProvider extends ChangeNotifier {
       // }
 
       final clientConfig = mcp.McpClient.simpleConfig(
-        name: 'Kelivo MCP',
+        name: 'Cuplivo MCP',
         version: '1.0.0',
         // Turn on library-internal verbose logs
         enableDebugLogging: false,

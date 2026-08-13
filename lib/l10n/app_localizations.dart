@@ -3227,6 +3227,30 @@ abstract class AppLocalizations {
   /// **'Copy as PNG image'**
   String get markdownTableCopyPngLabel;
 
+  /// No description provided for @markdownMathCopyLatexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy LaTeX'**
+  String get markdownMathCopyLatexLabel;
+
+  /// No description provided for @markdownMathCopyPngLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy as PNG'**
+  String get markdownMathCopyPngLabel;
+
+  /// No description provided for @markdownMathDownloadPngLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Download PNG'**
+  String get markdownMathDownloadPngLabel;
+
+  /// No description provided for @markdownMathDefaultFileNameStem.
+  ///
+  /// In en, this message translates to:
+  /// **'math'**
+  String get markdownMathDefaultFileNameStem;
+
   /// No description provided for @codeBlockCollapsedLines.
   ///
   /// In en, this message translates to:

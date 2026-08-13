@@ -1679,6 +1679,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get markdownTableCopyPngLabel => '复制为 PNG 图片';
 
   @override
+  String get markdownMathCopyLatexLabel => '复制 LaTeX';
+
+  @override
+  String get markdownMathCopyPngLabel => '复制为 PNG';
+
+  @override
+  String get markdownMathDownloadPngLabel => '下载 PNG';
+
+  @override
+  String get markdownMathDefaultFileNameStem => '公式';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… 已折叠 $n 行';
   }
@@ -9313,6 +9325,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get markdownTableCopyPngLabel => '复制为 PNG 图片';
 
   @override
+  String get markdownMathCopyLatexLabel => '复制 LaTeX';
+
+  @override
+  String get markdownMathCopyPngLabel => '复制为 PNG';
+
+  @override
+  String get markdownMathDownloadPngLabel => '下载 PNG';
+
+  @override
+  String get markdownMathDefaultFileNameStem => '公式';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… 已折叠 $n 行';
   }
@@ -16944,6 +16968,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get markdownTableCopyPngLabel => '複製為 PNG 圖片';
+
+  @override
+  String get markdownMathCopyLatexLabel => '複製 LaTeX';
+
+  @override
+  String get markdownMathCopyPngLabel => '複製為 PNG';
+
+  @override
+  String get markdownMathDownloadPngLabel => '下載 PNG';
+
+  @override
+  String get markdownMathDefaultFileNameStem => '公式';
 
   @override
   String codeBlockCollapsedLines(int n) {

@@ -464,6 +464,10 @@
   "markdownTableCopyMarkdownLabel": "複製為 Markdown",
   "markdownTableCopyTsvLabel": "複製為 TSV（Excel）",
   "markdownTableCopyPngLabel": "複製為 PNG 圖片",
+  "markdownMathCopyLatexLabel": "複製 LaTeX",
+  "markdownMathCopyPngLabel": "複製為 PNG",
+  "markdownMathDownloadPngLabel": "下載 PNG",
+  "markdownMathDefaultFileNameStem": "公式",
   "codeBlockCollapsedLines": "… 已摺疊 {n} 行",
   "@codeBlockCollapsedLines": {
     "placeholders": {

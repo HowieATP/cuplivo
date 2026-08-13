@@ -11,6 +11,7 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/theme/palettes.dart';
 import 'package:Cuplivo/theme/theme_factory.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -3677,6 +3678,136 @@ void main() {
       );
       expect(plainText, isNot(contains('<details>')));
       expect(plainText, isNot(contains('<a href=')));
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight opens math export menu on long press',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      await tester.pumpWidget(_markdownHarness(r'\[E = mc^2\]', width: 360));
+      await tester.pump();
+
+      await tester.longPress(
+        find.byType(Math),
+        warnIfMissed: false, // Math's RenderLine is paint-only; the gesture
+        // lands on the enclosing export GestureDetector.
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy LaTeX'), findsOneWidget);
+      expect(find.text('Copy as PNG'), findsOneWidget);
+      expect(find.text('Download PNG'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight copies raw LaTeX without tag normalization',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      await tester.pumpWidget(
+        _markdownHarness(r'\[E = mc^2 \tag{1}\]', width: 360),
+      );
+      await tester.pump();
+
+      await tester.longPress(
+        find.byType(Math),
+        warnIfMissed: false, // Math's RenderLine is paint-only; the gesture
+        // lands on the enclosing export GestureDetector.
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(clipboardText, r'E = mc^2 \tag{1}');
+      expect(clipboardText, isNot(contains(r'\qquad')));
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight opens math menu on desktop right click',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      await tester.pumpWidget(_markdownHarness(r'\[E = mc^2\]', width: 360));
+      await tester.pump();
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(Math)),
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryButton,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy LaTeX'), findsOneWidget);
+      expect(find.text('Copy as PNG'), findsOneWidget);
+      expect(find.text('Download PNG'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight math menu wins over enclosing SelectionArea',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(),
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SelectionArea(
+                contextMenuBuilder: (context, selectableRegionState) {
+                  return const Text('SELECTION_TOOLBAR_MARKER');
+                },
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: 360,
+                    child: MarkdownWithCodeHighlight(text: r'\[E = mc^2\]'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.longPress(
+        find.byType(Math),
+        warnIfMissed: false, // Math's RenderLine is paint-only; the gesture
+        // lands on the enclosing export GestureDetector.
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy LaTeX'), findsOneWidget);
+      expect(find.text('SELECTION_TOOLBAR_MARKER'), findsNothing);
     },
   );
 }

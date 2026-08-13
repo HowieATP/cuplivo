@@ -6488,20 +6488,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestLogAiAnalysisTooltip => 'Ask AI to analyze request logs';
 
   @override
-  String get requestLogAiAnalysisNoAssistant => 'No current assistant is available to analyze request logs.';
+  String get requestLogAiAnalysisNoAssistant =>
+      'No current assistant is available to analyze request logs.';
 
   @override
-  String get requestLogAiAnalysisNoRequests => 'No request logs are available to analyze.';
+  String get requestLogAiAnalysisNoRequests =>
+      'No request logs are available to analyze.';
 
   @override
-  String get requestLogAiAnalysisPreparationFailed => 'Couldn\'t prepare the request log analysis.';
+  String get requestLogAiAnalysisPreparationFailed =>
+      'Couldn\'t prepare the request log analysis.';
 
   @override
   String get requestLogAiAnalysisFilePrefix => 'request-log-analysis';
 
   @override
-  String get requestLogAiAnalysisPrompt => 'Please analyze the attached request logs and determine the main problem the user is most likely encountering, along with practical solutions.\n\nDo not mechanically repeat or analyze every request. Prioritize error status, failed or repeated failures, unusual latency, request/response mismatches, authentication, rate limiting, parameter formatting, streaming responses, or server-side errors that best explain the issue. Use neighboring logs to identify the likely root cause.\n\nAnswer in this order: main conclusion → key evidence → possible causes → recommended steps. If the evidence is insufficient, clearly say what is uncertain and what still needs checking. `<REDACTED: …>` values were intentionally replaced for privacy; do not treat their absence as the problem or ask the user to provide them.';
-
+  String get requestLogAiAnalysisPrompt =>
+      'Please analyze the attached request logs and determine the main problem the user is most likely encountering, along with practical solutions.\n\nDo not mechanically repeat or analyze every request. Prioritize error status, failed or repeated failures, unusual latency, request/response mismatches, authentication, rate limiting, parameter formatting, streaming responses, or server-side errors that best explain the issue. Use neighboring logs to identify the likely root cause.\n\nAnswer in this order: main conclusion → key evidence → possible causes → recommended steps. If the evidence is insufficient, clearly say what is uncertain and what still needs checking. `<REDACTED: …>` values were intentionally replaced for privacy; do not treat their absence as the problem or ask the user to provide them.';
 
   @override
   String get logSettingsAutoDelete => 'Auto-delete';

@@ -8072,6 +8072,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceRename => 'Rename';
 
   @override
+  String get workspaceTerminal => 'Terminal';
+
+  @override
+  String get workspaceTerminalAndroidOnly =>
+      'The workspace terminal is only available on Android.';
+
+  @override
+  String get workspaceTerminalReadOnly =>
+      'This workspace is read-only. The terminal is not available.';
+
+  @override
+  String get workspaceTerminalExited => 'The shell has exited.';
+
+  @override
+  String get workspaceTerminalRestart => 'Restart';
+
+  @override
+  String workspaceTerminalOpenFailed(String error) {
+    return 'Failed to start the terminal: $error';
+  }
+
+  @override
+  String get workspaceTerminalCopy => 'Copy';
+
+  @override
   String get workspaceFilesEntry => 'Workspace files';
 
   @override

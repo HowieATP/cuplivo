@@ -42,6 +42,64 @@ class SandboxReadiness {
   }
 }
 
+class SandboxPtyLaunchSpec {
+  final String executable;
+  final List<String> arguments;
+  final Map<String, String> environment;
+  final String workingDirectory;
+
+  const SandboxPtyLaunchSpec({
+    required this.executable,
+    required this.arguments,
+    required this.environment,
+    required this.workingDirectory,
+  });
+
+  factory SandboxPtyLaunchSpec.fromChannelMap(
+    Map<dynamic, dynamic> map, {
+    required String fallbackWorkingDirectory,
+  }) {
+    final executable = (map['executable'] ?? '').toString();
+    if (executable.isEmpty) {
+      throw StateError('ptyLaunchSpec missing executable');
+    }
+    final rawArgs = map['arguments'];
+    if (rawArgs is! List) {
+      throw StateError('ptyLaunchSpec missing arguments');
+    }
+    final rawEnv = map['environment'];
+    if (rawEnv is! Map) {
+      throw StateError('ptyLaunchSpec missing environment');
+    }
+    final workingDirectory =
+        (map['workingDirectory'] ?? fallbackWorkingDirectory).toString();
+    if (workingDirectory.isEmpty) {
+      throw StateError('ptyLaunchSpec missing workingDirectory');
+    }
+    final environment = <String, String>{};
+    rawEnv.forEach((key, value) {
+      if (key != null && value != null) {
+        environment[key.toString()] = value.toString();
+      }
+    });
+    return SandboxPtyLaunchSpec(
+      executable: executable,
+      arguments: rawArgs.map((e) => e.toString()).toList(),
+      environment: environment,
+      workingDirectory: workingDirectory,
+    );
+  }
+
+  static bool parseVolumeCtrlEvent(Object? event) {
+    if (event is! bool) {
+      throw StateError(
+        'volumeCtrl event must be bool, got ${event.runtimeType}',
+      );
+    }
+    return event;
+  }
+}
+
 class SandboxExecResult {
   final int exitCode;
   final String stdout;
@@ -98,6 +156,9 @@ class LinuxSandboxService {
   static final LinuxSandboxService instance = LinuxSandboxService._();
 
   static const MethodChannel _channel = MethodChannel('cuplivo/linux_sandbox');
+  static const EventChannel _volumeCtrlChannel = EventChannel(
+    'cuplivo/linux_sandbox/volume_ctrl',
+  );
 
   static const int maxOutputChars = 128 * 1024;
 
@@ -708,6 +769,53 @@ class LinuxSandboxService {
         stderr: e.message ?? e.code,
       );
     }
+  }
+
+  Future<SandboxPtyLaunchSpec> ptyLaunchSpec(String workspaceHostPath) async {
+    if (!Platform.isAndroid) {
+      throw UnsupportedError('Workspace Terminal is only available on Android');
+    }
+    final map = await _channel.invokeMethod<Map>('ptyLaunchSpec', {
+      'workspacePath': workspaceHostPath,
+    });
+    if (map == null) {
+      throw StateError('ptyLaunchSpec returned null');
+    }
+    return SandboxPtyLaunchSpec.fromChannelMap(
+      map,
+      fallbackWorkingDirectory: workspaceHostPath,
+    );
+  }
+
+  Future<void> setKeepScreenOn(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('setKeepScreenOn', {
+        'enabled': enabled,
+      });
+    } catch (e) {
+      debugPrint('LinuxSandboxService.setKeepScreenOn: $e');
+      if (enabled) rethrow;
+    }
+  }
+
+  Future<void> setVolumeCtrlIntercept(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('setVolumeCtrlIntercept', {
+        'enabled': enabled,
+      });
+    } catch (e) {
+      debugPrint('LinuxSandboxService.setVolumeCtrlIntercept: $e');
+      if (enabled) rethrow;
+    }
+  }
+
+  Stream<bool> volumeCtrlEvents() {
+    if (!Platform.isAndroid) return const Stream<bool>.empty();
+    return _volumeCtrlChannel.receiveBroadcastStream().map(
+      SandboxPtyLaunchSpec.parseVolumeCtrlEvent,
+    );
   }
 
   /// Allow only plain http(s) mirror base URLs without shell metacharacters.

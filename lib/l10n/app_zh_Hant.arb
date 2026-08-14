@@ -3070,6 +3070,20 @@
   "workspaceCannotDeleteDefault": "無法刪除預設工作區",
   "workspaceNotFound": "找不到工作區",
   "workspaceRename": "重新命名",
+  "workspaceTerminal": "終端",
+  "workspaceTerminalAndroidOnly": "工作區終端僅在 Android 上可用。",
+  "workspaceTerminalReadOnly": "此工作區為唯讀，無法開啟終端。",
+  "workspaceTerminalExited": "Shell 已結束。",
+  "workspaceTerminalRestart": "重新啟動",
+  "workspaceTerminalOpenFailed": "終端啟動失敗：{error}",
+  "@workspaceTerminalOpenFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceTerminalCopy": "複製",
   "workspaceFilesEntry": "工作區檔案",
   "workspaceFilesystemTools": "檔案系統工具",
   "workspaceInstallDeps": "安裝依賴",

@@ -15054,7 +15054,6 @@ abstract class AppLocalizations {
   /// **'Workspace'**
   String get assistantEditLocalToolWorkspaceTitle;
 
-
   /// No description provided for @iosKeepAliveMasterTitle.
   ///
   /// In en, this message translates to:
@@ -15143,7 +15142,8 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Standard background survival (~30s)'**
-  String get iosKeepAliveSurvivalShort;}
+  String get iosKeepAliveSurvivalShort;
+}
 
 class _AppLocalizationsDelegate
     extends LocalizationsDelegate<AppLocalizations> {

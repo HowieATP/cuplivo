@@ -48,6 +48,7 @@ static const NSTimeInterval kKillGraceSeconds = 2.0;
 }
 @property (nonatomic, copy) NSString *requestId;
 @property (nonatomic) int guestPid;
+@property (nonatomic) pid_t_ guestPgid;
 @property (nonatomic, readonly) CuplivoISHBoundedData *stdoutData;
 @property (nonatomic, readonly) CuplivoISHBoundedData *stderrData;
 @property (nonatomic, readonly) dispatch_semaphore_t waitSemaphore;
@@ -354,7 +355,7 @@ static dispatch_queue_t _readerQueue;
         }
     }
     if (ctx && pid > 1) {
-        [self killProcessGroup:pid];
+        [self killProcessGroup:pid groupId:ctx.guestPgid];
         dispatch_semaphore_signal(ctx.waitSemaphore);
         return YES;
     }
@@ -376,7 +377,7 @@ static dispatch_queue_t _readerQueue;
     }
     for (CuplivoISHExecutionContext *ctx in active) {
         if (ctx.guestPid > 1) {
-            [self killProcessGroup:ctx.guestPid];
+            [self killProcessGroup:ctx.guestPid groupId:ctx.guestPgid];
             dispatch_semaphore_signal(ctx.waitSemaphore);
         }
     }
@@ -553,6 +554,7 @@ static dispatch_queue_t _readerQueue;
     }
 
     ctx.guestPid = task->pid;
+    ctx.guestPgid = task->group->pgid;
     @synchronized(_activeExecutions) {
         _activeExecutions[@(ctx.guestPid)] = ctx;
         _activeExecutionsByRequest[requestId] = ctx;
@@ -583,7 +585,7 @@ static dispatch_queue_t _readerQueue;
     BOOL cancelled = ctx.cancelled;
     if (waitResult != 0 || cancelled) {
         timedOut = !cancelled;
-        [self killProcessGroup:ctx.guestPid];
+        [self killProcessGroup:ctx.guestPid groupId:ctx.guestPgid];
         // Give the exit notification a chance to land so the exit code and
         // any partial output are captured.
         (void)dispatch_semaphore_wait(ctx.waitSemaphore,
@@ -601,10 +603,12 @@ static dispatch_queue_t _readerQueue;
     // the readers stay blocked after the shell task exited. Reap those
     // descendants first: their fds close, the readers hit EOF and terminate
     // on their own.
-    if (!ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
-        if ([self hasTaskWithPid:ctx.guestPid]) {
-            [self killProcessGroup:ctx.guestPid];
-        }
+    if (ctx.exited || !ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
+        // The shell may already have exited while a background child either
+        // owns the pipe or redirected its output elsewhere. Keep the original
+        // process-group id so that child is still terminated after the shell
+        // PID disappears.
+        [self killProcessGroup:ctx.guestPid groupId:ctx.guestPgid];
     }
     // Last resort: closing the read ends unblocks the poll() loops (kqueue
     // based on Darwin). Only then join the readers.
@@ -753,43 +757,41 @@ static BOOL CuplivoTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
     return NO;
 }
 
-/// True when a guest task with the given pid still exists. Guards the
-/// pid-recycle window: only reap descendants while the command's root task
-/// is still present, so a recycled pid can never hit unrelated tasks.
-+ (BOOL)hasTaskWithPid:(int)pid {
-    lock(&pids_lock);
-    BOOL found = pid_get_task((dword_t)pid) != NULL;
-    unlock(&pids_lock);
-    return found;
-}
-
 /// SIGTERM the process group (pgid match or ancestry), then SIGKILL
 /// survivors after a short delay. Ported from OpenMinis including the
-/// pid-recycle safety rails.
-+ (void)killProcessGroup:(int)pid {
-    if (pid <= 1) {
-        NSLog(@"CuplivoISHExecutor: refusing killProcessGroup for pid=%d", pid);
+/// pid-recycle safety rails. When the root shell has already exited, the
+/// process group remains a safe identity while any inherited child survives;
+/// kill those members immediately with SIGKILL and do not schedule a delayed
+/// PID-based pass.
++ (void)killProcessGroup:(int)pid groupId:(pid_t_)knownPgid {
+    if (pid <= 1 && knownPgid <= 1) {
+        NSLog(@"CuplivoISHExecutor: refusing killProcessGroup for pid=%d pgid=%d",
+              pid, knownPgid);
         return;
     }
     struct siginfo_ info = SIGINFO_NIL;
 
     lock(&pids_lock);
     struct task *rootTask = pid_get_task((dword_t)pid);
-    pid_t_ pgid = 0;
-    if (rootTask) {
-        pgid = rootTask->group->pgid;
-        for (int i = 2; i < MAX_PID; i++) {
-            struct task *t = pid_get_task(i);
-            if (!t) continue;
-            BOOL byPgid = (pgid != 0 && t->group->pgid == pgid);
-            BOOL byAncestry = CuplivoTaskIsDescendantOf(t, (pid_t_)pid);
-            if (byPgid || byAncestry) {
-                send_signal(t, SIGTERM_, info);
-            }
+    pid_t_ pgid = rootTask ? rootTask->group->pgid : knownPgid;
+    if (pgid <= 1) {
+        unlock(&pids_lock);
+        return;
+    }
+    for (int i = 2; i < MAX_PID; i++) {
+        struct task *t = pid_get_task(i);
+        if (!t) continue;
+        BOOL byPgid = (t->group->pgid == pgid);
+        BOOL byAncestry = rootTask && CuplivoTaskIsDescendantOf(t, (pid_t_)pid);
+        if (byPgid || byAncestry) {
+            send_signal(t, rootTask ? SIGTERM_ : SIGKILL_, info);
         }
     }
     unlock(&pids_lock);
 
+    // Without the root task there is no safe object identity for a delayed
+    // PID-recycle check. The immediate group pass above is enough because a
+    // still-running child keeps this process group from being reused.
     if (rootTask == NULL) {
         return;
     }

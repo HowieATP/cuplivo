@@ -258,14 +258,6 @@ class WorkspaceToolsService {
         'message': 'Workspace host path is not ready.',
       });
     }
-    final status = await svc.statusFor(host);
-    if (status != SandboxStatus.ready) {
-      return jsonEncode({
-        'error': 'sandbox_not_ready',
-        'status': status.name,
-        'message': LinuxSandboxService.statusUserMessage(status),
-      });
-    }
     final command = (args['command'] ?? '').toString();
     if (command.trim().isEmpty) {
       return jsonEncode({
@@ -285,6 +277,7 @@ class WorkspaceToolsService {
             .toInt(),
         requestId: requestId,
         conversationId: conversationId,
+        requireReady: true,
       );
       return jsonEncode({
         'exitCode': result.exitCode,
@@ -305,6 +298,12 @@ class WorkspaceToolsService {
       return jsonEncode({
         'error': 'sandbox_cancelled',
         'message': 'The sandbox operation was cancelled.',
+      });
+    } on SandboxNotReadyException catch (e) {
+      return jsonEncode({
+        'error': 'sandbox_not_ready',
+        'status': e.status.name,
+        'message': LinuxSandboxService.statusUserMessage(e.status),
       });
     } catch (e, st) {
       debugPrint('shell tool failed: $e\n$st');

@@ -55,24 +55,59 @@ class TranslationService {
   final BuildContext Function() _getContext;
   final Map<String, _TranslationRequest> _activeRequests =
       <String, _TranslationRequest>{};
+  final Map<String, _TranslationRequest> _pendingSelections =
+      <String, _TranslationRequest>{};
 
   static const Duration liveUpdateInterval = Duration(milliseconds: 120);
 
   void cancelMessage(String messageId) {
     final request = _activeRequests.remove(messageId);
-    if (request == null) return;
-    request.cancelled = true;
-    ChatApiService.cancelRequest(request.requestId);
+    if (request != null) {
+      request.cancelled = true;
+      ChatApiService.cancelRequest(request.requestId);
+    }
+    final selection = _pendingSelections.remove(messageId);
+    selection?.cancelled = true;
   }
 
   void cancelAll() {
-    for (final messageId in _activeRequests.keys.toList()) {
+    final messageIds = <String>{
+      ..._activeRequests.keys,
+      ..._pendingSelections.keys,
+    };
+    for (final messageId in messageIds) {
       cancelMessage(messageId);
     }
   }
 
+  _TranslationRequest _beginSelection(String messageId) {
+    final previous = _pendingSelections.remove(messageId);
+    previous?.cancelled = true;
+    final request = _TranslationRequest(
+      messageId: messageId,
+      requestId:
+          'translation_${messageId}_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    _pendingSelections[messageId] = request;
+    return request;
+  }
+
+  bool _isCurrentSelection(_TranslationRequest request) =>
+      identical(_pendingSelections[request.messageId], request) &&
+      !request.cancelled;
+
+  void _finishSelection(_TranslationRequest request) {
+    if (identical(_pendingSelections[request.messageId], request)) {
+      _pendingSelections.remove(request.messageId);
+    }
+  }
+
   _TranslationRequest _beginRequest(String messageId) {
-    cancelMessage(messageId);
+    final previous = _activeRequests.remove(messageId);
+    if (previous != null) {
+      previous.cancelled = true;
+      ChatApiService.cancelRequest(previous.requestId);
+    }
     final request = _TranslationRequest(
       messageId: messageId,
       requestId:
@@ -81,6 +116,9 @@ class TranslationService {
     _activeRequests[messageId] = request;
     return request;
   }
+
+  bool hasActiveRequest(String messageId) =>
+      _activeRequests.containsKey(messageId);
 
   bool _isCurrent(_TranslationRequest request) =>
       identical(_activeRequests[request.messageId], request) &&
@@ -110,7 +148,7 @@ class TranslationService {
     final context = _getContext();
     final settings = context.read<SettingsProvider>();
     final assistant = context.read<AssistantProvider>().currentAssistant;
-    final request = _beginRequest(message.id);
+    final selection = _beginSelection(message.id);
 
     // 显示语言选择器
     final LanguageOption? language;
@@ -118,17 +156,21 @@ class TranslationService {
       language = await showLanguageSelector(context);
     } catch (_) {
       // Do not leave the request registered when the selector itself fails.
-      _finishRequest(request);
+      _finishSelection(selection);
       rethrow;
     }
     if (language == null) {
-      _finishRequest(request);
+      // Keep an already-running translation alive when the replacement
+      // language picker is dismissed without a choice.
+      _finishSelection(selection);
       return TranslationResult(type: TranslationResultType.cancelled);
     }
 
-    if (!_isCurrent(request)) {
+    if (!_isCurrentSelection(selection)) {
       return TranslationResult(type: TranslationResultType.cancelled);
     }
+    _finishSelection(selection);
+    final request = _beginRequest(message.id);
 
     // 检查是否选择清除翻译
     if (language.code == '__clear__') {
@@ -139,6 +181,7 @@ class TranslationService {
         }
         await _serializedMessageUpdate(
           message.id,
+          request,
           () => chatService.updateMessage(message.id, translation: ''),
         );
         if (!_isCurrent(request)) {
@@ -208,6 +251,7 @@ class TranslationService {
       // 保存最终翻译结果
       await _serializedMessageUpdate(
         message.id,
+        request,
         () => chatService.updateMessage(message.id, translation: translation),
       );
       if (!_isCurrent(request)) {
@@ -234,6 +278,7 @@ class TranslationService {
       }
       await _serializedMessageUpdate(
         message.id,
+        request,
         () => chatService.updateMessage(message.id, translation: ''),
       );
       if (!_isCurrent(request)) {
@@ -256,10 +301,17 @@ class TranslationService {
 
   Future<void> _serializedMessageUpdate(
     String messageId,
+    _TranslationRequest request,
     Future<void> Function() op,
   ) {
     final previous = _messageWriteChains[messageId] ?? Future<void>.value();
-    final next = previous.catchError((_) {}).then<void>((_) => op());
+    final next = previous.catchError((_) {}).then<void>((_) {
+      // A newer request can replace this request while it waits behind a
+      // previous database write. Do not let the stale operation start after
+      // that replacement.
+      if (!_isCurrent(request)) return Future<void>.value();
+      return op();
+    });
     _messageWriteChains[messageId] = next.catchError((_) {});
     return next;
   }

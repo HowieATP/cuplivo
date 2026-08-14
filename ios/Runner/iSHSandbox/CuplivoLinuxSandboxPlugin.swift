@@ -77,15 +77,48 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
           details: nil))
       return
     }
-    queue.async {
+    let rawRequestId = (args["requestId"] as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let requestId = rawRequestId.flatMap { $0.isEmpty ? nil : $0 }
+      ?? "ios_install_\(UUID().uuidString)"
+    if !registerRequest(requestId) {
+      result(
+        FlutterError(
+          code: "duplicate_request",
+          message: "requestId is already active: \(requestId)",
+          details: nil))
+      return
+    }
+    queue.async { [weak self] in
+      guard let self else { return }
+      defer { self.finishRequest(requestId) }
       // FlutterResult must be called on the platform (main) thread; this
       // queue is a background serial queue, so marshal the completion.
       let complete: (Any?) -> Void = { value in
         DispatchQueue.main.async { result(value) }
       }
+      if self.consumeCancellation(requestId) {
+        complete(
+          FlutterError(
+            code: "cancelled", message: "rootfs installation cancelled", details: nil))
+        return
+      }
       do {
-        try CuplivoSandboxRootfsInstaller.install(to: URL(fileURLWithPath: rootfsPath))
-        complete(nil)
+        try CuplivoSandboxRootfsInstaller.install(
+          to: URL(fileURLWithPath: rootfsPath),
+          isCancelled: { self.isCancelled(requestId) }
+        )
+        if self.isCancelled(requestId) {
+          complete(
+            FlutterError(
+              code: "cancelled", message: "rootfs installation cancelled", details: nil))
+        } else {
+          complete(nil)
+        }
+      } catch SandboxRootfsInstallerError.cancelled {
+        complete(
+          FlutterError(
+            code: "cancelled", message: "rootfs installation cancelled", details: nil))
       } catch {
         NSLog("CuplivoLinuxSandboxPlugin: installBase failed: \(error)")
         complete(

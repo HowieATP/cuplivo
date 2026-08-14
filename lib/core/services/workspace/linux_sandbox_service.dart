@@ -138,6 +138,15 @@ class SandboxCancelledException implements Exception {
   String toString() => 'Sandbox request $requestId was cancelled';
 }
 
+class SandboxNotReadyException implements Exception {
+  const SandboxNotReadyException(this.status);
+
+  final SandboxStatus status;
+
+  @override
+  String toString() => 'Sandbox is not ready: ${status.name}';
+}
+
 class SandboxInstallProgress {
   final String stage; // downloading | extracting | installing | done
   final double? progress; // 0-1 if known
@@ -276,6 +285,8 @@ class LinuxSandboxService {
   final Map<String, _WorkspaceExecutionQueue> _executionQueues =
       <String, _WorkspaceExecutionQueue>{};
   final Set<String> _cancelledRequestIds = <String>{};
+  final Map<String, CancelToken> _downloadCancelTokens =
+      <String, CancelToken>{};
   int _requestCounter = 0;
 
   String _newRequestId(String prefix) {
@@ -323,6 +334,11 @@ class LinuxSandboxService {
     }
   }
 
+  void _markCancelled(String requestId) {
+    _cancelledRequestIds.add(requestId);
+    _downloadCancelTokens[requestId]?.cancel('sandbox request cancelled');
+  }
+
   Future<void> cancelExec(String requestId) async {
     final ids = <String>{};
     for (final queue in _executionQueues.values) {
@@ -331,7 +347,9 @@ class LinuxSandboxService {
       );
       ids.addAll(cancellation.activeIds);
     }
-    _cancelledRequestIds.addAll(ids);
+    for (final id in ids) {
+      _markCancelled(id);
+    }
     for (final id in ids) {
       await _cancelNativeRequest(id);
     }
@@ -347,7 +365,9 @@ class LinuxSandboxService {
       );
       requestIds.addAll(cancellation.activeIds);
     }
-    _cancelledRequestIds.addAll(requestIds);
+    for (final requestId in requestIds) {
+      _markCancelled(requestId);
+    }
     for (final requestId in requestIds) {
       await _cancelNativeRequest(requestId);
     }
@@ -358,7 +378,9 @@ class LinuxSandboxService {
     for (final queue in _executionQueues.values) {
       requestIds.addAll(queue.cancelWhere((_) => true).activeIds);
     }
-    _cancelledRequestIds.addAll(requestIds);
+    for (final requestId in requestIds) {
+      _markCancelled(requestId);
+    }
     for (final requestId in requestIds) {
       await _cancelNativeRequest(requestId);
     }
@@ -637,19 +659,32 @@ class LinuxSandboxService {
             message: url,
           ),
         );
-        await _downloadFile(
-          url: url,
-          savePath: archivePath,
-          onProgress: (ratio) {
-            onProgress?.call(
-              SandboxInstallProgress(
-                stage: 'downloading',
-                progress: ratio,
-                message: url,
-              ),
-            );
-          },
-        );
+        final cancelToken = CancelToken();
+        _downloadCancelTokens[requestId] = cancelToken;
+        if (_cancelledRequestIds.contains(requestId)) {
+          cancelToken.cancel('sandbox request cancelled');
+        }
+        try {
+          await _downloadFile(
+            url: url,
+            savePath: archivePath,
+            cancelToken: cancelToken,
+            requestId: requestId,
+            onProgress: (ratio) {
+              onProgress?.call(
+                SandboxInstallProgress(
+                  stage: 'downloading',
+                  progress: ratio,
+                  message: url,
+                ),
+              );
+            },
+          );
+        } finally {
+          if (identical(_downloadCancelTokens[requestId], cancelToken)) {
+            _downloadCancelTokens.remove(requestId);
+          }
+        }
         _throwIfCancelled(requestId);
         onProgress?.call(
           const SandboxInstallProgress(stage: 'extracting', progress: null),
@@ -728,6 +763,8 @@ class LinuxSandboxService {
   Future<void> _downloadFile({
     required String url,
     required String savePath,
+    required String requestId,
+    CancelToken? cancelToken,
     void Function(double ratio)? onProgress,
   }) async {
     final dio = Dio(
@@ -746,6 +783,7 @@ class LinuxSandboxService {
       final response = await dio.download(
         url,
         savePath,
+        cancelToken: cancelToken,
         deleteOnError: true,
         onReceiveProgress: (received, total) {
           if (total > 0) {
@@ -769,6 +807,9 @@ class LinuxSandboxService {
         throw StateError('Downloaded file empty for $url');
       }
     } on DioException catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        throw SandboxCancelledException(requestId);
+      }
       final code = e.response?.statusCode;
       final reason = e.message ?? e.type.name;
       if (code != null) {
@@ -1001,6 +1042,7 @@ class LinuxSandboxService {
     int timeoutSeconds = 30,
     String? requestId,
     String? conversationId,
+    bool requireReady = false,
   }) async {
     if (!isSandboxPlatform) {
       throw UnsupportedError('shell is only available on Android or iOS');
@@ -1021,6 +1063,7 @@ class LinuxSandboxService {
         cwd: cwd,
         timeoutSeconds: timeoutSeconds,
         requestId: effectiveRequestId,
+        requireReady: requireReady,
       ),
     );
   }
@@ -1031,10 +1074,20 @@ class LinuxSandboxService {
     String? cwd,
     required int timeoutSeconds,
     required String requestId,
+    bool requireReady = false,
     int maxTimeoutSeconds = maxShellTimeoutSeconds,
   }) async {
     if (_cancelledRequestIds.remove(requestId)) {
       throw SandboxCancelledException(requestId);
+    }
+    if (requireReady) {
+      final status = await statusFor(workspaceHostPath);
+      if (_cancelledRequestIds.remove(requestId)) {
+        throw SandboxCancelledException(requestId);
+      }
+      if (status != SandboxStatus.ready) {
+        throw SandboxNotReadyException(status);
+      }
     }
     final boundedTimeout = timeoutSeconds.clamp(1, maxTimeoutSeconds).toInt();
     try {

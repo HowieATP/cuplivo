@@ -453,6 +453,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      hasActiveTranslation: _translationService.hasActiveRequest,
     );
     _viewModel.addListener(notifyListeners);
 
@@ -1620,7 +1621,15 @@ class HomePageController extends ChangeNotifier {
       },
     );
 
-    if (_disposed || result.isCancelled) return;
+    if (_disposed) return;
+    if (result.isCancelled) {
+      // A cancelled request may have been the owner keeping a completed
+      // source message's notifier alive. Do not remove it if a replacement
+      // request is already active for the same message.
+      _removeTranslationNotifierIfSettled(message.id);
+      return;
+    }
+    _removeTranslationNotifierIfSettled(message.id);
     if (result.isSuccess) {
       final finalTranslation = result.translation ?? '';
       final index = messages.indexWhere((m) => m.id == message.id);
@@ -1666,6 +1675,13 @@ class HomePageController extends ChangeNotifier {
         type: NotificationType.error,
       );
     }
+  }
+
+  void _removeTranslationNotifierIfSettled(String messageId) {
+    if (_translationService.hasActiveRequest(messageId)) return;
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index == -1 || messages[index].isStreaming) return;
+    _streamController.streamingContentNotifier.removeNotifier(messageId);
   }
 
   void _handleAssistantMessageFinished(ChatMessage message) {

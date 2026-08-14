@@ -128,7 +128,7 @@ class PlainTextCollector {
         scheduleAccumulated();
       }
       streamCompleted = true;
-    } on Object catch (e, st) {
+    } on Object catch (_) {
       // Surface a previously captured callback error in preference to the
       // stream error so interval-mode callers keep the same catchable
       // semantics as the per-chunk path.

@@ -116,7 +116,7 @@ class TranslationService {
     final LanguageOption? language;
     try {
       language = await showLanguageSelector(context);
-    } catch (e, st) {
+    } catch (_) {
       // Do not leave the request registered when the selector itself fails.
       _finishRequest(request);
       rethrow;
@@ -224,8 +224,9 @@ class TranslationService {
       }
       // The prompt embeds the user's message content; exceptions can echo
       // it, so only log in debug builds.
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('TranslationService: translation failed: $e\n$st');
+      }
       // 出错时清除翻译
       onTranslationCleared();
       if (!_isCurrent(request)) {

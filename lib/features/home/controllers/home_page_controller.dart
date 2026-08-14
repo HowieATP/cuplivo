@@ -1575,12 +1575,14 @@ class HomePageController extends ChangeNotifier {
       message: message,
       onTranslationStarted: () {
         if (_disposed) return;
-        final loadingMessage = message.copyWith(
-          translation: l10n.homePageTranslating,
-        );
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
-          messages[index] = loadingMessage;
+          // Apply on the current row, not the stale invocation snapshot:
+          // this callback fires after the language selector closes, so the
+          // message may have kept streaming (or finished) in the meantime.
+          messages[index] = messages[index].copyWith(
+            translation: l10n.homePageTranslating,
+          );
         }
         _streamController.streamingContentNotifier.getNotifier(message.id);
         _chatController.invalidateCache();
@@ -1636,10 +1638,12 @@ class HomePageController extends ChangeNotifier {
       if (!liveRow) {
         _streamController.streamingContentNotifier.removeNotifier(message.id);
       }
-      // Mirror the cleared/failure paths: drop the UI state entry so a
-      // previously collapsed box does not stay collapsed after the
-      // translation completes.
-      _translations.remove(message.id);
+      // Reset (not remove) the UI state entry so a previously collapsed box
+      // does not stay collapsed after the translation completes. Removing it
+      // would disable the collapse toggle entirely: both the message row's
+      // onToggleTranslation wiring and toggleTranslation() require a live
+      // entry to exist.
+      _translations[message.id] = TranslationData();
       _chatController.invalidateCache();
       notifyListeners();
       return;

@@ -64,6 +64,12 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
   @Volatile
   private var prootSupport: Boolean? = null
 
+  /// Guards the first-time proot probe so concurrent isSupported calls
+  /// cannot race on the APK copy (both would write the same fallback file).
+  /// Deliberately not `this`: engine attach/detach also synchronize on the
+  /// plugin, and a slow probe must not block engine teardown.
+  private val prootProbeLock = Any()
+
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     attachmentGeneration.incrementAndGet()
     prootSupport = null
@@ -138,19 +144,23 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
     when (call.method) {
       "isSupported" -> {
         // Cached capability probe. hasProot() is usually a cheap local file
-        // probe but can fall through to an APK copy on first use; the cache
-        // keeps that disk I/O off the platform (UI) thread after the first
-        // call and off the bounded executor entirely, so a saturated
-        // executor can never surface sandbox_busy and make Dart misclassify
-        // the sandbox as unsupported.
+        // probe but can fall through to an APK copy on first use (disk I/O),
+        // which must never run on the platform (UI) thread. The first probe
+        // therefore runs on a background thread — deliberately NOT the
+        // bounded execution executor, so a saturated executor can never
+        // surface sandbox_busy and make Dart misclassify the sandbox as
+        // unsupported — and the cached result keeps every later call cheap.
         val cached = prootSupport
         if (cached != null) {
           result.success(cached)
           return
         }
-        val supported = hasProot()
-        prootSupport = supported
-        result.success(supported)
+        Thread {
+          val supported = synchronized(prootProbeLock) {
+            prootSupport ?: hasProot().also { prootSupport = it }
+          }
+          mainHandler.post { result.success(supported) }
+        }.start()
       }
       "getAbi" -> result.success(primaryAbi())
       "extractRootfs" -> {

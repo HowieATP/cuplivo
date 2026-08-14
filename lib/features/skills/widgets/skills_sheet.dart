@@ -29,6 +29,10 @@ class _SkillsSheetState extends State<SkillsSheet> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
 
+  /// Tracks which category groups are currently collapsed.
+  /// All groups start expanded by default.
+  final Set<String> _collapsedGroups = {};
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +84,23 @@ class _SkillsSheetState extends State<SkillsSheet> {
     ).push(MaterialPageRoute(builder: (_) => const SkillsPage()));
   }
 
+  /// A stable key for a group, used to track collapsed state.
+  String _groupKey(String? group) => group ?? '__uncategorized__';
+
+  void _toggleGroup(String? group) {
+    setState(() {
+      final key = _groupKey(group);
+      if (_collapsedGroups.contains(key)) {
+        _collapsedGroups.remove(key);
+      } else {
+        _collapsedGroups.add(key);
+      }
+    });
+  }
+
+  bool _isGroupExpanded(String? group) =>
+      !_collapsedGroups.contains(_groupKey(group));
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -124,43 +145,122 @@ class _SkillsSheetState extends State<SkillsSheet> {
                           ),
                         ),
                       )
-                    : ListView(
-                        controller: controller,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        children: [
-                          for (final (group, skills) in groupSkillsByCategory(
-                            _skills,
-                          )) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
-                              child: Text(
-                                group ?? l10n.skillsUncategorizedGroup,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: AppFontWeights.emphasis,
-                                  color: cs.onSurface.withValues(alpha: 0.55),
-                                ),
-                              ),
-                            ),
-                            for (final skill in skills)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _SkillSheetRow(
-                                  name: skill.name,
-                                  enabled: assistant.skillIds.contains(
-                                    skill.name,
-                                  ),
-                                  onChanged: (v) =>
-                                      _toggle(assistant, skill.name, v),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
+                    : _buildGroupedList(controller, assistant, l10n, cs),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildGroupedList(
+    ScrollController controller,
+    Assistant assistant,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) {
+    final groups = groupSkillsByCategory(_skills);
+
+    // When there is only one group, skip collapsible headers.
+    if (groups.length == 1) {
+      final (_, skills) = groups.first;
+      return ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        children: [
+          for (final skill in skills)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SkillSheetRow(
+                name: skill.name,
+                enabled: assistant.skillIds.contains(skill.name),
+                onChanged: (v) => _toggle(assistant, skill.name, v),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return ListView(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        for (final (group, skills) in groups) ...[
+          _SheetCollapsibleGroupHeader(
+            groupName: group ?? l10n.skillsUncategorizedGroup,
+            skillCount: skills.length,
+            expanded: _isGroupExpanded(group),
+            onTap: () => _toggleGroup(group),
+          ),
+          if (_isGroupExpanded(group))
+            for (final skill in skills)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _SkillSheetRow(
+                  name: skill.name,
+                  enabled: assistant.skillIds.contains(skill.name),
+                  onChanged: (v) => _toggle(assistant, skill.name, v),
+                ),
+              ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Collapsible group header for the skills sheet.
+class _SheetCollapsibleGroupHeader extends StatelessWidget {
+  const _SheetCollapsibleGroupHeader({
+    required this.groupName,
+    required this.skillCount,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final String groupName;
+  final int skillCount;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
+        child: Row(
+          children: [
+            AnimatedRotation(
+              turns: expanded ? 0.25 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                Lucide.ChevronRight,
+                size: 14,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              groupName,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: AppFontWeights.emphasis,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '($skillCount)',
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.38),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

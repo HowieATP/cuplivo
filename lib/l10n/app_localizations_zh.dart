@@ -42,10 +42,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
-  String get settingsPageAssistant => '助手';
+  String get settingsPageAssistant => '助手 / 群聊';
 
   @override
-  String get settingsPageAssistantSubtitle => '默认助手与对话风格';
+  String get settingsPageAssistantSubtitle => '助手、群聊与对话风格';
 
   @override
   String get settingsPageModelsServicesSection => '模型与服务';
@@ -1722,7 +1722,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditModelUseGlobalDefault => '使用全局默认';
 
   @override
-  String get assistantSettingsPageTitle => '助手设置';
+  String get assistantSettingsPageTitle => '助手 / 群聊';
 
   @override
   String get assistantSettingsCopyButton => '复制';
@@ -1752,10 +1752,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantSettingsAddSheetSave => '保存';
 
   @override
-  String get desktopAssistantsListTitle => '助手列表';
+  String get desktopAssistantsListTitle => '助手 / 群聊';
 
   @override
-  String get desktopSidebarTabAssistants => '助手';
+  String get desktopSidebarTabAssistants => '助手 / 群聊';
 
   @override
   String get desktopSidebarTabTopics => '话题';
@@ -3013,7 +3013,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sideDrawerSearchHint => '搜索当前助手';
 
   @override
-  String get sideDrawerSearchAssistantsHint => '搜索助手';
+  String get sideDrawerSearchAssistantsHint => '搜索助手 / 群聊';
 
   @override
   String get sideDrawerTopicSearchModeLabel => '话题模式';
@@ -7957,10 +7957,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
-  String get settingsPageAssistant => '助手';
+  String get settingsPageAssistant => '助手 / 群聊';
 
   @override
-  String get settingsPageAssistantSubtitle => '默认助手与对话风格';
+  String get settingsPageAssistantSubtitle => '助手、群聊与对话风格';
 
   @override
   String get settingsPageModelsServicesSection => '模型与服务';
@@ -9637,7 +9637,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditModelUseGlobalDefault => '使用全局默认';
 
   @override
-  String get assistantSettingsPageTitle => '助手设置';
+  String get assistantSettingsPageTitle => '助手 / 群聊';
 
   @override
   String get assistantSettingsCopyButton => '复制';
@@ -9667,10 +9667,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantSettingsAddSheetSave => '保存';
 
   @override
-  String get desktopAssistantsListTitle => '助手列表';
+  String get desktopAssistantsListTitle => '助手 / 群聊';
 
   @override
-  String get desktopSidebarTabAssistants => '助手';
+  String get desktopSidebarTabAssistants => '助手 / 群聊';
 
   @override
   String get desktopSidebarTabTopics => '话题';
@@ -10928,7 +10928,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sideDrawerSearchHint => '搜索当前助手';
 
   @override
-  String get sideDrawerSearchAssistantsHint => '搜索助手';
+  String get sideDrawerSearchAssistantsHint => '搜索助手 / 群聊';
 
   @override
   String get sideDrawerTopicSearchModeLabel => '话题模式';
@@ -15872,10 +15872,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageDisplaySubtitle => '外觀、行為與互動偏好';
 
   @override
-  String get settingsPageAssistant => '助理';
+  String get settingsPageAssistant => '助理 / 群聊';
 
   @override
-  String get settingsPageAssistantSubtitle => '預設助理與對話風格';
+  String get settingsPageAssistantSubtitle => '助理、群聊與對話風格';
 
   @override
   String get settingsPageModelsServicesSection => '模型與服務';
@@ -17551,7 +17551,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditModelUseGlobalDefault => '使用全域預設';
 
   @override
-  String get assistantSettingsPageTitle => '助理設定';
+  String get assistantSettingsPageTitle => '助理 / 群聊';
 
   @override
   String get assistantSettingsCopyButton => '複製';
@@ -17581,10 +17581,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantSettingsAddSheetSave => '儲存';
 
   @override
-  String get desktopAssistantsListTitle => '助理列表';
+  String get desktopAssistantsListTitle => '助理 / 群聊';
 
   @override
-  String get desktopSidebarTabAssistants => '助理';
+  String get desktopSidebarTabAssistants => '助理 / 群聊';
 
   @override
   String get desktopSidebarTabTopics => '主題';
@@ -18841,7 +18841,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sideDrawerSearchHint => '搜尋當前助理';
 
   @override
-  String get sideDrawerSearchAssistantsHint => '搜尋助理';
+  String get sideDrawerSearchAssistantsHint => '搜尋助理 / 群聊';
 
   @override
   String get sideDrawerTopicSearchModeLabel => '話題模式';

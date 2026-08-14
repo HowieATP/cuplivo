@@ -44,10 +44,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Appearance, behavior, and interaction preferences';
 
   @override
-  String get settingsPageAssistant => 'Assistant';
+  String get settingsPageAssistant => 'Assistants / Group chats';
 
   @override
-  String get settingsPageAssistantSubtitle => 'Default assistant and style';
+  String get settingsPageAssistantSubtitle =>
+      'Assistants, group chats, and conversation style';
 
   @override
   String get settingsPageModelsServicesSection => 'Models & Services';
@@ -1786,7 +1787,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditModelUseGlobalDefault => 'Use global default';
 
   @override
-  String get assistantSettingsPageTitle => 'Assistant Settings';
+  String get assistantSettingsPageTitle => 'Assistants / Group chats';
 
   @override
   String get assistantSettingsCopyButton => 'Copy';
@@ -1816,10 +1817,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantSettingsAddSheetSave => 'Save';
 
   @override
-  String get desktopAssistantsListTitle => 'Assistants';
+  String get desktopAssistantsListTitle => 'Assistants / Group chats';
 
   @override
-  String get desktopSidebarTabAssistants => 'Assistants';
+  String get desktopSidebarTabAssistants => 'Assistants / Group chats';
 
   @override
   String get desktopSidebarTabTopics => 'Topics';
@@ -3126,7 +3127,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerSearchHint => 'Search current assistant';
 
   @override
-  String get sideDrawerSearchAssistantsHint => 'Search assistants';
+  String get sideDrawerSearchAssistantsHint =>
+      'Search assistants / group chats';
 
   @override
   String get sideDrawerTopicSearchModeLabel => 'Topic mode';

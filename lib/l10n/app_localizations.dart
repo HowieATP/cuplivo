@@ -169,13 +169,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPageAssistant.
   ///
   /// In en, this message translates to:
-  /// **'Assistant'**
+  /// **'Assistants / Group chats'**
   String get settingsPageAssistant;
 
   /// No description provided for @settingsPageAssistantSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Default assistant and style'**
+  /// **'Assistants, group chats, and conversation style'**
   String get settingsPageAssistantSubtitle;
 
   /// No description provided for @settingsPageModelsServicesSection.
@@ -3308,7 +3308,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantSettingsPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Assistant Settings'**
+  /// **'Assistants / Group chats'**
   String get assistantSettingsPageTitle;
 
   /// No description provided for @assistantSettingsCopyButton.
@@ -3368,13 +3368,13 @@ abstract class AppLocalizations {
   /// No description provided for @desktopAssistantsListTitle.
   ///
   /// In en, this message translates to:
-  /// **'Assistants'**
+  /// **'Assistants / Group chats'**
   String get desktopAssistantsListTitle;
 
   /// No description provided for @desktopSidebarTabAssistants.
   ///
   /// In en, this message translates to:
-  /// **'Assistants'**
+  /// **'Assistants / Group chats'**
   String get desktopSidebarTabAssistants;
 
   /// No description provided for @desktopSidebarTabTopics.
@@ -5700,7 +5700,7 @@ abstract class AppLocalizations {
   /// No description provided for @sideDrawerSearchAssistantsHint.
   ///
   /// In en, this message translates to:
-  /// **'Search assistants'**
+  /// **'Search assistants / group chats'**
   String get sideDrawerSearchAssistantsHint;
 
   /// No description provided for @sideDrawerTopicSearchModeLabel.

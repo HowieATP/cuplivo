@@ -564,14 +564,6 @@ class TtsProvider extends ChangeNotifier {
     }
   }
 
-  void _resumeKeepAliveForMedia() {
-    if (_keepAliveMediaCount <= 0) return;
-    _keepAliveMediaCount--;
-    if (_keepAliveMediaCount == 0) {
-      unawaited(IosKeepAliveService.instance.resumeSilentAudio());
-    }
-  }
-
   void _clearKeepAliveForMedia() {
     if (_keepAliveMediaCount <= 0) return;
     _keepAliveMediaCount = 0;

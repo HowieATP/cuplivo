@@ -39,8 +39,11 @@ class RequestLogAiAnalysisExporter {
     'credentials',
   };
 
-  /// Writes [entries] as a regular text attachment in the app upload tree so
-  /// it remains available if the user later sends the prefilled draft.
+  /// Writes [entries] as a regular text attachment so it remains available
+  /// if the user later sends the prefilled draft. Files live under the app
+  /// cache (not the upload tree) so they never enter backups or LAN sync;
+  /// any previously staged analysis file is removed first so the directory
+  /// holds at most the newest draft.
   static Future<File> writeAnalysisFile({
     required List<RequestLogEntry> entries,
     required String fileNamePrefix,
@@ -49,12 +52,14 @@ class RequestLogAiAnalysisExporter {
       throw ArgumentError.value(entries, 'entries', 'must not be empty');
     }
 
-    final uploadDirectory = await AppDirectories.getUploadDirectory();
+    final cacheDirectory = await AppDirectories.getCacheDirectory();
     final outputDirectory = Directory(
-      p.join(uploadDirectory.path, 'request-log-analysis'),
+      p.join(cacheDirectory.path, 'request-log-analysis'),
     );
     if (!await outputDirectory.exists()) {
       await outputDirectory.create(recursive: true);
+    } else {
+      await _removeStaleAnalysisFiles(outputDirectory);
     }
 
     final now = DateTime.now().toUtc();
@@ -71,6 +76,22 @@ class RequestLogAiAnalysisExporter {
     );
     await file.writeAsString(text, flush: true);
     return file;
+  }
+
+  /// Removes previously staged analysis drafts. A previous draft is either
+  /// already sent (the message carries its content) or was abandoned, so
+  /// keeping only the newest file bounds the cache to a single entry and
+  /// prevents orphaned JSON from accumulating on disk.
+  static Future<void> _removeStaleAnalysisFiles(Directory directory) async {
+    try {
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is! File) continue;
+        if (!entity.path.toLowerCase().endsWith('.json')) continue;
+        try {
+          await entity.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   /// Produces the export payload without doing file I/O.

@@ -15144,7 +15144,6 @@ abstract class AppLocalizations {
   /// **'Standard background survival (~30s)'**
   String get iosKeepAliveSurvivalShort;
 
-
   /// No description provided for @iosKeepAliveConfigAudioReady.
   ///
   /// In en, this message translates to:

@@ -172,14 +172,14 @@ class DioHttpClient extends http.BaseClient {
     final reqHeaders = Map<String, String>.from(request.headers);
     reqHeaders.putIfAbsent('User-Agent', () => 'Cuplivo');
 
-    final bodyText = bodyBytes.isEmpty
-        ? ''
-        : RequestLogger.safeDecodeUtf8(bodyBytes);
-    // Requests carrying an attachment whose file name embeds the log-skip
-    // marker (e.g. the AI log-analysis export) are kept entirely out of the
-    // log files, so analysis traffic cannot inflate or poison the logs.
-    final skipLog = _hasLogSkipMarker(bodyText);
-    final logEnabled = RequestLogger.llmEnabled && !skipLog;
+    // Decode only when logging is enabled; a request whose attachment file
+    // name embeds the log-skip marker (e.g. the AI log-analysis export) is
+    // kept entirely out of the log files, so analysis traffic cannot
+    // inflate or poison the logs.
+    final bodyText = RequestLogger.llmEnabled && bodyBytes.isNotEmpty
+        ? RequestLogger.safeDecodeUtf8(bodyBytes)
+        : '';
+    final logEnabled = RequestLogger.llmEnabled && !_hasLogSkipMarker(bodyText);
 
     if (logEnabled) {
       RequestLogger.logLine('[REQ $reqId] $method $uri');

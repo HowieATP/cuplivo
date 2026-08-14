@@ -31,6 +31,10 @@ class _SkillsPageState extends State<SkillsPage> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
 
+  /// Tracks which category groups are currently expanded.
+  /// All groups start expanded by default.
+  final Set<String> _collapsedGroups = {};
+
   @override
   void initState() {
     super.initState();
@@ -561,6 +565,23 @@ class _SkillsPageState extends State<SkillsPage> {
     await _refresh();
   }
 
+  /// A stable key for a group, used to track collapsed state.
+  String _groupKey(String? group) => group ?? '__uncategorized__';
+
+  void _toggleGroup(String? group) {
+    setState(() {
+      final key = _groupKey(group);
+      if (_collapsedGroups.contains(key)) {
+        _collapsedGroups.remove(key);
+      } else {
+        _collapsedGroups.add(key);
+      }
+    });
+  }
+
+  bool _isGroupExpanded(String? group) =>
+      !_collapsedGroups.contains(_groupKey(group));
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -693,19 +714,13 @@ class _SkillsPageState extends State<SkillsPage> {
   List<Widget> _buildSkillGroups({bool desktop = false}) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return [
-      for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
-          child: Text(
-            group ?? l10n.skillsUncategorizedGroup,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: AppFontWeights.semibold,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-        ),
+    final groups = groupSkillsByCategory(_skills);
+
+    // When there is only one group, skip the collapsible header and render
+    // skills flat — the grouping chrome adds no value with a single category.
+    if (groups.length == 1) {
+      final (_, skills) = groups.first;
+      return [
         for (final skill in skills)
           desktop
               ? _buildDesktopSkillCard(l10n, cs, skill)
@@ -745,6 +760,57 @@ class _SkillsPageState extends State<SkillsPage> {
                     ),
                   ),
                 ),
+      ];
+    }
+
+    return [
+      for (final (group, skills) in groups) ...[
+        _CollapsibleGroupHeader(
+          groupName: group ?? l10n.skillsUncategorizedGroup,
+          skillCount: skills.length,
+          expanded: _isGroupExpanded(group),
+          onTap: () => _toggleGroup(group),
+        ),
+        if (_isGroupExpanded(group))
+          for (final skill in skills)
+            desktop
+                ? _buildDesktopSkillCard(l10n, cs, skill)
+                : Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Icon(Lucide.BookOpen, color: cs.primary),
+                      title: Text(
+                        skill.name,
+                        style: TextStyle(fontWeight: AppFontWeights.semibold),
+                      ),
+                      subtitle: skill.description.isNotEmpty
+                          ? Text(
+                              skill.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 120),
+                            child: _CategoryTag(
+                              category: skill.category,
+                              label: skill.category ??
+                                  l10n.skillsUncategorizedGroup,
+                              onTap: () => _editCategory(skill),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Lucide.Trash2),
+                            color: cs.error,
+                            onPressed: () => _deleteSkill(skill.name),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
       ],
     ];
   }
@@ -914,6 +980,63 @@ class _SkillsPageState extends State<SkillsPage> {
       return;
     }
     await _refresh();
+  }
+}
+
+/// Collapsible group header with tap-to-expand/collapse and animated chevron.
+class _CollapsibleGroupHeader extends StatelessWidget {
+  const _CollapsibleGroupHeader({
+    required this.groupName,
+    required this.skillCount,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final String groupName;
+  final int skillCount;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
+        child: Row(
+          children: [
+            AnimatedRotation(
+              turns: expanded ? 0.25 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                Lucide.ChevronRight,
+                size: 14,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              groupName,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '($skillCount)',
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.38),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -278,16 +278,22 @@ class LinuxSandboxService {
     final status = await statusFor(workspaceHostPath);
     if (status != SandboxStatus.ready) return false;
     final probe = switch (depId) {
-      WorkspaceDependencyIds.python => 'python3',
-      WorkspaceDependencyIds.nodejs => 'node',
-      WorkspaceDependencyIds.git => 'git',
-      WorkspaceDependencyIds.buildEssential => 'gcc',
+      WorkspaceDependencyIds.python => 'command -v python3 >/dev/null 2>&1',
+      WorkspaceDependencyIds.nodejs => 'command -v node >/dev/null 2>&1',
+      WorkspaceDependencyIds.git => 'command -v git >/dev/null 2>&1',
+      // The office step installs a whole toolchain; LibreOffice alone is not
+      // enough, so require every component the document skills rely on.
+      WorkspaceDependencyIds.office =>
+        'command -v soffice >/dev/null 2>&1 && '
+            'command -v pandoc >/dev/null 2>&1 && '
+            'command -v pdftoppm >/dev/null 2>&1',
+      WorkspaceDependencyIds.buildEssential => 'command -v gcc >/dev/null 2>&1',
       _ => null,
     };
     if (probe == null) return false;
     final r = await exec(
       workspaceHostPath: workspaceHostPath,
-      command: 'command -v $probe >/dev/null 2>&1',
+      command: probe,
       timeoutSeconds: 15,
     );
     return r.exitCode == 0;
@@ -462,37 +468,46 @@ class LinuxSandboxService {
   /// Build the staged apt commands used by [installPackage] (Android).
   ///
   /// The `recover` step repairs an interrupted dpkg state left behind by a
-  /// killed transaction (install timeout, app process death) and clears
-  /// stale lock files, so later installs do not fail with
-  /// "dpkg was interrupted". Exposed for tests.
+  /// killed transaction (install timeout, app process death), so later
+  /// installs do not fail with "dpkg was interrupted". Lock files are NOT
+  /// deleted here: fcntl locks are released automatically when the holder
+  /// exits, and unlinking the inode under a live holder would let a second
+  /// dpkg mutate the database concurrently. Every apt invocation carries
+  /// `Acquire::Lock::Timeout` so a transiently held dpkg lock (e.g. an
+  /// install triggered through the LLM shell tool) waits instead of failing.
+  /// [installTimeoutSeconds] allows oversized packages (LibreOffice ~550MB)
+  /// to finish without the exec timeout killing dpkg mid-transaction.
+  /// Exposed for tests.
   static List<PackageInstallStep> buildAptInstallSteps({
     required String packages,
     String mirrorSetup = '',
+    int installTimeoutSeconds = 1800,
   }) {
+    const lockTimeout = '-o Acquire::Lock::Timeout=600';
     return [
       PackageInstallStep(
         stage: 'recover',
-        timeoutSeconds: 300,
+        // Long enough to cover the 600s lock wait plus dpkg repair work.
+        timeoutSeconds: 900,
         command:
             'export DEBIAN_FRONTEND=noninteractive; '
-            'rm -f /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend '
-            '/var/cache/apt/archives/lock /var/lib/apt/lists/lock; '
-            'dpkg --configure -a; apt-get -f install -y',
+            'dpkg --configure -a; '
+            'apt-get $lockTimeout -f install -y',
       ),
       PackageInstallStep(
         stage: 'update',
         timeoutSeconds: 600,
         command:
             '${mirrorSetup.isEmpty ? '' : mirrorSetup}'
-            'apt-get update -y',
+            'apt-get $lockTimeout update -y',
       ),
       PackageInstallStep(
         stage: 'install',
-        timeoutSeconds: 1800,
+        timeoutSeconds: installTimeoutSeconds,
         command:
             'export DEBIAN_FRONTEND=noninteractive; '
-            'apt-get install -y --no-install-recommends $packages '
-            '&& apt-get clean',
+            'apt-get $lockTimeout install -y --no-install-recommends $packages '
+            '&& apt-get $lockTimeout clean',
       ),
     ];
   }
@@ -500,10 +515,12 @@ class LinuxSandboxService {
   /// Build the staged apk commands used by [installPackage] (iOS Alpine).
   ///
   /// `recover` clears a stale apk lock left by a killed install; apk has no
-  /// dpkg-equivalent interrupted state. Exposed for tests.
+  /// dpkg-equivalent interrupted state. [installTimeoutSeconds] mirrors
+  /// [buildAptInstallSteps] for oversized package sets. Exposed for tests.
   static List<PackageInstallStep> buildApkInstallSteps({
     required String packages,
     String mirrorSetup = '',
+    int installTimeoutSeconds = 1800,
   }) {
     return [
       PackageInstallStep(
@@ -518,7 +535,7 @@ class LinuxSandboxService {
       ),
       PackageInstallStep(
         stage: 'install',
-        timeoutSeconds: 1800,
+        timeoutSeconds: installTimeoutSeconds,
         command: 'apk add $packages',
       ),
     ];
@@ -571,6 +588,13 @@ class LinuxSandboxService {
         ios ? 'python3 py3-pip' : 'python3 python3-pip',
       WorkspaceDependencyIds.nodejs => 'nodejs npm',
       WorkspaceDependencyIds.git => 'git',
+      WorkspaceDependencyIds.office =>
+        ios
+            ? 'libreoffice pandoc poppler-utils py3-lxml py3-pillow '
+                  'py3-reportlab py3-openpyxl py3-pandas py3-defusedxml'
+            : 'libreoffice pandoc poppler-utils python3-lxml python3-pil '
+                  'python3-reportlab python3-openpyxl python3-pandas '
+                  'python3-defusedxml',
       WorkspaceDependencyIds.buildEssential =>
         ios ? 'build-base' : 'build-essential',
       _ => throw StateError('Unknown dependency: $depId'),
@@ -593,9 +617,24 @@ class LinuxSandboxService {
       }
     }
     final steps = ios
-        ? buildApkInstallSteps(packages: packages, mirrorSetup: mirrorSetup)
-        : buildAptInstallSteps(packages: packages, mirrorSetup: mirrorSetup);
+        ? buildApkInstallSteps(
+            packages: packages,
+            mirrorSetup: mirrorSetup,
+            installTimeoutSeconds: depId == WorkspaceDependencyIds.office
+                ? 2700
+                : 1800,
+          )
+        : buildAptInstallSteps(
+            packages: packages,
+            mirrorSetup: mirrorSetup,
+            installTimeoutSeconds: depId == WorkspaceDependencyIds.office
+                ? 2700
+                : 1800,
+          );
     for (final step in steps) {
+      onProgress?.call(
+        SandboxInstallProgress(stage: step.stage, progress: null),
+      );
       final r = await exec(
         workspaceHostPath: workspaceHostPath,
         command: step.command,

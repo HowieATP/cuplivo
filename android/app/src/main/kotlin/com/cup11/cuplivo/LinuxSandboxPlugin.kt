@@ -2,6 +2,7 @@ package com.cup11.cuplivo
 
 import android.content.Context
 import android.os.Build
+import android.os.Process as AndroidProcess
 import android.util.Log
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -205,11 +206,12 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
   }
 
-  /** Minimal Android-friendly rootfs fixes (DNS / tmp). */
+  /** Minimal Android-friendly rootfs fixes (DNS / tmp / apt locks). */
   private fun patchRootfs(linuxDir: File) {
     try {
       patchDns(linuxDir)
       ensureGuestDirs(linuxDir)
+      writeAptConfig(linuxDir)
     } catch (e: Exception) {
       Log.w(TAG, "patchRootfs: ${e.message}")
     }
@@ -236,6 +238,23 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
       File(linuxDir, path).mkdirs()
     }
   }
+
+  /**
+   * Make every apt invocation inside the guest wait for a held dpkg/apt lock
+   * instead of failing instantly. Covers commands run through the LLM shell
+   * tool (which bypasses the Dart-side install queue): a concurrent install
+   * just waits, then proceeds.
+   */
+  private fun writeAptConfig(linuxDir: File) {
+    val confDir = File(linuxDir, "etc/apt/apt.conf.d")
+    confDir.mkdirs()
+    File(confDir, "99cuplivo").writeText(
+      "// Cuplivo Linux sandbox: wait for dpkg/apt locks instead of failing.\n" +
+        "Acquire::Lock::Timeout \"600\";\n" +
+        "DPkg::Lock::Timeout \"600\";\n" +
+        "Acquire::Retries \"3\";\n",
+    )
+  }
 }
 
 /** Runs one command inside the proot guest and captures capped output. */
@@ -247,7 +266,7 @@ private class GuestCommandRunner(private val appContext: Context) {
     timeoutMs: Long,
   ): Map<String, Any?> {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
-      ?: throw IllegalStateException("proot missing (filesDir cache and APK copy both failed)")
+      ?: throw IllegalStateException("proot missing (system lib dir, filesDir cache and APK copy all failed)")
     val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
       ?: throw IllegalStateException("proot loader missing")
     val linux = File(workspacePath, ".sandbox/linux")
@@ -277,38 +296,59 @@ private class GuestCommandRunner(private val appContext: Context) {
   }
 }
 
-/** Vendored proot native library resolution (cached copy → APK). */
+/**
+ * Vendored proot native library resolution.
+ *
+ * Preferred source is the platform-extracted native library directory
+ * (`applicationInfo.nativeLibraryDir`): the system writes those files with
+ * the exec bit and the right SELinux label already in place, so the binary
+ * can be spawned directly without copying or chmod. The filesDir copy chain
+ * below is kept only for installs where that directory is unavailable.
+ */
 private object NativeLibResolver {
   fun resolve(appContext: Context, libFileName: String): File? {
-    val candidates = mutableListOf<File>()
-
-    // 1) Previously copied fallback (survives restarts and app updates)
-    candidates += File(appContext.filesDir, "proot/$libFileName")
-
-    for (f in candidates) {
-      if (f.isFile && f.length() > 0L) {
-        makeExecutable(f)
-        return f
-      }
+    // 1) System-extracted native lib dir: executable out of the box. Still
+    //    verified (and repaired via chmod if needed) so a non-executable
+    //    copy falls through to the fallback chain instead of failing at
+    //    exec time.
+    val systemLib = File(appContext.applicationInfo.nativeLibraryDir, libFileName)
+    if (systemLib.isFile && systemLib.length() > 0L && makeExecutable(systemLib)) {
+      return systemLib
     }
 
-    // 2) Copy out of APK / split APKs into app filesDir
+    // 2) Previously copied fallback (survives restarts and app updates)
+    val cached = File(appContext.filesDir, "proot/$libFileName")
+    if (cached.isFile && cached.length() > 0L && makeExecutable(cached)) {
+      return cached
+    }
+
+    // 3) Copy out of APK / split APKs into app filesDir
     val copied = copyFromApk(appContext, libFileName)
-    if (copied != null) {
-      makeExecutable(copied)
+    if (copied != null && makeExecutable(copied)) {
       return copied
     }
     return null
   }
 
-  private fun makeExecutable(file: File) {
+  /**
+   * Best-effort exec bit setup for the filesDir fallback path. setExecutable
+   * silently no-ops on some Android versions/OEMs, so the result is verified
+   * and an explicit libcore chmod (0755) is tried before giving up. Returns
+   * true only when the file is actually executable, so a binary that cannot
+   * be made runnable is reported as missing instead of failing at exec time.
+   */
+  private fun makeExecutable(file: File): Boolean {
     try {
-      if (!file.canExecute()) {
-        file.setExecutable(true, false)
-      }
+      if (file.canExecute()) return true
+      file.setExecutable(true, false)
+      if (file.canExecute()) return true
+      android.system.Os.chmod(file.path, 0x1ED) // 0755
+      if (file.canExecute()) return true
+      Log.w(TAG, "makeExecutable: still not executable after chmod: ${file.absolutePath}")
     } catch (e: Exception) {
-      Log.w("LinuxSandbox", "setExecutable failed for ${file.absolutePath}: ${e.message}")
+      Log.w(TAG, "makeExecutable failed for ${file.absolutePath}: ${e.message}")
     }
+    return false
   }
 
   private fun copyFromApk(appContext: Context, libFileName: String): File? {
@@ -416,6 +456,9 @@ private object OutputDrainer {
       // would leave orphan apt processes still holding /var/lib/dpkg locks.
       process.destroy()
       if (!process.waitFor(GRACE_AFTER_TERM_MS, TimeUnit.MILLISECONDS)) {
+        // SIGTERM did not finish the tree: kill surviving guest children
+        // (orphaned apt/dpkg that keep the dpkg lock) before the SIGKILL.
+        pidOf(process)?.let { killDescendants(it) }
         process.destroyForcibly()
       }
       stdout.joinFor(1_000)
@@ -435,6 +478,62 @@ private object OutputDrainer {
       "stderr" to stderr.text(),
       "timedOut" to false,
     )
+  }
+
+  /**
+   * Android's java.lang.Process has no `pid()` (Java 9 API). Parse it from
+   * ProcessImpl.toString(), whose "Process[pid=NNNN]" format is stable
+   * across API levels. Returns null when parsing fails (cleanup skipped).
+   */
+  private fun pidOf(process: Process): Long? {
+    val m = Regex("pid=(\\d+)").find(process.toString())
+    val pid = m?.groupValues?.get(1)?.toLongOrNull()
+    if (pid == null) {
+      Log.w(TAG, "pidOf: cannot parse pid from '${process.toString()}'")
+    }
+    return pid
+  }
+
+  /**
+   * Recursively SIGKILL all children of [pid] by walking /proc (the proot
+   * guest processes are host processes, so the host view sees them). Called
+   * before destroyForcibly so no apt/dpkg survives to hold the dpkg lock.
+   */
+  private fun killDescendants(pid: Long) {
+    val children = mutableListOf<Long>()
+    try {
+      File("/proc").listFiles()?.forEach { dir ->
+        val pidText = dir.name.toLongOrNull() ?: return@forEach
+        try {
+          // A target process may exit between listFiles and readText; that
+          // only skips this PID, the rest of the scan continues.
+          val stat = File(dir, "stat")
+          if (!stat.isFile) return@forEach
+          val text = stat.readText()
+          val open = text.indexOf('(')
+          val close = text.lastIndexOf(')')
+          if (open < 0 || close <= open) return@forEach
+          val parts = text.substring(close + 1).trim().split(' ')
+          // parts[0] = state, parts[1] = ppid
+          if (parts.size > 1 && parts[1].toLongOrNull() == pid) {
+            children += pidText
+          }
+        } catch (e: Exception) {
+          Log.w(TAG, "killDescendants read $pidText: ${e.message}")
+        }
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "killDescendants scan: ${e.message}")
+      return
+    }
+    children.forEach { child ->
+      killDescendants(child)
+      try {
+        AndroidProcess.killProcess(child.toInt())
+      } catch (e: Exception) {
+        Log.w(TAG, "killDescendants kill $child: ${e.message}")
+      }
+    }
   }
 
   private class LineDrain(private val stream: java.io.InputStream) : Thread() {

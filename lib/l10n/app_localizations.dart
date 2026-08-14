@@ -14640,6 +14640,42 @@ abstract class AppLocalizations {
   /// **'Reinstall'**
   String get workspaceDepReinstall;
 
+  /// No description provided for @workspaceDepQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued…'**
+  String get workspaceDepQueued;
+
+  /// No description provided for @workspaceDepStageDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get workspaceDepStageDownloading;
+
+  /// No description provided for @workspaceDepStageExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting…'**
+  String get workspaceDepStageExtracting;
+
+  /// No description provided for @workspaceDepStageRecover.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairing package state…'**
+  String get workspaceDepStageRecover;
+
+  /// No description provided for @workspaceDepStageUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating package lists…'**
+  String get workspaceDepStageUpdate;
+
+  /// No description provided for @workspaceDepStageInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get workspaceDepStageInstall;
+
   /// No description provided for @workspaceSandboxRuntimeMissing.
   ///
   /// In en, this message translates to:
@@ -14741,6 +14777,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
+
+  /// No description provided for @workspaceDepOfficeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document & Office Tools'**
+  String get workspaceDepOfficeTitle;
+
+  /// No description provided for @workspaceDepOfficeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  String get workspaceDepOfficeDesc;
 
   /// No description provided for @workspaceDepBuildTitle.
   ///

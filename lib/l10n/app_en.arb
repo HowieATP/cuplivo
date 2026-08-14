@@ -3653,6 +3653,20 @@
   "workspaceCannotDeleteDefault": "The default workspace cannot be deleted",
   "workspaceNotFound": "Workspace not found",
   "workspaceRename": "Rename",
+  "workspaceTerminal": "Terminal",
+  "workspaceTerminalAndroidOnly": "The workspace terminal is only available on Android.",
+  "workspaceTerminalReadOnly": "This workspace is read-only. The terminal is not available.",
+  "workspaceTerminalExited": "The shell has exited.",
+  "workspaceTerminalRestart": "Restart",
+  "workspaceTerminalOpenFailed": "Failed to start the terminal: {error}",
+  "@workspaceTerminalOpenFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceTerminalCopy": "Copy",
   "workspaceFilesEntry": "Workspace files",
   "workspaceFilesystemTools": "Filesystem tools",
   "workspaceInstallDeps": "Install dependencies",

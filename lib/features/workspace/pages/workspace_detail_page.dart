@@ -16,6 +16,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../settings/pages/mount_files_page.dart';
 import '../controllers/dependency_install_controller.dart';
+import 'workspace_terminal_page.dart';
 
 class WorkspaceDetailPage extends StatefulWidget {
   const WorkspaceDetailPage({super.key, required this.workspaceId});
@@ -152,6 +153,18 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
             icon: Icon(Lucide.Pencil, size: 20, color: cs.onSurface),
             onPressed: () => _rename(context, ws),
           ),
+          if (Platform.isAndroid || Platform.isIOS)
+            IconButton(
+              tooltip: l10n.workspaceTerminal,
+              icon: Icon(Lucide.Terminal, size: 20, color: cs.onSurface),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WorkspaceTerminalPage(workspaceId: ws.id),
+                  ),
+                );
+              },
+            ),
         ],
       ),
       body: ListView(

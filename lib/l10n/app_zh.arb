@@ -3069,6 +3069,20 @@
   "workspaceCannotDeleteDefault": "无法删除默认工作区",
   "workspaceNotFound": "未找到工作区",
   "workspaceRename": "重命名",
+  "workspaceTerminal": "终端",
+  "workspaceTerminalAndroidOnly": "工作区终端仅在 Android 上可用。",
+  "workspaceTerminalReadOnly": "此工作区为只读，无法打开终端。",
+  "workspaceTerminalExited": "Shell 已退出。",
+  "workspaceTerminalRestart": "重新启动",
+  "workspaceTerminalOpenFailed": "终端启动失败：{error}",
+  "@workspaceTerminalOpenFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceTerminalCopy": "复制",
   "workspaceFilesEntry": "工作区文件",
   "workspaceFilesystemTools": "文件系统工具",
   "workspaceInstallDeps": "安装依赖",

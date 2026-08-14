@@ -14580,6 +14580,48 @@ abstract class AppLocalizations {
   /// **'Rename'**
   String get workspaceRename;
 
+  /// No description provided for @workspaceTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get workspaceTerminal;
+
+  /// No description provided for @workspaceTerminalAndroidOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'The workspace terminal is only available on Android.'**
+  String get workspaceTerminalAndroidOnly;
+
+  /// No description provided for @workspaceTerminalReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This workspace is read-only. The terminal is not available.'**
+  String get workspaceTerminalReadOnly;
+
+  /// No description provided for @workspaceTerminalExited.
+  ///
+  /// In en, this message translates to:
+  /// **'The shell has exited.'**
+  String get workspaceTerminalExited;
+
+  /// No description provided for @workspaceTerminalRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get workspaceTerminalRestart;
+
+  /// No description provided for @workspaceTerminalOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to start the terminal: {error}'**
+  String workspaceTerminalOpenFailed(String error);
+
+  /// No description provided for @workspaceTerminalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get workspaceTerminalCopy;
+
   /// No description provided for @workspaceFilesEntry.
   ///
   /// In en, this message translates to:

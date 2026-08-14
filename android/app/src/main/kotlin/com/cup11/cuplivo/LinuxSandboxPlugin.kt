@@ -1,10 +1,15 @@
 package com.cup11.cuplivo
 
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.Process as AndroidProcess
 import android.util.Log
+import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedReader
@@ -20,18 +25,72 @@ import java.util.zip.ZipFile
  * Rootfs download and apt orchestration live in Dart; this plugin only
  * extracts the archive and runs commands inside the guest.
  */
-class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
   private lateinit var channel: MethodChannel
   private lateinit var appContext: Context
+  private var activity: Activity? = null
+  private var volumeCtrlChannel: EventChannel? = null
+  private var volumeCtrlSink: EventChannel.EventSink? = null
+  @Volatile internal var volumeCtrlEnabled: Boolean = false
+
+  private val volumeCtrlStreamHandler = object : EventChannel.StreamHandler {
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+      volumeCtrlSink = events
+    }
+
+    override fun onCancel(arguments: Any?) {
+      volumeCtrlSink = null
+    }
+  }
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     appContext = binding.applicationContext
     channel = MethodChannel(binding.binaryMessenger, "cuplivo/linux_sandbox")
     channel.setMethodCallHandler(this)
+    volumeCtrlChannel = EventChannel(
+      binding.binaryMessenger,
+      "cuplivo/linux_sandbox/volume_ctrl",
+    )
+    volumeCtrlChannel?.setStreamHandler(volumeCtrlStreamHandler)
   }
 
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
+    volumeCtrlEnabled = false
+    volumeCtrlSink = null
+    volumeCtrlChannel?.setStreamHandler(null)
+    volumeCtrlChannel = null
+  }
+
+  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    activity = binding.activity
+    if (binding.activity is MainActivity) {
+      (binding.activity as MainActivity).volumeCtrlPlugin = this
+    }
+  }
+
+  override fun onDetachedFromActivityForConfigChanges() {
+    detachActivity(resetIntercept = false)
+  }
+
+  override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+    onAttachedToActivity(binding)
+  }
+
+  override fun onDetachedFromActivity() {
+    detachActivity(resetIntercept = true)
+  }
+
+  private fun detachActivity(resetIntercept: Boolean) {
+    if (resetIntercept) {
+      volumeCtrlEnabled = false
+    }
+    (activity as? MainActivity)?.volumeCtrlPlugin = null
+    activity = null
+  }
+
+  internal fun emitVolumeCtrl(down: Boolean) {
+    volumeCtrlSink?.success(down)
   }
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -125,6 +184,49 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
           }
         }.start()
+      }
+      "ptyLaunchSpec" -> {
+        val workspace = call.argument<String>("workspacePath")
+        if (workspace.isNullOrBlank()) {
+          result.error("bad_args", "workspacePath required", null)
+          return
+        }
+        Thread {
+          try {
+            val spec = GuestCommandRunner(appContext).ptyLaunchSpec(workspace)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+              result.success(spec)
+            }
+          } catch (e: Exception) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+              result.error("pty_spec_failed", e.message, null)
+            }
+          }
+        }.start()
+      }
+      "setKeepScreenOn" -> {
+        val enabled = call.argument<Boolean>("enabled") == true
+        val act = activity
+        if (act == null) {
+          if (enabled) {
+            result.error("no_activity", "Activity not attached", null)
+          } else {
+            result.success(null)
+          }
+          return
+        }
+        act.runOnUiThread {
+          if (enabled) {
+            act.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+          } else {
+            act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+          }
+        }
+        result.success(null)
+      }
+      "setVolumeCtrlIntercept" -> {
+        volumeCtrlEnabled = call.argument<Boolean>("enabled") == true
+        result.success(null)
       }
       else -> result.notImplemented()
     }
@@ -294,6 +396,36 @@ private class GuestCommandRunner(private val appContext: Context) {
     env["TMPDIR"] = tmp.absolutePath
     return OutputDrainer.capture(builder.start(), timeoutMs)
   }
+
+  fun ptyLaunchSpec(workspacePath: String): Map<String, Any> {
+    val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
+      ?: throw IllegalStateException("proot missing (system lib dir, filesDir cache and APK copy all failed)")
+    val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
+      ?: throw IllegalStateException("proot loader missing")
+    val linux = File(workspacePath, ".sandbox/linux")
+    val tmp = File(workspacePath, ".sandbox/tmp")
+    tmp.mkdirs()
+    if (!linux.isDirectory) {
+      throw IllegalStateException("sandbox rootfs missing: ${linux.absolutePath}")
+    }
+    val arguments = buildGuestCommand(
+      proot = exec,
+      linuxDir = linux,
+      guestCwd = "/workspace",
+      hostWorkspace = workspacePath,
+      command = null,
+    )
+    return mapOf(
+      "executable" to arguments.first(),
+      "arguments" to arguments.drop(1),
+      "environment" to mapOf(
+        "PROOT_LOADER" to loader.absolutePath,
+        "PROOT_TMP_DIR" to tmp.absolutePath,
+        "TMPDIR" to tmp.absolutePath,
+      ),
+      "workingDirectory" to workspacePath,
+    )
+  }
 }
 
 /**
@@ -409,7 +541,7 @@ private fun buildGuestCommand(
   linuxDir: File,
   guestCwd: String,
   hostWorkspace: String,
-  command: String,
+  command: String?,
 ): List<String> {
   val argv = mutableListOf<String>()
   argv += proot.absolutePath
@@ -434,10 +566,12 @@ private fun buildGuestCommand(
     "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "LANG=C.UTF-8",
     "TERM=xterm-256color",
-    "/bin/bash",
-    "-lc",
-    command,
   )
+  if (command == null) {
+    argv += listOf("/bin/bash", "-l")
+  } else {
+    argv += listOf("/bin/bash", "-lc", command)
+  }
   return argv
 }
 

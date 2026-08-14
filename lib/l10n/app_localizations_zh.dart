@@ -7713,6 +7713,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceRename => '重命名';
 
   @override
+  String get workspaceTerminal => '终端';
+
+  @override
+  String get workspaceTerminalAndroidOnly => '工作区终端仅在 Android 上可用。';
+
+  @override
+  String get workspaceTerminalReadOnly => '此工作区为只读，无法打开终端。';
+
+  @override
+  String get workspaceTerminalExited => 'Shell 已退出。';
+
+  @override
+  String get workspaceTerminalRestart => '重新启动';
+
+  @override
+  String workspaceTerminalOpenFailed(String error) {
+    return '终端启动失败：$error';
+  }
+
+  @override
+  String get workspaceTerminalCopy => '复制';
+
+  @override
   String get workspaceFilesEntry => '工作区文件';
 
   @override
@@ -15628,6 +15651,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceRename => '重命名';
 
   @override
+  String get workspaceTerminal => '终端';
+
+  @override
+  String get workspaceTerminalAndroidOnly => '工作区终端仅在 Android 上可用。';
+
+  @override
+  String get workspaceTerminalReadOnly => '此工作区为只读，无法打开终端。';
+
+  @override
+  String get workspaceTerminalExited => 'Shell 已退出。';
+
+  @override
+  String get workspaceTerminalRestart => '重新启动';
+
+  @override
+  String workspaceTerminalOpenFailed(String error) {
+    return '终端启动失败：$error';
+  }
+
+  @override
+  String get workspaceTerminalCopy => '复制';
+
+  @override
   String get workspaceFilesEntry => '工作区文件';
 
   @override
@@ -23541,6 +23587,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceRename => '重新命名';
+
+  @override
+  String get workspaceTerminal => '終端';
+
+  @override
+  String get workspaceTerminalAndroidOnly => '工作區終端僅在 Android 上可用。';
+
+  @override
+  String get workspaceTerminalReadOnly => '此工作區為唯讀，無法開啟終端。';
+
+  @override
+  String get workspaceTerminalExited => 'Shell 已結束。';
+
+  @override
+  String get workspaceTerminalRestart => '重新啟動';
+
+  @override
+  String workspaceTerminalOpenFailed(String error) {
+    return '終端啟動失敗：$error';
+  }
+
+  @override
+  String get workspaceTerminalCopy => '複製';
 
   @override
   String get workspaceFilesEntry => '工作區檔案';

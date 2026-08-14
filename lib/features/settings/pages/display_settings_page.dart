@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../../../core/services/android_background.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/ios_keep_alive.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
@@ -2562,16 +2563,19 @@ class IosBackgroundSettingsPage extends StatefulWidget {
 
 class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
   late Future<IosBackgroundGenerationStatus> _statusFuture;
+  late Future<IosKeepAliveStatus> _keepAliveStatusFuture;
 
   @override
   void initState() {
     super.initState();
     _statusFuture = IosBackgroundGenerationService.instance.getStatus();
+    _keepAliveStatusFuture = IosKeepAliveService.instance.getStatus();
   }
 
   void _refreshStatus() {
     setState(() {
       _statusFuture = IosBackgroundGenerationService.instance.getStatus();
+      _keepAliveStatusFuture = IosKeepAliveService.instance.getStatus();
     });
   }
 
@@ -2588,6 +2592,32 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
     if (!mounted) return;
     await settings.setIosBackgroundNotificationsEnabled(granted);
     _refreshStatus();
+  }
+
+  Future<void> _setLocationKeepAliveEnabled(bool enabled) async {
+    final settings = context.read<SettingsProvider>();
+    if (!enabled) {
+      await settings.setIosLocationKeepAliveEnabled(false);
+      await _pushKeepAliveConfig();
+      _refreshStatus();
+      return;
+    }
+
+    final granted = await IosKeepAliveService.instance
+        .requestLocationAuthorization();
+    if (!mounted) return;
+    await settings.setIosLocationKeepAliveEnabled(granted);
+    await _pushKeepAliveConfig();
+    _refreshStatus();
+  }
+
+  Future<void> _pushKeepAliveConfig() async {
+    final settings = context.read<SettingsProvider>();
+    await IosKeepAliveService.instance.configure(
+      masterEnabled: settings.iosKeepAliveEnabled,
+      silentAudioEnabled: settings.iosSilentAudioKeepAliveEnabled,
+      locationEnabled: settings.iosLocationKeepAliveEnabled,
+    );
   }
 
   Future<void> _openAppSettings() async {
@@ -2628,6 +2658,60 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
             context,
             title: l10n.iosBackgroundLimitNoticeTitle,
             body: l10n.iosBackgroundLimitNoticeBody,
+          ),
+          const SizedBox(height: 12),
+          _iosSectionCard(
+            children: [
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Cpu,
+                label: l10n.iosKeepAliveMasterTitle,
+                subtitle: l10n.iosKeepAliveMasterSubtitle,
+                value: sp.iosKeepAliveEnabled,
+                onChanged: (v) async {
+                  await context
+                      .read<SettingsProvider>()
+                      .setIosKeepAliveEnabled(v);
+                  await _pushKeepAliveConfig();
+                  _refreshStatus();
+                },
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.VolumeX,
+                label: l10n.iosKeepAliveSilentAudioTitle,
+                subtitle: l10n.iosKeepAliveSilentAudioSubtitle,
+                value: sp.iosSilentAudioKeepAliveEnabled,
+                onChanged: (v) async {
+                  await context
+                      .read<SettingsProvider>()
+                      .setIosSilentAudioKeepAliveEnabled(v);
+                  await _pushKeepAliveConfig();
+                  _refreshStatus();
+                },
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.MapPin,
+                label: l10n.iosKeepAliveLocationTitle,
+                subtitle: l10n.iosKeepAliveLocationSubtitle,
+                value: sp.iosLocationKeepAliveEnabled,
+                onChanged: _setLocationKeepAliveEnabled,
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Shield,
+                label: l10n.iosKeepAlivePrivacyModeTitle,
+                subtitle: l10n.iosKeepAlivePrivacyModeSubtitle,
+                value: sp.iosLiveActivityPrivacyMode,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setIosLiveActivityPrivacyMode(v),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           _iosSectionCard(
@@ -2701,6 +2785,45 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                         ? l10n.iosBackgroundNotificationsAuthorized
                         : l10n.iosBackgroundNotificationsNotAuthorized,
                     onTap: _openNotificationSettings,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<IosKeepAliveStatus>(
+            future: _keepAliveStatusFuture,
+            builder: (context, snapshot) {
+              final status = snapshot.data;
+              return _iosSectionCard(
+                children: [
+                  _iosNavRow(
+                    context,
+                    icon: Lucide.Cpu,
+                    label: status == null
+                        ? l10n.iosKeepAliveStatusUnavailable
+                        : status.survivalTier == 'extended'
+                        ? l10n.iosKeepAliveSurvivalExtended
+                        : l10n.iosKeepAliveSurvivalShort,
+                  ),
+                  _iosDivider(context),
+                  _iosNavRow(
+                    context,
+                    icon: Lucide.VolumeX,
+                    label: status?.silentAudioActive == true
+                        ? l10n.iosKeepAliveSilentAudioActive
+                        : l10n.iosKeepAliveSilentAudioInactive,
+                  ),
+                  _iosDivider(context),
+                  _iosNavRow(
+                    context,
+                    icon: Lucide.MapPin,
+                    label: status?.locationAuthorized == true
+                        ? l10n.iosKeepAliveLocationAuthorized
+                        : l10n.iosKeepAliveLocationNotAuthorized,
+                    onTap: status?.locationAuthorized == true
+                        ? null
+                        : _openAppSettings,
                   ),
                 ],
               );

@@ -7952,6 +7952,51 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15902,6 +15947,51 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -23852,4 +23942,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作區';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增強背景執行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在 App 進入背景時保持代理任務繼續運行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '靜默音訊保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段聽不見的音軌，讓 iOS 在背景保持程序存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用背景定位更新，在 App 退到背景時保持程序存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隱私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在鎖定畫面與動態島上隱藏會話內容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活狀態不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '靜默音訊運行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '靜默音訊未運行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授權';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授權——點擊開啟系統設定';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延長背景存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '標準背景存活（約 30 秒）';
 }

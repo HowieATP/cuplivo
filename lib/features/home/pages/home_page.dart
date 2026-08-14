@@ -25,6 +25,7 @@ import '../widgets/live_panel.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/services/chat/external_chat_draft_handoff.dart';
 import '../../../core/services/android_process_text.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
@@ -686,6 +687,14 @@ class _HomePageState extends State<HomePage>
   @override
   void didPopNext() {
     _controller.onDidPopNext();
+    unawaited(_consumeExternalChatDraft());
+  }
+
+  Future<void> _consumeExternalChatDraft() async {
+    if (!mounted) return;
+    final draft = ExternalChatDraftHandoff.take();
+    if (draft == null) return;
+    await _controller.createNewConversationWithDraft(draft);
   }
 
   @override

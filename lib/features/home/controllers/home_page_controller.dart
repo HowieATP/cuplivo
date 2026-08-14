@@ -1146,6 +1146,19 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> createNewConversationAnimated() async {
+    await _createNewConversationAnimated();
+  }
+
+  /// Creates a normal new draft conversation and restores [draft] into its
+  /// composer without sending it. Used by actions that originate outside the
+  /// chat route, such as request-log AI analysis.
+  Future<bool> createNewConversationWithDraft(ChatInputData draft) {
+    return _createNewConversationAnimated(initialDraft: draft);
+  }
+
+  Future<bool> _createNewConversationAnimated({
+    ChatInputData? initialDraft,
+  }) async {
     // Guardrail: block rapid creation if conversation has only preset messages
     if (_shouldBlockNewConversation) {
       final l10n = AppLocalizations.of(_context)!;
@@ -1154,7 +1167,7 @@ class HomePageController extends ChangeNotifier {
         message: l10n.homePagePresetConversationBlocked,
         type: NotificationType.warning,
       );
-      return;
+      return false;
     }
     try {
       await _viewModel.flushCurrentConversationProgress();
@@ -1166,6 +1179,15 @@ class HomePageController extends ChangeNotifier {
       } catch (_) {}
     }
     await _createNewConversation();
+    if (initialDraft != null) {
+      _inputController.value = TextEditingValue(
+        text: initialDraft.text,
+        selection: TextSelection.collapsed(offset: initialDraft.text.length),
+        composing: TextRange.empty,
+      );
+      _mediaController.restoreInput(initialDraft);
+      notifyListeners();
+    }
     _scrollCtrl.clearObserverCache();
     if (!isDesktopPlatform) {
       try {
@@ -1177,6 +1199,7 @@ class HomePageController extends ChangeNotifier {
         _inputFocus.requestFocus();
       });
     }
+    return true;
   }
 
   bool get _shouldBlockNewConversation {

@@ -141,6 +141,8 @@ class WorkspaceToolsService {
     LinuxSandboxService? sandbox,
     void Function(int receivedBytes, int? totalBytes)? onDownloadProgress,
     WorkspaceDownloadAbortToken? downloadAbortToken,
+    String? toolCallId,
+    String? conversationId,
   }) async {
     if (assistant == null || !assistant.workspaceEnabled) return null;
     if (!WorkspaceToolNames.isWorkspaceTool(name)) return null;
@@ -168,6 +170,8 @@ class WorkspaceToolsService {
         ws: ws,
         workspaces: workspaces,
         sandbox: sandbox,
+        requestId: toolCallId,
+        conversationId: conversationId,
       );
     }
 
@@ -237,6 +241,8 @@ class WorkspaceToolsService {
     required Workspace ws,
     required WorkspaceProvider workspaces,
     LinuxSandboxService? sandbox,
+    String? requestId,
+    String? conversationId,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return jsonEncode({
@@ -274,13 +280,31 @@ class WorkspaceToolsService {
         workspaceHostPath: host,
         command: command,
         cwd: cwd,
-        timeoutSeconds: timeout.clamp(1, 600),
+        timeoutSeconds: timeout
+            .clamp(1, LinuxSandboxService.maxShellTimeoutSeconds)
+            .toInt(),
+        requestId: requestId,
+        conversationId: conversationId,
       );
       return jsonEncode({
         'exitCode': result.exitCode,
         'timedOut': result.timedOut,
+        'cancelled': result.cancelled,
+        'stdoutTruncated': result.stdoutTruncated,
+        'stderrTruncated': result.stderrTruncated,
         'stdout': result.stdout,
         'stderr': result.stderr,
+      });
+    } on SandboxBusyException {
+      return jsonEncode({
+        'error': 'sandbox_busy',
+        'message':
+            'Another sandbox operation is already queued for this workspace.',
+      });
+    } on SandboxCancelledException {
+      return jsonEncode({
+        'error': 'sandbox_cancelled',
+        'message': 'The sandbox operation was cancelled.',
       });
     } catch (e, st) {
       debugPrint('shell tool failed: $e\n$st');

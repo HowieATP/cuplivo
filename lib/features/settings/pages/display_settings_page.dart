@@ -2664,7 +2664,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
             children: [
               _iosSwitchRow(
                 context,
-                icon: Lucide.Cpu,
+                icon: Lucide.Zap,
                 label: l10n.iosKeepAliveMasterTitle,
                 subtitle: l10n.iosKeepAliveMasterSubtitle,
                 value: sp.iosKeepAliveEnabled,
@@ -2679,7 +2679,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
-                icon: Lucide.VolumeX,
+                icon: Lucide.Volume2,
                 label: l10n.iosKeepAliveSilentAudioTitle,
                 subtitle: l10n.iosKeepAliveSilentAudioSubtitle,
                 value: sp.iosSilentAudioKeepAliveEnabled,
@@ -2694,7 +2694,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
-                icon: Lucide.MapPin,
+                icon: Lucide.Pin,
                 label: l10n.iosKeepAliveLocationTitle,
                 subtitle: l10n.iosKeepAliveLocationSubtitle,
                 value: sp.iosLocationKeepAliveEnabled,
@@ -2799,7 +2799,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                 children: [
                   _iosNavRow(
                     context,
-                    icon: Lucide.Cpu,
+                    icon: Lucide.Zap,
                     label: status == null
                         ? l10n.iosKeepAliveStatusUnavailable
                         : status.survivalTier == 'extended'
@@ -2809,7 +2809,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                   _iosDivider(context),
                   _iosNavRow(
                     context,
-                    icon: Lucide.VolumeX,
+                    icon: Lucide.Volume2,
                     label: status?.silentAudioActive == true
                         ? l10n.iosKeepAliveSilentAudioActive
                         : l10n.iosKeepAliveSilentAudioInactive,
@@ -2817,7 +2817,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                   _iosDivider(context),
                   _iosNavRow(
                     context,
-                    icon: Lucide.MapPin,
+                    icon: Lucide.Pin,
                     label: status?.locationAuthorized == true
                         ? l10n.iosKeepAliveLocationAuthorized
                         : l10n.iosKeepAliveLocationNotAuthorized,

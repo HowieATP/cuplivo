@@ -126,7 +126,12 @@ class _DesktopAssistantsBodyState extends State<_DesktopAssistantsBody> {
                         key: ValueKey('desktop-group-chat-${group.id}'),
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _DesktopGroupChatCard(group: group),
+                          child: GroupChatSettingsCard(
+                            group: group,
+                            radius: 18,
+                            padding: const EdgeInsets.all(16),
+                            avatarSize: 48,
+                          ),
                         ),
                       );
                     },
@@ -147,46 +152,23 @@ class _AddAssistantButton extends StatefulWidget {
 }
 
 class _AddAssistantButtonState extends State<_AddAssistantButton> {
-  bool _hover = false;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
-        : Colors.transparent;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () async {
-          final assistantProvider = context.read<AssistantProvider>();
-          final name = await _showAddAssistantDesktopDialog(context);
-          if (name == null || name.trim().isEmpty) return;
-          if (!context.mounted) return;
-          await assistantProvider.addAssistant(
-            name: name.trim(),
-            context: context,
-          );
-        },
-        child: Tooltip(
-          message: AppLocalizations.of(context)!.assistantProviderNewAssistantName,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: _DesktopCreateGlyph(
-              baseIcon: lucide.Lucide.Bot,
-              color: cs.primary,
-            ),
-          ),
-        ),
-      ),
+    return CreateActionIconButton(
+      baseIcon: lucide.Lucide.Bot,
+      tooltip: AppLocalizations.of(context)!.assistantProviderNewAssistantName,
+      color: cs.primary,
+      onTap: () async {
+        final assistantProvider = context.read<AssistantProvider>();
+        final name = await _showAddAssistantDesktopDialog(context);
+        if (name == null || name.trim().isEmpty) return;
+        if (!context.mounted) return;
+        await assistantProvider.addAssistant(
+          name: name.trim(),
+          context: context,
+        );
+      },
     );
   }
 }
@@ -197,119 +179,134 @@ class _AddGroupChatButton extends StatefulWidget {
 }
 
 class _AddGroupChatButtonState extends State<_AddGroupChatButton> {
-  bool _hover = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
-        : Colors.transparent;
     final l10n = AppLocalizations.of(context)!;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () async {
-          final name = await _showAddGroupChatDesktopDialog(context);
-          if (name == null || !context.mounted) return;
-          final group = await context.read<GroupChatProvider>().createGroup(
-            name: name.trim().isEmpty ? l10n.groupChatDefaultName : name.trim(),
-          );
-          if (!context.mounted) return;
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => GroupChatSettingsPage(groupChatId: group.id),
-            ),
-          );
-        },
-        child: Tooltip(
-          message: l10n.groupChatCreate,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: _DesktopCreateGlyph(
-              baseIcon: lucide.Lucide.MessageCircle,
-              color: cs.primary,
-            ),
+    return CreateActionIconButton(
+      baseIcon: lucide.Lucide.MessageCircle,
+      tooltip: l10n.groupChatCreate,
+      color: cs.primary,
+      onTap: () async {
+        final name = await _showAddGroupChatDesktopDialog(context);
+        if (name == null || !context.mounted) return;
+        final group = await context.read<GroupChatProvider>().createGroup(
+          name: name.trim().isEmpty ? l10n.groupChatDefaultName : name.trim(),
+        );
+        if (!context.mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => GroupChatSettingsPage(groupChatId: group.id),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DesktopCreateGlyph extends StatelessWidget {
-  const _DesktopCreateGlyph({required this.baseIcon, required this.color});
-
-  final IconData baseIcon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 20,
-      height: 20,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment.center,
-              child: Icon(baseIcon, size: 17, color: color),
-            ),
-          ),
-          Positioned(
-            right: -1,
-            top: -1,
-            child: Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Icon(lucide.Lucide.Plus, size: 8, color: color),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 Future<String?> _showAddGroupChatDesktopDialog(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
+  final cs = Theme.of(context).colorScheme;
   final controller = TextEditingController();
-  final result = await showDialog<String>(
+  String? result;
+  await showDialog<String>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(l10n.groupChatCreate),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(hintText: l10n.groupChatNameHint),
-        onSubmitted: (v) => Navigator.of(ctx).pop(v),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(l10n.groupChatCancel),
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 44,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.groupChatCreate,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: AppFontWeights.emphasis,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(
+                          ctx,
+                        ).closeButtonTooltip,
+                        icon: const Icon(lucide.Lucide.X, size: 18),
+                        color: cs.onSurface,
+                        onPressed: () => Navigator.of(ctx).maybePop(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: l10n.groupChatNameHint,
+                        filled: true,
+                        fillColor: Theme.of(ctx).brightness == Brightness.dark
+                            ? Colors.white10
+                            : const Color(0xFFF7F7F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.outlineVariant.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.primary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ),
+                      onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _DeskIosButton(
+                          label: l10n.groupChatCancel,
+                          filled: false,
+                          dense: true,
+                          onTap: () => Navigator.of(ctx).pop(),
+                        ),
+                        const SizedBox(width: 8),
+                        _DeskIosButton(
+                          label: l10n.groupChatConfirm,
+                          filled: true,
+                          dense: true,
+                          onTap: () =>
+                              Navigator.of(ctx).pop(controller.text.trim()),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(controller.text),
-          child: Text(l10n.groupChatConfirm),
-        ),
-      ],
-    ),
+      );
+    },
   );
   controller.dispose();
   return result;
@@ -831,111 +828,6 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DesktopGroupChatCard extends StatefulWidget {
-  const _DesktopGroupChatCard({required this.group});
-
-  final GroupChat group;
-
-  @override
-  State<_DesktopGroupChatCard> createState() => _DesktopGroupChatCardState();
-}
-
-class _DesktopGroupChatCardState extends State<_DesktopGroupChatCard> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final preview = context.watch<GroupChatProvider>().latestMessagePreview(
-      widget.group.id,
-    );
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
-    final borderColor = _hover
-        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: _CardPress(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  GroupChatSettingsPage(groupChatId: widget.group.id),
-            ),
-          );
-        },
-        pressedScale: 1.0,
-        builder: (pressed, overlay) => Container(
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(overlay, baseBg),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor, width: 1.0),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              GroupAvatar(
-                avatar: widget.group.avatar,
-                name: widget.group.name,
-                size: 48,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            widget.group.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: AppFontWeights.emphasis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          l10n.groupChatDefaultName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurface.withValues(alpha: 0.42),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      preview ?? '—',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.7),
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
       ),

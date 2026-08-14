@@ -6,17 +6,17 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/group_chat_provider.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/group_chat.dart';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'assistant_settings_edit_page.dart';
 import '../../group_chat/pages/group_chat_settings_page.dart';
-import '../../group_chat/widgets/group_avatar.dart';
+import '../../group_chat/widgets/group_chat_settings_card.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/create_action_icon_button.dart';
 import '../../../theme/app_font_weights.dart';
 
 class AssistantSettingsPage extends StatefulWidget {
@@ -60,7 +60,7 @@ class _AssistantSettingsPageState extends State<AssistantSettingsPage> {
         ),
         title: Text(l10n.assistantSettingsPageTitle),
         actions: [
-          _CreateActionIconButton(
+          CreateActionIconButton(
             baseIcon: Lucide.Bot,
             tooltip: l10n.assistantProviderNewAssistantName,
             color: cs.onSurface,
@@ -80,7 +80,7 @@ class _AssistantSettingsPageState extends State<AssistantSettingsPage> {
               );
             },
           ),
-          _CreateActionIconButton(
+          CreateActionIconButton(
             baseIcon: Lucide.MessageCircle,
             tooltip: l10n.groupChatCreate,
             color: cs.onSurface,
@@ -141,7 +141,7 @@ class _AssistantSettingsPageState extends State<AssistantSettingsPage> {
             key: ValueKey('settings-group-chat-${group.id}'),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _GroupChatSettingsCard(group: group),
+              child: GroupChatSettingsCard(group: group),
             ),
           );
         },
@@ -361,173 +361,6 @@ class _AssistantCard extends StatelessWidget {
         ],
       ),
       child: content,
-    );
-  }
-}
-
-class _GroupChatSettingsCard extends StatelessWidget {
-  const _GroupChatSettingsCard({required this.group});
-
-  final GroupChat group;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final preview = context.watch<GroupChatProvider>().latestMessagePreview(
-      group.id,
-    );
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
-
-    return _TactileCard(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => GroupChatSettingsPage(groupChatId: group.id),
-          ),
-        );
-      },
-      builder: (pressed, overlay) => Container(
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(overlay, baseBg),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-            width: 0.8,
-          ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            GroupAvatar(avatar: group.avatar, name: group.name, size: 44),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          group.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.groupChatDefaultName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurface.withValues(alpha: 0.42),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    preview ?? '—',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: 0.7),
-                      height: 1.25,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- iOS-style tactile helpers ---
-
-class _CreateActionIconButton extends StatefulWidget {
-  const _CreateActionIconButton({
-    required this.baseIcon,
-    required this.tooltip,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData baseIcon;
-  final String tooltip;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  State<_CreateActionIconButton> createState() =>
-      _CreateActionIconButtonState();
-}
-
-class _CreateActionIconButtonState extends State<_CreateActionIconButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _pressed
-        ? widget.color.withValues(alpha: 0.7)
-        : widget.color;
-    return Tooltip(
-      message: widget.tooltip,
-      child: Semantics(
-        button: true,
-        label: widget.tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTap: () {
-            Haptics.light();
-            widget.onTap();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: Icon(widget.baseIcon, size: 20, color: color),
-                    ),
-                  ),
-                  Positioned(
-                    right: -1,
-                    top: -1,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Lucide.Plus, size: 9, color: color),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

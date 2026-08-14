@@ -355,6 +355,7 @@ class HomePageController extends ChangeNotifier {
       );
       if (!registered) {
         port.close();
+        debugPrint('[ProactiveCare] Port registration failed');
         FlutterLogger.log(
           'Proactive care port registration failed',
           tag: 'HomePageController',
@@ -364,10 +365,14 @@ class HomePageController extends ChangeNotifier {
       _proactiveCarePort = port;
       port.listen((dynamic data) {
         final assistantId = data?.toString() ?? '';
+        debugPrint(
+          '[ProactiveCare] Main isolate received trigger for $assistantId',
+        );
         if (assistantId.isEmpty) return;
         unawaited(_viewModel.handleProactiveCareTrigger(assistantId));
       });
     } catch (e) {
+      debugPrint('[ProactiveCare] Port setup failed: $e');
       FlutterLogger.log(
         'Proactive care port setup failed: $e',
         tag: 'HomePageController',
@@ -667,6 +672,23 @@ class HomePageController extends ChangeNotifier {
     await _chatService.init();
     if (!ctx.mounted) return;
     await assistantProvider.ensureDefaults(ctx);
+    // Re-arm proactive care exact alarms lost after force-stop or process
+    // death. This must run after assistants have finished loading (the
+    // first-frame callback in main.dart captured an empty list) — see
+    // docs/adr/0031-proactive-care-startup-reschedule-and-logging.md.
+    if (ProactiveCareAlarmService.isSupported) {
+      try {
+        await ProactiveCareAlarmService.rescheduleAll(
+          assistantProvider.assistants,
+        );
+      } catch (e) {
+        debugPrint('[ProactiveCare] Startup rescheduleAll failed: $e');
+        FlutterLogger.log(
+          'Proactive care startup rescheduleAll failed: $e',
+          tag: 'HomePageController',
+        );
+      }
+    }
     if (prefs.newChatOnLaunch) {
       await _createNewConversation();
     } else {

@@ -132,6 +132,11 @@ class DependencyInstallController extends ChangeNotifier {
       }
     } finally {
       _running.remove(workspaceId);
+      // The queue list is empty here (loop drained it); drop it so the
+      // controller does not accumulate per-workspace entries over the app
+      // lifetime. The next enqueue recreates it via putIfAbsent. No awaits
+      // below this point, so no enqueue can interleave.
+      _queues.remove(workspaceId);
     }
   }
 }

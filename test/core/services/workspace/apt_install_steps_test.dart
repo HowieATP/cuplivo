@@ -12,15 +12,14 @@ void main() {
       ]);
     });
 
-    test('recover clears stale locks and repairs interrupted dpkg state', () {
+    test('recover repairs interrupted dpkg state without deleting locks', () {
       final steps = LinuxSandboxService.buildAptInstallSteps(packages: 'git');
       final recover = steps.first;
       expect(recover.stage, 'recover');
-      expect(recover.command, contains('rm -f /var/lib/dpkg/lock'));
-      expect(
-        recover.command,
-        contains('/var/cache/apt/archives/lock /var/lib/apt/lists/lock'),
-      );
+      // Lock files must not be unlinked: fcntl locks are released when the
+      // holder exits, and deleting the inode under a live holder would let a
+      // second dpkg mutate the database concurrently.
+      expect(recover.command, isNot(contains('rm -f /var/lib/dpkg/lock')));
       expect(recover.command, contains('dpkg --configure -a'));
       expect(
         recover.command,
@@ -69,12 +68,30 @@ void main() {
           '--no-install-recommends python3 python3-pip',
         ),
       );
-      expect(install.command, contains('&& apt-get clean'));
+      // The cache-clean invocation must carry the same lock timeout, or a
+      // held lock would fail the whole chained step after the install.
+      expect(
+        install.command,
+        endsWith('&& apt-get -o Acquire::Lock::Timeout=600 clean'),
+      );
+    });
+
+    test('office installs the document toolchain with an extended timeout', () {
+      final steps = LinuxSandboxService.buildAptInstallSteps(
+        packages:
+            'libreoffice pandoc poppler-utils python3-lxml '
+            'python3-pil python3-reportlab python3-openpyxl python3-pandas '
+            'python3-defusedxml',
+        installTimeoutSeconds: 2700,
+      );
+      expect(steps.last.timeoutSeconds, 2700);
+      expect(steps.last.command, contains('libreoffice'));
+      expect(steps.last.command, contains('pandoc poppler-utils'));
     });
 
     test('uses fixed staged timeouts', () {
       final steps = LinuxSandboxService.buildAptInstallSteps(packages: 'git');
-      expect(steps[0].timeoutSeconds, 300);
+      expect(steps[0].timeoutSeconds, 900);
       expect(steps[1].timeoutSeconds, 600);
       expect(steps[2].timeoutSeconds, 1800);
     });

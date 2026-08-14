@@ -251,6 +251,7 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     File(confDir, "99cuplivo").writeText(
       "// Cuplivo Linux sandbox: wait for dpkg/apt locks instead of failing.\n" +
         "Acquire::Lock::Timeout \"600\";\n" +
+        "DPkg::Lock::Timeout \"600\";\n" +
         "Acquire::Retries \"3\";\n",
     )
   }
@@ -306,9 +307,12 @@ private class GuestCommandRunner(private val appContext: Context) {
  */
 private object NativeLibResolver {
   fun resolve(appContext: Context, libFileName: String): File? {
-    // 1) System-extracted native lib dir: executable out of the box.
+    // 1) System-extracted native lib dir: executable out of the box. Still
+    //    verified (and repaired via chmod if needed) so a non-executable
+    //    copy falls through to the fallback chain instead of failing at
+    //    exec time.
     val systemLib = File(appContext.applicationInfo.nativeLibraryDir, libFileName)
-    if (systemLib.isFile && systemLib.length() > 0L) {
+    if (systemLib.isFile && systemLib.length() > 0L && makeExecutable(systemLib)) {
       return systemLib
     }
 
@@ -483,7 +487,11 @@ private object OutputDrainer {
    */
   private fun pidOf(process: Process): Long? {
     val m = Regex("pid=(\\d+)").find(process.toString())
-    return m?.groupValues?.get(1)?.toLongOrNull()
+    val pid = m?.groupValues?.get(1)?.toLongOrNull()
+    if (pid == null) {
+      Log.w(TAG, "pidOf: cannot parse pid from '${process.toString()}'")
+    }
+    return pid
   }
 
   /**
@@ -496,16 +504,22 @@ private object OutputDrainer {
     try {
       File("/proc").listFiles()?.forEach { dir ->
         val pidText = dir.name.toLongOrNull() ?: return@forEach
-        val stat = File(dir, "stat")
-        if (!stat.isFile) return@forEach
-        val text = stat.readText()
-        val open = text.indexOf('(')
-        val close = text.lastIndexOf(')')
-        if (open < 0 || close <= open) return@forEach
-        val parts = text.substring(close + 1).trim().split(' ')
-        // parts[0] = state, parts[1] = ppid
-        if (parts.size > 1 && parts[1].toLongOrNull() == pid) {
-          children += pidText
+        try {
+          // A target process may exit between listFiles and readText; that
+          // only skips this PID, the rest of the scan continues.
+          val stat = File(dir, "stat")
+          if (!stat.isFile) return@forEach
+          val text = stat.readText()
+          val open = text.indexOf('(')
+          val close = text.lastIndexOf(')')
+          if (open < 0 || close <= open) return@forEach
+          val parts = text.substring(close + 1).trim().split(' ')
+          // parts[0] = state, parts[1] = ppid
+          if (parts.size > 1 && parts[1].toLongOrNull() == pid) {
+            children += pidText
+          }
+        } catch (e: Exception) {
+          Log.w(TAG, "killDescendants read $pidText: ${e.message}")
         }
       }
     } catch (e: Exception) {

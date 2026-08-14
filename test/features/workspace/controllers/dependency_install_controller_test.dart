@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// on a completer so tests observe the queue deterministically mid-run.
 class _FakeInstaller {
   final List<String> order = <String>[];
+  final List<String> hostPaths = <String>[];
+  final List<DependencyInstallPref> prefs = <DependencyInstallPref>[];
   int maxConcurrent = 0;
   int concurrent = 0;
   final Map<String, Object?> failures = <String, Object?>{};
@@ -23,6 +25,8 @@ class _FakeInstaller {
     concurrent++;
     if (concurrent > maxConcurrent) maxConcurrent = concurrent;
     order.add(depId);
+    hostPaths.add(workspaceHostPath);
+    prefs.add(pref);
     try {
       onProgress?.call(SandboxInstallProgress(stage: 'install', progress: 0.5));
       final g = gate[depId];
@@ -123,10 +127,11 @@ void main() {
       WorkspaceDependencyIds.git,
       WorkspaceDependencyIds.python,
     ]);
-    expect(
-      controller.takeCompleted(wsId)[WorkspaceDependencyIds.nodejs],
-      isNull,
-    );
+    // The runner must receive the exact host path and pref per workspace.
+    expect(fake.hostPaths, ['/ws', '/ws', '/ws']);
+    expect(fake.prefs, [pref, pref, pref]);
+    final completed = controller.takeCompleted(wsId);
+    expect(completed, containsPair(WorkspaceDependencyIds.nodejs, isNull));
   });
 
   test('duplicate enqueue of the same dep is ignored', () async {
@@ -181,11 +186,95 @@ void main() {
       WorkspaceDependencyIds.nodejs,
       WorkspaceDependencyIds.git,
     ]);
+    final completed = controller.takeCompleted(wsId);
+    expect(completed[WorkspaceDependencyIds.nodejs], isA<StateError>());
+    expect(completed, containsPair(WorkspaceDependencyIds.git, isNull));
+    // Consumption is one-shot: a second call returns nothing.
+    expect(controller.takeCompleted(wsId), isEmpty);
+  });
+
+  test('a dep enqueued while another is running is deduped', () async {
+    final fake = _FakeInstaller()
+      ..gate[WorkspaceDependencyIds.nodejs] = Completer<void>();
+    final controller = DependencyInstallController(installer: fake.call);
+
+    controller.enqueue(
+      workspaceId: wsId,
+      depId: WorkspaceDependencyIds.nodejs,
+      hostPath: '/ws',
+      pref: pref,
+    );
+    controller.enqueue(
+      workspaceId: wsId,
+      depId: WorkspaceDependencyIds.git,
+      hostPath: '/ws',
+      pref: pref,
+    );
+    // git is queued behind the gated nodejs install; re-enqueueing it while
+    // queued must be ignored (the queue-level dedupe path).
+    controller.enqueue(
+      workspaceId: wsId,
+      depId: WorkspaceDependencyIds.git,
+      hostPath: '/ws',
+      pref: pref,
+    );
+
+    fake.gate[WorkspaceDependencyIds.nodejs]!.complete();
+    await _pumpUntil(
+      () =>
+          controller.statusFor(wsId, WorkspaceDependencyIds.git) ==
+          DepInstallStatus.idle,
+    );
+    expect(fake.order, [
+      WorkspaceDependencyIds.nodejs,
+      WorkspaceDependencyIds.git,
+    ]);
+  });
+
+  test('a failed dep can be retried by enqueueing again', () async {
+    final fake = _FakeInstaller()
+      ..failures[WorkspaceDependencyIds.nodejs] = 'transient error';
+    final controller = DependencyInstallController(installer: fake.call);
+
+    controller.enqueue(
+      workspaceId: wsId,
+      depId: WorkspaceDependencyIds.nodejs,
+      hostPath: '/ws',
+      pref: pref,
+    );
+    await _pumpUntil(
+      () =>
+          controller.statusFor(wsId, WorkspaceDependencyIds.nodejs) ==
+          DepInstallStatus.idle,
+    );
+    expect(fake.order, [WorkspaceDependencyIds.nodejs]);
     expect(
       controller.takeCompleted(wsId)[WorkspaceDependencyIds.nodejs],
       isA<StateError>(),
     );
-    expect(controller.takeCompleted(wsId)[WorkspaceDependencyIds.git], isNull);
+
+    // Clear the failure and retry: the controller must accept a fresh
+    // enqueue after the dep went idle.
+    fake.failures.remove(WorkspaceDependencyIds.nodejs);
+    controller.enqueue(
+      workspaceId: wsId,
+      depId: WorkspaceDependencyIds.nodejs,
+      hostPath: '/ws',
+      pref: pref,
+    );
+    await _pumpUntil(
+      () =>
+          controller.statusFor(wsId, WorkspaceDependencyIds.nodejs) ==
+          DepInstallStatus.idle,
+    );
+    expect(fake.order, [
+      WorkspaceDependencyIds.nodejs,
+      WorkspaceDependencyIds.nodejs,
+    ]);
+    expect(
+      controller.takeCompleted(wsId)[WorkspaceDependencyIds.nodejs],
+      isNull,
+    );
   });
 
   test('progress and stage are exposed only while installing', () async {
@@ -208,7 +297,8 @@ void main() {
 
     fake.gate[WorkspaceDependencyIds.git]!.complete();
     await _pumpUntil(
-      () => controller.statusFor(wsId, WorkspaceDependencyIds.git) ==
+      () =>
+          controller.statusFor(wsId, WorkspaceDependencyIds.git) ==
           DepInstallStatus.idle,
     );
     expect(controller.progressFor(wsId, WorkspaceDependencyIds.git), isNull);
@@ -245,5 +335,7 @@ void main() {
           controller.statusFor('ws_b', 'git2') == DepInstallStatus.idle,
     );
     expect(fake.order, containsAll([WorkspaceDependencyIds.git, 'git2']));
+    // Each workspace's install must run against its own rootfs path.
+    expect(fake.hostPaths, containsAll(['/ws_a', '/ws_b']));
   });
 }

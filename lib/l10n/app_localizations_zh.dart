@@ -7997,6 +7997,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15992,6 +16016,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -23987,4 +24035,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosKeepAliveSurvivalShort => '標準背景存活（約 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '靜默音訊就緒';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '靜默音訊未開啟';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就緒';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位權限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未開啟';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系統中斷';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '背景任務';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任務進行中…';
 }

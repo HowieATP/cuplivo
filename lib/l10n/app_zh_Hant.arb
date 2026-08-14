@@ -3170,5 +3170,13 @@
   "iosKeepAliveLocationAuthorized": "定位已授權",
   "iosKeepAliveLocationNotAuthorized": "定位未授權——點擊開啟系統設定",
   "iosKeepAliveSurvivalExtended": "延長背景存活",
-  "iosKeepAliveSurvivalShort": "標準背景存活（約 30 秒）"
+  "iosKeepAliveSurvivalShort": "標準背景存活（約 30 秒）",
+  "iosKeepAliveConfigAudioReady": "靜默音訊就緒",
+  "iosKeepAliveConfigAudioOff": "靜默音訊未開啟",
+  "iosKeepAliveConfigLocationReady": "定位就緒",
+  "iosKeepAliveConfigLocationPermissionNeeded": "需要定位權限",
+  "iosKeepAliveConfigLocationOff": "定位未開啟",
+  "iosKeepAliveInterruptedNotice": "曾被系統中斷",
+  "iosBackgroundGenerationPrivacyActiveTitle": "背景任務",
+  "iosBackgroundGenerationPrivacyActiveDetail": "任務進行中…"
 }

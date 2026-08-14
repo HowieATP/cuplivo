@@ -13,10 +13,10 @@
 //      so finite background tasks can be re-armed instead of dying.
 //
 //   2. Location keep-alive — coarse CLLocationManager updates (5s
-//      heartbeat, UIBackgroundModes: location) plus a
-//      CLBackgroundActivitySession on iOS 17+. Armed only 15s after the
-//      app enters the background so brief background blips never spin up
-//      location.
+//      heartbeat on iOS 16, continuous CLLocationUpdate.liveUpdates on
+//      iOS 17+ with CLBackgroundActivitySession, UIBackgroundModes:
+//      location). Armed only 15s after the app enters the background so
+//      brief background blips never spin up location.
 //
 //   3. Finite background task coordination — AppDelegate consults
 //      `keepAliveEffective` when its UIBackgroundTask expires: when the
@@ -44,6 +44,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   private(set) var masterEnabled = false
   private(set) var silentAudioEnabled = false
   private(set) var locationEnabled = false
+  private(set) var liveActivityPrivacyMode = false
 
   // MARK: - Runtime state
 
@@ -55,6 +56,12 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   private var backgroundLocationArmTimer: Timer?
   private var locationTimer: Timer?
   private var bgActivitySession: Any?
+  private var liveUpdatesTask: Task<Void, Never>?
+
+  // MARK: - Interruption tracking
+
+  private(set) var interruptionCount = 0
+  private(set) var lastInterruptedAt: Date?
 
   // MARK: - Silent audio
 
@@ -62,6 +69,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   private var silentPlayerNode: AVAudioPlayerNode?
   private var silentAudioActivationRetries = 0
   private var silentAudioSuspendCount = 0
+  private var pendingSilentAudioStop: DispatchWorkItem?
 
   // MARK: - Location
 
@@ -73,6 +81,8 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   private static let locationHeartbeatInterval: TimeInterval = 5.0
   private static let maxActivationRetries = 3
   private static let activationRetryDelay: TimeInterval = 0.5
+  private static let silentAudioStopDebounce: TimeInterval = 1.5
+  private static let routeChangeReevalDelay: TimeInterval = 0.5
 
   private override init() {
     super.init()
@@ -92,6 +102,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       probe.invalidate()
     }
     observeLifecycle()
+    observeAudioInterruptions()
   }
 
   // MARK: - MethodChannel
@@ -110,7 +121,8 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       configure(
         masterEnabled: args["masterEnabled"] as? Bool ?? false,
         silentAudioEnabled: args["silentAudioEnabled"] as? Bool ?? false,
-        locationEnabled: args["locationEnabled"] as? Bool ?? false
+        locationEnabled: args["locationEnabled"] as? Bool ?? false,
+        liveActivityPrivacyMode: args["liveActivityPrivacyMode"] as? Bool ?? false
       )
       result(true)
     case "beginSession":
@@ -125,6 +137,15 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       result(statusMap())
     case "requestLocationAuthorization":
       requestLocationAuthorization(result: result)
+    case "suspendSilentAudio":
+      suspendSilentAudio()
+      result(true)
+    case "resumeSilentAudio":
+      resumeSilentAudio()
+      result(true)
+    case "recordInterruption":
+      recordInterruption()
+      result(true)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -162,12 +183,52 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     cleanupLocationStateOnForeground()
   }
 
+  // MARK: - Audio interruption / route-change recovery
+
+  private func observeAudioInterruptions() {
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAudioInterruption(_:)),
+      name: AVAudioSession.interruptionNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleRouteChange(_:)),
+      name: AVAudioSession.routeChangeNotification,
+      object: nil
+    )
+  }
+
+  @objc private func handleAudioInterruption(_ note: Notification) {
+    guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+      let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+    if type == .ended {
+      // Interruption over (e.g. phone call finished) — reclaim the session.
+      evaluateKeepAlive(caller: "interruptionEnded")
+    }
+  }
+
+  @objc private func handleRouteChange(_ note: Notification) {
+    // Route changes (headphones unplugged, Bluetooth drop, …) can tear down
+    // our audio session. Re-evaluate shortly after to restart if wanted.
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.routeChangeReevalDelay) { [weak self] in
+      self?.evaluateKeepAlive(caller: "routeChange")
+    }
+  }
+
   // MARK: - Configuration
 
-  func configure(masterEnabled: Bool, silentAudioEnabled: Bool, locationEnabled: Bool) {
+  func configure(
+    masterEnabled: Bool,
+    silentAudioEnabled: Bool,
+    locationEnabled: Bool,
+    liveActivityPrivacyMode: Bool
+  ) {
     self.masterEnabled = masterEnabled
     self.silentAudioEnabled = silentAudioEnabled
     self.locationEnabled = locationEnabled
+    self.liveActivityPrivacyMode = liveActivityPrivacyMode
     evaluateKeepAlive(caller: "configure")
   }
 
@@ -193,6 +254,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       "masterEnabled": masterEnabled,
       "silentAudioEnabled": silentAudioEnabled,
       "locationEnabled": locationEnabled,
+      "liveActivityPrivacyMode": liveActivityPrivacyMode,
       "sessionActive": sessionActive,
       "appIsInBackground": appIsInBackground,
       "silentAudioActive": silentAudioActive,
@@ -200,6 +262,8 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       "locationArmed": backgroundLocationArmed,
       "locationAuthorized": isLocationAuthorized,
       "survivalTier": survivalTier,
+      "interruptionCount": interruptionCount,
+      "lastInterruptedAt": lastInterruptedAt?.timeIntervalSince1970 ?? 0,
     ]
   }
 
@@ -209,9 +273,10 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     let shouldPlay = masterEnabled && silentAudioEnabled && sessionActive
       && appIsInBackground && silentAudioSuspendCount == 0
     if shouldPlay && !silentAudioActive {
+      cancelPendingSilentAudioStop()
       startSilentAudio()
     } else if !shouldPlay && silentAudioActive {
-      stopSilentAudio()
+      requestStopSilentAudio(transientForeground: !appIsInBackground)
     }
     evaluateLocationUpdates()
     evaluateBackgroundActivitySession()
@@ -277,6 +342,40 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     }
   }
 
+  /// Stop silent audio, debounced when the trigger is a transient foreground
+  /// blip (app switcher peek, call ended, Control Center, …) — a background
+  /// signal arriving within the window cancels the stop. Other triggers
+  /// (session ended, media suspend, toggle off) stop immediately.
+  private func requestStopSilentAudio(transientForeground: Bool) {
+    guard transientForeground else {
+      cancelPendingSilentAudioStop()
+      stopSilentAudio()
+      return
+    }
+    guard pendingSilentAudioStop == nil else { return }
+    let work = DispatchWorkItem { [weak self] in
+      guard let self else { return }
+      self.pendingSilentAudioStop = nil
+      // Re-check the world at fire time: if we went back to background (or
+      // any other reason now keeps it playing), do NOT stop.
+      let stillForeground = !self.appIsInBackground
+      let stillActive = self.masterEnabled && self.silentAudioEnabled
+        && self.sessionActive && self.silentAudioSuspendCount == 0
+      if stillForeground || !stillActive {
+        self.stopSilentAudio()
+      }
+    }
+    pendingSilentAudioStop = work
+    DispatchQueue.main.asyncAfter(
+      deadline: .now() + Self.silentAudioStopDebounce, execute: work
+    )
+  }
+
+  private func cancelPendingSilentAudioStop() {
+    pendingSilentAudioStop?.cancel()
+    pendingSilentAudioStop = nil
+  }
+
   private func stopSilentAudio() {
     silentAudioActivationRetries = 0
     guard silentAudioActive else { return }
@@ -293,6 +392,8 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   }
 
   /// Temporary suspend while user media (TTS / audio player) is active.
+  /// Called from Dart around media playback; counter-based so nested
+  /// play/pause sequences balance correctly.
   func suspendSilentAudio() {
     silentAudioSuspendCount += 1
     if silentAudioActive {
@@ -305,6 +406,13 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     if silentAudioSuspendCount == 0 && silentAudioActive == false {
       evaluateKeepAlive(caller: "resumeSilentAudio")
     }
+  }
+
+  // MARK: - Interruption tracking
+
+  func recordInterruption() {
+    interruptionCount += 1
+    lastInterruptedAt = Date()
   }
 
   // MARK: - Location keep-alive
@@ -351,18 +459,48 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     }
   }
 
+  /// iOS 17+: continuous live-updates stream + CLBackgroundActivitySession.
+  /// The liveUpdates(.otherNavigation) stream is what keeps the blue
+  /// location indicator on screen continuously (and the process alive) —
+  /// single-shot requestLocation() heartbeats do not.
   private func evaluateBackgroundActivitySession() {
     let shouldRun = masterEnabled && locationEnabled && isLocationAuthorized
       && sessionActive && appIsInBackground && backgroundLocationArmed
-    if shouldRun && bgActivitySession == nil {
-      if #available(iOS 17.0, *) {
-        bgActivitySession = CLBackgroundActivitySession()
-      }
+    if shouldRun && liveUpdatesTask == nil {
+      startBackgroundActivitySession()
     } else if !shouldRun {
-      if #available(iOS 17.0, *), let session = bgActivitySession as? CLBackgroundActivitySession {
-        session.invalidate()
-        bgActivitySession = nil
+      stopBackgroundActivitySession()
+    }
+  }
+
+  private func startBackgroundActivitySession() {
+    guard liveUpdatesTask == nil else { return }
+    if #available(iOS 17.0, *) {
+      let session = CLBackgroundActivitySession()
+      bgActivitySession = session
+      liveUpdatesTask = Task { @MainActor [weak self] in
+        guard let self else { return }
+        do {
+          let updates = CLLocationUpdate.liveUpdates(.otherNavigation)
+          for try await update in updates {
+            guard !Task.isCancelled else { break }
+            // Location data is intentionally discarded — merely receiving
+            // updates keeps the process (and indicator) alive.
+          }
+        } catch {
+          // Transient stream errors are fine; next evaluation retries.
+        }
+        self.liveUpdatesTask = nil
       }
+    }
+  }
+
+  private func stopBackgroundActivitySession() {
+    liveUpdatesTask?.cancel()
+    liveUpdatesTask = nil
+    if #available(iOS 17.0, *), let session = bgActivitySession as? CLBackgroundActivitySession {
+      session.invalidate()
+      bgActivitySession = nil
     }
   }
 
@@ -373,10 +511,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
       locationUpdating = false
       locationManager.allowsBackgroundLocationUpdates = false
     }
-    if #available(iOS 17.0, *), let session = bgActivitySession as? CLBackgroundActivitySession {
-      session.invalidate()
-      bgActivitySession = nil
-    }
+    stopBackgroundActivitySession()
   }
 
   func requestLocationAuthorization(result: @escaping FlutterResult) {

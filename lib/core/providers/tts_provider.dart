@@ -15,6 +15,7 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
 import '../services/backup/double_pref_keys.dart' show prefDouble;
+import '../services/ios_keep_alive.dart';
 
 String ttsAudioFileExtensionForMime(String? mime) {
   switch ((mime ?? '').toLowerCase()) {
@@ -427,6 +428,7 @@ class TtsProvider extends ChangeNotifier {
     bool flush = true,
     bool reuseResolvedNetworkAudio = false,
   }) async {
+    _suspendKeepAliveForMedia();
     final content = _stripMarkdown(text).trim();
     if (content.isEmpty) return;
     if (flush) await _stopPlaybackEngines();
@@ -550,8 +552,35 @@ class TtsProvider extends ChangeNotifier {
     return true;
   }
 
+  // Keep-alive media coordination: while TTS plays, suspend the silent-audio
+  // keep-alive leg so both don't fight over the audio session. Counter keeps
+  // nested speak/stop sequences balanced; resume is idempotent (clears to 0).
+  int _keepAliveMediaCount = 0;
+
+  void _suspendKeepAliveForMedia() {
+    _keepAliveMediaCount++;
+    if (_keepAliveMediaCount == 1) {
+      unawaited(IosKeepAliveService.instance.suspendSilentAudio());
+    }
+  }
+
+  void _resumeKeepAliveForMedia() {
+    if (_keepAliveMediaCount <= 0) return;
+    _keepAliveMediaCount--;
+    if (_keepAliveMediaCount == 0) {
+      unawaited(IosKeepAliveService.instance.resumeSilentAudio());
+    }
+  }
+
+  void _clearKeepAliveForMedia() {
+    if (_keepAliveMediaCount <= 0) return;
+    _keepAliveMediaCount = 0;
+    unawaited(IosKeepAliveService.instance.resumeSilentAudio());
+  }
+
   Future<void> stop() async {
     _sessionId++;
+    _clearKeepAliveForMedia();
     await _stopPlaybackEngines();
     _stopInternal(updateState: true);
   }
@@ -919,6 +948,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _finishPlayback({required TtsPlaybackStatus status, String? error}) {
+    _clearKeepAliveForMedia();
     _isSpeaking = false;
     _isPaused = false;
     _usingNetwork = false;

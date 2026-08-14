@@ -3753,5 +3753,13 @@
   "iosKeepAliveLocationAuthorized": "Location authorized",
   "iosKeepAliveLocationNotAuthorized": "Location not authorized — tap to open system settings",
   "iosKeepAliveSurvivalExtended": "Extended background survival",
-  "iosKeepAliveSurvivalShort": "Standard background survival (~30s)"
+  "iosKeepAliveSurvivalShort": "Standard background survival (~30s)",
+  "iosKeepAliveConfigAudioReady": "Silent audio ready",
+  "iosKeepAliveConfigAudioOff": "Silent audio off",
+  "iosKeepAliveConfigLocationReady": "Location ready",
+  "iosKeepAliveConfigLocationPermissionNeeded": "Location permission needed",
+  "iosKeepAliveConfigLocationOff": "Location off",
+  "iosKeepAliveInterruptedNotice": "Interrupted by the system previously",
+  "iosBackgroundGenerationPrivacyActiveTitle": "Background Task",
+  "iosBackgroundGenerationPrivacyActiveDetail": "Task in progress…"
 }

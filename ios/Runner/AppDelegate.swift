@@ -250,6 +250,9 @@ private final class IosBackgroundGenerationHandler {
         }
         self.beginBackgroundTask()
       } else {
+        // No keep-alive backing us — the system really will suspend the app.
+        // Record the interruption so the UI can tell the user what happened.
+        BackgroundKeepAliveManager.shared.recordInterruption()
         self.endBackgroundTask()
       }
     }

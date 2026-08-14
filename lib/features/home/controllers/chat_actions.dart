@@ -147,16 +147,24 @@ class ChatActions {
         masterEnabled: settings.iosKeepAliveEnabled,
         silentAudioEnabled: settings.iosSilentAudioKeepAliveEnabled,
         locationEnabled: settings.iosLocationKeepAliveEnabled,
+        liveActivityPrivacyMode: settings.iosLiveActivityPrivacyMode,
       );
       await IosKeepAliveService.instance.beginSession();
+      final privacy = settings.iosLiveActivityPrivacyMode;
       await IosBackgroundGenerationService.instance.start(
         enabled: settings.iosBackgroundGenerationEnabled,
         liveActivityEnabled: settings.iosLiveActivityEnabled,
         notificationsEnabled: settings.iosBackgroundNotificationsEnabled,
         refreshEnabled: settings.iosBackgroundTaskRefreshEnabled,
-        title: l10n.iosBackgroundGenerationActiveTitle,
-        detail: l10n.iosBackgroundGenerationActiveDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(0),
+        title: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveTitle
+            : l10n.iosBackgroundGenerationActiveTitle,
+        detail: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveDetail
+            : l10n.iosBackgroundGenerationActiveDetail,
+        tokenLabel: privacy
+            ? ''
+            : l10n.iosBackgroundGenerationTokenCount(0),
       );
     } catch (error, stackTrace) {
       _logIosBackgroundGenerationFailure('start', error, stackTrace);
@@ -167,9 +175,15 @@ class ChatActions {
     final l10n = _l10n;
     if (l10n == null) return;
     try {
+      final settings = contextProvider.read<SettingsProvider>();
+      final privacy = settings.iosLiveActivityPrivacyMode;
       await IosBackgroundGenerationService.instance.update(
-        detail: l10n.iosBackgroundGenerationStreamingDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(totalTokens),
+        detail: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveDetail
+            : l10n.iosBackgroundGenerationStreamingDetail,
+        tokenLabel: privacy
+            ? ''
+            : l10n.iosBackgroundGenerationTokenCount(totalTokens),
         tokenCount: totalTokens,
       );
     } catch (error, stackTrace) {

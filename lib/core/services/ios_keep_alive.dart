@@ -9,6 +9,7 @@ class IosKeepAliveStatus {
     required this.masterEnabled,
     required this.silentAudioEnabled,
     required this.locationEnabled,
+    required this.liveActivityPrivacyMode,
     required this.sessionActive,
     required this.appIsInBackground,
     required this.silentAudioActive,
@@ -16,6 +17,8 @@ class IosKeepAliveStatus {
     required this.locationArmed,
     required this.locationAuthorized,
     required this.survivalTier,
+    required this.interruptionCount,
+    required this.lastInterruptedAt,
   });
 
   factory IosKeepAliveStatus.fromMap(Map<dynamic, dynamic>? map) {
@@ -24,6 +27,7 @@ class IosKeepAliveStatus {
       masterEnabled: readBool('masterEnabled'),
       silentAudioEnabled: readBool('silentAudioEnabled'),
       locationEnabled: readBool('locationEnabled'),
+      liveActivityPrivacyMode: readBool('liveActivityPrivacyMode'),
       sessionActive: readBool('sessionActive'),
       appIsInBackground: readBool('appIsInBackground'),
       silentAudioActive: readBool('silentAudioActive'),
@@ -31,12 +35,16 @@ class IosKeepAliveStatus {
       locationArmed: readBool('locationArmed'),
       locationAuthorized: readBool('locationAuthorized'),
       survivalTier: (map?['survivalTier'] as String?) ?? 'short',
+      interruptionCount: (map?['interruptionCount'] as int?) ?? 0,
+      lastInterruptedAt:
+          ((map?['lastInterruptedAt'] as num?) ?? 0).toDouble(),
     );
   }
 
   final bool masterEnabled;
   final bool silentAudioEnabled;
   final bool locationEnabled;
+  final bool liveActivityPrivacyMode;
   final bool sessionActive;
   final bool appIsInBackground;
   final bool silentAudioActive;
@@ -44,6 +52,8 @@ class IosKeepAliveStatus {
   final bool locationArmed;
   final bool locationAuthorized;
   final String survivalTier;
+  final int interruptionCount;
+  final double lastInterruptedAt;
 
   /// Long-lived keep-alive is actually effective right now.
   bool get effective => silentAudioActive || locationUpdating;
@@ -65,6 +75,7 @@ class IosKeepAliveService {
     required bool masterEnabled,
     required bool silentAudioEnabled,
     required bool locationEnabled,
+    required bool liveActivityPrivacyMode,
   }) async {
     if (!_isIos) return;
     try {
@@ -72,6 +83,7 @@ class IosKeepAliveService {
         'masterEnabled': masterEnabled,
         'silentAudioEnabled': silentAudioEnabled,
         'locationEnabled': locationEnabled,
+        'liveActivityPrivacyMode': liveActivityPrivacyMode,
       });
     } catch (_) {
       // Native side may be unavailable (e.g. during tests); toggles are
@@ -95,12 +107,30 @@ class IosKeepAliveService {
     } catch (_) {}
   }
 
+  /// Suspend the silent-audio keep-alive while user media is playing.
+  /// Counter-based on the native side; call once per playback start.
+  Future<void> suspendSilentAudio() async {
+    if (!_isIos) return;
+    try {
+      await _channel.invokeMethod<void>('suspendSilentAudio');
+    } catch (_) {}
+  }
+
+  /// Resume the silent-audio keep-alive after user media finished.
+  Future<void> resumeSilentAudio() async {
+    if (!_isIos) return;
+    try {
+      await _channel.invokeMethod<void>('resumeSilentAudio');
+    } catch (_) {}
+  }
+
   Future<IosKeepAliveStatus> getStatus() async {
     if (!_isIos) {
       return const IosKeepAliveStatus(
         masterEnabled: false,
         silentAudioEnabled: false,
         locationEnabled: false,
+        liveActivityPrivacyMode: false,
         sessionActive: false,
         appIsInBackground: false,
         silentAudioActive: false,
@@ -108,6 +138,8 @@ class IosKeepAliveService {
         locationArmed: false,
         locationAuthorized: false,
         survivalTier: 'short',
+        interruptionCount: 0,
+        lastInterruptedAt: 0,
       );
     }
     final result = await _channel.invokeMethod<dynamic>('getStatus');

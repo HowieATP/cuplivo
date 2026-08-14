@@ -2617,6 +2617,7 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
       masterEnabled: settings.iosKeepAliveEnabled,
       silentAudioEnabled: settings.iosSilentAudioKeepAliveEnabled,
       locationEnabled: settings.iosLocationKeepAliveEnabled,
+      liveActivityPrivacyMode: settings.iosLiveActivityPrivacyMode,
     );
   }
 
@@ -2795,36 +2796,39 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
             future: _keepAliveStatusFuture,
             builder: (context, snapshot) {
               final status = snapshot.data;
+              final sp2 = context.read<SettingsProvider>();
               return _iosSectionCard(
                 children: [
                   _iosNavRow(
                     context,
-                    icon: Lucide.Zap,
-                    label: status == null
-                        ? l10n.iosKeepAliveStatusUnavailable
-                        : status.survivalTier == 'extended'
-                        ? l10n.iosKeepAliveSurvivalExtended
-                        : l10n.iosKeepAliveSurvivalShort,
-                  ),
-                  _iosDivider(context),
-                  _iosNavRow(
-                    context,
                     icon: Lucide.Volume2,
-                    label: status?.silentAudioActive == true
-                        ? l10n.iosKeepAliveSilentAudioActive
-                        : l10n.iosKeepAliveSilentAudioInactive,
+                    label: sp2.iosSilentAudioKeepAliveEnabled
+                        ? l10n.iosKeepAliveConfigAudioReady
+                        : l10n.iosKeepAliveConfigAudioOff,
                   ),
                   _iosDivider(context),
                   _iosNavRow(
                     context,
                     icon: Lucide.Pin,
-                    label: status?.locationAuthorized == true
-                        ? l10n.iosKeepAliveLocationAuthorized
-                        : l10n.iosKeepAliveLocationNotAuthorized,
-                    onTap: status?.locationAuthorized == true
+                    label: !sp2.iosLocationKeepAliveEnabled
+                        ? l10n.iosKeepAliveConfigLocationOff
+                        : status?.locationAuthorized == true
+                        ? l10n.iosKeepAliveConfigLocationReady
+                        : l10n.iosKeepAliveConfigLocationPermissionNeeded,
+                    onTap: !sp2.iosLocationKeepAliveEnabled
+                        ? null
+                        : status?.locationAuthorized == true
                         ? null
                         : _openAppSettings,
                   ),
+                  if ((status?.interruptionCount ?? 0) > 0) ...[
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.TriangleAlert,
+                      label: l10n.iosKeepAliveInterruptedNotice,
+                    ),
+                  ],
                 ],
               );
             },

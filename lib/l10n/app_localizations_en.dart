@@ -8371,4 +8371,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosKeepAliveSurvivalShort => 'Standard background survival (~30s)';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => 'Silent audio ready';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => 'Silent audio off';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => 'Location ready';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded =>
+      'Location permission needed';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => 'Location off';
+
+  @override
+  String get iosKeepAliveInterruptedNotice =>
+      'Interrupted by the system previously';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => 'Background Task';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => 'Task in progress…';
 }

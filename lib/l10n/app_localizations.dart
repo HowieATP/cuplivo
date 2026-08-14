@@ -15143,6 +15143,55 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Standard background survival (~30s)'**
   String get iosKeepAliveSurvivalShort;
+
+
+  /// No description provided for @iosKeepAliveConfigAudioReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio ready'**
+  String get iosKeepAliveConfigAudioReady;
+
+  /// No description provided for @iosKeepAliveConfigAudioOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio off'**
+  String get iosKeepAliveConfigAudioOff;
+
+  /// No description provided for @iosKeepAliveConfigLocationReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Location ready'**
+  String get iosKeepAliveConfigLocationReady;
+
+  /// No description provided for @iosKeepAliveConfigLocationPermissionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission needed'**
+  String get iosKeepAliveConfigLocationPermissionNeeded;
+
+  /// No description provided for @iosKeepAliveConfigLocationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location off'**
+  String get iosKeepAliveConfigLocationOff;
+
+  /// No description provided for @iosKeepAliveInterruptedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted by the system previously'**
+  String get iosKeepAliveInterruptedNotice;
+
+  /// No description provided for @iosBackgroundGenerationPrivacyActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Task'**
+  String get iosBackgroundGenerationPrivacyActiveTitle;
+
+  /// No description provided for @iosBackgroundGenerationPrivacyActiveDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Task in progress…'**
+  String get iosBackgroundGenerationPrivacyActiveDetail;
 }
 
 class _AppLocalizationsDelegate

@@ -7809,6 +7809,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
 
   @override
+  String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
+
+  @override
+  String get workspaceSandboxFilesTitle => '沙箱系统目录';
+
+  @override
+  String get workspaceSandboxNoDeps => '未安装依赖';
+
+  @override
+  String get workspaceSandboxSharedBanner => '此目录为所有工作区共享';
+
+  @override
   String get workspaceDepSource => '安装源';
 
   @override
@@ -15747,6 +15759,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
 
   @override
+  String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
+
+  @override
+  String get workspaceSandboxFilesTitle => '沙箱系统目录';
+
+  @override
+  String get workspaceSandboxNoDeps => '未安装依赖';
+
+  @override
+  String get workspaceSandboxSharedBanner => '此目录为所有工作区共享';
+
+  @override
   String get workspaceDepSource => '安装源';
 
   @override
@@ -23683,6 +23707,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceSandboxBaseRequired => '請先安裝基礎相依元件';
+
+  @override
+  String get workspaceSandboxDirEntryTitle => '沙箱系統目錄';
+
+  @override
+  String get workspaceSandboxFilesTitle => '沙箱系統目錄';
+
+  @override
+  String get workspaceSandboxNoDeps => '未安裝相依元件';
+
+  @override
+  String get workspaceSandboxSharedBanner => '此目錄為所有工作區共享';
 
   @override
   String get workspaceDepSource => '安裝來源';

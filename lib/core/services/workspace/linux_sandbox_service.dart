@@ -281,6 +281,7 @@ class LinuxSandboxService {
       WorkspaceDependencyIds.python => 'python3',
       WorkspaceDependencyIds.nodejs => 'node',
       WorkspaceDependencyIds.git => 'git',
+      WorkspaceDependencyIds.office => 'soffice',
       WorkspaceDependencyIds.buildEssential => 'gcc',
       _ => null,
     };
@@ -467,10 +468,13 @@ class LinuxSandboxService {
   /// "dpkg was interrupted". Every apt invocation carries
   /// `Acquire::Lock::Timeout` so a transiently held dpkg lock (e.g. an
   /// install triggered through the LLM shell tool) waits instead of failing.
+  /// [installTimeoutSeconds] allows oversized packages (LibreOffice ~550MB)
+  /// to finish without the exec timeout killing dpkg mid-transaction.
   /// Exposed for tests.
   static List<PackageInstallStep> buildAptInstallSteps({
     required String packages,
     String mirrorSetup = '',
+    int installTimeoutSeconds = 1800,
   }) {
     const lockTimeout = '-o Acquire::Lock::Timeout=600';
     return [
@@ -493,7 +497,7 @@ class LinuxSandboxService {
       ),
       PackageInstallStep(
         stage: 'install',
-        timeoutSeconds: 1800,
+        timeoutSeconds: installTimeoutSeconds,
         command:
             'export DEBIAN_FRONTEND=noninteractive; '
             'apt-get $lockTimeout install -y --no-install-recommends $packages '
@@ -505,10 +509,12 @@ class LinuxSandboxService {
   /// Build the staged apk commands used by [installPackage] (iOS Alpine).
   ///
   /// `recover` clears a stale apk lock left by a killed install; apk has no
-  /// dpkg-equivalent interrupted state. Exposed for tests.
+  /// dpkg-equivalent interrupted state. [installTimeoutSeconds] mirrors
+  /// [buildAptInstallSteps] for oversized package sets. Exposed for tests.
   static List<PackageInstallStep> buildApkInstallSteps({
     required String packages,
     String mirrorSetup = '',
+    int installTimeoutSeconds = 1800,
   }) {
     return [
       PackageInstallStep(
@@ -523,7 +529,7 @@ class LinuxSandboxService {
       ),
       PackageInstallStep(
         stage: 'install',
-        timeoutSeconds: 1800,
+        timeoutSeconds: installTimeoutSeconds,
         command: 'apk add $packages',
       ),
     ];
@@ -576,6 +582,13 @@ class LinuxSandboxService {
         ios ? 'python3 py3-pip' : 'python3 python3-pip',
       WorkspaceDependencyIds.nodejs => 'nodejs npm',
       WorkspaceDependencyIds.git => 'git',
+      WorkspaceDependencyIds.office =>
+        ios
+            ? 'libreoffice pandoc poppler-utils py3-lxml py3-pillow '
+                  'py3-reportlab py3-openpyxl py3-pandas py3-defusedxml'
+            : 'libreoffice pandoc poppler-utils python3-lxml python3-pil '
+                  'python3-reportlab python3-openpyxl python3-pandas '
+                  'python3-defusedxml',
       WorkspaceDependencyIds.buildEssential =>
         ios ? 'build-base' : 'build-essential',
       _ => throw StateError('Unknown dependency: $depId'),
@@ -598,8 +611,20 @@ class LinuxSandboxService {
       }
     }
     final steps = ios
-        ? buildApkInstallSteps(packages: packages, mirrorSetup: mirrorSetup)
-        : buildAptInstallSteps(packages: packages, mirrorSetup: mirrorSetup);
+        ? buildApkInstallSteps(
+            packages: packages,
+            mirrorSetup: mirrorSetup,
+            installTimeoutSeconds: depId == WorkspaceDependencyIds.office
+                ? 2700
+                : 1800,
+          )
+        : buildAptInstallSteps(
+            packages: packages,
+            mirrorSetup: mirrorSetup,
+            installTimeoutSeconds: depId == WorkspaceDependencyIds.office
+                ? 2700
+                : 1800,
+          );
     for (final step in steps) {
       onProgress?.call(
         SandboxInstallProgress(stage: step.stage, progress: null),

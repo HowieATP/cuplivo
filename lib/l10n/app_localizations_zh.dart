@@ -7812,6 +7812,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepOfficeTitle => '文档办公工具';
+
+  @override
+  String get workspaceDepOfficeDesc =>
+      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+
+  @override
   String get workspaceDepBuildTitle => '编译工具链';
 
   @override
@@ -15701,6 +15708,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepOfficeTitle => '文档办公工具';
+
+  @override
+  String get workspaceDepOfficeDesc =>
+      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+
+  @override
   String get workspaceDepBuildTitle => '编译工具链';
 
   @override
@@ -23588,6 +23602,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceDepGitDesc => '版本控制工具';
+
+  @override
+  String get workspaceDepOfficeTitle => '文件辦公工具';
+
+  @override
+  String get workspaceDepOfficeDesc =>
+      'docx/pptx/xlsx 處理（LibreOffice、pandoc、Poppler）；約 550MB，安裝較慢';
 
   @override
   String get workspaceDepBuildTitle => '編譯工具鏈';

@@ -3686,6 +3686,8 @@
   "workspaceDepNodeDesc": "nodejs and npm",
   "workspaceDepGitTitle": "Git",
   "workspaceDepGitDesc": "Version control tools",
+  "workspaceDepOfficeTitle": "Document & Office Tools",
+  "workspaceDepOfficeDesc": "docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install",
   "workspaceDepBuildTitle": "Build tools",
   "workspaceDepBuildDesc": "gcc, make, and related packages",
   "workspaceToolReadTitle": "Read",

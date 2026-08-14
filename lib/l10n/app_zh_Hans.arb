@@ -3103,6 +3103,8 @@
   "workspaceDepNodeDesc": "nodejs 与 npm",
   "workspaceDepGitTitle": "Git",
   "workspaceDepGitDesc": "版本控制工具",
+  "workspaceDepOfficeTitle": "文档办公工具",
+  "workspaceDepOfficeDesc": "docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢",
   "workspaceDepBuildTitle": "编译工具链",
   "workspaceDepBuildDesc": "gcc、make 等编译相关包",
   "workspaceToolReadTitle": "读取",

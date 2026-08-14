@@ -8169,6 +8169,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepGitDesc => 'Version control tools';
 
   @override
+  String get workspaceDepOfficeTitle => 'Document & Office Tools';
+
+  @override
+  String get workspaceDepOfficeDesc =>
+      'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
+
+  @override
   String get workspaceDepBuildTitle => 'Build tools';
 
   @override

@@ -753,6 +753,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     WorkspaceDependencyIds.python => l10n.workspaceDepPythonTitle,
     WorkspaceDependencyIds.nodejs => l10n.workspaceDepNodeTitle,
     WorkspaceDependencyIds.git => l10n.workspaceDepGitTitle,
+    WorkspaceDependencyIds.office => l10n.workspaceDepOfficeTitle,
     WorkspaceDependencyIds.buildEssential => l10n.workspaceDepBuildTitle,
     _ => id,
   };
@@ -762,6 +763,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     WorkspaceDependencyIds.python => l10n.workspaceDepPythonDesc,
     WorkspaceDependencyIds.nodejs => l10n.workspaceDepNodeDesc,
     WorkspaceDependencyIds.git => l10n.workspaceDepGitDesc,
+    WorkspaceDependencyIds.office => l10n.workspaceDepOfficeDesc,
     WorkspaceDependencyIds.buildEssential => l10n.workspaceDepBuildDesc,
     _ => '',
   };

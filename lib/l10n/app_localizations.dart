@@ -14778,6 +14778,18 @@ abstract class AppLocalizations {
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
 
+  /// No description provided for @workspaceDepOfficeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document & Office Tools'**
+  String get workspaceDepOfficeTitle;
+
+  /// No description provided for @workspaceDepOfficeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  String get workspaceDepOfficeDesc;
+
   /// No description provided for @workspaceDepBuildTitle.
   ///
   /// In en, this message translates to:

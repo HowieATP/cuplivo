@@ -14766,6 +14766,30 @@ abstract class AppLocalizations {
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
 
+  /// No description provided for @workspaceSandboxDirEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox system'**
+  String get workspaceSandboxDirEntryTitle;
+
+  /// No description provided for @workspaceSandboxFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox files'**
+  String get workspaceSandboxFilesTitle;
+
+  /// No description provided for @workspaceSandboxNoDeps.
+  ///
+  /// In en, this message translates to:
+  /// **'No dependencies installed'**
+  String get workspaceSandboxNoDeps;
+
+  /// No description provided for @workspaceSandboxSharedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This directory is shared by all workspaces'**
+  String get workspaceSandboxSharedBanner;
+
   /// No description provided for @workspaceDepSource.
   ///
   /// In en, this message translates to:

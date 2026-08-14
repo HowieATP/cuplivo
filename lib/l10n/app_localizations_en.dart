@@ -8173,6 +8173,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Install the base dependency first';
 
   @override
+  String get workspaceSandboxDirEntryTitle => 'Sandbox system';
+
+  @override
+  String get workspaceSandboxFilesTitle => 'Sandbox files';
+
+  @override
+  String get workspaceSandboxNoDeps => 'No dependencies installed';
+
+  @override
+  String get workspaceSandboxSharedBanner =>
+      'This directory is shared by all workspaces';
+
+  @override
   String get workspaceDepSource => 'Install source';
 
   @override

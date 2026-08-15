@@ -56,6 +56,15 @@ class AssistantProvider extends ChangeNotifier {
 
   Future<void> ensureLoaded() async {
     if (_loaded) return;
+    final cs = chatService;
+    if (cs == null) return;
+    // Do not silently bail when the chat service is not initialized yet:
+    // callers (ensureDefaults → initChat) would then see an empty list and —
+    // because putAssistants replaces the whole table — could wipe real
+    // assistants with the defaults. Wait for init to finish instead.
+    if (!cs.initialized) {
+      await cs.init();
+    }
     final repo = _repo;
     if (repo == null) return;
     await _doLoad(repo);
@@ -333,6 +342,25 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> ensureDefaults(dynamic context) async {
     await ensureLoaded();
     if (_assistants.isNotEmpty) return;
+    final repo = _repo;
+    if (repo != null) {
+      final diskCount = await repo.getAssistantCount();
+      if (diskCount > 0) {
+        // Wipe guard: putAssistants replaces the whole table (delete-then-
+        // insert), so never seed defaults over a non-empty assistant table.
+        // If the in-memory load above raced or failed, re-read from disk and
+        // keep the real assistants instead of overwriting them.
+        await _doLoad(repo);
+        if (_assistants.isEmpty) {
+          debugPrint(
+            '[AssistantProvider.ensureDefaults] assistant table has '
+            '$diskCount rows but the reload came back empty; refusing to '
+            'overwrite with defaults',
+          );
+        }
+        return;
+      }
+    }
     final l10n = AppLocalizations.of(context)!;
     // 1) 默认助手
     _assistants.add(_defaultAssistant(l10n));

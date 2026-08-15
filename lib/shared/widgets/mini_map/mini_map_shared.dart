@@ -39,15 +39,16 @@ List<MiniMapQaPair> buildMiniMapPairs(List<ChatMessage> messages) {
 }
 
 /// Flattens message content to a single line for mini map display bubbles.
-/// Strips vendor inline reasoning/thought blocks, `[image:]` / `[file:]`
-/// markers, collapses newlines and repeated whitespace. Unlike
-/// [miniMapHitSnippet], stripped regions are removed entirely — this is the
-/// DISPLAY text, while search matches against the raw content.
+/// Strips vendor inline reasoning/thought blocks (`<think>`/`<thinking>`/
+/// `<thought>`/`<reasoning>`), `[image:]` / `[file:]` markers, collapses
+/// newlines and repeated whitespace. Unlike [miniMapHitSnippet], stripped
+/// regions are removed entirely — this is the DISPLAY text, while search
+/// matches against the raw content.
 String miniMapOneLine(String s) {
   var t = s
       .replaceAll(
         RegExp(
-          r'<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>',
+          r'<(?:think|thinking|thought)>[\s\S]*?<\/(?:think|thinking|thought)>',
           caseSensitive: false,
         ),
         '',
@@ -100,7 +101,8 @@ List<ChatMessage> filterMiniMapMessages(
 }
 
 final RegExp _vendorBlockRe = RegExp(
-  r'<(?:think|thought|reasoning)>[\s\S]*?<\/(?:think|thought|reasoning)>',
+  r'<(?:think|thinking|thought|reasoning)>[\s\S]*?'
+  r'<\/(?:think|thinking|thought|reasoning)>',
   caseSensitive: false,
 );
 
@@ -121,9 +123,10 @@ String _flattenMarker(Match m) {
 }
 
 /// Hit-centered snippet extracted from the RAW content with tag-flattening:
-/// `<think>/<thought>/<reasoning>` and `[image:]`/`[file:]` markers keep their
-/// inner text but lose their markup, so a hit inside a stripped region stays
-/// visible and explainable. Markdown syntax symbols are left untouched.
+/// `<think>/<thinking>/<thought>/<reasoning>` and `[image:]`/`[file:]`
+/// markers keep their inner text but lose their markup, so a hit inside a
+/// stripped region stays visible and explainable. Markdown syntax symbols are
+/// left untouched.
 String miniMapHitSnippet(
   String content,
   List<String> tokens, {
@@ -158,7 +161,7 @@ String miniMapHitSnippet(
   // A window cut mid-block leaves a stray open/close tag that never matched
   // _vendorBlockRe; scrub bare vendor tags so snippets never show raw markup.
   frag = frag.replaceAll(
-    RegExp(r'<\/?(?:think|thought|reasoning)>', caseSensitive: false),
+    RegExp(r'<\/?(?:think|thinking|thought|reasoning)>', caseSensitive: false),
     ' ',
   );
   // Likewise, a cut mid-marker leaves an unterminated `[image:`/`[file:`

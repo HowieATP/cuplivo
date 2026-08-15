@@ -4,8 +4,8 @@ import BackgroundTasks
 import UserNotifications
 import ActivityKit
 
-private let backgroundRefreshIdentifier = "psyche.cuplivo.background-generation.refresh"
-private let backgroundProcessingIdentifier = "psyche.cuplivo.background-generation.processing"
+private let backgroundRefreshIdentifier = "com.cup11.cuplivo.background-generation.refresh"
+private let backgroundProcessingIdentifier = "com.cup11.cuplivo.background-generation.processing"
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {

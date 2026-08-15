@@ -52,6 +52,15 @@ android {
             }
         }
     }
+
+    packaging {
+        jniLibs {
+            // Extract vendored proot binaries to nativeLibraryDir at install
+            // time (system-set exec bit + SELinux label), so the sandbox can
+            // spawn them directly instead of copying to filesDir and chmod.
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {

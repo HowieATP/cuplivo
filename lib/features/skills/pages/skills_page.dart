@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -27,7 +28,8 @@ class SkillsPage extends StatefulWidget {
   State<SkillsPage> createState() => _SkillsPageState();
 }
 
-class _SkillsPageState extends State<SkillsPage> {
+class _SkillsPageState extends State<SkillsPage>
+    with CollapsibleGroupsMixin<SkillsPage> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
 
@@ -693,19 +695,13 @@ class _SkillsPageState extends State<SkillsPage> {
   List<Widget> _buildSkillGroups({bool desktop = false}) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return [
-      for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
-          child: Text(
-            group ?? l10n.skillsUncategorizedGroup,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: AppFontWeights.semibold,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-        ),
+    final groups = groupSkillsByCategory(_skills);
+
+    // When there is only one group, skip the collapsible header and render
+    // skills flat — the grouping chrome adds no value with a single category.
+    if (groups.length == 1) {
+      final (_, skills) = groups.first;
+      return [
         for (final skill in skills)
           desktop
               ? _buildDesktopSkillCard(l10n, cs, skill)
@@ -745,6 +741,69 @@ class _SkillsPageState extends State<SkillsPage> {
                     ),
                   ),
                 ),
+      ];
+    }
+
+    return [
+      for (final (group, skills) in groups) ...[
+        CollapsibleGroupHeader(
+          groupName: group ?? l10n.skillsUncategorizedGroup,
+          skillCount: skills.length,
+          expanded: isGroupExpanded(group),
+          onTap: () => toggleGroup(group),
+        ),
+        CollapsibleGroupBody(
+          expanded: isGroupExpanded(group),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final skill in skills)
+                desktop
+                    ? _buildDesktopSkillCard(l10n, cs, skill)
+                    : Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(Lucide.BookOpen, color: cs.primary),
+                          title: Text(
+                            skill.name,
+                            style: TextStyle(
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                          subtitle: skill.description.isNotEmpty
+                              ? Text(
+                                  skill.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 120,
+                                ),
+                                child: _CategoryTag(
+                                  category: skill.category,
+                                  label:
+                                      skill.category ??
+                                      l10n.skillsUncategorizedGroup,
+                                  onTap: () => _editCategory(skill),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Lucide.Trash2),
+                                color: cs.error,
+                                onPressed: () => _deleteSkill(skill.name),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+            ],
+          ),
+        ),
       ],
     ];
   }

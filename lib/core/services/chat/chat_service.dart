@@ -56,7 +56,24 @@ class ChatService extends ChangeNotifier {
     return id != null && _temporaryConversationIds.contains(id);
   }
 
-  Future<void> init() async {
+  /// Single-flight guard for [init].
+  ///
+  /// At startup several subsystems race to call [init] concurrently (e.g. the
+  /// side drawer preloads group chats while HomePageController boots the chat
+  /// service). Without this lock two Drift connections would open and migrate
+  /// the same SQLite file at once, corrupting reads (empty assistant/group
+  /// lists) and risking a wipe — see PR #403 regression where the side drawer
+  /// started forcing `GroupChatProvider.load()` → `init()` on the first frame.
+  Future<void>? _initFuture;
+
+  Future<void> init() {
+    if (_initialized) return Future.value();
+    return _initFuture ??= _doInit().whenComplete(() {
+      _initFuture = null;
+    });
+  }
+
+  Future<void> _doInit() async {
     if (_initialized) return;
 
     final appDataDir = await AppDirectories.getAppDataDirectory();
@@ -1275,7 +1292,7 @@ class ChatService extends ChangeNotifier {
     String? reasoningText,
     DateTime? reasoningStartAt,
     DateTime? reasoningFinishedAt,
-    String? translation,
+    Object? translation = ChatMessage.sentinel,
     String? reasoningSegmentsJson,
     int? promptTokens,
     int? completionTokens,
@@ -1357,7 +1374,7 @@ class ChatService extends ChangeNotifier {
     String? reasoningText,
     DateTime? reasoningStartAt,
     DateTime? reasoningFinishedAt,
-    String? translation,
+    Object? translation = ChatMessage.sentinel,
     String? reasoningSegmentsJson,
     int? promptTokens,
     int? completionTokens,

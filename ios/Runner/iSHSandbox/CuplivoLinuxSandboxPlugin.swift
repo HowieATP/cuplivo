@@ -17,6 +17,13 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
   private let queue = DispatchQueue(label: "com.cuplivo.linux_sandbox", qos: .userInitiated)
   private var channel: FlutterMethodChannel?
   private var mountedWorkspaceHostPath: String?
+  private let requestLock = NSLock()
+  private var pendingRequestIds = Set<String>()
+  private var cancelledRequestIds = Set<String>()
+
+  deinit {
+    cancelAllRequests()
+  }
 
   @discardableResult
   static func register(messenger: FlutterBinaryMessenger) -> CuplivoLinuxSandboxPlugin {
@@ -43,6 +50,8 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
       installBase(call: call, result: result)
     case "exec":
       exec(call: call, result: result)
+    case "cancel":
+      cancel(call: call, result: result)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -68,13 +77,51 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
           details: nil))
       return
     }
-    queue.async {
+    let rawRequestId = (args["requestId"] as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let requestId = rawRequestId.flatMap { $0.isEmpty ? nil : $0 }
+      ?? "ios_install_\(UUID().uuidString)"
+    if !registerRequest(requestId) {
+      result(
+        FlutterError(
+          code: "duplicate_request",
+          message: "requestId is already active: \(requestId)",
+          details: nil))
+      return
+    }
+    queue.async { [weak self] in
+      guard let self else { return }
+      defer { self.finishRequest(requestId) }
+      // FlutterResult must be called on the platform (main) thread; this
+      // queue is a background serial queue, so marshal the completion.
+      let complete: (Any?) -> Void = { value in
+        DispatchQueue.main.async { result(value) }
+      }
+      if self.consumeCancellation(requestId) {
+        complete(
+          FlutterError(
+            code: "cancelled", message: "rootfs installation cancelled", details: nil))
+        return
+      }
       do {
-        try CuplivoSandboxRootfsInstaller.install(to: URL(fileURLWithPath: rootfsPath))
-        result(nil)
+        try CuplivoSandboxRootfsInstaller.install(
+          to: URL(fileURLWithPath: rootfsPath),
+          isCancelled: { self.isCancelled(requestId) }
+        )
+        if self.isCancelled(requestId) {
+          complete(
+            FlutterError(
+              code: "cancelled", message: "rootfs installation cancelled", details: nil))
+        } else {
+          complete(nil)
+        }
+      } catch SandboxRootfsInstallerError.cancelled {
+        complete(
+          FlutterError(
+            code: "cancelled", message: "rootfs installation cancelled", details: nil))
       } catch {
         NSLog("CuplivoLinuxSandboxPlugin: installBase failed: \(error)")
-        result(
+        complete(
           FlutterError(
             code: "extract_failed", message: error.localizedDescription, details: nil))
       }
@@ -82,6 +129,19 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
   }
 
   // MARK: - exec
+
+  private func cancel(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any] ?? [:]
+    guard let requestId = (args["requestId"] as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines), !requestId.isEmpty
+    else {
+      result(FlutterError(code: "bad_args", message: "requestId required", details: nil))
+      return
+    }
+    let pluginCancelled = markCancelled(requestId)
+    let executorCancelled = CuplivoISHExecutor.cancelRequest(requestId)
+    result(pluginCancelled || executorCancelled)
+  }
 
   private func exec(call: FlutterMethodCall, result: @escaping FlutterResult) {
     let args = call.arguments as? [String: Any] ?? [:]
@@ -101,14 +161,52 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
       return
     }
     let cwd = args["cwd"] as? String
-    let timeoutMs = (args["timeoutMs"] as? NSNumber)?.doubleValue ?? 30_000
+    let rawRequestId = (args["requestId"] as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let requestId = rawRequestId.flatMap { $0.isEmpty ? nil : $0 }
+      ?? "ios_shell_\(UUID().uuidString)"
+    let rawTimeout = (args["timeoutMs"] as? NSNumber)?.doubleValue ?? 30_000
+    // Guard the channel boundary: NaN/Infinity would trap later at the
+    // Int(timeoutMs / 1000.0) conversion.
+    let timeoutMs = rawTimeout.isFinite ? min(max(rawTimeout, 1), 3_600_000) : 30_000
+
+    if !registerRequest(requestId) {
+      result(
+        FlutterError(
+          code: "duplicate_request",
+          message: "requestId is already active: \(requestId)",
+          details: nil))
+      return
+    }
 
     queue.async { [weak self] in
       guard let self else { return }
+      defer { self.finishRequest(requestId) }
+
+      // FlutterResult must be called on the platform (main) thread; this
+      // queue and the executor callback are background threads, so marshal
+      // every completion through the main queue.
+      let completionLock = NSLock()
+      var completed = false
+      let complete: (Any?) -> Void = { value in
+        completionLock.lock()
+        guard !completed else {
+          completionLock.unlock()
+          return
+        }
+        completed = true
+        completionLock.unlock()
+        DispatchQueue.main.async { result(value) }
+      }
+
+      if self.consumeCancellation(requestId) {
+        complete(self.cancelledResult())
+        return
+      }
 
       let metaDb = URL(fileURLWithPath: rootfsPath).appendingPathComponent("meta.db")
       guard FileManager.default.fileExists(atPath: metaDb.path) else {
-        result(
+        complete(
           FlutterError(
             code: "rootfs_missing",
             message: "rootfs not installed at \(rootfsPath)",
@@ -120,7 +218,7 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
       if !kernel.isBooted {
         let err = kernel.boot(withRootPath: rootfsPath)
         if err < 0 {
-          result(
+          complete(
             FlutterError(
               code: "boot_failed",
               message: "iSH kernel boot failed: \(err)",
@@ -128,7 +226,7 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
           return
         }
       } else if kernel.bootRootPath != rootfsPath {
-        result(
+        complete(
           FlutterError(
             code: "boot_path_mismatch",
             message: "kernel already booted with a different rootfs; restart the app",
@@ -141,7 +239,7 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
       if self.mountedWorkspaceHostPath != workspacePath {
         let mountErr = kernel.bindMountPath("/workspace", toHostPath: workspacePath)
         if mountErr < 0 {
-          result(
+          complete(
             FlutterError(
               code: "mount_failed",
               message: "failed to mount workspace into guest: \(mountErr)",
@@ -149,6 +247,11 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
           return
         }
         self.mountedWorkspaceHostPath = workspacePath
+      }
+
+      if self.isCancelled(requestId) {
+        complete(self.cancelledResult())
+        return
       }
 
       // Guest cwd mapping mirrors Android's GuestCommandRunner.
@@ -164,13 +267,109 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
         guestCwd = "/workspace/\(rel)"
       }
 
+      let executionFinished = DispatchSemaphore(value: 0)
       CuplivoISHExecutor.executeCommand(
         command,
+        requestId: requestId,
         cwd: guestCwd,
         timeout: timeoutMs / 1000.0
       ) { execResult in
-        result(execResult)
+        complete(execResult)
+        executionFinished.signal()
+      }
+      // A cancel can race the hand-off to the native executor. At this point
+      // the executor has registered the queued request, so repeat the cancel
+      // to close that race without running the command unchecked.
+      if self.isCancelled(requestId) {
+        CuplivoISHExecutor.cancelRequest(requestId)
+      }
+      // Keep workspace bind-mount changes and guest execution serialized as
+      // one operation. The executor is also serialized, but returning here
+      // would allow the next workspace to be mounted before this command
+      // starts using /workspace.
+      //
+      // Bound the wait: the executor normally completes within timeout plus a
+      // short grace. If the completion never fires (e.g. an Objective-C
+      // exception inside the executor), an unbounded wait would block this
+      // serial queue forever and freeze every subsequent exec and installBase.
+      let waitSeconds = Int(timeoutMs / 1000.0) + 90
+      let waitResult = executionFinished.wait(timeout: .now() + .seconds(waitSeconds))
+      if waitResult == .timedOut {
+        NSLog(
+          "CuplivoLinuxSandboxPlugin: exec completion timeout for \(requestId); cancelling"
+        )
+        CuplivoISHExecutor.cancelRequest(requestId)
+        complete(self.timeoutResult())
       }
     }
+  }
+
+  private func registerRequest(_ requestId: String) -> Bool {
+    requestLock.lock()
+    defer { requestLock.unlock() }
+    // Reject duplicates: two concurrent operations sharing one id would
+    // collapse into a single registry entry, making one of them
+    // uncancellable and letting a finishRequest target the wrong operation.
+    guard !pendingRequestIds.contains(requestId) else { return false }
+    pendingRequestIds.insert(requestId)
+    return true
+  }
+
+  private func markCancelled(_ requestId: String) -> Bool {
+    requestLock.lock()
+    defer { requestLock.unlock() }
+    guard pendingRequestIds.contains(requestId) else { return false }
+    cancelledRequestIds.insert(requestId)
+    return true
+  }
+
+  private func isCancelled(_ requestId: String) -> Bool {
+    requestLock.lock()
+    defer { requestLock.unlock() }
+    return cancelledRequestIds.contains(requestId)
+  }
+
+  private func consumeCancellation(_ requestId: String) -> Bool {
+    requestLock.lock()
+    defer { requestLock.unlock() }
+    return cancelledRequestIds.remove(requestId) != nil
+  }
+
+  private func finishRequest(_ requestId: String) {
+    requestLock.lock()
+    pendingRequestIds.remove(requestId)
+    cancelledRequestIds.remove(requestId)
+    requestLock.unlock()
+  }
+
+  private func cancelAllRequests() {
+    requestLock.lock()
+    cancelledRequestIds.formUnion(pendingRequestIds)
+    requestLock.unlock()
+    CuplivoISHExecutor.cancelAll()
+  }
+
+  private func cancelledResult() -> [String: Any] {
+    return [
+      "exitCode": -1,
+      "stdout": "",
+      "stderr": "",
+      "timedOut": false,
+      "cancelled": true,
+      "stdoutTruncated": false,
+      "stderrTruncated": false,
+    ]
+  }
+
+  private func timeoutResult() -> [String: Any] {
+    return [
+      "exitCode": -1,
+      "stdout": "",
+      "stderr": "native executor did not finish in time",
+      "timedOut": true,
+      "cancelled": false,
+      "stdoutTruncated": false,
+      "stderrTruncated": false,
+    ]
   }
 }

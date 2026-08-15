@@ -181,6 +181,7 @@
 - **Count fallback (数量回退)**: Vendors that ignore/reject `n` are handled by re-requesting with `n=1` until the requested count is reached. Under-delivery is NOT silent: a localized notice is appended to the output when fewer images arrive than requested (no-silent-degradation rule). Errors mid-loop propagate as exceptions.
 - **Panel-state lifecycle**: The send queue carries the options (`ChatInputData.extraBody` snapshot/restore); multi-AI threads receive the same body wherever `allowImagesApiRouting` already flows; the cold-start input draft does NOT persist panel state — after a restart the panel resets to inherited defaults (the per-message metadata remains the durable record).
 - **UI shell**: Dual-shell, same content — centered Dialog on desktop, bottom sheet on mobile (same pattern as `ImageCompressionDialog` / `UpdateChangelogDialog`).
+- **Responses API native image generation (Responses 原生图像生成)**: Distinct from the Images API routing above. When the provider uses the Responses API (`useResponseApi == true`), the model can emit image output natively as output items of type `image_generation_call` (OpenAI) or `openrouter:image_generation` (OpenRouter), whose `result` carries base64 image data — possibly a full `data:` URL — rendered as saved local images. No `/images/generations` or `/images/edits` call is involved. Non-streaming responses must still scan the `output` array for image items even when `output_text` is present; the text short-circuit would otherwise drop the image.
 
 ## Skill System
 

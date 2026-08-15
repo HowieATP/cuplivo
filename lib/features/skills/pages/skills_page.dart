@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -27,13 +28,10 @@ class SkillsPage extends StatefulWidget {
   State<SkillsPage> createState() => _SkillsPageState();
 }
 
-class _SkillsPageState extends State<SkillsPage> {
+class _SkillsPageState extends State<SkillsPage>
+    with CollapsibleGroupsMixin<SkillsPage> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
-
-  /// Tracks which category groups are currently expanded.
-  /// All groups start expanded by default.
-  final Set<String> _collapsedGroups = {};
 
   @override
   void initState() {
@@ -565,23 +563,6 @@ class _SkillsPageState extends State<SkillsPage> {
     await _refresh();
   }
 
-  /// A stable key for a group, used to track collapsed state.
-  String _groupKey(String? group) => group ?? '__uncategorized__';
-
-  void _toggleGroup(String? group) {
-    setState(() {
-      final key = _groupKey(group);
-      if (_collapsedGroups.contains(key)) {
-        _collapsedGroups.remove(key);
-      } else {
-        _collapsedGroups.add(key);
-      }
-    });
-  }
-
-  bool _isGroupExpanded(String? group) =>
-      !_collapsedGroups.contains(_groupKey(group));
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -765,52 +746,64 @@ class _SkillsPageState extends State<SkillsPage> {
 
     return [
       for (final (group, skills) in groups) ...[
-        _CollapsibleGroupHeader(
+        CollapsibleGroupHeader(
           groupName: group ?? l10n.skillsUncategorizedGroup,
           skillCount: skills.length,
-          expanded: _isGroupExpanded(group),
-          onTap: () => _toggleGroup(group),
+          expanded: isGroupExpanded(group),
+          onTap: () => toggleGroup(group),
         ),
-        if (_isGroupExpanded(group))
-          for (final skill in skills)
-            desktop
-                ? _buildDesktopSkillCard(l10n, cs, skill)
-                : Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Icon(Lucide.BookOpen, color: cs.primary),
-                      title: Text(
-                        skill.name,
-                        style: TextStyle(fontWeight: AppFontWeights.semibold),
-                      ),
-                      subtitle: skill.description.isNotEmpty
-                          ? Text(
-                              skill.description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
-                          : null,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 120),
-                            child: _CategoryTag(
-                              category: skill.category,
-                              label: skill.category ??
-                                  l10n.skillsUncategorizedGroup,
-                              onTap: () => _editCategory(skill),
+        CollapsibleGroupBody(
+          expanded: isGroupExpanded(group),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final skill in skills)
+                desktop
+                    ? _buildDesktopSkillCard(l10n, cs, skill)
+                    : Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(Lucide.BookOpen, color: cs.primary),
+                          title: Text(
+                            skill.name,
+                            style: TextStyle(
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Lucide.Trash2),
-                            color: cs.error,
-                            onPressed: () => _deleteSkill(skill.name),
+                          subtitle: skill.description.isNotEmpty
+                              ? Text(
+                                  skill.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 120,
+                                ),
+                                child: _CategoryTag(
+                                  category: skill.category,
+                                  label:
+                                      skill.category ??
+                                      l10n.skillsUncategorizedGroup,
+                                  onTap: () => _editCategory(skill),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Lucide.Trash2),
+                                color: cs.error,
+                                onPressed: () => _deleteSkill(skill.name),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+            ],
+          ),
+        ),
       ],
     ];
   }
@@ -980,63 +973,6 @@ class _SkillsPageState extends State<SkillsPage> {
       return;
     }
     await _refresh();
-  }
-}
-
-/// Collapsible group header with tap-to-expand/collapse and animated chevron.
-class _CollapsibleGroupHeader extends StatelessWidget {
-  const _CollapsibleGroupHeader({
-    required this.groupName,
-    required this.skillCount,
-    required this.expanded,
-    required this.onTap,
-  });
-
-  final String groupName;
-  final int skillCount;
-  final bool expanded;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
-        child: Row(
-          children: [
-            AnimatedRotation(
-              turns: expanded ? 0.25 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                Lucide.ChevronRight,
-                size: 14,
-                color: cs.onSurface.withValues(alpha: 0.55),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              groupName,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface.withValues(alpha: 0.55),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '($skillCount)',
-              style: TextStyle(
-                fontSize: 11,
-                color: cs.onSurface.withValues(alpha: 0.38),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

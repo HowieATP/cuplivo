@@ -7,6 +7,7 @@ void main() {
     test('blank and null map to /workspace', () {
       expect(normalizeGuestCwd(null), '/workspace');
       expect(normalizeGuestCwd(''), '/workspace');
+      expect(normalizeGuestCwd('   '), '/workspace');
     });
 
     test('accepts the exact /workspace root', () {
@@ -31,6 +32,22 @@ void main() {
     test('rejects lookalike prefixes that are not /workspace subpaths', () {
       expect(normalizeGuestCwd('/workspaceX'), isNull);
       expect(normalizeGuestCwd('/workspaceX/src'), isNull);
+    });
+
+    test('rejects traversal that escapes /workspace', () {
+      final dotdot = '..';
+      expect(normalizeGuestCwd('/workspace/${dotdot}/etc'), isNull);
+      expect(normalizeGuestCwd('/workspace/${dotdot}/${dotdot}/root'), isNull);
+      expect(normalizeGuestCwd('${dotdot}/${dotdot}/root'), isNull);
+      expect(normalizeGuestCwd('/workspace/a/${dotdot}/${dotdot}/root'), isNull);
+      expect(normalizeGuestCwd(dotdot), isNull);
+      expect(normalizeGuestCwd('${dotdot}/a'), isNull);
+    });
+
+    test('rejects NUL bytes', () {
+      final nul = String.fromCharCode(0);
+      expect(normalizeGuestCwd('/workspace/a${nul}b'), isNull);
+      expect(normalizeGuestCwd('a$nul'), isNull);
     });
   });
 }

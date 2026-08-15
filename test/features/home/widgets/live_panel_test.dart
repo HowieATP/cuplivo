@@ -55,7 +55,15 @@ void main() {
               value: inputStatus,
             ),
           ],
-          child: Scaffold(body: LivePanel(onOpenChild: onOpenChild)),
+          // LivePanel sits above the input bar in the real app (bottom of
+          // screen) — pin it to the bottom so the info popover, which opens
+          // upward, has room to render in tests.
+          child: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: LivePanel(onOpenChild: onOpenChild),
+            ),
+          ),
         ),
       ),
     );
@@ -264,21 +272,102 @@ void main() {
       expect(find.textContaining('report.zip'), findsNothing);
     });
 
-    testWidgets('renders and dismisses the image-mode info pill', (
-      tester,
-    ) async {
-      inputStatus.updateImageModeKey('parent-conv::p::m');
+    testWidgets(
+      'image-mode pill expands inline options, dismisses to the chat-API '
+      'pill, restore auto-expands',
+      (tester) async {
+        inputStatus.updateImageModeKey('p::m');
+
+        await pumpPanel(tester);
+
+        expect(find.byIcon(Lucide.Brush), findsOneWidget);
+        expect(find.textContaining('Images API'), findsOneWidget);
+        expect(find.byIcon(Icons.close), findsOneWidget);
+
+        // Tap the pill → the inline options card expands (subagent-style),
+        // showing the shared generation-options body.
+        await tester.tap(find.byIcon(Lucide.Brush));
+        await tester.pump();
+        expect(find.text('Image Generation Options'), findsOneWidget);
+        expect(find.text('Quality'), findsOneWidget);
+
+        // Dismiss → the chat-API pill replaces it (no ✕ on the chat pill).
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.pump();
+        expect(find.byIcon(Lucide.Brush), findsNothing);
+        expect(find.byIcon(Lucide.MessageSquare), findsOneWidget);
+        expect(find.text('Chat API'), findsOneWidget);
+        expect(find.byIcon(Icons.close), findsNothing);
+
+        // One tap restores image mode AND auto-expands the options card.
+        await tester.tap(find.byIcon(Lucide.MessageSquare));
+        await tester.pump();
+        expect(find.byIcon(Lucide.Brush), findsOneWidget);
+        expect(find.text('Image Generation Options'), findsOneWidget);
+      },
+    );
+
+    testWidgets('info icon opens the image-mode info popover and outside tap '
+        'closes it', (tester) async {
+      inputStatus.updateImageModeKey('p::m');
 
       await pumpPanel(tester);
 
-      expect(find.byIcon(Icons.close), findsOneWidget);
-      expect(find.byIcon(Lucide.Brush), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.close));
-      await tester.pump();
+      expect(find.text('What is image mode?'), findsOneWidget);
+      expect(find.textContaining('Images API'), findsNWidgets(2));
 
-      expect(find.byIcon(Icons.close), findsNothing);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What is image mode?'), findsNothing);
     });
+
+    testWidgets(
+      'popover content stays reachable when the pill sits near the top of a '
+      'short screen',
+      (tester) async {
+        inputStatus.updateImageModeKey('p::m');
+        // Tiny viewport + 2x text scale push the pill close to the screen
+        // top: the popover's headroom (anchorRect.top) shrinks below its
+        // content height, which used to clip the panel unreachably.
+        tester.view.physicalSize = const Size(400, 240);
+        tester.view.devicePixelRatio = 1.0;
+        tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+          tester.platformDispatcher.clearTextScaleFactorTestValue();
+        });
+
+        await pumpPanel(tester);
+        await tester.tap(find.byIcon(Icons.info_outline));
+        await tester.pumpAndSettle();
+
+        // The panel must be capped to the headroom: its top edge (and the
+        // title) never overflow above the screen.
+        final title = find.text('What is image mode?');
+        expect(tester.getTopLeft(title).dy, greaterThanOrEqualTo(0));
+
+        // The body is taller than the headroom, but the panel scrolls, so
+        // it stays reachable.
+        final body = find.textContaining('completions');
+        final bodyScroll = find.ancestor(
+          of: body,
+          matching: find.byType(SingleChildScrollView),
+        );
+        expect(bodyScroll, findsOneWidget);
+        await tester.drag(bodyScroll, const Offset(0, -300));
+        await tester.pumpAndSettle();
+
+        // Content scrolled: the title left the viewport and the body moved
+        // into it.
+        expect(tester.getTopLeft(title).dy, lessThan(0));
+        expect(tester.getRect(body).bottom, greaterThan(0));
+      },
+    );
 
     testWidgets('renders and dismisses the image-warning pill', (tester) async {
       inputStatus.updateImageWarningKey('parent-conv::p::m');

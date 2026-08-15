@@ -3313,10 +3313,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarVoiceTranscribing => 'Recognizing…';
 
   @override
-  String get chatInputBarImageMode => 'Image mode';
+  String get chatInputBarImageMode => 'Image mode · Images API';
 
   @override
   String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
+
+  @override
+  String get chatInputBarChatMode => 'Chat API';
+
+  @override
+  String get chatInputBarImageModeInfoTitle => 'What is image mode?';
+
+  @override
+  String get chatInputBarImageModeInfoBody =>
+      'With image mode on, your send goes to the OpenAI Images API (/images/generations or /images/edits) and generates image files directly. If your relay or provider does not support this API, turn image mode off to use the chat API (completions) instead — the model returns images as Markdown in its reply. Generation options are only available in image mode.';
+
+  @override
+  String get chatInputBarImageModeInfoTooltip =>
+      'Learn about the two sending interfaces';
+
+  @override
+  String get chatInputBarImageModeInfoDismissTooltip => 'Close';
 
   @override
   String get chatInputBarImageWarning => 'Images will be ignored';
@@ -8032,11 +8049,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageGenLossless => '(lossless)';
-
-  @override
-  String imageGenPaletteTooltip(Object summary) {
-    return 'Generation params: $summary';
-  }
 
   @override
   String imageGenPartialNotice(Object received, Object requested) {

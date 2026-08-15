@@ -6042,7 +6042,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatInputBarImageMode.
   ///
   /// In en, this message translates to:
-  /// **'Image mode'**
+  /// **'Image mode · Images API'**
   String get chatInputBarImageMode;
 
   /// No description provided for @chatInputBarDisableImageModeTooltip.
@@ -6050,6 +6050,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Turn off image mode'**
   String get chatInputBarDisableImageModeTooltip;
+
+  /// No description provided for @chatInputBarChatMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat API'**
+  String get chatInputBarChatMode;
+
+  /// No description provided for @chatInputBarImageModeInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is image mode?'**
+  String get chatInputBarImageModeInfoTitle;
+
+  /// No description provided for @chatInputBarImageModeInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'With image mode on, your send goes to the OpenAI Images API (/images/generations or /images/edits) and generates image files directly. If your relay or provider does not support this API, turn image mode off to use the chat API (completions) instead — the model returns images as Markdown in its reply. Generation options are only available in image mode.'**
+  String get chatInputBarImageModeInfoBody;
+
+  /// No description provided for @chatInputBarImageModeInfoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn about the two sending interfaces'**
+  String get chatInputBarImageModeInfoTooltip;
+
+  /// No description provided for @chatInputBarImageModeInfoDismissTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get chatInputBarImageModeInfoDismissTooltip;
 
   /// No description provided for @chatInputBarImageWarning.
   ///
@@ -14513,12 +14543,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'(lossless)'**
   String get imageGenLossless;
-
-  /// No description provided for @imageGenPaletteTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation params: {summary}'**
-  String imageGenPaletteTooltip(Object summary);
 
   /// No description provided for @imageGenPartialNotice.
   ///

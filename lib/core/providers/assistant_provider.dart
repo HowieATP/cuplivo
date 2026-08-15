@@ -56,6 +56,15 @@ class AssistantProvider extends ChangeNotifier {
 
   Future<void> ensureLoaded() async {
     if (_loaded) return;
+    final cs = chatService;
+    if (cs == null) return;
+    // Do not silently bail when the chat service is not initialized yet:
+    // callers (ensureDefaults → initChat) would then see an empty list and —
+    // because putAssistants replaces the whole table — could wipe real
+    // assistants with the defaults. Wait for init to finish instead.
+    if (!cs.initialized) {
+      await cs.init();
+    }
     final repo = _repo;
     if (repo == null) return;
     await _doLoad(repo);

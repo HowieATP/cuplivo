@@ -93,6 +93,12 @@ void main() {
       final conversation = await service.createDraftConversation(
         title: 'race test',
       );
+      // Drafts only enter history once the first message is persisted.
+      await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'hello',
+      );
       expect(service.getAllConversations().map((c) => c.id), [
         conversation.id,
       ]);

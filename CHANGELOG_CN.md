@@ -1,5 +1,34 @@
 # 更新日志
 
+## [3.0.1] - 2026-08-15
+
+> ℹ️ v3.0.1 是 v3 的第一个稳定版本，v3 主要引入了沙箱、语音识别功能，优化了多工作区，退役了内置 fetch、filesystem、subagent MCP 服务器，可能有破坏性变更，详情请见 [https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0](https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0)
+
+### 新增
+
+- **安卓交互式终端**: 在安卓上可以打开一个类似 Termux 的终端，与 Shell 工具独立，暂无保活，无跨重启持久化 (#428 by @Pheobe-Southwood)
+- 绘图模式重构: 将绘图面板移动至可折叠实时面板，并可快捷从聊天模式切换至绘图模式，添加使用说明 (#438 by @cup113)
+- AI 日志分析: 日志界面中可以让 AI 分析已脱敏日志 (#390 by @banana4432)
+- 工具 API: 兼容 OpenRouter 图片生成工具 (#346 by @cup113, @Chevey339)
+- Skills: 按分组折叠 (#426 by @xuanxuan9929, @cup113)
+- 渲染: 兼容了 `<thinking></thinking>` 推理标签 (#354 by @cup113, @Chevey339)
+
+### 变更
+
+- 多助手群聊融入助手列表，避免入口臃肿 (#403 by @banana4432)
+- 关闭了 so 压缩，优化冷启动时间和安装后存储 (#353 by @Pheobe-Southwood)
+- 更新了推理内容回传机制 (#351 by @cup113, @Chevey339)
+- 沙箱命令注入 GOMAXPROCS/GODEBUG 降低 Go 负载在模拟器下的开销 (#376 by @xuanxuan9929)
+
+### 修复
+
+- 修复了 **iOS** 命名错误导致**保活**未启动的问题 (#382 by @HowieATP)
+- 修复了 **shell** 工具调用导致的**闪退/卡死** (#431 by @Pheobe-Southwood, #383 by @HowieATP)
+- 修复了安卓沙箱安装依赖的竞态，避免文件系统损坏 (#408 by @Pheobe-Southwood)
+- 修复了前台到时 Ta 的来信未触发的问题 (#424 by @Pheobe-Southwood)
+- 修复了沙箱依赖不可见的问题 (#427 by @Pheobe-Southwood)
+- 修复了 DeepSeek Responses API 推理和缓存命中异常的问题 (#368 by @cup113, @Chevey339)
+
 ## [3.0.0] - 2026-08-13
 
 > ⚠️ 大版本更新，功能可能不稳定。内置 MCP 变更为本地工具为破坏性变更，历史任务上下文可能被污染，新开对话不受影响。

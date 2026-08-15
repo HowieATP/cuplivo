@@ -20,6 +20,7 @@ import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/clipboard_images.dart';
+import '../../core/services/haptics.dart';
 import '../../features/chat/pages/image_viewer_page.dart';
 import 'snackbar.dart';
 import 'ios_tactile.dart';
@@ -2756,6 +2757,108 @@ String markdownTableRowsToMarkdownForTesting(List<List<String>> rows) =>
 @visibleForTesting
 TargetPlatform? markdownTableTargetPlatformOverride;
 
+@visibleForTesting
+TargetPlatform? markdownMathTargetPlatformOverride;
+
+bool _markdownMathTargetPlatformIsDesktop() {
+  final override = markdownMathTargetPlatformOverride;
+  if (override != null) {
+    return override == TargetPlatform.macOS ||
+        override == TargetPlatform.windows ||
+        override == TargetPlatform.linux;
+  }
+  return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+}
+
+/// Captures the PNG bytes of the [RepaintBoundary] identified by [boundaryKey].
+///
+/// Shared by the markdown table block and the math formula block. Reads back
+/// 8-bit straight-alpha RGBA and re-encodes with `image` instead of using
+/// `ImageByteFormat.png` directly: on wide-gamut backends (iOS Impeller) the
+/// latter embeds 10/16-bit bytes that downstream consumers misinterpret as sRGB.
+Future<Uint8List?> _captureRepaintBoundaryPng(GlobalKey boundaryKey) async {
+  await WidgetsBinding.instance.endOfFrame;
+  final boundary =
+      boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+  if (boundary == null) return null;
+  final image = await boundary.toImage(pixelRatio: 3.0);
+  final data = await image.toByteData(
+    format: ui.ImageByteFormat.rawStraightRgba,
+  );
+  if (data == null) return null;
+  return image_lib.encodePng(
+    image_lib.Image.fromBytes(
+      width: image.width,
+      height: image.height,
+      bytes: data.buffer,
+      numChannels: 4,
+    ),
+  );
+}
+
+Future<File> _writePngTempFile(Uint8List bytes, String stem) async {
+  final dir = Directory.systemTemp;
+  final file = File(
+    p.join(dir.path, '$stem-${DateTime.now().millisecondsSinceEpoch}.png'),
+  );
+  await file.writeAsBytes(bytes, flush: true);
+  return file;
+}
+
+Future<String?> _savePngFile({
+  required String dialogTitle,
+  required String filename,
+  required Uint8List bytes,
+}) async {
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    final savePath = await FilePicker.platform.saveFile(
+      dialogTitle: dialogTitle,
+      fileName: filename,
+      type: FileType.custom,
+      allowedExtensions: const ['png'],
+    );
+    if (savePath == null) return null;
+    await File(savePath).parent.create(recursive: true);
+    await File(savePath).writeAsBytes(bytes, flush: true);
+    return savePath;
+  }
+
+  return FilePicker.platform.saveFile(
+    dialogTitle: dialogTitle,
+    fileName: filename,
+    type: FileType.custom,
+    allowedExtensions: const ['png'],
+    bytes: bytes,
+  );
+}
+
+Future<bool> _copyPngToClipboard(Uint8List bytes, String suggestedName) async {
+  try {
+    final clipboard = SystemClipboard.instance;
+    if (clipboard != null) {
+      final item = DataWriterItem(suggestedName: suggestedName);
+      item.add(Formats.png(bytes));
+      await clipboard.write([item]);
+      return true;
+    }
+  } catch (e) {
+    debugPrint('PNG clipboard write via super_clipboard failed: $e');
+  }
+
+  try {
+    final file = await _writePngTempFile(
+      bytes,
+      suggestedName.endsWith('.png')
+          ? suggestedName.substring(0, suggestedName.length - 4)
+          : suggestedName,
+    );
+    return await ClipboardImages.setImagePath(file.path);
+  } catch (e) {
+    debugPrint('PNG clipboard write via ClipboardImages fallback failed: $e');
+    return false;
+  }
+}
+
 class _MarkdownTableBlock extends StatelessWidget {
   _MarkdownTableBlock({
     required this.rows,
@@ -3204,88 +3307,18 @@ class _MarkdownTableBlock extends StatelessWidget {
     }
   }
 
-  Future<Uint8List?> _captureTablePngBytes() async {
-    await WidgetsBinding.instance.endOfFrame;
-    final boundary =
-        _tableBoundaryKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-    if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(
-      format: ui.ImageByteFormat.rawStraightRgba,
-    );
-    if (data == null) return null;
-    // 8-bit straight-alpha readback: ImageByteFormat.png on wide-gamut
-    // backends (iOS Impeller) embeds 10/16-bit wide-gamut bytes that
-    // downstream consumers misinterpret as sRGB. Encode to a plain
-    // 8-bit PNG here instead.
-    return image_lib.encodePng(
-      image_lib.Image.fromBytes(
-        width: image.width,
-        height: image.height,
-        bytes: data.buffer,
-        numChannels: 4,
-      ),
-    );
-  }
-
-  Future<File> _writeTableImageTempFile(Uint8List bytes) async {
-    final dir = Directory.systemTemp;
-    final file = File(
-      p.join(
-        dir.path,
-        'cuplivo-table-${DateTime.now().millisecondsSinceEpoch}.png',
-      ),
-    );
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
-  }
+  Future<Uint8List?> _captureTablePngBytes() =>
+      _captureRepaintBoundaryPng(_tableBoundaryKey);
 
   Future<String?> _savePngBytes({
     required String dialogTitle,
     required String filename,
     required Uint8List bytes,
-  }) async {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: dialogTitle,
-        fileName: filename,
-        type: FileType.custom,
-        allowedExtensions: const ['png'],
-      );
-      if (savePath == null) return null;
-      await File(savePath).parent.create(recursive: true);
-      await File(savePath).writeAsBytes(bytes, flush: true);
-      return savePath;
-    }
+  }) =>
+      _savePngFile(dialogTitle: dialogTitle, filename: filename, bytes: bytes);
 
-    return FilePicker.platform.saveFile(
-      dialogTitle: dialogTitle,
-      fileName: filename,
-      type: FileType.custom,
-      allowedExtensions: const ['png'],
-      bytes: bytes,
-    );
-  }
-
-  Future<bool> _writePngToClipboard(Uint8List bytes) async {
-    try {
-      final clipboard = SystemClipboard.instance;
-      if (clipboard != null) {
-        final item = DataWriterItem(suggestedName: 'cuplivo-table.png');
-        item.add(Formats.png(bytes));
-        await clipboard.write([item]);
-        return true;
-      }
-    } catch (_) {}
-
-    try {
-      final file = await _writeTableImageTempFile(bytes);
-      return await ClipboardImages.setImagePath(file.path);
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<bool> _writePngToClipboard(Uint8List bytes) =>
+      _copyPngToClipboard(bytes, 'cuplivo-table.png');
 }
 
 class _MarkdownTableCell extends StatelessWidget {
@@ -4503,7 +4536,7 @@ class LatexBlockScrollableMd extends BlockMd {
     final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
     if (body.isEmpty) return const SizedBox.shrink();
 
-    final math = _renderMath(body, style: config.style, displayMode: true);
+    final math = _LatexMathBlock(body: body, style: config.style);
     // Wrap in horizontal scroll to avoid overflow and center within available width
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -4522,6 +4555,230 @@ class LatexBlockScrollableMd extends BlockMd {
         },
       ),
     );
+  }
+}
+
+/// Display math block with an export gesture (long-press on mobile,
+/// right-click on desktop) and a capture boundary for PNG export.
+class _LatexMathBlock extends StatefulWidget {
+  const _LatexMathBlock({required this.body, required this.style});
+
+  final String body;
+  final TextStyle? style;
+
+  @override
+  State<_LatexMathBlock> createState() => _LatexMathBlockState();
+}
+
+class _LatexMathBlockState extends State<_LatexMathBlock> {
+  final GlobalKey _boundaryKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDesktop = _markdownMathTargetPlatformIsDesktop();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: isDesktop ? null : (_) => _showMobileMenu(),
+      onSecondaryTapDown: isDesktop
+          ? (details) => _showDesktopMenu(details.globalPosition)
+          : null,
+      child: RepaintBoundary(
+        key: _boundaryKey,
+        child: Container(
+          // Matches the chat surface (cs.surface) so the box is invisible in
+          // the message; the color exists only so the captured PNG has a
+          // non-transparent, theme-matched background. Symmetric padding gives
+          // the PNG a small margin without shifting the formula's center.
+          color: cs.surface,
+          padding: const EdgeInsets.all(4),
+          child: _renderMath(
+            widget.body,
+            style: widget.style,
+            displayMode: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDesktopMenu(Offset globalPosition) {
+    final l10n = AppLocalizations.of(context)!;
+    showDesktopContextMenuAt(
+      context,
+      globalPosition: globalPosition,
+      items: [
+        DesktopContextMenuItem(
+          icon: Lucide.Copy,
+          label: l10n.markdownMathCopyLatexLabel,
+          onTap: _copyLatex,
+        ),
+        DesktopContextMenuItem(
+          icon: Lucide.Image,
+          label: l10n.markdownMathCopyPngLabel,
+          onTap: _copyPng,
+        ),
+        DesktopContextMenuItem(
+          icon: Lucide.Download,
+          label: l10n.markdownMathDownloadPngLabel,
+          onTap: _downloadPng,
+        ),
+      ],
+    );
+  }
+
+  void _showMobileMenu() {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx)!;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _menuItem(
+                  ctx,
+                  Lucide.Copy,
+                  l10n.markdownMathCopyLatexLabel,
+                  _copyLatex,
+                ),
+                _menuItem(
+                  ctx,
+                  Lucide.Image,
+                  l10n.markdownMathCopyPngLabel,
+                  _copyPng,
+                ),
+                _menuItem(
+                  ctx,
+                  Lucide.Download,
+                  l10n.markdownMathDownloadPngLabel,
+                  _downloadPng,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _menuItem(
+    BuildContext ctx,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    final cs = Theme.of(ctx).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: SizedBox(
+        height: 48,
+        child: IosCardPress(
+          borderRadius: BorderRadius.circular(14),
+          baseColor: cs.surface,
+          duration: const Duration(milliseconds: 260),
+          onTap: () {
+            try {
+              Haptics.light();
+            } catch (_) {}
+            Navigator.of(ctx).maybePop();
+            onTap();
+          },
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: cs.onSurface),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.medium,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyLatex() async {
+    final l10n = AppLocalizations.of(context)!;
+    await Clipboard.setData(ClipboardData(text: widget.body));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.chatMessageWidgetCopiedToClipboard,
+      type: NotificationType.success,
+    );
+  }
+
+  Future<void> _copyPng() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final bytes = await _captureRepaintBoundaryPng(_boundaryKey);
+      if (bytes == null) throw 'render error';
+      final ok = await _copyPngToClipboard(bytes, 'cuplivo-math.png');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: ok
+            ? l10n.chatMessageWidgetCopiedToClipboard
+            : l10n.messageExportSheetExportFailed('clipboard'),
+        type: ok ? NotificationType.success : NotificationType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportFailed('$e'),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<void> _downloadPng() async {
+    final l10n = AppLocalizations.of(context)!;
+    final timestamp = DateTime.now().toLocal().toIso8601String().replaceAll(
+      RegExp(r'[:.]'),
+      '-',
+    );
+    final filename = '${l10n.markdownMathDefaultFileNameStem}_$timestamp.png';
+    try {
+      final bytes = await _captureRepaintBoundaryPng(_boundaryKey);
+      if (bytes == null) throw 'render error';
+      final savePath = await _savePngFile(
+        dialogTitle: l10n.backupPageExportToFile,
+        filename: filename,
+        bytes: bytes,
+      );
+      if (savePath == null) return;
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+        type: NotificationType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportFailed('$e'),
+        type: NotificationType.error,
+      );
+    }
   }
 }
 

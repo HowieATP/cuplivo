@@ -1286,6 +1286,149 @@ void main() {
   });
 
   group('OpenAI Responses image generation', () {
+    test('renders OpenRouter image generation data URL', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openrouter_responses_image_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'output_text': 'Done',
+            'output': [
+              {
+                'type': 'openrouter:image_generation',
+                'result':
+                    'data:image/png;base64,${base64Encode(const [1, 2, 3, 4])}',
+              },
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+        modelId: 'gpt-5.6-luna',
+        messages: const [
+          {'role': 'user', 'content': 'draw a cat'},
+        ],
+        stream: false,
+      ).toList();
+
+      final content = chunks.map((chunk) => chunk.content).join();
+      expect(content, contains('Done'));
+      final imageUri = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(content)!.group(1)!;
+      expect(imageUri.endsWith('.png'), isTrue);
+      expect(await File(imageUri).readAsBytes(), const [1, 2, 3, 4]);
+      expect(chunks.last.isDone, isTrue);
+    });
+
+    test(
+      'renders OpenRouter image generation in streaming completed output',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'kelivo_openrouter_responses_stream_image_',
+        );
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+        addTearDown(() async {
+          PathProviderPlatform.instance = previousPathProvider;
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
+
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.headers.set('Transfer-Encoding', 'chunked');
+
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'response.output_item.added',
+              'item': {'id': 'ig_1', 'type': 'openrouter:image_generation', 'status': 'in_progress'},
+              'output_index': 0,
+            })}\n\n',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'response.output_item.done',
+              'item': {
+                'id': 'ig_1',
+                'type': 'openrouter:image_generation',
+                'status': 'completed',
+                'result': 'data:image/png;base64,${base64Encode(const [1, 2, 3, 4])}',
+              },
+              'output_index': 0,
+            })}\n\n',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'response.completed',
+              'response': {
+                'output': [
+                  {
+                    'type': 'openrouter:image_generation',
+                    'result': 'data:image/png;base64,${base64Encode(const [1, 2, 3, 4])}',
+                  },
+                ],
+                'usage': {'input_tokens': 1, 'output_tokens': 1},
+              },
+            })}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+          modelId: 'gpt-5.6-luna',
+          messages: const [
+            {'role': 'user', 'content': 'draw a cat'},
+          ],
+        ).toList();
+
+        final content = chunks.map((chunk) => chunk.content).join();
+        final matches = RegExp(
+          r'!\[image\]\(([^)]+)\)',
+        ).allMatches(content).toList();
+        expect(matches, hasLength(1));
+        final imagePath = matches.single.group(1)!;
+        expect(imagePath.endsWith('.png'), isTrue);
+        expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
+        expect(chunks.last.isDone, isTrue);
+      },
+    );
+
     test('renders partial image when completed output is empty', () async {
       final tempDir = await Directory.systemTemp.createTemp(
         'kelivo_openai_responses_partial_image_',

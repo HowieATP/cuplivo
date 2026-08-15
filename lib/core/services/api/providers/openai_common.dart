@@ -21,18 +21,30 @@ Uri _openAICompatibleUrl(ProviderConfig config) {
 }
 
 Future<String> _saveResponsesImageGenerationMarkdown(
-  String imageBase64, {
+  String imageData, {
   String? outputFormat,
 }) async {
   final normalizedFormat = (outputFormat ?? '').trim().toLowerCase();
-  final mime = switch (normalizedFormat) {
+  var mime = switch (normalizedFormat) {
     'jpeg' || 'jpg' => 'image/jpeg',
     'webp' => 'image/webp',
     _ => 'image/png',
   };
+  var imageBase64 = imageData.trim();
+  if (imageBase64.startsWith('data:')) {
+    final commaIndex = imageBase64.indexOf(',');
+    if (commaIndex < 0) return '';
+    mime = _mimeFromDataUrl(imageBase64);
+    imageBase64 = imageBase64.substring(commaIndex + 1);
+  }
   final savedPath = await AppDirectories.saveBase64Image(mime, imageBase64);
   if (savedPath == null || savedPath.isEmpty) return '';
   return '\n![image]($savedPath)\n';
+}
+
+bool _isResponsesImageGenerationType(dynamic type) {
+  return type == 'image_generation_call' ||
+      type == 'openrouter:image_generation';
 }
 
 void _applyCompatibleBuiltInSearch(
@@ -98,6 +110,21 @@ void _applyCompatibleResponsesReasoning(
   int? thinkingBudget,
 }) {
   if (config.useResponseApi != true) return;
+
+  final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
+  final isDeepSeek =
+      host.contains('deepseek') ||
+      config.id.toLowerCase().contains('deepseek') ||
+      upstreamModelId.toLowerCase().contains('deepseek');
+  if (isDeepSeek) {
+    if (!isReasoning) {
+      body.remove('reasoning');
+    } else if (_isOff(thinkingBudget)) {
+      body['reasoning'] = {'effort': 'none'};
+    }
+    return;
+  }
+
   if (!BuiltInToolsHelper.isDashScopeProvider(config)) return;
 
   body.remove('reasoning');
@@ -123,7 +150,7 @@ bool _isKimiK25Model(String upstreamModelId) {
 bool _isKimiK3Model(String upstreamModelId) {
   final trimmed = upstreamModelId.trim();
   return RegExp(
-        r'(^|[/_:@])kimi-k3(?:$|[-.])',
+        r'(^|[/_:@])kimi-k3(?:$|[-.:])',
         caseSensitive: false,
       ).hasMatch(trimmed) ||
       RegExp(
@@ -131,6 +158,14 @@ bool _isKimiK3Model(String upstreamModelId) {
         caseSensitive: false,
       ).hasMatch(trimmed);
 }
+
+bool _isKimiPreservedThinkingModel(String upstreamModelId) {
+  final normalized = upstreamModelId.trim().toLowerCase();
+  return _isKimiK3Model(normalized) ||
+      RegExp(r'(^|[/_:@])kimi-k2\.7-code(?:$|[-.:])').hasMatch(normalized);
+}
+
+enum _ReasoningContentReplayPolicy { none, toolTurns, all }
 
 bool _isRemoteHttpUrl(String source) {
   final normalized = source.trim().toLowerCase();
@@ -479,17 +514,46 @@ int _readOpenAIUsageInt(dynamic value) {
 TokenUsage? _mergeOpenAICompatibleUsage(TokenUsage? current, dynamic rawUsage) {
   if (rawUsage is! Map) return current;
 
-  final details = rawUsage['prompt_tokens_details'];
+  final details =
+      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
   final cachedTokens = details is Map
       ? _readOpenAIUsageInt(details['cached_tokens'])
       : 0;
   return (current ?? const TokenUsage()).merge(
     TokenUsage(
-      promptTokens: _readOpenAIUsageInt(rawUsage['prompt_tokens']),
-      completionTokens: _readOpenAIUsageInt(rawUsage['completion_tokens']),
+      promptTokens: _readOpenAIUsageInt(
+        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
+      ),
+      completionTokens: _readOpenAIUsageInt(
+        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
+      ),
       cachedTokens: cachedTokens,
     ),
   );
+}
+
+String _responsesReasoningText(dynamic rawOutput) {
+  if (rawOutput is! List) return '';
+
+  final buffer = StringBuffer();
+  for (final item in rawOutput) {
+    if (item is! Map || item['type'] != 'reasoning') continue;
+    final content = item['content'];
+    if (content is String) {
+      buffer.write(content);
+      continue;
+    }
+    if (content is! List) continue;
+    for (final part in content) {
+      if (part is String) {
+        buffer.write(part);
+      } else if (part is Map &&
+          (part['type'] == 'reasoning_text' || part['type'] == 'text')) {
+        buffer.write((part['text'] ?? part['content'] ?? '').toString());
+      }
+    }
+  }
+  return buffer.toString();
 }
 
 String _stripDataUrlPrefix(String dataUrl) {
@@ -788,6 +852,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   required bool canImageInput,
   required bool allowRemoteImages,
   bool sendToolResultImages = false,
+  required _ReasoningContentReplayPolicy reasoningContentReplayPolicy,
   bool stripUnsignedReasoningContent = false,
 }) async {
   int lastUserIndex = -1;
@@ -795,6 +860,22 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     if ((messages[i]['role'] ?? '').toString() == 'user') {
       lastUserIndex = i;
       break;
+    }
+  }
+
+  final toolTurnIds = <int>{};
+  final messageTurnIds = <int>[];
+  var currentTurnId = -1;
+  for (final message in messages) {
+    final messageRole = (message['role'] ?? 'user').toString();
+    if (messageRole == 'user') currentTurnId++;
+    messageTurnIds.add(currentTurnId);
+    final messageToolCalls = message['tool_calls'];
+    if (messageRole == 'tool' ||
+        (messageRole == 'assistant' &&
+            messageToolCalls is List &&
+            messageToolCalls.isNotEmpty)) {
+      toolTurnIds.add(currentTurnId);
     }
   }
 
@@ -810,10 +891,19 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg['role'] = role;
-    if (stripUnsignedReasoningContent && role == 'assistant') {
+    if (role == 'assistant') {
       final details = outMsg['reasoning_details'];
-      final hasSignedDetails = details is List && details.isNotEmpty;
-      if (!hasSignedDetails) {
+      final hasSignedClaudeReasoning =
+          stripUnsignedReasoningContent &&
+          details is List &&
+          details.isNotEmpty;
+      final keepReasoningContent =
+          hasSignedClaudeReasoning ||
+          reasoningContentReplayPolicy == _ReasoningContentReplayPolicy.all ||
+          (reasoningContentReplayPolicy ==
+                  _ReasoningContentReplayPolicy.toolTurns &&
+              toolTurnIds.contains(messageTurnIds[i]));
+      if (!keepReasoningContent) {
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
       }
@@ -1096,6 +1186,17 @@ class _OpenAIProviderInfo {
 
   bool get needsReasoningEcho =>
       isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+
+  _ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
+    if (_isKimiPreservedThinkingModel(upstreamModelId)) {
+      return _ReasoningContentReplayPolicy.all;
+    }
+    if (needsReasoningEcho) {
+      return _ReasoningContentReplayPolicy.toolTurns;
+    }
+    return _ReasoningContentReplayPolicy.none;
+  }
+
   String get completionTokensKey =>
       (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
 }
@@ -1634,6 +1735,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         canImageInput: canImageInput,
         allowRemoteImages: allowRemoteImages,
         sendToolResultImages: sendToolResultImages,
+        reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
         stripUnsignedReasoningContent: isClaudeUpstream,
       );
       body = {
@@ -1739,6 +1841,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       // Responses API non-stream
       if (config.useResponseApi == true) {
         String outText = '';
+        final rawOutput = obj['output'] ?? obj['response']?['output'];
+        final reasoningText = _responsesReasoningText(rawOutput);
         try {
           outText = (obj['output_text'] ?? '').toString();
         } catch (_) {}
@@ -1747,65 +1851,53 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             outText = (obj['response']?['output_text'] ?? '').toString();
           } catch (_) {}
         }
-        if (outText.isEmpty) {
-          try {
-            final out = obj['output'] as List?;
-            if (out != null) {
-              final buf = StringBuffer();
-              for (final it in out) {
-                if (it is Map && it['type'] == 'output_text') {
-                  final c = (it['content'] ?? '').toString();
-                  if (c.isNotEmpty) buf.write(c);
-                } else if (it is Map && it['type'] == 'message') {
-                  final content = it['content'] as List?;
-                  if (content != null) {
-                    for (final part in content) {
-                      if (part is Map &&
-                          (part['type'] == 'output_text' ||
-                              part['type'] == 'text')) {
-                        final t = (part['text'] ?? part['content'] ?? '')
-                            .toString();
-                        if (t.isNotEmpty) buf.write(t);
-                      }
+        final shouldReadOutputText = outText.isEmpty;
+        try {
+          final out = rawOutput as List?;
+          if (out != null) {
+            final buf = StringBuffer(outText);
+            for (final it in out) {
+              if (it is! Map) continue;
+              if (_isResponsesImageGenerationType(it['type'])) {
+                final b64 = (it['result'] ?? '').toString();
+                if (b64.isNotEmpty) {
+                  final mdImg = await _saveResponsesImageGenerationMarkdown(
+                    b64,
+                    outputFormat: (it['output_format'] ?? '').toString(),
+                  );
+                  if (mdImg.isNotEmpty) buf.write(mdImg);
+                }
+                continue;
+              }
+              if (!shouldReadOutputText) continue;
+              if (it['type'] == 'output_text') {
+                final c = (it['content'] ?? '').toString();
+                if (c.isNotEmpty) buf.write(c);
+              } else if (it['type'] == 'message') {
+                final content = it['content'] as List?;
+                if (content != null) {
+                  for (final part in content) {
+                    if (part is Map &&
+                        (part['type'] == 'output_text' ||
+                            part['type'] == 'text')) {
+                      final t = (part['text'] ?? part['content'] ?? '')
+                          .toString();
+                      if (t.isNotEmpty) buf.write(t);
                     }
-                  }
-                } else if (it is Map && it['type'] == 'image_generation_call') {
-                  final b64 = (it['result'] ?? '').toString();
-                  if (b64.isNotEmpty) {
-                    final mdImg = await _saveResponsesImageGenerationMarkdown(
-                      b64,
-                      outputFormat: (it['output_format'] ?? '').toString(),
-                    );
-                    if (mdImg.isNotEmpty) buf.write(mdImg);
                   }
                 }
               }
-              outText = buf.toString();
             }
-          } catch (_) {}
-        }
-        TokenUsage? usage;
-        try {
-          final u = (obj['usage'] ?? obj['response']?['usage']) as Map?;
-          if (u != null) {
-            final prompt =
-                (u['prompt_tokens'] ?? u['input_tokens'] ?? 0) as int? ?? 0;
-            final completion =
-                (u['completion_tokens'] ?? u['output_tokens'] ?? 0) as int? ??
-                0;
-            final cached =
-                (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
-                0;
-            usage = TokenUsage(
-              promptTokens: prompt,
-              completionTokens: completion,
-              cachedTokens: cached,
-              totalTokens: prompt + completion,
-            );
+            outText = buf.toString();
           }
         } catch (_) {}
+        final usage = _mergeOpenAICompatibleUsage(
+          null,
+          obj['usage'] ?? obj['response']?['usage'],
+        );
         yield ChatStreamChunk(
           content: outText,
+          reasoning: reasoningText.isEmpty ? null : reasoningText,
           isDone: true,
           totalTokens: usage?.totalTokens ?? 0,
           usage: usage,
@@ -1990,6 +2082,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   canImageInput: canImageInput,
                   allowRemoteImages: allowRemoteImages,
                   sendToolResultImages: sendToolResultImages,
+                  reasoningContentReplayPolicy:
+                      info.reasoningContentReplayPolicy,
                   stripUnsignedReasoningContent: isClaudeUpstream,
                 );
           reqBody.remove('stream');
@@ -2241,6 +2335,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       canImageInput: canImageInput,
                       allowRemoteImages: allowRemoteImages,
                       sendToolResultImages: sendToolResultImages,
+                      reasoningContentReplayPolicy:
+                          info.reasoningContentReplayPolicy,
                       stripUnsignedReasoningContent: isClaudeUpstream,
                     ),
                     'stream': true,
@@ -2671,7 +2767,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'args': '',
                 };
               } else if (item is Map &&
-                  (item['type'] ?? '') == 'image_generation_call') {
+                  _isResponsesImageGenerationType(item['type'])) {
                 responsesImagesByIndex.putIfAbsent(
                   idx,
                   () => const _ResponsesImageGenerationResult(),
@@ -2717,7 +2813,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 );
                 if (args.isNotEmpty) entry['args'] = args;
               } else if (item is Map &&
-                  (item['type'] ?? '') == 'image_generation_call') {
+                  _isResponsesImageGenerationType(item['type'])) {
                 final b64 = (item['result'] ?? '').toString();
                 if (b64.isNotEmpty) {
                   responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
@@ -2750,15 +2846,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             }
           } else if (type == 'response.incomplete') {
-            final u = json['response']?['usage'];
-            if (u != null) {
-              final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-              final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-              usage = (usage ?? const TokenUsage()).merge(
-                TokenUsage(promptTokens: inTok, completionTokens: outTok),
-              );
-              totalTokens = usage.totalTokens;
-            }
+            usage = _mergeOpenAICompatibleUsage(
+              usage,
+              json['response']?['usage'],
+            );
+            totalTokens = usage?.totalTokens ?? totalTokens;
             try {
               final details = json['response']?['incomplete_details'];
               if (details is Map) {
@@ -2766,15 +2858,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             } catch (_) {}
           } else if (type == 'response.completed') {
-            final u = json['response']?['usage'];
-            if (u != null) {
-              final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-              final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-              usage = (usage ?? const TokenUsage()).merge(
-                TokenUsage(promptTokens: inTok, completionTokens: outTok),
-              );
-              totalTokens = usage.totalTokens;
-            }
+            usage = _mergeOpenAICompatibleUsage(
+              usage,
+              json['response']?['usage'],
+            );
+            totalTokens = usage?.totalTokens ?? totalTokens;
             // Extract web search citations from final output (Responses API)
             try {
               final output = json['response']?['output'];
@@ -2820,9 +2908,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         }
                       }
                     }
-                  } else if (it['type'] == 'image_generation_call') {
+                  } else if (_isResponsesImageGenerationType(it['type'])) {
                     // Handle image generation output from OpenAI Responses API
-                    // it['result'] is directly the base64 image data
+                    // it['result'] contains base64 image data or a data URL.
                     final b64 = (it['result'] ?? '').toString();
                     if (b64.isNotEmpty) {
                       completedImageIndexes.add(outputIndex);
@@ -3165,19 +3253,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       } else if (o is Map &&
                           (o['type'] ?? '') == 'response.completed') {
                         // usage
-                        final u2 = o['response']?['usage'];
-                        if (u2 != null) {
-                          final inTok = (u2['input_tokens'] ?? 0) as int? ?? 0;
-                          final outTok =
-                              (u2['output_tokens'] ?? 0) as int? ?? 0;
-                          usage = (usage ?? const TokenUsage()).merge(
-                            TokenUsage(
-                              promptTokens: inTok,
-                              completionTokens: outTok,
-                            ),
-                          );
-                          totalTokens = usage.totalTokens;
-                        }
+                        usage = _mergeOpenAICompatibleUsage(
+                          usage,
+                          o['response']?['usage'],
+                        );
+                        totalTokens = usage?.totalTokens ?? totalTokens;
                         // capture output items
                         final out2 = o['response']?['output'];
                         if (out2 is List) {
@@ -3351,15 +3431,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             if (output != null) {
               content = (output['content'] ?? '').toString();
               approxCompletionChars += content.length;
-              final u = json['usage'];
-              if (u != null) {
-                final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-                final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-                usage = (usage ?? const TokenUsage()).merge(
-                  TokenUsage(promptTokens: inTok, completionTokens: outTok),
-                );
-                totalTokens = usage.totalTokens;
-              }
+              usage = _mergeOpenAICompatibleUsage(usage, json['usage']);
+              totalTokens = usage?.totalTokens ?? totalTokens;
             }
           }
         } else {
@@ -3797,6 +3870,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       canImageInput: canImageInput,
                       allowRemoteImages: allowRemoteImages,
                       sendToolResultImages: sendToolResultImages,
+                      reasoningContentReplayPolicy:
+                          info.reasoningContentReplayPolicy,
                       stripUnsignedReasoningContent: isClaudeUpstream,
                     ),
                     'stream': true,
@@ -4335,6 +4410,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           canImageInput: canImageInput,
                           allowRemoteImages: allowRemoteImages,
                           sendToolResultImages: sendToolResultImages,
+                          reasoningContentReplayPolicy:
+                              info.reasoningContentReplayPolicy,
                           stripUnsignedReasoningContent: isClaudeUpstream,
                         ),
                         'stream': true,

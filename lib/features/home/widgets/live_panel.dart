@@ -11,8 +11,10 @@ import '../../../core/services/generation_engine.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/image_mode_info_popover.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/tool_approval_service.dart';
+import 'image_generation_options.dart';
 
 /// LivePanel (实时面板): unified transient-status surface pinned above the
 /// conversation input bar. Hosts heterogeneous live entries — subagent jobs,
@@ -23,11 +25,16 @@ import '../services/tool_approval_service.dart';
 /// Every entry is conversation-scoped (keyed off `currentConversationId`);
 /// the panel disappears when no entry exists.
 class LivePanel extends StatefulWidget {
-  const LivePanel({super.key, this.onOpenChild});
+  const LivePanel({super.key, this.onOpenChild, this.imageGenController});
 
   /// Called with the child conversation id when the user taps 查看子对话 /
   /// 去回答 on a subagent entry.
   final ValueChanged<String>? onOpenChild;
+
+  /// Shared image-generation options controller (home page owned, same
+  /// instance as the input bar's). Drives the inline expanded options card;
+  /// when null the panel creates its own (tests).
+  final ImageGenerationOptionsController? imageGenController;
 
   @override
   State<LivePanel> createState() => _LivePanelState();
@@ -37,6 +44,11 @@ class _LivePanelState extends State<LivePanel> {
   Timer? _ticker;
   final _expandedJobIds = <String>{};
   final _expandedDownloadIds = <String>{};
+  bool _expandedImageMode = false;
+  final _imageModeInfoKey = GlobalKey(debugLabel: 'image-mode-info');
+  final _chatModeInfoKey = GlobalKey(debugLabel: 'chat-mode-info');
+  late final ImageGenerationOptionsController _imageGenController =
+      widget.imageGenController ?? ImageGenerationOptionsController();
 
   @override
   void initState() {
@@ -132,7 +144,9 @@ class _LivePanelState extends State<LivePanel> {
     final downloads = _activeDownloads();
     final inputStatus = context.watch<InputStatusProvider>();
     final hasPills =
-        inputStatus.imageModeActive || inputStatus.imageWarningActive;
+        inputStatus.imageModeActive ||
+        inputStatus.imageModeDismissed ||
+        inputStatus.imageWarningActive;
     if (jobs.isEmpty && downloads.isEmpty && !hasPills) {
       return const SizedBox.shrink();
     }
@@ -142,20 +156,29 @@ class _LivePanelState extends State<LivePanel> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = isDark ? cs.surfaceContainerHighest : cs.surface;
 
+    // The expansion flag is only meaningful while the image-mode pill renders.
+    // Sync it here so a model switch (pill disappears) collapses the options
+    // card instead of silently re-expanding it on the next activation.
+    final showImageOptionsExpanded =
+        _expandedImageMode && inputStatus.imageModeActive;
+    if (showImageOptionsExpanded != _expandedImageMode) {
+      _expandedImageMode = showImageOptionsExpanded;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (inputStatus.imageModeActive) ...[
-            _buildPill(
-              icon: Lucide.Brush,
-              label: l10n.chatInputBarImageMode,
-              closeTooltip: l10n.chatInputBarDisableImageModeTooltip,
-              onClose: () => inputStatus.dismissImageMode(),
-              base: base,
-              cs: cs,
-            ),
+            _buildImageModePill(inputStatus, base, cs, l10n),
+            if (showImageOptionsExpanded) ...[
+              const SizedBox(height: 6),
+              _buildImageOptionsCard(base),
+            ],
+            const SizedBox(height: 6),
+          ] else if (inputStatus.imageModeDismissed) ...[
+            _buildChatModePill(inputStatus, base, cs, l10n),
             const SizedBox(height: 6),
           ],
           if (inputStatus.imageWarningActive) ...[
@@ -184,19 +207,124 @@ class _LivePanelState extends State<LivePanel> {
     );
   }
 
+  Widget _buildImageModePill(
+    InputStatusProvider inputStatus,
+    Color base,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
+    return _buildPill(
+      icon: Lucide.Brush,
+      label: l10n.chatInputBarImageMode,
+      base: base,
+      cs: cs,
+      onTap: () => setState(() => _expandedImageMode = !_expandedImageMode),
+      infoButton: IosIconButton(
+        key: _imageModeInfoKey,
+        icon: Icons.info_outline,
+        size: 16,
+        color: cs.onSurfaceVariant,
+        semanticLabel: l10n.chatInputBarImageModeInfoTooltip,
+        onTap: () => unawaited(
+          showImageModeInfoPopover(context, anchorKey: _imageModeInfoKey),
+        ),
+      ),
+      trailing: [
+        if (_imageGenController.customized)
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: cs.primary,
+              shape: BoxShape.circle,
+            ),
+          ),
+        Icon(
+          _expandedImageMode
+              ? Icons.keyboard_arrow_down
+              : Icons.keyboard_arrow_up,
+          size: 18,
+          color: cs.onSurfaceVariant,
+        ),
+        const SizedBox(width: 2),
+        IosIconButton(
+          icon: Icons.close,
+          size: 16,
+          color: cs.onSurfaceVariant,
+          semanticLabel: l10n.chatInputBarDisableImageModeTooltip,
+          onTap: () {
+            setState(() => _expandedImageMode = false);
+            inputStatus.dismissImageMode();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChatModePill(
+    InputStatusProvider inputStatus,
+    Color base,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
+    return _buildPill(
+      icon: Lucide.MessageSquare,
+      label: l10n.chatInputBarChatMode,
+      base: base,
+      cs: cs,
+      onTap: () {
+        inputStatus.restoreImageMode();
+        setState(() => _expandedImageMode = true);
+      },
+      infoButton: IosIconButton(
+        key: _chatModeInfoKey,
+        icon: Icons.info_outline,
+        size: 16,
+        color: cs.onSurfaceVariant,
+        semanticLabel: l10n.chatInputBarImageModeInfoTooltip,
+        onTap: () => unawaited(
+          showImageModeInfoPopover(context, anchorKey: _chatModeInfoKey),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageOptionsCard(Color base) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.55;
+    return Container(
+      decoration: BoxDecoration(
+        color: base,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          child: ImageGenerationOptionsBody(
+            controller: _imageGenController,
+            onChanged: () => setState(() {}),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPill({
     required IconData icon,
     required String label,
-    required String closeTooltip,
-    required VoidCallback onClose,
     required Color base,
     required ColorScheme cs,
+    VoidCallback? onTap,
+    Widget? infoButton,
+    List<Widget> trailing = const <Widget>[],
+    String? closeTooltip,
+    VoidCallback? onClose,
   }) {
     return IosCardPress(
       borderRadius: BorderRadius.circular(12),
       baseColor: base,
       pressedScale: 0.99,
-      onTap: null,
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -215,13 +343,18 @@ class _LivePanelState extends State<LivePanel> {
                 ),
               ),
             ),
-            IosIconButton(
-              icon: Icons.close,
-              size: 16,
-              color: cs.onSurfaceVariant,
-              semanticLabel: closeTooltip,
-              onTap: onClose,
-            ),
+            if (infoButton != null) ...[infoButton, const SizedBox(width: 2)],
+            ...trailing,
+            if (onClose != null) ...[
+              const SizedBox(width: 2),
+              IosIconButton(
+                icon: Icons.close,
+                size: 16,
+                color: cs.onSurfaceVariant,
+                semanticLabel: closeTooltip ?? label,
+                onTap: onClose,
+              ),
+            ],
           ],
         ),
       ),

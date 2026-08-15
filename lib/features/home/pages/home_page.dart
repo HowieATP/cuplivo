@@ -22,9 +22,11 @@ import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../settings/pages/trash_detail_page.dart';
 import '../widgets/live_panel.dart';
+import '../widgets/image_generation_options.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/services/chat/external_chat_draft_handoff.dart';
 import '../../../core/services/android_process_text.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
@@ -587,6 +589,8 @@ class _HomePageState extends State<HomePage>
   final FocusNode _inputFocus = FocusNode();
   final TextEditingController _inputController = TextEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
+  final ImageGenerationOptionsController _imageGenController =
+      ImageGenerationOptionsController();
   final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
   final BackdropKey _messageListBackdropKey = BackdropKey();
@@ -686,6 +690,14 @@ class _HomePageState extends State<HomePage>
   @override
   void didPopNext() {
     _controller.onDidPopNext();
+    unawaited(_consumeExternalChatDraft());
+  }
+
+  Future<void> _consumeExternalChatDraft() async {
+    if (!mounted) return;
+    final draft = ExternalChatDraftHandoff.take();
+    if (draft == null) return;
+    await _controller.createNewConversationWithDraft(draft);
   }
 
   @override
@@ -1508,12 +1520,14 @@ class _HomePageState extends State<HomePage>
         LivePanel(
           onOpenChild: (childId) =>
               _controller.switchConversationAnimated(childId),
+          imageGenController: _imageGenController,
         ),
         ChatInputSection(
           inputBarKey: _inputBarKey,
           inputFocus: _inputFocus,
           inputController: _inputController,
           mediaController: _mediaController,
+          imageGenController: _imageGenController,
           isTablet: isTablet,
           isLoading: _controller.isCurrentConversationLoading,
           isToolModel: _controller.isToolModel,

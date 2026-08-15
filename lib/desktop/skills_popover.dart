@@ -7,6 +7,7 @@ import '../core/providers/assistant_provider.dart';
 import '../features/skills/skill_manager.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
+import '../shared/widgets/collapsible_group_header.dart';
 import '../theme/app_font_weights.dart';
 
 Future<void> showDesktopSkillsPopover(
@@ -210,7 +211,7 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _SkillsPopoverContent extends StatelessWidget {
+class _SkillsPopoverContent extends StatefulWidget {
   const _SkillsPopoverContent({
     required this.skills,
     required this.assistantId,
@@ -224,10 +225,18 @@ class _SkillsPopoverContent extends StatelessWidget {
   final VoidCallback onClose;
 
   @override
+  State<_SkillsPopoverContent> createState() => _SkillsPopoverContentState();
+}
+
+class _SkillsPopoverContentState extends State<_SkillsPopoverContent>
+    with CollapsibleGroupsMixin<_SkillsPopoverContent> {
+  @override
   Widget build(BuildContext context) {
     final ap = context.watch<AssistantProvider>();
+    final skills = widget.skills;
+    final assistantId = widget.assistantId;
     final assistant = assistantId != null
-        ? ap.getById(assistantId!)
+        ? ap.getById(assistantId)
         : ap.currentAssistant;
     final allSelected =
         skills.isNotEmpty &&
@@ -242,11 +251,11 @@ class _SkillsPopoverContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _SkillsPopoverHeader(
-              onManageSkills: onManageSkills == null
+              onManageSkills: widget.onManageSkills == null
                   ? null
                   : () {
-                      onClose();
-                      onManageSkills?.call();
+                      widget.onClose();
+                      widget.onManageSkills?.call();
                     },
               showSelectAll: skills.isNotEmpty && assistant != null,
               allSelected: allSelected,
@@ -267,27 +276,40 @@ class _SkillsPopoverContent extends StatelessWidget {
                     },
             ),
             if (skills.isEmpty)
-              _SkillsPopoverEmpty(onImport: onManageSkills, onClose: onClose)
+              _SkillsPopoverEmpty(
+                onImport: widget.onManageSkills,
+                onClose: widget.onClose,
+              )
             else
               for (final (group, groupSkills) in groupSkillsByCategory(
                 skills,
               )) ...[
-                Padding(
+                CollapsibleGroupHeader(
+                  groupName:
+                      group ??
+                      AppLocalizations.of(context)!.skillsUncategorizedGroup,
+                  skillCount: groupSkills.length,
+                  expanded: isGroupExpanded(group),
+                  onTap: () => toggleGroup(group),
+                  fontSize: 12.5,
+                  fontWeight: AppFontWeights.emphasis,
                   padding: const EdgeInsets.only(top: 6, bottom: 2),
-                  child: _GroupHeaderRow(
-                    title:
-                        group ??
-                        AppLocalizations.of(context)!.skillsUncategorizedGroup,
+                ),
+                CollapsibleGroupBody(
+                  expanded: isGroupExpanded(group),
+                  child: Column(
+                    children: [
+                      for (final skill in groupSkills)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 1),
+                          child: _SkillsRowItem(
+                            name: skill.name,
+                            assistantId: assistantId,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                for (final skill in groupSkills)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 1),
-                    child: _SkillsRowItem(
-                      name: skill.name,
-                      assistantId: assistantId,
-                    ),
-                  ),
               ],
           ],
         ),
@@ -467,38 +489,6 @@ class _SkillsPopoverEmpty extends StatelessWidget {
               label: Text(l10n.skillsSheetImportAction),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _GroupHeaderRow extends StatelessWidget {
-  const _GroupHeaderRow({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 30,
-      child: Row(
-        children: [
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: AppFontWeights.emphasis,
-                color: cs.onSurface.withValues(alpha: 0.75),
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
         ],
       ),
     );

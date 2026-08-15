@@ -169,13 +169,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPageAssistant.
   ///
   /// In en, this message translates to:
-  /// **'Assistant'**
+  /// **'Assistants / Group chats'**
   String get settingsPageAssistant;
 
   /// No description provided for @settingsPageAssistantSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Default assistant and style'**
+  /// **'Assistants, group chats, and conversation style'**
   String get settingsPageAssistantSubtitle;
 
   /// No description provided for @settingsPageModelsServicesSection.
@@ -3308,7 +3308,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantSettingsPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Assistant Settings'**
+  /// **'Assistants / Group chats'**
   String get assistantSettingsPageTitle;
 
   /// No description provided for @assistantSettingsCopyButton.
@@ -3368,13 +3368,13 @@ abstract class AppLocalizations {
   /// No description provided for @desktopAssistantsListTitle.
   ///
   /// In en, this message translates to:
-  /// **'Assistants'**
+  /// **'Assistants / Group chats'**
   String get desktopAssistantsListTitle;
 
   /// No description provided for @desktopSidebarTabAssistants.
   ///
   /// In en, this message translates to:
-  /// **'Assistants'**
+  /// **'Assistants / Group chats'**
   String get desktopSidebarTabAssistants;
 
   /// No description provided for @desktopSidebarTabTopics.
@@ -5700,7 +5700,7 @@ abstract class AppLocalizations {
   /// No description provided for @sideDrawerSearchAssistantsHint.
   ///
   /// In en, this message translates to:
-  /// **'Search assistants'**
+  /// **'Search assistants / group chats'**
   String get sideDrawerSearchAssistantsHint;
 
   /// No description provided for @sideDrawerTopicSearchModeLabel.
@@ -6042,7 +6042,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatInputBarImageMode.
   ///
   /// In en, this message translates to:
-  /// **'Image mode'**
+  /// **'Image mode · Images API'**
   String get chatInputBarImageMode;
 
   /// No description provided for @chatInputBarDisableImageModeTooltip.
@@ -6050,6 +6050,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Turn off image mode'**
   String get chatInputBarDisableImageModeTooltip;
+
+  /// No description provided for @chatInputBarChatMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat API'**
+  String get chatInputBarChatMode;
+
+  /// No description provided for @chatInputBarImageModeInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is image mode?'**
+  String get chatInputBarImageModeInfoTitle;
+
+  /// No description provided for @chatInputBarImageModeInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'With image mode on, your send goes to the OpenAI Images API (/images/generations or /images/edits) and generates image files directly. If your relay or provider does not support this API, turn image mode off to use the chat API (completions) instead — the model returns images as Markdown in its reply. Generation options are only available in image mode.'**
+  String get chatInputBarImageModeInfoBody;
+
+  /// No description provided for @chatInputBarImageModeInfoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn about the two sending interfaces'**
+  String get chatInputBarImageModeInfoTooltip;
+
+  /// No description provided for @chatInputBarImageModeInfoDismissTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get chatInputBarImageModeInfoDismissTooltip;
 
   /// No description provided for @chatInputBarImageWarning.
   ///
@@ -11808,6 +11838,42 @@ abstract class AppLocalizations {
   /// **'Search'**
   String get logViewerFilterSearch;
 
+  /// No description provided for @requestLogAiAnalysisTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask AI to analyze request logs'**
+  String get requestLogAiAnalysisTooltip;
+
+  /// No description provided for @requestLogAiAnalysisNoAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'No current assistant is available to analyze request logs.'**
+  String get requestLogAiAnalysisNoAssistant;
+
+  /// No description provided for @requestLogAiAnalysisNoRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'No request logs are available to analyze.'**
+  String get requestLogAiAnalysisNoRequests;
+
+  /// No description provided for @requestLogAiAnalysisPreparationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t prepare the request log analysis.'**
+  String get requestLogAiAnalysisPreparationFailed;
+
+  /// No description provided for @requestLogAiAnalysisFilePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'request-log-analysis'**
+  String get requestLogAiAnalysisFilePrefix;
+
+  /// No description provided for @requestLogAiAnalysisPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Please analyze the attached request logs and determine the main problem the user is most likely encountering, along with practical solutions.\n\nDo not mechanically repeat or analyze every request. Prioritize error status, failed or repeated failures, unusual latency, request/response mismatches, authentication, rate limiting, parameter formatting, streaming responses, or server-side errors that best explain the issue. Use neighboring logs to identify the likely root cause.\n\nAnswer in this order: main conclusion → key evidence → possible causes → recommended steps. If the evidence is insufficient, clearly say what is uncertain and what still needs checking. `<REDACTED: …>` values were intentionally replaced for privacy; do not treat their absence as the problem or ask the user to provide them.'**
+  String get requestLogAiAnalysisPrompt;
+
   /// No description provided for @logSettingsAutoDelete.
   ///
   /// In en, this message translates to:
@@ -14478,12 +14544,6 @@ abstract class AppLocalizations {
   /// **'(lossless)'**
   String get imageGenLossless;
 
-  /// No description provided for @imageGenPaletteTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation params: {summary}'**
-  String imageGenPaletteTooltip(Object summary);
-
   /// No description provided for @imageGenPartialNotice.
   ///
   /// In en, this message translates to:
@@ -14543,6 +14603,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rename'**
   String get workspaceRename;
+
+  /// No description provided for @workspaceTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get workspaceTerminal;
+
+  /// No description provided for @workspaceTerminalAndroidOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'The workspace terminal is only available on Android.'**
+  String get workspaceTerminalAndroidOnly;
+
+  /// No description provided for @workspaceTerminalReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This workspace is read-only. The terminal is not available.'**
+  String get workspaceTerminalReadOnly;
+
+  /// No description provided for @workspaceTerminalExited.
+  ///
+  /// In en, this message translates to:
+  /// **'The shell has exited.'**
+  String get workspaceTerminalExited;
+
+  /// No description provided for @workspaceTerminalRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get workspaceTerminalRestart;
+
+  /// No description provided for @workspaceTerminalOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to start the terminal: {error}'**
+  String workspaceTerminalOpenFailed(String error);
+
+  /// No description provided for @workspaceTerminalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get workspaceTerminalCopy;
 
   /// No description provided for @workspaceFilesEntry.
   ///
@@ -14640,6 +14742,42 @@ abstract class AppLocalizations {
   /// **'Reinstall'**
   String get workspaceDepReinstall;
 
+  /// No description provided for @workspaceDepQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued…'**
+  String get workspaceDepQueued;
+
+  /// No description provided for @workspaceDepStageDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get workspaceDepStageDownloading;
+
+  /// No description provided for @workspaceDepStageExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting…'**
+  String get workspaceDepStageExtracting;
+
+  /// No description provided for @workspaceDepStageRecover.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairing package state…'**
+  String get workspaceDepStageRecover;
+
+  /// No description provided for @workspaceDepStageUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating package lists…'**
+  String get workspaceDepStageUpdate;
+
+  /// No description provided for @workspaceDepStageInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get workspaceDepStageInstall;
+
   /// No description provided for @workspaceSandboxRuntimeMissing.
   ///
   /// In en, this message translates to:
@@ -14651,6 +14789,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
+
+  /// No description provided for @workspaceSandboxDirEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox system'**
+  String get workspaceSandboxDirEntryTitle;
+
+  /// No description provided for @workspaceSandboxFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox files'**
+  String get workspaceSandboxFilesTitle;
+
+  /// No description provided for @workspaceSandboxNoDeps.
+  ///
+  /// In en, this message translates to:
+  /// **'No dependencies installed'**
+  String get workspaceSandboxNoDeps;
+
+  /// No description provided for @workspaceSandboxSharedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This directory is shared by all workspaces'**
+  String get workspaceSandboxSharedBanner;
 
   /// No description provided for @workspaceDepSource.
   ///
@@ -14741,6 +14903,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
+
+  /// No description provided for @workspaceDepOfficeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document & Office Tools'**
+  String get workspaceDepOfficeTitle;
+
+  /// No description provided for @workspaceDepOfficeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  String get workspaceDepOfficeDesc;
 
   /// No description provided for @workspaceDepBuildTitle.
   ///

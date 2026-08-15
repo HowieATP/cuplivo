@@ -8,6 +8,7 @@ import '../../models/workspace.dart';
 import '../../providers/workspace_provider.dart';
 import '../../services/chat/chat_service.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
+import 'guest_cwd.dart';
 import 'linux_sandbox_service.dart';
 import 'workspace_download_service.dart';
 import 'workspace_path_presentation.dart';
@@ -266,12 +267,19 @@ class WorkspaceToolsService {
       });
     }
     final cwd = args['cwd']?.toString();
+    final normalizedCwd = normalizeGuestCwd(cwd);
+    if (normalizedCwd == null) {
+      return jsonEncode({
+        'error': 'invalid_cwd',
+        'message': 'cwd must be a relative path or under /workspace',
+      });
+    }
     final timeout = (args['timeout'] as num?)?.toInt() ?? 30;
     try {
       final result = await svc.exec(
         workspaceHostPath: host,
         command: command,
-        cwd: cwd,
+        cwd: normalizedCwd,
         timeoutSeconds: timeout
             .clamp(1, LinuxSandboxService.maxShellTimeoutSeconds)
             .toInt(),

@@ -128,46 +128,6 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
     }
   }
 
-  /// Normalizes a guest cwd under /workspace, or returns nil when the value
-  /// escapes the workspace root (…/..), is not a real /workspace subpath
-  /// (/workspaceX), or contains a NUL byte. Blank input maps to "/workspace".
-  /// Mirrors the Dart helper (lib/core/services/workspace/guest_cwd.dart) and
-  /// the Android bridge (issue #400).
-  private func normalizeGuestCwd(_ raw: String?) -> String? {
-    let trimmed = (raw ?? "").trimmingCharacters(in: .whitespaces)
-    if trimmed.isEmpty { return "/workspace" }
-    if trimmed.contains("\0") { return nil }
-
-    let relative: String
-    if trimmed == "/workspace" {
-      return "/workspace"
-    } else if trimmed.hasPrefix("/workspace/") {
-      relative = String(trimmed.dropFirst("/workspace/".count))
-    } else if trimmed.hasPrefix("/workspace") {
-      // "/workspaceX" is not a /workspace subpath.
-      return nil
-    } else {
-      var rel = trimmed
-      while rel.hasPrefix("/") { rel.removeFirst() }
-      relative = rel
-    }
-
-    var segments: [String] = []
-    for part in relative.split(separator: "/") {
-      let segment = String(part)
-      if segment.isEmpty || segment == "." { continue }
-      if segment == ".." {
-        if segments.isEmpty { return nil }  // escapes /workspace
-        segments.removeLast()
-      } else {
-        segments.append(segment)
-      }
-    }
-    return segments.isEmpty
-      ? "/workspace"
-      : "/workspace/" + segments.joined(separator: "/")
-  }
-
   // MARK: - exec
 
   private func cancel(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -294,16 +254,17 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
         return
       }
 
-      // Guest cwd must stay under /workspace. Strictly validate the path
-      // boundary (/workspaceX is not a subpath) and normalize . / .. segments
-      // instead of passing raw text to the guest VFS (issue #400).
-      guard let guestCwd = normalizeGuestCwd(cwd) else {
-        complete(
-          FlutterError(
-            code: "invalid_cwd",
-            message: "cwd must be a relative path or under /workspace",
-            details: nil))
-        return
+      // Guest cwd mapping mirrors Android's GuestCommandRunner.
+      let guestCwd: String
+      let trimmedCwd = cwd?.trimmingCharacters(in: .whitespaces) ?? ""
+      if trimmedCwd.isEmpty {
+        guestCwd = "/workspace"
+      } else if trimmedCwd.hasPrefix("/workspace") {
+        guestCwd = trimmedCwd
+      } else {
+        var rel = trimmedCwd
+        while (rel.hasPrefix("/")) { rel.removeFirst() }
+        guestCwd = "/workspace/\(rel)"
       }
 
       let executionFinished = DispatchSemaphore(value: 0)

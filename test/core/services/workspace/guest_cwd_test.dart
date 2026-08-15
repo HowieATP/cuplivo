@@ -27,5 +27,10 @@ void main() {
       expect(normalizeGuestCwd('/workspace/.'), '/workspace');
       expect(normalizeGuestCwd('/workspace/'), '/workspace');
     });
+
+    test('rejects lookalike prefixes that are not /workspace subpaths', () {
+      expect(normalizeGuestCwd('/workspaceX'), isNull);
+      expect(normalizeGuestCwd('/workspaceX/src'), isNull);
+    });
   });
 }

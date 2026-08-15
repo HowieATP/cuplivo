@@ -992,7 +992,11 @@ class DataSync {
     final sink = file.openWrite();
 
     try {
-      sink.write('{"version":2,');
+      // Upstream (Kelivo) legacy chats.json importer only accepts version 1
+      // (or a missing field); version 2 is rejected with FormatException.
+      // Cuplivo's own importer never reads this field, so exporting v1 keeps
+      // backups importable into Kelivo without affecting Cuplivo round-trips.
+      sink.write('{"version":1,');
 
       // --- conversations ---
       sink.write('"conversations":[');

@@ -12,5 +12,13 @@ void main() {
     test('accepts the exact /workspace root', () {
       expect(normalizeGuestCwd('/workspace'), '/workspace');
     });
+
+    test('accepts relative paths and resolves them under /workspace', () {
+      expect(normalizeGuestCwd('src'), '/workspace/src');
+      expect(normalizeGuestCwd('src/lib'), '/workspace/src/lib');
+      expect(normalizeGuestCwd('/src'), '/workspace/src');
+      expect(normalizeGuestCwd('a//b'), '/workspace/a/b');
+      expect(normalizeGuestCwd('./a'), '/workspace/a');
+    });
   });
 }

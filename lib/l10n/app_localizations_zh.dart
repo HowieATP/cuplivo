@@ -3191,10 +3191,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
+  String get chatInputBarImageMode => '绘图模式 · images 接口';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
+
+  @override
+  String get chatInputBarChatMode => '聊天接口';
+
+  @override
+  String get chatInputBarImageModeInfoTitle => '绘图模式是什么？';
+
+  @override
+  String get chatInputBarImageModeInfoBody =>
+      '开启绘图模式后，发送将调用 OpenAI images 接口（/images/generations 或 /images/edits），由接口直接生成图片文件。若你的中转站或服务商不支持该接口，可关闭绘图模式改用聊天接口（completions），由模型在回复中返回 Markdown 图片。生图参数仅在绘图模式下可用。';
+
+  @override
+  String get chatInputBarImageModeInfoTooltip => '了解两种发送接口的区别';
+
+  @override
+  String get chatInputBarImageModeInfoDismissTooltip => '关闭';
 
   @override
   String get chatInputBarImageWarning => '将忽略图片';
@@ -7657,11 +7673,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageGenLossless => '无损';
 
   @override
-  String imageGenPaletteTooltip(Object summary) {
-    return '生图参数：$summary';
-  }
-
-  @override
   String imageGenPartialNotice(Object received, Object requested) {
     return '仅生成 $received/$requested 张图片';
   }
@@ -11062,10 +11073,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
-  String get chatInputBarImageMode => '绘图模式';
+  String get chatInputBarImageMode => '绘图模式 · images 接口';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
+
+  @override
+  String get chatInputBarChatMode => '聊天接口';
+
+  @override
+  String get chatInputBarImageModeInfoTitle => '绘图模式是什么？';
+
+  @override
+  String get chatInputBarImageModeInfoBody =>
+      '开启绘图模式后，发送将调用 OpenAI images 接口（/images/generations 或 /images/edits），由接口直接生成图片文件。若你的中转站或服务商不支持该接口，可关闭绘图模式改用聊天接口（completions），由模型在回复中返回 Markdown 图片。生图参数仅在绘图模式下可用。';
+
+  @override
+  String get chatInputBarImageModeInfoTooltip => '了解两种发送接口的区别';
+
+  @override
+  String get chatInputBarImageModeInfoDismissTooltip => '关闭';
 
   @override
   String get chatInputBarImageWarning => '将忽略图片';
@@ -15528,11 +15555,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageGenLossless => '无损';
 
   @override
-  String imageGenPaletteTooltip(Object summary) {
-    return '生图参数：$summary';
-  }
-
-  @override
   String imageGenPartialNotice(Object received, Object requested) {
     return '仅生成 $received/$requested 张图片';
   }
@@ -18931,10 +18953,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarVoiceTranscribing => '正在辨識…';
 
   @override
-  String get chatInputBarImageMode => '繪圖模式';
+  String get chatInputBarImageMode => '繪圖模式 · images 介面';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
+
+  @override
+  String get chatInputBarChatMode => '聊天介面';
+
+  @override
+  String get chatInputBarImageModeInfoTitle => '繪圖模式是什麼？';
+
+  @override
+  String get chatInputBarImageModeInfoBody =>
+      '開啟繪圖模式後，傳送將呼叫 OpenAI images 介面（/images/generations 或 /images/edits），由介面直接產生圖片檔案。若你的中轉站或服務商不支援該介面，可關閉繪圖模式改用聊天介面（completions），由模型在回覆中回傳 Markdown 圖片。生圖參數僅在繪圖模式下可用。';
+
+  @override
+  String get chatInputBarImageModeInfoTooltip => '了解兩種傳送介面的差異';
+
+  @override
+  String get chatInputBarImageModeInfoDismissTooltip => '關閉';
 
   @override
   String get chatInputBarImageWarning => '將忽略圖片';
@@ -23397,11 +23435,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get imageGenLossless => '無損';
-
-  @override
-  String imageGenPaletteTooltip(Object summary) {
-    return '生圖參數：$summary';
-  }
 
   @override
   String imageGenPartialNotice(Object received, Object requested) {

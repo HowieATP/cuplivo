@@ -487,99 +487,12 @@ class ImageGenerationOptionsController {
 }
 
 // ---------------------------------------------------------------------------
-// Sheet widget (dual-shell: centered Dialog on desktop, bottom sheet on mobile)
+// Options body (shared: the LivePanel inline expanded card renders this)
 // ---------------------------------------------------------------------------
 
-class ImageGenerationOptionsSheet {
-  /// Desktop: centered Dialog.
-  static Future<void> show(
-    BuildContext context, {
-    required ImageGenerationOptionsController controller,
-    required VoidCallback onChanged,
-  }) {
-    return showDialog<void>(
-      context: context,
-      builder: (_) => _ImageGenerationOptionsShell(
-        controller: controller,
-        onChanged: onChanged,
-        isSheet: false,
-      ),
-    );
-  }
-
-  /// Mobile: bottom sheet.
-  static Future<void> showSheet(
-    BuildContext context, {
-    required ImageGenerationOptionsController controller,
-    required VoidCallback onChanged,
-  }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _ImageGenerationOptionsShell(
-        controller: controller,
-        onChanged: onChanged,
-        isSheet: true,
-      ),
-    );
-  }
-}
-
-class _ImageGenerationOptionsShell extends StatelessWidget {
-  const _ImageGenerationOptionsShell({
-    required this.controller,
-    required this.onChanged,
-    required this.isSheet,
-  });
-
-  final ImageGenerationOptionsController controller;
-  final VoidCallback onChanged;
-  final bool isSheet;
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final maxSheetHeight = math.min(
-      media.size.height * 0.74,
-      media.size.height - media.padding.top - 12,
-    );
-
-    Widget content = ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxSheetHeight),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          bottom: isSheet ? 12 + media.viewInsets.bottom : 16,
-        ),
-        child: _ImageGenerationOptionsBody(
-          controller: controller,
-          onChanged: onChanged,
-        ),
-      ),
-    );
-
-    if (isSheet) {
-      return SafeArea(top: false, child: content);
-    }
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: content,
-      ),
-    );
-  }
-}
-
-class _ImageGenerationOptionsBody extends StatefulWidget {
-  const _ImageGenerationOptionsBody({
+class ImageGenerationOptionsBody extends StatefulWidget {
+  const ImageGenerationOptionsBody({
+    super.key,
     required this.controller,
     required this.onChanged,
   });
@@ -588,13 +501,14 @@ class _ImageGenerationOptionsBody extends StatefulWidget {
   final VoidCallback onChanged;
 
   @override
-  State<_ImageGenerationOptionsBody> createState() =>
+  State<ImageGenerationOptionsBody> createState() =>
       _ImageGenerationOptionsBodyState();
 }
 
 class _ImageGenerationOptionsBodyState
-    extends State<_ImageGenerationOptionsBody> {
+    extends State<ImageGenerationOptionsBody> {
   late final TextEditingController _customRatioController;
+  final _customRatioFocus = FocusNode();
 
   @override
   void initState() {
@@ -605,15 +519,29 @@ class _ImageGenerationOptionsBodyState
   }
 
   @override
+  void didUpdateWidget(covariant ImageGenerationOptionsBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The body is permanently mounted inside the LivePanel expanded card
+    // (unlike the old per-open sheet), so external controller mutations —
+    // queue restore (reset) or model-switch default changes — reach it
+    // through the parent's rebuild. The controller is the source of truth:
+    // re-sync the field, but never under a focused cursor.
+    if (!_customRatioFocus.hasFocus &&
+        _customRatioController.text != widget.controller.customAspectRatio) {
+      _customRatioController.text = widget.controller.customAspectRatio;
+    }
+  }
+
+  @override
   void dispose() {
     _customRatioController.dispose();
+    _customRatioFocus.dispose();
     super.dispose();
   }
 
-  /// The sheet/dialog is a separate Navigator route, so the input bar's own
-  /// setState never rebuilds it — rebuild locally AND notify the caller.
+  /// The parent (LivePanel) owns the rebuild — just forward the change.
   void _handleChange() {
-    setState(() => widget.onChanged());
+    widget.onChanged();
   }
 
   @override
@@ -688,6 +616,7 @@ class _ImageGenerationOptionsBodyState
           const SizedBox(height: 10),
           TextField(
             controller: _customRatioController,
+            focusNode: _customRatioFocus,
             decoration: InputDecoration(
               labelText: l10n.imageGenCustomRatioLabel,
               hintText: l10n.imageGenCustomRatioHint,

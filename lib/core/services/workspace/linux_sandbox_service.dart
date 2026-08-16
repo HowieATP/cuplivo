@@ -1198,13 +1198,47 @@ class LinuxSandboxService {
   }
 
   static String _boundOutput(String value) {
+    return boundOutput(value);
+  }
+
+  /// Bounds [value] to [maxOutputChars] characters, keeping a head/tail
+  /// preview. Cut points are adjusted so a UTF-16 surrogate pair is never
+  /// split: a lone surrogate would make the truncated string unencodable by
+  /// `jsonEncode` and would fail the whole shell tool result serialization.
+  @visibleForTesting
+  static String boundOutput(String value) {
     if (value.length <= maxOutputChars) return value;
     const marker = '\n...[truncated]...\n';
     final available = maxOutputChars - marker.length;
     final head = available ~/ 2;
     final tail = available - head;
-    return '${value.substring(0, head)}$marker'
-        '${value.substring(value.length - tail)}';
+    final headEnd = _utf16SafeCut(value, head, preferPrevious: true);
+    final tailStart = _utf16SafeCut(
+      value,
+      value.length - tail,
+      preferPrevious: false,
+    );
+    return '${value.substring(0, headEnd)}$marker'
+        '${value.substring(tailStart)}';
+  }
+
+  /// Moves [index] off a surrogate-pair boundary so the surrounding cut does
+  /// not leave a lone high/low surrogate behind. With [preferPrevious] a cut
+  /// inside a pair moves one code unit back (the whole pair stays in the
+  /// head); otherwise it moves one code unit forward (the whole pair stays
+  /// in the tail).
+  static int _utf16SafeCut(
+    String value,
+    int index, {
+    required bool preferPrevious,
+  }) {
+    if (index <= 0 || index >= value.length) return index;
+    final prev = value.codeUnitAt(index - 1);
+    final cur = value.codeUnitAt(index);
+    final pairStraddles =
+        prev >= 0xD800 && prev <= 0xDBFF && cur >= 0xDC00 && cur <= 0xDFFF;
+    if (!pairStraddles) return index;
+    return preferPrevious ? index - 1 : index + 1;
   }
 
   /// Allow only plain http(s) mirror base URLs without shell metacharacters.

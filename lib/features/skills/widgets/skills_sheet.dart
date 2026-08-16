@@ -6,6 +6,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
@@ -25,7 +26,8 @@ class SkillsSheet extends StatefulWidget {
   State<SkillsSheet> createState() => _SkillsSheetState();
 }
 
-class _SkillsSheetState extends State<SkillsSheet> {
+class _SkillsSheetState extends State<SkillsSheet>
+    with CollapsibleGroupsMixin<SkillsSheet> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
 
@@ -124,44 +126,75 @@ class _SkillsSheetState extends State<SkillsSheet> {
                           ),
                         ),
                       )
-                    : ListView(
-                        controller: controller,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        children: [
-                          for (final (group, skills) in groupSkillsByCategory(
-                            _skills,
-                          )) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
-                              child: Text(
-                                group ?? l10n.skillsUncategorizedGroup,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: AppFontWeights.emphasis,
-                                  color: cs.onSurface.withValues(alpha: 0.55),
-                                ),
-                              ),
-                            ),
-                            for (final skill in skills)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _SkillSheetRow(
-                                  name: skill.name,
-                                  enabled: assistant.skillIds.contains(
-                                    skill.name,
-                                  ),
-                                  onChanged: (v) =>
-                                      _toggle(assistant, skill.name, v),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
+                    : _buildGroupedList(controller, assistant, l10n, cs),
               ),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildGroupedList(
+    ScrollController controller,
+    Assistant assistant,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) {
+    final groups = groupSkillsByCategory(_skills);
+
+    // When there is only one group, skip collapsible headers.
+    if (groups.length == 1) {
+      final (_, skills) = groups.first;
+      return ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        children: [
+          for (final skill in skills)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SkillSheetRow(
+                name: skill.name,
+                enabled: assistant.skillIds.contains(skill.name),
+                onChanged: (v) => _toggle(assistant, skill.name, v),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return ListView(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        for (final (group, skills) in groups) ...[
+          CollapsibleGroupHeader(
+            groupName: group ?? l10n.skillsUncategorizedGroup,
+            skillCount: skills.length,
+            expanded: isGroupExpanded(group),
+            onTap: () => toggleGroup(group),
+            fontSize: 12.5,
+            fontWeight: AppFontWeights.emphasis,
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
+          ),
+          CollapsibleGroupBody(
+            expanded: isGroupExpanded(group),
+            child: Column(
+              children: [
+                for (final skill in skills)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _SkillSheetRow(
+                      name: skill.name,
+                      enabled: assistant.skillIds.contains(skill.name),
+                      onChanged: (v) => _toggle(assistant, skill.name, v),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

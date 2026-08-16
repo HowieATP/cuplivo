@@ -25,6 +25,7 @@ import '../../../core/services/haptics.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
+import '../../../core/services/workspace/linux_sandbox_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -163,6 +164,7 @@ class HomePageController extends ChangeNotifier {
   late AnimationController _convoFadeController;
   late Animation<double> _convoFade;
   bool _chatControllerReady = false;
+  bool _disposed = false;
 
   // ============================================================================
   // State Fields
@@ -355,6 +357,7 @@ class HomePageController extends ChangeNotifier {
       );
       if (!registered) {
         port.close();
+        debugPrint('[ProactiveCare] Port registration failed');
         FlutterLogger.log(
           'Proactive care port registration failed',
           tag: 'HomePageController',
@@ -364,10 +367,14 @@ class HomePageController extends ChangeNotifier {
       _proactiveCarePort = port;
       port.listen((dynamic data) {
         final assistantId = data?.toString() ?? '';
+        debugPrint(
+          '[ProactiveCare] Main isolate received trigger for $assistantId',
+        );
         if (assistantId.isEmpty) return;
         unawaited(_viewModel.handleProactiveCareTrigger(assistantId));
       });
     } catch (e) {
+      debugPrint('[ProactiveCare] Port setup failed: $e');
       FlutterLogger.log(
         'Proactive care port setup failed: $e',
         tag: 'HomePageController',
@@ -446,6 +453,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      hasActiveTranslation: _translationService.hasActiveRequest,
     );
     _viewModel.addListener(notifyListeners);
 
@@ -667,6 +675,23 @@ class HomePageController extends ChangeNotifier {
     await _chatService.init();
     if (!ctx.mounted) return;
     await assistantProvider.ensureDefaults(ctx);
+    // Re-arm proactive care exact alarms lost after force-stop or process
+    // death. This must run after assistants have finished loading (the
+    // first-frame callback in main.dart captured an empty list) — see
+    // docs/adr/0031-proactive-care-startup-reschedule-and-logging.md.
+    if (ProactiveCareAlarmService.isSupported) {
+      try {
+        await ProactiveCareAlarmService.rescheduleAll(
+          assistantProvider.assistants,
+        );
+      } catch (e) {
+        debugPrint('[ProactiveCare] Startup rescheduleAll failed: $e');
+        FlutterLogger.log(
+          'Proactive care startup rescheduleAll failed: $e',
+          tag: 'HomePageController',
+        );
+      }
+    }
     if (prefs.newChatOnLaunch) {
       await _createNewConversation();
     } else {
@@ -1146,6 +1171,19 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> createNewConversationAnimated() async {
+    await _createNewConversationAnimated();
+  }
+
+  /// Creates a normal new draft conversation and restores [draft] into its
+  /// composer without sending it. Used by actions that originate outside the
+  /// chat route, such as request-log AI analysis.
+  Future<bool> createNewConversationWithDraft(ChatInputData draft) {
+    return _createNewConversationAnimated(initialDraft: draft);
+  }
+
+  Future<bool> _createNewConversationAnimated({
+    ChatInputData? initialDraft,
+  }) async {
     // Guardrail: block rapid creation if conversation has only preset messages
     if (_shouldBlockNewConversation) {
       final l10n = AppLocalizations.of(_context)!;
@@ -1154,7 +1192,7 @@ class HomePageController extends ChangeNotifier {
         message: l10n.homePagePresetConversationBlocked,
         type: NotificationType.warning,
       );
-      return;
+      return false;
     }
     try {
       await _viewModel.flushCurrentConversationProgress();
@@ -1166,6 +1204,15 @@ class HomePageController extends ChangeNotifier {
       } catch (_) {}
     }
     await _createNewConversation();
+    if (initialDraft != null) {
+      _inputController.value = TextEditingValue(
+        text: initialDraft.text,
+        selection: TextSelection.collapsed(offset: initialDraft.text.length),
+        composing: TextRange.empty,
+      );
+      _mediaController.restoreInput(initialDraft);
+      notifyListeners();
+    }
     _scrollCtrl.clearObserverCache();
     if (!isDesktopPlatform) {
       try {
@@ -1177,6 +1224,7 @@ class HomePageController extends ChangeNotifier {
         _inputFocus.requestFocus();
       });
     }
+    return true;
   }
 
   bool get _shouldBlockNewConversation {
@@ -1520,39 +1568,52 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> translateMessage(ChatMessage message) async {
+    if (_disposed) return;
     final ctx = _scaffoldKey.currentContext ?? _context;
     final l10n = AppLocalizations.of(ctx)!;
 
     final result = await _translationService.translateMessage(
       message: message,
       onTranslationStarted: () {
-        final loadingMessage = message.copyWith(
-          translation: l10n.homePageTranslating,
-        );
+        if (_disposed) return;
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
-          messages[index] = loadingMessage;
+          // Apply on the current row, not the stale invocation snapshot:
+          // this callback fires after the language selector closes, so the
+          // message may have kept streaming (or finished) in the meantime.
+          messages[index] = messages[index].copyWith(
+            translation: l10n.homePageTranslating,
+          );
         }
-        // Messages are mutated externally; invalidate ChatController caches so
-        // collapsed/grouped views reflect updates immediately.
+        _streamController.streamingContentNotifier.getNotifier(message.id);
         _chatController.invalidateCache();
         _translations[message.id] = TranslationData();
         notifyListeners();
       },
       onTranslationUpdate: (translation) {
-        final updatingMessage = message.copyWith(translation: translation);
-        final index = messages.indexWhere((m) => m.id == message.id);
-        if (index != -1) {
-          messages[index] = updatingMessage;
-        }
-        _chatController.invalidateCache();
-        notifyListeners();
+        if (_disposed) return;
+        _streamController.streamingContentNotifier.updateTranslation(
+          message.id,
+          translation,
+        );
       },
       onTranslationCleared: () {
-        final clearedMessage = message.copyWith(translation: '');
+        if (_disposed) return;
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
-          messages[index] = clearedMessage;
+          // Apply on the current row, not the stale invocation snapshot.
+          messages[index] = messages[index].copyWith(translation: '');
+        }
+        // The notifier is shared with the generation pipeline; a still-
+        // streaming message must keep receiving live content updates.
+        final liveRow = index != -1 && messages[index].isStreaming;
+        if (liveRow) {
+          _streamController.streamingContentNotifier.updateTranslation(
+            message.id,
+            '',
+          );
+        } else {
+          _streamController.streamingContentNotifier.removeNotifier(message.id);
         }
         _chatController.invalidateCache();
         _translations.remove(message.id);
@@ -1560,7 +1621,42 @@ class HomePageController extends ChangeNotifier {
       },
     );
 
-    if (result.isCancelled) return;
+    if (_disposed) return;
+    if (result.isCancelled) {
+      // A cancelled request may have been the owner keeping a completed
+      // source message's notifier alive. Do not remove it if a replacement
+      // request is already active for the same message.
+      _removeTranslationNotifierIfSettled(message.id);
+      return;
+    }
+    _removeTranslationNotifierIfSettled(message.id);
+    if (result.isSuccess) {
+      final finalTranslation = result.translation ?? '';
+      final index = messages.indexWhere((m) => m.id == message.id);
+      if (index != -1) {
+        // Apply on the current row: `message` is the snapshot captured at
+        // translateMessage() time and may be stale by now.
+        messages[index] = messages[index].copyWith(
+          translation: finalTranslation,
+        );
+      }
+      // The notifier is shared with the generation pipeline; translating a
+      // still-streaming message must not sever its live content updates.
+      // The generation completion path removes the notifier itself.
+      final liveRow = index != -1 && messages[index].isStreaming;
+      if (!liveRow) {
+        _streamController.streamingContentNotifier.removeNotifier(message.id);
+      }
+      // Reset (not remove) the UI state entry so a previously collapsed box
+      // does not stay collapsed after the translation completes. Removing it
+      // would disable the collapse toggle entirely: both the message row's
+      // onToggleTranslation wiring and toggleTranslation() require a live
+      // entry to exist.
+      _translations[message.id] = TranslationData();
+      _chatController.invalidateCache();
+      notifyListeners();
+      return;
+    }
     if (!ctx.mounted) return;
 
     if (result.type == TranslationResultType.noModelConfigured) {
@@ -1579,6 +1675,13 @@ class HomePageController extends ChangeNotifier {
         type: NotificationType.error,
       );
     }
+  }
+
+  void _removeTranslationNotifierIfSettled(String messageId) {
+    if (_translationService.hasActiveRequest(messageId)) return;
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index == -1 || messages[index].isStreaming) return;
+    _streamController.streamingContentNotifier.removeNotifier(messageId);
   }
 
   void _handleAssistantMessageFinished(ChatMessage message) {
@@ -2707,6 +2810,16 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _translationService.cancelAll();
+    if (_chatControllerReady) {
+      final conversationId = currentConversation?.id;
+      if (conversationId != null) {
+        unawaited(
+          LinuxSandboxService.instance.cancelForConversation(conversationId),
+        );
+      }
+    }
     _proactiveCarePort?.close();
     IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
     _convoFadeController.dispose();

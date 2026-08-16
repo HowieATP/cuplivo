@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.0.1] - 2026-08-15
+
+> ℹ️ v3.0.1 is the first stable release of the v3 line. v3 mainly introduced the sandbox and speech recognition, improved multi-workspace, and retired the built-in fetch, filesystem, and subagent MCP servers — this may be a breaking change. See [https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0](https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0) for details.
+
+### Added
+
+- **Android interactive terminal**: a Termux-like terminal can be opened on Android, independent of the Shell tool; no keep-alive yet, no persistence across restarts (#428 by @Pheobe-Southwood)
+- Image-mode refactor: image-generation options moved into a collapsible live panel, with quick switching from chat mode to image mode and usage notes (#438 by @cup113)
+- AI log analysis: let AI analyze redacted logs right from the request log UI (#390 by @banana4432)
+- Tool API: OpenRouter image generation tool compatibility (#346 by @cup113, @Chevey339)
+- Skills: collapsible groups (#426 by @xuanxuan9929, @cup113)
+- Rendering: compatible with `<thinking></thinking>` reasoning tags (#354 by @cup113, @Chevey339)
+
+### Changed
+
+- Multi-assistant group chats merged into the assistant list to reduce entry clutter (#403 by @banana4432)
+- Disabled .so compression for faster cold start and lower post-install storage (#353 by @Pheobe-Southwood)
+- Updated the reasoning content replay mechanism (#351 by @cup113, @Chevey339)
+- Sandbox commands now inject GOMAXPROCS/GODEBUG to lower Go runtime overhead under emulation (#376 by @xuanxuan9929)
+
+### Fixed
+
+- Fixed **iOS** background tasks not starting due to an identifier naming mismatch (#382 by @HowieATP)
+- Fixed **shell** tool calls causing **crashes/freezes** (#431 by @Pheobe-Southwood, #383 by @HowieATP)
+- Fixed an Android sandbox dependency-install race that could corrupt the filesystem (#408 by @Pheobe-Southwood)
+- Fixed proactive care "Ta's message" not triggering when the foreground countdown elapsed (#424 by @Pheobe-Southwood)
+- Fixed sandbox dependencies being invisible (#427 by @Pheobe-Southwood)
+- Fixed DeepSeek Responses API reasoning and cache-hit anomalies (#368 by @cup113, @Chevey339)
+
 ## [3.0.0] - 2026-08-13
 
 > ⚠️ Major release — features may be unstable. Replacing built-in MCP with local tools is a breaking change: historical task context may be polluted, but newly-created conversations are unaffected.

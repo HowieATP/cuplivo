@@ -23,6 +23,7 @@ import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/workspace_provider.dart';
+import 'features/workspace/controllers/dependency_install_controller.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
@@ -212,6 +213,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
+        ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(
           create: (ctx) =>
               AssistantProvider(chatService: ctx.read<ChatService>()),
@@ -386,11 +388,6 @@ class MyApp extends StatelessWidget {
                     final mode = settings.androidBackgroundChatMode;
                     final l10n = AppLocalizations.of(context);
                     if (l10n == null) return;
-                    // Capture before any async gap to satisfy
-                    // use_build_context_synchronously.
-                    final allAssistants = context
-                        .read<AssistantProvider>()
-                        .assistants;
                     if (mode != AndroidBackgroundChatMode.off) {
                       // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
@@ -411,14 +408,14 @@ class MyApp extends StatelessWidget {
                         await NotificationService.ensureAndroidNotificationsPermission();
                       }
                     }
-                    // Initialize proactive care alarms (reschedule any pending).
-                    // This runs regardless of background chat mode, because
-                    // proactive care uses its own exact-alarm mechanism
-                    // independent of the background chat service.
+                    // Persist l10n strings so the background isolate can use
+                    // localized text instead of English fallbacks. Alarm
+                    // recovery (rescheduleAll) runs in HomePageController
+                    // initChat after assistants finish loading — the
+                    // assistant list is not available at first frame, see
+                    // docs/adr/0031-proactive-care-startup-reschedule-and-logging.md.
                     try {
                       if (ProactiveCareAlarmService.isSupported) {
-                        // Persist l10n strings so the background isolate can
-                        // use localized text instead of English fallbacks.
                         await ProactiveCareL10nSnapshot.save(
                           defaultConversationTitle:
                               l10n.chatServiceDefaultConversationTitle,
@@ -429,15 +426,16 @@ class MyApp extends StatelessWidget {
                           failureNotificationBody:
                               l10n.proactiveCareFailedNotificationBody,
                         );
-                        // Recover alarms lost after force-stop or process
-                        // death by re-scheduling all enabled assistants.
-                        await ProactiveCareAlarmService.rescheduleAll(
-                          allAssistants,
-                        );
                       }
-                    } catch (_) {}
+                    } catch (e) {
+                      debugPrint(
+                        '[ProactiveCare] L10n snapshot save failed: $e',
+                      );
+                    }
                   }
-                } catch (_) {}
+                } catch (e) {
+                  debugPrint('[main] Android background setup failed: $e');
+                }
               });
 
               final useDyn = isAndroid && settings.useDynamicColor;

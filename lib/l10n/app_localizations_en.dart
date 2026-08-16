@@ -44,10 +44,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Appearance, behavior, and interaction preferences';
 
   @override
-  String get settingsPageAssistant => 'Assistant';
+  String get settingsPageAssistant => 'Assistants / Group chats';
 
   @override
-  String get settingsPageAssistantSubtitle => 'Default assistant and style';
+  String get settingsPageAssistantSubtitle =>
+      'Assistants, group chats, and conversation style';
 
   @override
   String get settingsPageModelsServicesSection => 'Models & Services';
@@ -1786,7 +1787,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditModelUseGlobalDefault => 'Use global default';
 
   @override
-  String get assistantSettingsPageTitle => 'Assistant Settings';
+  String get assistantSettingsPageTitle => 'Assistants / Group chats';
 
   @override
   String get assistantSettingsCopyButton => 'Copy';
@@ -1816,10 +1817,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantSettingsAddSheetSave => 'Save';
 
   @override
-  String get desktopAssistantsListTitle => 'Assistants';
+  String get desktopAssistantsListTitle => 'Assistants / Group chats';
 
   @override
-  String get desktopSidebarTabAssistants => 'Assistants';
+  String get desktopSidebarTabAssistants => 'Assistants / Group chats';
 
   @override
   String get desktopSidebarTabTopics => 'Topics';
@@ -3126,7 +3127,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerSearchHint => 'Search current assistant';
 
   @override
-  String get sideDrawerSearchAssistantsHint => 'Search assistants';
+  String get sideDrawerSearchAssistantsHint =>
+      'Search assistants / group chats';
 
   @override
   String get sideDrawerTopicSearchModeLabel => 'Topic mode';
@@ -3311,10 +3313,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarVoiceTranscribing => 'Recognizing…';
 
   @override
-  String get chatInputBarImageMode => 'Image mode';
+  String get chatInputBarImageMode => 'Image mode · Images API';
 
   @override
   String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
+
+  @override
+  String get chatInputBarChatMode => 'Chat API';
+
+  @override
+  String get chatInputBarImageModeInfoTitle => 'What is image mode?';
+
+  @override
+  String get chatInputBarImageModeInfoBody =>
+      'With image mode on, your send goes to the OpenAI Images API (/images/generations or /images/edits) and generates image files directly. If your relay or provider does not support this API, turn image mode off to use the chat API (completions) instead — the model returns images as Markdown in its reply. Generation options are only available in image mode.';
+
+  @override
+  String get chatInputBarImageModeInfoTooltip =>
+      'Learn about the two sending interfaces';
+
+  @override
+  String get chatInputBarImageModeInfoDismissTooltip => 'Close';
 
   @override
   String get chatInputBarImageWarning => 'Images will be ignored';
@@ -6485,6 +6504,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logViewerFilterSearch => 'Search';
 
   @override
+  String get requestLogAiAnalysisTooltip => 'Ask AI to analyze request logs';
+
+  @override
+  String get requestLogAiAnalysisNoAssistant =>
+      'No current assistant is available to analyze request logs.';
+
+  @override
+  String get requestLogAiAnalysisNoRequests =>
+      'No request logs are available to analyze.';
+
+  @override
+  String get requestLogAiAnalysisPreparationFailed =>
+      'Couldn\'t prepare the request log analysis.';
+
+  @override
+  String get requestLogAiAnalysisFilePrefix => 'request-log-analysis';
+
+  @override
+  String get requestLogAiAnalysisPrompt =>
+      'Please analyze the attached request logs and determine the main problem the user is most likely encountering, along with practical solutions.\n\nDo not mechanically repeat or analyze every request. Prioritize error status, failed or repeated failures, unusual latency, request/response mismatches, authentication, rate limiting, parameter formatting, streaming responses, or server-side errors that best explain the issue. Use neighboring logs to identify the likely root cause.\n\nAnswer in this order: main conclusion → key evidence → possible causes → recommended steps. If the evidence is insufficient, clearly say what is uncertain and what still needs checking. `<REDACTED: …>` values were intentionally replaced for privacy; do not treat their absence as the problem or ask the user to provide them.';
+
+  @override
   String get logSettingsAutoDelete => 'Auto-delete';
 
   @override
@@ -8010,11 +8051,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageGenLossless => '(lossless)';
 
   @override
-  String imageGenPaletteTooltip(Object summary) {
-    return 'Generation params: $summary';
-  }
-
-  @override
   String imageGenPartialNotice(Object received, Object requested) {
     return 'Only $received/$requested images were generated.';
   }
@@ -8046,6 +8082,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceRename => 'Rename';
+
+  @override
+  String get workspaceTerminal => 'Terminal';
+
+  @override
+  String get workspaceTerminalAndroidOnly =>
+      'The workspace terminal is only available on Android.';
+
+  @override
+  String get workspaceTerminalReadOnly =>
+      'This workspace is read-only. The terminal is not available.';
+
+  @override
+  String get workspaceTerminalExited => 'The shell has exited.';
+
+  @override
+  String get workspaceTerminalRestart => 'Restart';
+
+  @override
+  String workspaceTerminalOpenFailed(String error) {
+    return 'Failed to start the terminal: $error';
+  }
+
+  @override
+  String get workspaceTerminalCopy => 'Copy';
 
   @override
   String get workspaceFilesEntry => 'Workspace files';
@@ -8098,12 +8159,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepReinstall => 'Reinstall';
 
   @override
+  String get workspaceDepQueued => 'Queued…';
+
+  @override
+  String get workspaceDepStageDownloading => 'Downloading…';
+
+  @override
+  String get workspaceDepStageExtracting => 'Extracting…';
+
+  @override
+  String get workspaceDepStageRecover => 'Repairing package state…';
+
+  @override
+  String get workspaceDepStageUpdate => 'Updating package lists…';
+
+  @override
+  String get workspaceDepStageInstall => 'Installing…';
+
+  @override
   String get workspaceSandboxRuntimeMissing =>
       'Sandbox runtime missing; reinstall this app build';
 
   @override
   String get workspaceSandboxBaseRequired =>
       'Install the base dependency first';
+
+  @override
+  String get workspaceSandboxDirEntryTitle => 'Sandbox system';
+
+  @override
+  String get workspaceSandboxFilesTitle => 'Sandbox files';
+
+  @override
+  String get workspaceSandboxNoDeps => 'No dependencies installed';
+
+  @override
+  String get workspaceSandboxSharedBanner =>
+      'This directory is shared by all workspaces';
 
   @override
   String get workspaceDepSource => 'Install source';
@@ -8149,6 +8241,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceDepGitDesc => 'Version control tools';
+
+  @override
+  String get workspaceDepOfficeTitle => 'Document & Office Tools';
+
+  @override
+  String get workspaceDepOfficeDesc =>
+      'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
 
   @override
   String get workspaceDepBuildTitle => 'Build tools';

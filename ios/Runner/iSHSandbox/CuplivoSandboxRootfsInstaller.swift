@@ -32,7 +32,10 @@ enum SandboxRootfsInstallerError: Error, LocalizedError {
 final class CuplivoSandboxRootfsInstaller {
   static let resourceName = "alpine-rootfs"
 
-  /// Extract the bundled rootfs zip into `destDir` (created fresh).
+  /// Install the bundled rootfs zip into `destDir` atomically: the archive is
+  /// first extracted into a sibling staging directory and structurally
+  /// verified, then replaced with a backup for recovery. A failed
+  /// or cancelled install never deletes the previously usable rootfs.
   static func install(to destDir: URL, isCancelled: () -> Bool = { false }) throws {
     guard let zipURL = Bundle.main.url(forResource: resourceName, withExtension: "zip") else {
       throw SandboxRootfsInstallerError.bundleResourceMissing
@@ -42,47 +45,246 @@ final class CuplivoSandboxRootfsInstaller {
     }
 
     let fm = FileManager.default
+    let parent = destDir.deletingLastPathComponent()
+    try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+    try recoverInterruptedInstall(to: destDir, fileManager: fm)
+
+    let staging = parent.appendingPathComponent(
+      "\(destDir.lastPathComponent).staging-\(UUID().uuidString)"
+    )
+
     do {
       if isCancelled() {
         throw SandboxRootfsInstallerError.cancelled
       }
-      if fm.fileExists(atPath: destDir.path) {
-        try fm.removeItem(at: destDir)
-      }
-      try fm.createDirectory(at: destDir, withIntermediateDirectories: true)
-
-      let destBase = destDir.standardizedFileURL.path
-      for entry in archive.entries {
-        if isCancelled() {
-          throw SandboxRootfsInstallerError.cancelled
-        }
-        // Zip-slip guard: resolved path must stay inside destDir.
-        let entryURL = destDir.appendingPathComponent(entry.path).standardizedFileURL
-        guard entryURL.path == destBase || entryURL.path.hasPrefix(destBase + "/") else {
-          throw SandboxRootfsInstallerError.unsafeEntryPath(entry.path)
-        }
-        if entry.isDirectory {
-          try fm.createDirectory(at: entryURL, withIntermediateDirectories: true)
-          continue
-        }
-        let parent = entryURL.deletingLastPathComponent()
-        if !fm.fileExists(atPath: parent.path) {
-          try fm.createDirectory(at: parent, withIntermediateDirectories: true)
-        }
-        guard let data = try archive.extractData(for: entry) else {
-          throw SandboxRootfsInstallerError.extractionFailed("Failed to extract \(entry.path)")
-        }
-        if isCancelled() {
-          throw SandboxRootfsInstallerError.cancelled
-        }
-        try data.write(to: entryURL)
-      }
-      NSLog("CuplivoSandboxRootfsInstaller: extracted \(archive.entries.count) entries to \(destDir.path)")
+      try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+      try extract(archive: archive, into: staging, isCancelled: isCancelled)
+      try commitStagedRootfs(
+        staging,
+        to: destDir,
+        isCancelled: isCancelled,
+        fileManager: fm
+      )
+      cleanupArtifactsIfDestinationUsable(at: destDir, fileManager: fm)
+      NSLog(
+        "CuplivoSandboxRootfsInstaller: installed \(archive.entries.count) entries to \(destDir.path)"
+      )
     } catch {
-      // A cancelled or failed install must not leave a directory that looks
-      // like a usable rootfs to the next readiness probe.
-      try? fm.removeItem(at: destDir)
+      removeArtifact(staging, fileManager: fm)
       throw error
+    }
+  }
+
+  static func commitStagedRootfs(
+    _ staging: URL,
+    to destDir: URL,
+    isCancelled: () -> Bool = { false },
+    fileManager fm: FileManager = .default
+  ) throws {
+    try verifyRootfs(at: staging)
+    if isCancelled() {
+      throw SandboxRootfsInstallerError.cancelled
+    }
+
+    guard fm.fileExists(atPath: destDir.path) else {
+      try fm.moveItem(at: staging, to: destDir)
+      return
+    }
+
+    let backupName = "\(destDir.lastPathComponent).backup-\(UUID().uuidString)"
+    let backup = destDir.deletingLastPathComponent().appendingPathComponent(backupName)
+    do {
+      _ = try fm.replaceItemAt(
+        destDir,
+        withItemAt: staging,
+        backupItemName: backupName,
+        options: [.usingNewMetadataOnly, .withoutDeletingBackupItem]
+      )
+    } catch {
+      NSLog(
+        "CuplivoSandboxRootfsInstaller: atomic replace failed; "
+          + "original/backup retained when available: \(error)"
+      )
+      throw error
+    }
+    removeArtifact(backup, fileManager: fm)
+  }
+
+  static func recoverInterruptedInstall(
+    to destDir: URL,
+    fileManager fm: FileManager = .default
+  ) throws {
+    let parent = destDir.deletingLastPathComponent()
+    let candidates: [URL]
+    do {
+      candidates = try fm.contentsOfDirectory(
+        at: parent,
+        includingPropertiesForKeys: [.isRegularFileKey]
+      )
+    } catch {
+      throw SandboxRootfsInstallerError.extractionFailed(
+        "Failed to inspect interrupted rootfs installs: \(error.localizedDescription)"
+      )
+    }
+
+    if isUsableRootfs(at: destDir) {
+      cleanupArtifacts(candidates, for: destDir, fileManager: fm)
+      return
+    }
+
+    let backupPrefix = "\(destDir.lastPathComponent).backup-"
+    let usableBackups = candidates.filter {
+      $0.lastPathComponent.hasPrefix(backupPrefix) && isUsableRootfs(at: $0)
+    }
+    guard usableBackups.count <= 1 else {
+      throw SandboxRootfsInstallerError.extractionFailed(
+        "Multiple usable rootfs backups found; refusing ambiguous recovery"
+      )
+    }
+    guard let backup = usableBackups.first else {
+      return
+    }
+
+    let displaced = parent.appendingPathComponent(
+      "\(destDir.lastPathComponent).staging-recovery-\(UUID().uuidString)"
+    )
+    let hadDestination = fm.fileExists(atPath: destDir.path)
+    if hadDestination {
+      try fm.moveItem(at: destDir, to: displaced)
+    }
+    do {
+      try fm.moveItem(at: backup, to: destDir)
+    } catch {
+      if hadDestination {
+        do {
+          try fm.moveItem(at: displaced, to: destDir)
+        } catch let rollbackError {
+          NSLog(
+            "CuplivoSandboxRootfsInstaller: recovery rollback failed: \(rollbackError)"
+          )
+        }
+      }
+      throw SandboxRootfsInstallerError.extractionFailed(
+        "Failed to restore rootfs backup: \(error.localizedDescription)"
+      )
+    }
+
+    cleanupArtifactsIfDestinationUsable(at: destDir, fileManager: fm)
+    NSLog("CuplivoSandboxRootfsInstaller: restored interrupted rootfs backup")
+  }
+
+  private static func extract(
+    archive: SandboxZipArchive,
+    into destDir: URL,
+    isCancelled: () -> Bool
+  ) throws {
+    let fm = FileManager.default
+    let destBase = destDir.standardizedFileURL.path
+    for entry in archive.entries {
+      if isCancelled() {
+        throw SandboxRootfsInstallerError.cancelled
+      }
+      // Zip-slip guard: resolved path must stay inside destDir.
+      let entryURL = destDir.appendingPathComponent(entry.path).standardizedFileURL
+      guard entryURL.path == destBase || entryURL.path.hasPrefix(destBase + "/") else {
+        throw SandboxRootfsInstallerError.unsafeEntryPath(entry.path)
+      }
+      if entry.isDirectory {
+        try fm.createDirectory(at: entryURL, withIntermediateDirectories: true)
+        continue
+      }
+      let parent = entryURL.deletingLastPathComponent()
+      if !fm.fileExists(atPath: parent.path) {
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+      }
+      guard let data = try archive.extractData(for: entry) else {
+        throw SandboxRootfsInstallerError.extractionFailed("Failed to extract \(entry.path)")
+      }
+      if isCancelled() {
+        throw SandboxRootfsInstallerError.cancelled
+      }
+      try data.write(to: entryURL)
+    }
+  }
+
+  /// Lightweight structural validation of a staged rootfs before it replaces
+  /// the live one. Complements the deeper ZIP-integrity work tracked
+  /// separately: a truncated or mis-extracted fakefs must never be committed
+  /// as the active rootfs.
+  static func verifyRootfs(at dir: URL) throws {
+    for probe in ["meta.db", "data/bin/busybox", ".arch"] {
+      let url = dir.appendingPathComponent(probe)
+      let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+      guard values?.isRegularFile == true else {
+        throw SandboxRootfsInstallerError.extractionFailed(
+          "staged rootfs missing regular file \(probe)"
+        )
+      }
+    }
+    let arch: String
+    do {
+      arch = try String(contentsOf: dir.appendingPathComponent(".arch"), encoding: .utf8)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    } catch {
+      throw SandboxRootfsInstallerError.extractionFailed(
+        "staged rootfs .arch unreadable: \(error.localizedDescription)"
+      )
+    }
+    guard arch == "aarch64" else {
+      throw SandboxRootfsInstallerError.extractionFailed(
+        "staged rootfs arch mismatch (\(arch))"
+      )
+    }
+  }
+
+  private static func isUsableRootfs(at url: URL) -> Bool {
+    do {
+      try verifyRootfs(at: url)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private static func cleanupArtifactsIfDestinationUsable(
+    at destDir: URL,
+    fileManager fm: FileManager
+  ) {
+    guard isUsableRootfs(at: destDir) else { return }
+    do {
+      let candidates = try fm.contentsOfDirectory(
+        at: destDir.deletingLastPathComponent(),
+        includingPropertiesForKeys: nil
+      )
+      cleanupArtifacts(candidates, for: destDir, fileManager: fm)
+    } catch {
+      NSLog("CuplivoSandboxRootfsInstaller: artifact scan failed: \(error)")
+    }
+  }
+
+  private static func cleanupArtifacts(
+    _ candidates: [URL],
+    for destDir: URL,
+    fileManager fm: FileManager
+  ) {
+    let stagingPrefix = "\(destDir.lastPathComponent).staging-"
+    let backupPrefix = "\(destDir.lastPathComponent).backup-"
+    for url in candidates where url.standardizedFileURL != destDir.standardizedFileURL {
+      let name = url.lastPathComponent
+      if name.hasPrefix(stagingPrefix) || name.hasPrefix(backupPrefix) {
+        removeArtifact(url, fileManager: fm)
+      }
+    }
+  }
+
+  private static func removeArtifact(_ url: URL, fileManager fm: FileManager) {
+    guard fm.fileExists(atPath: url.path) else { return }
+    do {
+      try fm.removeItem(at: url)
+    } catch {
+      NSLog(
+        "CuplivoSandboxRootfsInstaller: failed to clean \(url.lastPathComponent): \(error)"
+      )
     }
   }
 }

@@ -12,6 +12,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
+import 'image_generation_options.dart';
 import 'model_icon.dart';
 
 /// Callback for checking if a model supports tool calling.
@@ -70,6 +71,7 @@ class ChatInputSection extends StatelessWidget {
     this.backgroundImageActive = false,
     this.multiAIModelCount,
     this.onMultiSelectModel,
+    this.imageGenController,
   });
 
   final GlobalKey inputBarKey;
@@ -115,6 +117,11 @@ class ChatInputSection extends StatelessWidget {
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
+
+  /// Shared image-generation options controller (home page owned), forwarded
+  /// to the bar so the LivePanel inline card and the bar snapshot one
+  /// controller.
+  final ImageGenerationOptionsController? imageGenController;
 
   @override
   Widget build(BuildContext context) {
@@ -225,6 +232,7 @@ class ChatInputSection extends StatelessWidget {
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
       multiAIModelCount: multiAIModelCount,
       onMultiSelectModel: onMultiSelectModel,
+      imageGenController: imageGenController,
     );
   }
 

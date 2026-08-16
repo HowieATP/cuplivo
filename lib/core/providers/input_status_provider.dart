@@ -16,7 +16,6 @@ import 'package:flutter/foundation.dart';
 /// mark the ancestor `InheritedProviderScope` dirty mid-build (an assert).
 class InputStatusProvider extends ChangeNotifier {
   String? _imageModeModelKey;
-  String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
   String? _imageWarningModelKey;
   String? _lastImageWarningModelKey;
@@ -30,6 +29,14 @@ class InputStatusProvider extends ChangeNotifier {
   bool get imageModeActive =>
       _imageModeModelKey != null &&
       _imageModeModelKey != _dismissedImageModeModelKey;
+
+  /// True when the current model supports OpenAI image routing but the mode
+  /// has been dismissed for that model (the "Chat API" info pill). The
+  /// dismissal sticks to the model for the whole session — the only way back
+  /// is [restoreImageMode].
+  bool get imageModeDismissed =>
+      _imageModeModelKey != null &&
+      _imageModeModelKey == _dismissedImageModeModelKey;
 
   /// True when images are attached to a model that cannot consume them and
   /// OCR is inactive (the "ImageOff" warning pill), not yet dismissed.
@@ -53,15 +60,13 @@ class InputStatusProvider extends ChangeNotifier {
   }
 
   /// Reports the current model's image-mode key (null when unsupported).
-  /// Resets the per-model dismissal when the key changes. Called from the
-  /// input bar's build; notifies only when an observable value changed.
+  /// The dismissal is sticky: it is keyed to the model (the key includes the
+  /// provider and model id, NOT the conversation) and survives switching away
+  /// and back within the session. Called from the input bar's build; notifies
+  /// only when an observable value changed.
   void updateImageModeKey(String? key, {String? conversationId}) {
     final beforeActive = imageModeActive;
     final beforeAllow = allowImagesApiRoutingFor(conversationId);
-    if (key != _lastImageModeModelKey) {
-      _dismissedImageModeModelKey = null;
-      _lastImageModeModelKey = key;
-    }
     _imageModeModelKey = key;
     if (imageModeActive != beforeActive ||
         allowImagesApiRoutingFor(conversationId) != beforeAllow) {
@@ -101,6 +106,14 @@ class InputStatusProvider extends ChangeNotifier {
     _scheduleNotify();
   }
 
+  /// Re-enables image mode for the current model key (the "Chat API" pill
+  /// tap). The one-step recovery path for an accidental [dismissImageMode].
+  void restoreImageMode() {
+    if (!imageModeDismissed) return;
+    _dismissedImageModeModelKey = null;
+    _scheduleNotify();
+  }
+
   /// Dismisses the image-warning pill for the current model key.
   void dismissImageWarning() {
     if (!imageWarningActive) return;
@@ -112,6 +125,22 @@ class InputStatusProvider extends ChangeNotifier {
   /// input that wanted routing but finds no routing model sets the one-shot
   /// "must not route" flag (scoped to [conversationId]); a restored input that
   /// did not want routing dismisses image mode for the current model.
+  ///
+  /// NOTE: both branches affect the STICKY per-model dismissal, so a queue
+  /// restore re-dismisses (allow=false) OR revives (allow=true) the model for
+  /// EVERY conversation using it in the session, not just this one. This is
+  /// intentional: the queued-input metadata is the durable record of how the
+  /// message was queued, and restore replays it faithfully (same principle as
+  /// regenerate replaying per-message request metadata). The dismissal's
+  /// deliberate user entry points are only the pill ✕ and the chat-API pill;
+  /// the restore path is a replay, not a user preference change. Queued
+  /// drafts with allow=false imply the model was dismissed (or unsupported)
+  /// when the snapshot was taken, so the re-dismissal is usually a no-op; the
+  /// remaining edges are re-dismissing after the user already restored via
+  /// the chat-API pill, and reviving via allow=true a model the user ✕-dismissed
+  /// after queueing the draft — the pill reappears in every conversation
+  /// using the model, and the user can ✕ again (or restore is the desired
+  /// outcome of having queued a routing-enabled draft).
   void restoreAllowImagesApiRouting({
     required bool allow,
     required String? conversationId,

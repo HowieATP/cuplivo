@@ -328,6 +328,57 @@ void main() {
     focusNode.dispose();
   });
 
+  testWidgets('路由模型恢复排队草稿时发送携带路由与生图参数', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final settings = SettingsProvider();
+    await settings.setProviderConfig(
+      'OpenAITest',
+      ProviderConfig(
+        id: 'OpenAITest',
+        enabled: true,
+        name: 'OpenAITest',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+      ),
+    );
+    await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settingsProvider: settings,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'draw a cat',
+        allowImagesApiRouting: true,
+        extraBody: {'quality': 'low', 'n': 2},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tapSendButton(tester);
+
+    // The restored draft's routing decision and options flow into the send.
+    expect(submitted?.allowImagesApiRouting, isTrue);
+    expect(submitted?.extraBody, {'quality': 'low', 'n': 2});
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
   testWidgets('恢复队列的标志只影响恢复后的第一次发送', (tester) async {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
@@ -409,7 +460,7 @@ void main() {
     focusNode.dispose();
   });
 
-  testWidgets('群聊输入栏不显示生图参数面板按钮', (tester) async {
+  testWidgets('生图参数入口已移出输入栏（调色板按钮不复存在）', (tester) async {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
     final settings = SettingsProvider();
@@ -431,30 +482,62 @@ void main() {
         controller: controller,
         focusNode: focusNode,
         settingsProvider: settings,
-        mode: ChatInputMode.groupChat,
         onSend: (_) async => ChatInputSubmissionResult.rejected,
       ),
     );
 
-    // Image mode itself is active (the model supports it) but group chat
-    // never consumes generation options — the palette must be hidden.
+    // The palette button was removed with ImageGenerationOptionsSheet —
+    // generation options now live in the LivePanel inline expanded card, and
+    // group chat never consumes them (its composer stays draft-free).
     expect(find.byIcon(Lucide.Palette), findsNothing);
 
     controller.dispose();
     focusNode.dispose();
   });
 
-  test('image-mode pill reappears after switching conversation', () {
+  test('image-mode dismissal sticks to the model across conversations and '
+      'model switches', () {
     final status = InputStatusProvider();
-    status.updateImageModeKey('conversation-a::OpenAITest::gpt-image-2');
+    status.updateImageModeKey('OpenAITest::gpt-image-2');
     expect(status.imageModeActive, isTrue);
+    expect(status.imageModeDismissed, isFalse);
 
     status.dismissImageMode();
     expect(status.imageModeActive, isFalse);
+    expect(status.imageModeDismissed, isTrue);
 
-    // Switching conversation changes the model key → the dismissal resets.
-    status.updateImageModeKey('conversation-b::OpenAITest::gpt-image-2');
+    // Switching away and back does NOT reset the dismissal (sticky for the
+    // whole session) — the key no longer contains the conversation id.
+    status.updateImageModeKey('OpenAITest::gpt-image-3');
     expect(status.imageModeActive, isTrue);
+    expect(status.imageModeDismissed, isFalse);
+
+    status.updateImageModeKey('OpenAITest::gpt-image-2');
+    expect(status.imageModeActive, isFalse);
+    expect(status.imageModeDismissed, isTrue);
+
+    // The chat-API pill is the one-step recovery.
+    status.restoreImageMode();
+    expect(status.imageModeActive, isTrue);
+    expect(status.imageModeDismissed, isFalse);
+  });
+
+  test('queue restore replays routing metadata onto the sticky dismissal', () {
+    final status = InputStatusProvider();
+    status.updateImageModeKey('OpenAITest::gpt-image-2');
+
+    // A restored draft that did not want routing dismisses the model — the
+    // dismissal is the restore mechanism and is NOT conversation-scoped, so
+    // every conversation using the model sees the chat-API pill.
+    status.restoreAllowImagesApiRouting(allow: false, conversationId: 'conv-a');
+    expect(status.imageModeDismissed, isTrue);
+    expect(status.allowImagesApiRoutingFor('conv-b'), isFalse);
+
+    // A restored draft that wanted routing revives the mode (metadata is the
+    // durable record, replayed faithfully — same as regenerate).
+    status.restoreAllowImagesApiRouting(allow: true, conversationId: 'conv-a');
+    expect(status.imageModeDismissed, isFalse);
+    expect(status.allowImagesApiRoutingFor('conv-a'), isTrue);
   });
 
   testWidgets('非绘图模型保持默认路由许可', (tester) async {

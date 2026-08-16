@@ -1,15 +1,7 @@
-import 'package:Cuplivo/core/models/chat_input_data.dart';
-import 'package:Cuplivo/core/providers/assistant_provider.dart';
-import 'package:Cuplivo/core/providers/input_status_provider.dart';
-import 'package:Cuplivo/core/providers/settings_provider.dart';
-import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
-import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/features/home/widgets/image_generation_options.dart';
-import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -159,77 +151,38 @@ void main() {
     );
   });
 
-  group('ImageGenerationOptionsSheet', () {
-    Widget buildHarness({
-      required TextEditingController controller,
-      required FocusNode focusNode,
-      required Future<ChatInputSubmissionResult> Function(ChatInputData input)
-      onSend,
-      required SettingsProvider settings,
-    }) {
-      return MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: settings),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: InputStatusProvider()),
-          Provider<InputDraftPersistence>.value(
-            value: InputDraftPersistence(null),
-          ),
-        ],
-        child: MaterialApp(
+  group('ImageGenerationOptionsBody', () {
+    testWidgets('panel updates its own UI live when options change', (
+      tester,
+    ) async {
+      final optionsController = ImageGenerationOptionsController()
+        ..applyDefaultsFromBody(const {
+          'quality': 'high',
+          'output_format': 'png',
+        });
+
+      await tester.pumpWidget(
+        MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ChatInputBar(
-              controller: controller,
-              focusNode: focusNode,
-              onSend: onSend,
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return ImageGenerationOptionsBody(
+                  controller: optionsController,
+                  onChanged: () => setState(() {}),
+                );
+              },
             ),
           ),
         ),
       );
-    }
 
-    testWidgets('panel updates its own UI live when options change', (
-      tester,
-    ) async {
-      final controller = TextEditingController(text: 'draw a cat');
-      final focusNode = FocusNode();
-      final settings = SettingsProvider();
-      await settings.setProviderConfig(
-        'OpenAITest',
-        ProviderConfig(
-          id: 'OpenAITest',
-          enabled: true,
-          name: 'OpenAITest',
-          apiKey: 'test-key',
-          baseUrl: 'https://example.com/v1',
-          providerType: ProviderKind.openai,
-        ),
-      );
-      await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
-
-      await tester.pumpWidget(
-        buildHarness(
-          controller: controller,
-          focusNode: focusNode,
-          settings: settings,
-          onSend: (_) async => ChatInputSubmissionResult.rejected,
-        ),
-      );
-
-      // Image mode is active (the model supports image routing), so the
-      // palette button is available.
-      expect(find.byIcon(Lucide.Palette), findsOneWidget);
-
-      await tester.tap(find.byIcon(Lucide.Palette));
-      await tester.pumpAndSettle();
-
-      // Initial state: defaults inherited for gpt-image-* models.
+      // Initial state: inherited defaults.
       expect(find.text('Actual size: auto'), findsOneWidget);
 
-      // Tapping a chip must rebuild the panel in place (it is a separate
-      // Navigator route; the input bar's setState alone would not update it).
+      // Tapping a chip must rebuild the panel in place (the parent's
+      // onChanged triggers the rebuild, exactly like the LivePanel card).
       await tester.tap(find.text('4K'));
       await tester.pump();
       expect(find.text('Actual size: 3840x2160'), findsOneWidget);
@@ -245,9 +198,55 @@ void main() {
       await tester.pump();
       expect(find.text('Actual size: auto'), findsOneWidget);
       expect(find.text('Compression'), findsNothing);
+    });
 
-      controller.dispose();
-      focusNode.dispose();
+    testWidgets('external controller mutation syncs the custom-ratio field', (
+      tester,
+    ) async {
+      final optionsController = ImageGenerationOptionsController()
+        ..aspectRatio = 'custom';
+
+      Future<void> pumpBody() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, setState) {
+                  return ImageGenerationOptionsBody(
+                    controller: optionsController,
+                    onChanged: () => setState(() {}),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      }
+
+      await pumpBody();
+      expect(find.byType(TextField), findsOneWidget);
+
+      // User edit focuses the field.
+      await tester.enterText(find.byType(TextField), '7:1');
+      await tester.pump();
+      expect(find.text('7:1'), findsOneWidget);
+
+      // External mutation (queue restore / model-switch defaults) while the
+      // field is focused: never rewrite the text under the cursor.
+      optionsController.customAspectRatio = '5:2';
+      await pumpBody();
+      await tester.pump();
+      expect(find.text('7:1'), findsOneWidget);
+
+      // Unfocus, then the next rebuild syncs the field to the controller.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await pumpBody();
+      await tester.pump();
+      expect(find.text('5:2'), findsOneWidget);
+      expect(find.text('7:1'), findsNothing);
     });
   });
 }

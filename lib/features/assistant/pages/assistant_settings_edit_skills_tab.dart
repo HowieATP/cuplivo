@@ -8,7 +8,8 @@ class _SkillsTab extends StatefulWidget {
   State<_SkillsTab> createState() => _SkillsTabState();
 }
 
-class _SkillsTabState extends State<_SkillsTab> {
+class _SkillsTabState extends State<_SkillsTab>
+    with CollapsibleGroupsMixin<_SkillsTab> {
   List<SkillMetadata> _skills = const [];
   bool _loading = true;
 
@@ -119,40 +120,41 @@ class _SkillsTabState extends State<_SkillsTab> {
               ),
               _iosDivider(context),
               for (final (group, skills) in groupSkillsByCategory(_skills)) ...[
-                Padding(
+                CollapsibleGroupHeader(
+                  groupName: group ?? l10n.skillsUncategorizedGroup,
+                  skillCount: skills.length,
+                  expanded: isGroupExpanded(group),
+                  onTap: () => toggleGroup(group),
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-                  child: Text(
-                    group ?? l10n.skillsUncategorizedGroup,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: AppFontWeights.semibold,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
+                ),
+                CollapsibleGroupBody(
+                  expanded: isGroupExpanded(group),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < skills.length; i++) ...[
+                        if (i > 0) _iosDivider(context),
+                        _SkillRow(
+                          name: skills[i].name,
+                          description: skills[i].description,
+                          enabled: assistant.skillIds.contains(skills[i].name),
+                          onChanged: (value) {
+                            final ids = assistant.skillIds.toSet();
+                            if (value) {
+                              ids.add(skills[i].name);
+                            } else {
+                              ids.remove(skills[i].name);
+                            }
+                            context.read<AssistantProvider>().updateAssistant(
+                              assistant.copyWith(
+                                skillIds: ids.toList(growable: false),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                for (int i = 0; i < skills.length; i++) ...[
-                  if (i > 0) _iosDivider(context),
-                  _SkillRow(
-                    name: skills[i].name,
-                    description: skills[i].description,
-                    enabled: assistant.skillIds.contains(skills[i].name),
-                    onChanged: (value) {
-                      final ids = assistant.skillIds.toSet();
-                      if (value) {
-                        ids.add(skills[i].name);
-                      } else {
-                        ids.remove(skills[i].name);
-                      }
-                      context.read<AssistantProvider>().updateAssistant(
-                        assistant.copyWith(
-                          skillIds: ids.toList(growable: false),
-                        ),
-                      );
-                    },
-                  ),
-                ],
               ],
             ],
           ],

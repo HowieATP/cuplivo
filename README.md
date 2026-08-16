@@ -40,7 +40,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ### Signature Chat Experience
 
-1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools (#301).
+1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools (#301). Android can also open a Termux-like interactive terminal from workspace settings, independent of the model shell tool (#428).
 
 2. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
    - *Android-only*: background alarm + notification channel; alarm persists through force-stop
@@ -96,6 +96,8 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 7. **Batch export conversations** — Export multiple conversations to Markdown in a single operation (#276, #305).
 
 8. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG (#345).
+
+9. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI (#390).
 
 ### UI & Rendering
 

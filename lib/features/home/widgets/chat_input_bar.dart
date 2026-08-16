@@ -126,6 +126,7 @@ class ChatInputBar extends StatefulWidget {
     this.multiAIModelCount,
     this.onMultiSelectModel,
     this.mode = ChatInputMode.normal,
+    this.imageGenController,
   });
 
   /// When [ChatInputMode.groupChat], hide model/search/reasoning/MCP/multi-AI.
@@ -183,6 +184,11 @@ class ChatInputBar extends StatefulWidget {
   final double inputBackgroundOpacityLight;
   final double inputBackgroundOpacityDark;
 
+  /// Shared image-generation options controller. When null the bar creates
+  /// its own; the home page passes a shared instance so the LivePanel's
+  /// inline options card edits the same controller the bar snapshots on send.
+  final ImageGenerationOptionsController? imageGenController;
+
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
@@ -226,7 +232,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool _oneClickConfirming = false;
   Timer? _confirmTimer;
   String? _lastImageDefaultsSignature;
-  final _imageGenController = ImageGenerationOptionsController();
+  late final ImageGenerationOptionsController _imageGenController =
+      widget.imageGenController ?? ImageGenerationOptionsController();
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -349,9 +356,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       cfg,
       modelId,
     );
-    final nextKey = supported
-        ? '${widget.conversationId ?? ''}::$providerKey::$modelId'
-        : null;
+    final nextKey = supported ? '$providerKey::$modelId' : null;
     _inputStatus.updateImageModeKey(
       nextKey,
       conversationId: widget.conversationId,
@@ -405,9 +410,6 @@ class _ChatInputBarState extends State<ChatInputBar>
       _inputStatus.allowImagesApiRoutingFor(widget.conversationId);
 
   bool get _imageParamsCustomized => _imageGenController.customized;
-
-  String get _imageParamsSummary =>
-      _imageGenController.summary(AppLocalizations.of(context)!);
 
   Map<String, dynamic> _imageGenerationExtraBody() {
     if (!_imageModeActive ||
@@ -1255,29 +1257,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  Future<void> _showImageGenerationOptions() async {
-    if (_composerLocked) return;
-    final controller = _imageGenController;
-    void onChanged() {
-      if (!mounted) return;
-      setState(() {});
-    }
-
-    if (MediaQuery.of(context).size.width >= AppBreakpoints.tablet) {
-      await ImageGenerationOptionsSheet.show(
-        context,
-        controller: controller,
-        onChanged: onChanged,
-      );
-    } else {
-      await ImageGenerationOptionsSheet.showSheet(
-        context,
-        controller: controller,
-        onChanged: onChanged,
-      );
-    }
-  }
-
   void _insertNewlineAtCursor() {
     final value = _controller.value;
     final selection = value.selection;
@@ -1998,27 +1977,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                   onTap: lockTap(widget.onOpenSearch),
                 );
               }(),
-            ),
-          );
-        }
-
-        // Group chat never consumes image generation options (member streams
-        // build requests from message content only) — hide the palette there.
-        if (_imageModeActive && !isGroupChat) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.imageGenPaletteTooltip(_imageParamsSummary),
-                icon: Lucide.Palette,
-                active: _imageParamsCustomized,
-                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Palette,
-                label: l10n.imageGenPaletteTooltip(_imageParamsSummary),
-                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
-              ),
             ),
           );
         }

@@ -10,6 +10,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/generation_engine.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/ios_keep_alive.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -141,14 +142,31 @@ class ChatActions {
     final l10n = _l10n;
     if (l10n == null) return;
     try {
+      // Push keep-alive toggles and open a keep-alive session before the
+      // native background task starts, so silent-audio / location legs can
+      // arm as soon as the app backgrounds.
+      await IosKeepAliveService.instance.configure(
+        masterEnabled: settings.iosKeepAliveEnabled,
+        silentAudioEnabled: settings.iosSilentAudioKeepAliveEnabled,
+        locationEnabled: settings.iosLocationKeepAliveEnabled,
+        liveActivityPrivacyMode: settings.iosLiveActivityPrivacyMode,
+      );
+      await IosKeepAliveService.instance.beginSession();
+      final privacy = settings.iosLiveActivityPrivacyMode;
       await IosBackgroundGenerationService.instance.start(
         enabled: settings.iosBackgroundGenerationEnabled,
         liveActivityEnabled: settings.iosLiveActivityEnabled,
         notificationsEnabled: settings.iosBackgroundNotificationsEnabled,
         refreshEnabled: settings.iosBackgroundTaskRefreshEnabled,
-        title: l10n.iosBackgroundGenerationActiveTitle,
-        detail: l10n.iosBackgroundGenerationActiveDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(0),
+        title: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveTitle
+            : l10n.iosBackgroundGenerationActiveTitle,
+        detail: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveDetail
+            : l10n.iosBackgroundGenerationActiveDetail,
+        tokenLabel: privacy
+            ? ''
+            : l10n.iosBackgroundGenerationTokenCount(0),
       );
     } catch (error, stackTrace) {
       _logIosBackgroundGenerationFailure('start', error, stackTrace);
@@ -159,9 +177,15 @@ class ChatActions {
     final l10n = _l10n;
     if (l10n == null) return;
     try {
+      final settings = contextProvider.read<SettingsProvider>();
+      final privacy = settings.iosLiveActivityPrivacyMode;
       await IosBackgroundGenerationService.instance.update(
-        detail: l10n.iosBackgroundGenerationStreamingDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(totalTokens),
+        detail: privacy
+            ? l10n.iosBackgroundGenerationPrivacyActiveDetail
+            : l10n.iosBackgroundGenerationStreamingDetail,
+        tokenLabel: privacy
+            ? ''
+            : l10n.iosBackgroundGenerationTokenCount(totalTokens),
         tokenCount: totalTokens,
       );
     } catch (error, stackTrace) {
@@ -176,6 +200,7 @@ class ChatActions {
     final l10n = _l10n;
     if (l10n == null) return;
     try {
+      await IosKeepAliveService.instance.endSession();
       await IosBackgroundGenerationService.instance.finish(
         title: success
             ? l10n.iosBackgroundGenerationCompleteTitle
@@ -195,6 +220,7 @@ class ChatActions {
   Future<void> _cancelIosBackgroundGeneration() async {
     final l10n = _l10n;
     try {
+      await IosKeepAliveService.instance.endSession();
       await IosBackgroundGenerationService.instance.cancel(
         detail: l10n?.iosBackgroundGenerationCancelledDetail,
       );

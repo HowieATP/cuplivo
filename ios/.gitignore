@@ -41,3 +41,5 @@ sandbox/ish/
 sandbox/libs/
 sandbox/include/
 sandbox/resources/libvdso.so.elf
+# Xcode build output (XCBuildData etc.)
+build/

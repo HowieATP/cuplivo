@@ -24,6 +24,7 @@ import '../deleted_records_store.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment;
 import 'kelivo_image_settings_mapper.dart';
+import 'kelivo_v2_exception.dart';
 import 'double_pref_keys.dart';
 import '../../../utils/app_directories.dart';
 
@@ -1106,6 +1107,15 @@ class DataSync {
         _extractZipSync(file.path, extractDir.path);
       });
 
+      // Kelivo v2 (upstream) backups carry a manifest.json + database/
+      // kelivo.db payload instead of chats.json. This build cannot import
+      // them — importing would silently restore nothing. Surface a typed
+      // error so the UI can redirect to the kelivo-helper compat page.
+      // Detected before ANY write, so nothing local is destroyed.
+      if (File(p.join(extractDir.path, 'manifest.json')).existsSync()) {
+        throw KelivoV2BackupException();
+      }
+
       // Restore settings
       Object? backupAssistantsRaw;
       Object? backupLegacyOcrEnabled;
@@ -1399,6 +1409,31 @@ class DataSync {
         } catch (_) {}
       }
 
+      // Parse the backup's assistants BEFORE any destructive write so a
+      // malformed payload aborts cleanly instead of leaving a wiped-but-empty
+      // assistant table (issue #475). The overwrite path is fully parsed into
+      // [Assistant] objects here; the merge path only validates that the
+      // payload is a list of maps (field-level parse happens against the
+      // merged maps during the write phase, mirroring pre-refactor behavior).
+      List<Map<String, dynamic>>? rawIncomingAssistants;
+      List<Assistant>? parsedOverwriteAssistants;
+      if (backupAssistantsRaw is String) {
+        final decoded = jsonDecode(backupAssistantsRaw) as List;
+        rawIncomingAssistants = decoded
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        if (mode == RestoreMode.overwrite) {
+          parsedOverwriteAssistants = rawIncomingAssistants
+              .map(
+                (e) => Assistant.fromJson(
+                  _applyLegacyOcrModeToAssistantMap(e, backupLegacyOcrEnabled),
+                ),
+              )
+              .toList();
+        }
+      }
+
       // Restore chats
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
       if (cfg.includeChats && await chatsFile.exists()) {
@@ -1579,7 +1614,41 @@ class DataSync {
               }
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('restoreData: chats restore failed: $e\n$st');
+        }
+      }
+
+      // Restore assistants to SQLite. Runs AFTER clearAllData + chats but
+      // BEFORE the fallible file/skill copying below, so a mid-restore file
+      // failure can never leave the assistant table wiped-but-empty (issue
+      // #475).
+      if (rawIncomingAssistants != null) {
+        if (!chatService.initialized) await chatService.init();
+        if (mode == RestoreMode.overwrite) {
+          final assistants = parsedOverwriteAssistants;
+          if (assistants == null) {
+            throw StateError('assistants_parse_incomplete');
+          }
+          await chatService.putAssistants(assistants);
+        } else {
+          final existing = await chatService.getAllAssistants();
+          final existingMaps = existing.map((a) => a.toJson()).toList();
+          final merged = _mergeAssistantMaps(
+            existingMaps,
+            rawIncomingAssistants,
+          );
+          // Local assistants always carry an explicit ocrMode; only
+          // brand-new incoming assistants can still lack it.
+          final assistants = merged
+              .map(
+                (m) => Assistant.fromJson(
+                  _applyLegacyOcrModeToAssistantMap(m, backupLegacyOcrEnabled),
+                ),
+              )
+              .toList();
+          await chatService.putAssistants(assistants);
+        }
       }
 
       // Restore deleted.json markers (merge mode only — overwrite wipes local)
@@ -1620,144 +1689,27 @@ class DataSync {
         }
       }
 
-      // Restore files
+      // Restore files. File copying is best-effort: a single locked or unusual
+      // file must not abort the whole restore — conversations and assistants
+      // are already committed at this point.
       if (cfg.includeFiles) {
-        if (mode == RestoreMode.overwrite) {
-          // Overwrite mode: Delete existing directories and copy all
-          // Restore upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-          if (await uploadSrc.exists()) {
-            final dst = await _getUploadDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in uploadSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: uploadSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
+        try {
+          if (mode == RestoreMode.overwrite) {
+            // Overwrite mode: Delete existing directories and copy all
+            // Restore upload directory
+            final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+            if (await uploadSrc.exists()) {
+              final dst = await _getUploadDir();
+              if (await dst.exists()) {
                 try {
-                  await target.setLastModified(await ent.lastModified());
+                  await dst.delete(recursive: true);
                 } catch (_) {}
               }
-            }
-          }
-
-          // Restore images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-          if (await imagesSrc.exists()) {
-            final dst = await _getImagesDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in imagesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: imagesSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-          if (await avatarsSrc.exists()) {
-            final dst = await _getAvatarsDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in avatarsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: avatarsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
-          if (await fontsSrc.exists()) {
-            final dst = await _getFontsDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in fontsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: fontsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore @workspaces sandbox directory (dot-prefixed entries are
-          // never exported, so none should appear here; skip them defensively)
-          final workspacesSrc = Directory(
-            p.join(extractDir.path, 'workspaces'),
-          );
-          if (await workspacesSrc.exists()) {
-            final dst = await _getWorkspacesDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in workspacesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: workspacesSrc.path);
-                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-                  continue;
-                }
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-        } else {
-          // Merge mode: Only copy non-existing files
-          // Merge upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-          if (await uploadSrc.exists()) {
-            final dst = await _getUploadDir();
-            if (!await dst.exists()) {
               await dst.create(recursive: true);
-            }
-            for (final ent in uploadSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: uploadSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
+              for (final ent in uploadSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: uploadSrc.path);
+                  final target = File(p.join(dst.path, rel));
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
                   try {
@@ -1766,20 +1718,21 @@ class DataSync {
                 }
               }
             }
-          }
 
-          // Merge images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-          if (await imagesSrc.exists()) {
-            final dst = await _getImagesDir();
-            if (!await dst.exists()) {
+            // Restore images directory
+            final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+            if (await imagesSrc.exists()) {
+              final dst = await _getImagesDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in imagesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: imagesSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
+              for (final ent in imagesSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: imagesSrc.path);
+                  final target = File(p.join(dst.path, rel));
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
                   try {
@@ -1788,20 +1741,21 @@ class DataSync {
                 }
               }
             }
-          }
 
-          // Merge avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-          if (await avatarsSrc.exists()) {
-            final dst = await _getAvatarsDir();
-            if (!await dst.exists()) {
+            // Restore avatars directory
+            final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+            if (await avatarsSrc.exists()) {
+              final dst = await _getAvatarsDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in avatarsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: avatarsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
+              for (final ent in avatarsSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: avatarsSrc.path);
+                  final target = File(p.join(dst.path, rel));
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
                   try {
@@ -1810,20 +1764,21 @@ class DataSync {
                 }
               }
             }
-          }
 
-          // Merge managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
-          if (await fontsSrc.exists()) {
-            final dst = await _getFontsDir();
-            if (!await dst.exists()) {
+            // Restore managed local fonts directory
+            final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+            if (await fontsSrc.exists()) {
+              final dst = await _getFontsDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in fontsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: fontsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
+              for (final ent in fontsSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: fontsSrc.path);
+                  final target = File(p.join(dst.path, rel));
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
                   try {
@@ -1832,25 +1787,29 @@ class DataSync {
                 }
               }
             }
-          }
 
-          // Merge @workspaces sandbox directory (skip dot-prefixed entries)
-          final workspacesSrc = Directory(
-            p.join(extractDir.path, 'workspaces'),
-          );
-          if (await workspacesSrc.exists()) {
-            final dst = await _getWorkspacesDir();
-            if (!await dst.exists()) {
+            // Restore @workspaces sandbox directory (dot-prefixed entries are
+            // never exported, so none should appear here; skip them defensively)
+            final workspacesSrc = Directory(
+              p.join(extractDir.path, 'workspaces'),
+            );
+            if (await workspacesSrc.exists()) {
+              final dst = await _getWorkspacesDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in workspacesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: workspacesSrc.path);
-                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-                  continue;
-                }
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
+              for (final ent in workspacesSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: workspacesSrc.path);
+                  if (rel
+                      .split(RegExp(r'[\\/]'))
+                      .any((s) => s.startsWith('.'))) {
+                    continue;
+                  }
+                  final target = File(p.join(dst.path, rel));
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
                   try {
@@ -1859,91 +1818,172 @@ class DataSync {
                 }
               }
             }
+          } else {
+            // Merge mode: Only copy non-existing files
+            // Merge upload directory
+            final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+            if (await uploadSrc.exists()) {
+              final dst = await _getUploadDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              for (final ent in uploadSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: uploadSrc.path);
+                  final target = File(p.join(dst.path, rel));
+                  if (!await target.exists()) {
+                    await target.parent.create(recursive: true);
+                    await ent.copy(target.path);
+                    try {
+                      await target.setLastModified(await ent.lastModified());
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+
+            // Merge images directory
+            final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+            if (await imagesSrc.exists()) {
+              final dst = await _getImagesDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              for (final ent in imagesSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: imagesSrc.path);
+                  final target = File(p.join(dst.path, rel));
+                  if (!await target.exists()) {
+                    await target.parent.create(recursive: true);
+                    await ent.copy(target.path);
+                    try {
+                      await target.setLastModified(await ent.lastModified());
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+
+            // Merge avatars directory
+            final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+            if (await avatarsSrc.exists()) {
+              final dst = await _getAvatarsDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              for (final ent in avatarsSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: avatarsSrc.path);
+                  final target = File(p.join(dst.path, rel));
+                  if (!await target.exists()) {
+                    await target.parent.create(recursive: true);
+                    await ent.copy(target.path);
+                    try {
+                      await target.setLastModified(await ent.lastModified());
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+
+            // Merge managed local fonts directory
+            final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+            if (await fontsSrc.exists()) {
+              final dst = await _getFontsDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              for (final ent in fontsSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: fontsSrc.path);
+                  final target = File(p.join(dst.path, rel));
+                  if (!await target.exists()) {
+                    await target.parent.create(recursive: true);
+                    await ent.copy(target.path);
+                    try {
+                      await target.setLastModified(await ent.lastModified());
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+
+            // Merge @workspaces sandbox directory (skip dot-prefixed entries)
+            final workspacesSrc = Directory(
+              p.join(extractDir.path, 'workspaces'),
+            );
+            if (await workspacesSrc.exists()) {
+              final dst = await _getWorkspacesDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              for (final ent in workspacesSrc.listSync(recursive: true)) {
+                if (ent is File) {
+                  final rel = p.relative(ent.path, from: workspacesSrc.path);
+                  if (rel
+                      .split(RegExp(r'[\\/]'))
+                      .any((s) => s.startsWith('.'))) {
+                    continue;
+                  }
+                  final target = File(p.join(dst.path, rel));
+                  if (!await target.exists()) {
+                    await target.parent.create(recursive: true);
+                    await ent.copy(target.path);
+                    try {
+                      await target.setLastModified(await ent.lastModified());
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
           }
+        } catch (e, st) {
+          debugPrint('restoreData: files restore failed: $e\n$st');
         }
       }
 
       // Restore skills/ -- always exported independent of includeFiles (see
       // _packZipSync), so restore it symmetrically and unconditionally.
-      final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
-      if (await skillsSrc.exists()) {
-        final dst = await _getSkillsDir();
-        if (mode == RestoreMode.overwrite && await dst.exists()) {
-          try {
-            await dst.delete(recursive: true);
-          } catch (_) {}
-        }
-        if (!await dst.exists()) {
-          await dst.create(recursive: true);
-        }
-        for (final ent in skillsSrc.listSync(recursive: true)) {
-          if (ent is File) {
-            final rel = p.relative(ent.path, from: skillsSrc.path);
-            final target = File(p.join(dst.path, rel));
-            if (mode == RestoreMode.merge && await target.exists()) {
-              // Newer-wins per file: replace a local copy only when the
-              // backup entry is strictly newer; ties/older keep local.
-              try {
-                final backupMod = await ent.lastModified();
-                final localMod = await target.lastModified();
-                if (!backupMod.isAfter(localMod)) continue;
-              } catch (_) {
-                // Cannot compare mtimes — keep the local copy conservatively
-                continue;
-              }
-            }
-            await target.parent.create(recursive: true);
-            await ent.copy(target.path);
+      // Best-effort like files/: a skill-file failure must not abort the
+      // whole restore.
+      try {
+        final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
+        if (await skillsSrc.exists()) {
+          final dst = await _getSkillsDir();
+          if (mode == RestoreMode.overwrite && await dst.exists()) {
             try {
-              await target.setLastModified(await ent.lastModified());
+              await dst.delete(recursive: true);
             } catch (_) {}
           }
-        }
-      }
-
-      // Restore assistants to SQLite (after clearAllData in chats block)
-      if (backupAssistantsRaw is String && chatService.initialized) {
-        try {
-          final decoded = jsonDecode(backupAssistantsRaw) as List;
-          if (mode == RestoreMode.overwrite) {
-            final assistants = decoded
-                .whereType<Map>()
-                .map(
-                  (e) => Assistant.fromJson(
-                    _applyLegacyOcrModeToAssistantMap(
-                      Map<String, dynamic>.from(e),
-                      backupLegacyOcrEnabled,
-                    ),
-                  ),
-                )
-                .toList();
-            await chatService.putAssistants(assistants);
-          } else {
-            final incoming = decoded
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-            final existing = await chatService.getAllAssistants();
-            final existingMaps = existing.map((a) => a.toJson()).toList();
-            final merged = _mergeAssistantMaps(existingMaps, incoming);
-            // Local assistants always carry an explicit ocrMode; only
-            // brand-new incoming assistants can still lack it.
-            final assistants = merged
-                .map(
-                  (m) => Assistant.fromJson(
-                    _applyLegacyOcrModeToAssistantMap(
-                      m,
-                      backupLegacyOcrEnabled,
-                    ),
-                  ),
-                )
-                .toList();
-            await chatService.putAssistants(assistants);
+          if (!await dst.exists()) {
+            await dst.create(recursive: true);
           }
-        } catch (e, st) {
-          debugPrint('restoreData: assistants restore failed: $e\n$st');
-          rethrow;
+          for (final ent in skillsSrc.listSync(recursive: true)) {
+            if (ent is File) {
+              final rel = p.relative(ent.path, from: skillsSrc.path);
+              final target = File(p.join(dst.path, rel));
+              if (mode == RestoreMode.merge && await target.exists()) {
+                // Newer-wins per file: replace a local copy only when the
+                // backup entry is strictly newer; ties/older keep local.
+                try {
+                  final backupMod = await ent.lastModified();
+                  final localMod = await target.lastModified();
+                  if (!backupMod.isAfter(localMod)) continue;
+                } catch (_) {
+                  // Cannot compare mtimes — keep the local copy conservatively
+                  continue;
+                }
+              }
+              await target.parent.create(recursive: true);
+              await ent.copy(target.path);
+              try {
+                await target.setLastModified(await ent.lastModified());
+              } catch (_) {}
+            }
+          }
         }
+      } catch (e, st) {
+        debugPrint('restoreData: skills restore failed: $e\n$st');
       }
 
       // Always re-sync conversation cache from disk after restore so UI/providers

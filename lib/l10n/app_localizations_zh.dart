@@ -1956,6 +1956,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
 
   @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -9917,6 +9931,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
 
   @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
@@ -17875,6 +17903,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageRikkaHubStep5 => '如有問題可進入 Cuplivo 的 QQ 群回饋';
+
+  @override
+  String get backupPageKelivoCompatTitle => '無法匯入 Kelivo v2 備份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此備份使用 Kelivo v2（v1.2）格式，目前版本無法直接匯入。請先透過 kelivo-helper 相容工具將其降級為相容格式，再匯入轉換後的檔案。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '開啟降級工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暫不支援';

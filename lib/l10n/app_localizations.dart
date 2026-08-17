@@ -3767,6 +3767,30 @@ abstract class AppLocalizations {
   /// **'If you have any issues, join the Cuplivo QQ group to give feedback.'**
   String get backupPageRikkaHubStep5;
 
+  /// No description provided for @backupPageKelivoCompatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot Import Kelivo v2 Backup'**
+  String get backupPageKelivoCompatTitle;
+
+  /// No description provided for @backupPageKelivoCompatContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup uses the Kelivo v2 (v1.2) format, which this version cannot import directly. Please open the kelivo-helper compat tool to downgrade it to a compatible format first, then import the converted file.'**
+  String get backupPageKelivoCompatContent;
+
+  /// No description provided for @backupPageKelivoCompatOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Downgrade Tool'**
+  String get backupPageKelivoCompatOpen;
+
+  /// No description provided for @backupPageKelivoCompatUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/compat'**
+  String get backupPageKelivoCompatUrl;
+
   /// No description provided for @backupPageNotSupportedYet.
   ///
   /// In en, this message translates to:

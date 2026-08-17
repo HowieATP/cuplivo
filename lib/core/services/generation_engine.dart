@@ -64,7 +64,7 @@ typedef EngineChatStreamProvider =
 /// pre-created assistant placeholder message row". The caller creates the
 /// placeholder (page: version/group/subgroup/speaker control; subagent
 /// server: plain placeholder) and passes [assistantMessageId] — the engine
-/// never creates message rows. See docs/adr/0028-generation-engine-unified-pipeline.md.
+/// never creates message rows. See docs/adr/0034-generation-engine-unified-pipeline.md.
 class GenerationSlotRequest {
   const GenerationSlotRequest({
     required this.assistantMessageId,
@@ -272,7 +272,7 @@ class GenerationSlot {
 /// A Round is a transient in-memory token — never persisted; the message rows
 /// carry the persisted identity (`groupId`/`version`/`subgroupId`). Single AI
 /// = 1-slot Round; Multi-AI = N parallel slots in one Round; subagent = 1-slot
-/// Round in the child conversation. See docs/adr/0028-generation-engine-unified-pipeline.md.
+/// Round in the child conversation. See docs/adr/0034-generation-engine-unified-pipeline.md.
 class GenerationRound {
   GenerationRound({
     required this.conversationId,
@@ -335,7 +335,7 @@ class GenerationRound {
 /// image sanitization, assistant regex transform), persist throttled per
 /// chunk (crash-safe), and render live state (per-slot
 /// `StreamingContentNotifier` + smooth pacing). See
-/// docs/adr/0028-generation-engine-unified-pipeline.md.
+/// docs/adr/0034-generation-engine-unified-pipeline.md.
 class GenerationEngine extends ChangeNotifier {
   GenerationEngine({
     required this._chatService,
@@ -630,7 +630,7 @@ class GenerationEngine extends ChangeNotifier {
       }
       // Abort any in-flight workspace download the stopped conversation was
       // running (its raw HttpClient is independent of the Dio CancelToken —
-      // ADR-0030).
+      // ADR-0036).
       _downloadProgressStore?.cancelForConversation(id);
       unawaited(LinuxSandboxService.instance.cancelForConversation(id));
     }

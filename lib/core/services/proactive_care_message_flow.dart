@@ -463,7 +463,7 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> apiMessages,
     int? fallbackThinkingBudget,
   }) async {
-    // Layer-① collector (ADR-0028): accumulate the silent no-tool stream.
+    // Layer-① collector (ADR-0034): accumulate the silent no-tool stream.
     final text = await PlainTextCollector().collect(
       config: config,
       modelId: modelId,

@@ -1,4 +1,4 @@
-# ADR-0029: iOS Linux sandbox via embedded iSH-ARM64, shared rootfs + workspace bind mounts
+# ADR-0035: iOS Linux sandbox via embedded iSH-ARM64, shared rootfs + workspace bind mounts
 
 The Android workspace sandbox (proot + per-workspace Ubuntu rootfs + apt, ADR-era commit `37a7ef97`) needed an iOS counterpart with the same model-facing contract: a `shell` workspace tool that runs commands in a Linux guest where `/workspace` is the bound workspace's host directory.
 

@@ -19,7 +19,7 @@ import 'image_generation_options.dart';
 /// LivePanel (实时面板): unified transient-status surface pinned above the
 /// conversation input bar. Hosts heterogeneous live entries — subagent jobs,
 /// workspace downloads, and the image-mode / image-warning pills — sharing one
-/// pill↔card design language (issue #307, ADR-0030).
+/// pill↔card design language (issue #307, ADR-0036).
 ///
 /// Entry order: info pill, warning pill, download entries, subagent entries.
 /// Every entry is conversation-scoped (keyed off `currentConversationId`);

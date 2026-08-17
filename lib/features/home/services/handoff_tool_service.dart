@@ -123,7 +123,7 @@ class HandoffToolService {
       '(parent: $parentConversationId, assistant: ${target.name})',
     );
 
-    // The caller creates the assistant placeholder (ADR-0028 slot model: the
+    // The caller creates the assistant placeholder (ADR-0034 slot model: the
     // engine streams into a pre-created message row and never creates rows
     // itself). For wait-mode it is created NOW so the round/slot registered
     // below carries the row id — the 子代理面板 binds to the slot from the

@@ -134,7 +134,7 @@ class _TranslatePageState extends State<TranslatePage> {
 
     try {
       _requestId = 'translate_${DateTime.now().millisecondsSinceEpoch}';
-      // Layer-① collector (ADR-0028): accumulate + live-update the output.
+      // Layer-① collector (ADR-0034): accumulate + live-update the output.
       await PlainTextCollector().collect(
         config: cfg,
         modelId: mid,

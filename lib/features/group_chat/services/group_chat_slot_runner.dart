@@ -7,7 +7,7 @@ import '../../../core/services/generation_engine.dart';
 import '../../home/controllers/stream_controller.dart' as stream_ctrl;
 
 /// Streams one group-chat member assistant turn into a GenerationEngine slot
-/// (ADR-0028 layer ③). Replaces the source-parity chunk loop of the deleted
+/// (ADR-0034 layer ③). Replaces the source-parity chunk loop of the deleted
 /// `group_chat_stream_executor.dart`; the engine owns the chunk pipeline,
 /// persistence, reasoning segments, sanitization and the smooth live ramp.
 ///

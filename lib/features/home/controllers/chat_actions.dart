@@ -257,7 +257,7 @@ class ChatActions {
   /// Replay the per-message request metadata of the last user message in the
   /// given context: the image-mode routing decision and the image options
   /// body that were persisted at send time. See
-  /// docs/adr/0018-per-message-request-metadata.md.
+  /// docs/adr/0033-per-message-request-metadata.md.
   ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
   _resolveRequestOptionsFromMessages(
     List<ChatMessage> messages, {
@@ -972,7 +972,7 @@ class ChatActions {
   }
 
   /// Execute generation with the given context via the GenerationEngine
-  /// (ADR-0028: the page path streams into engine slots; the engine owns the
+  /// (ADR-0034: the page path streams into engine slots; the engine owns the
   /// chunk pipeline, persistence, reasoning segments, sanitization and the
   /// smooth live ramp).
   ///

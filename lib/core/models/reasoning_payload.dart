@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 /// Shared reasoning payload types + serialization for the generation
-/// pipeline. Owned by the GenerationEngine (ADR-0028); the page pipeline
+/// pipeline. Owned by the GenerationEngine (ADR-0034); the page pipeline
 /// (`StreamController`) re-exports these so both surfaces persist and restore
 /// the SAME payload format.
 ///

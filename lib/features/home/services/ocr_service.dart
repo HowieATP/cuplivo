@@ -99,7 +99,7 @@ class OcrService {
 
     String out = '';
     try {
-      // Layer-① collector (ADR-0028): accumulate the no-tool stream. No
+      // Layer-① collector (ADR-0034): accumulate the no-tool stream. No
       // temperature: many current models reject or ignore the sampling
       // parameter on utility calls, and OCR determinism relies on the
       // thinking budget instead.

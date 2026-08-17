@@ -78,7 +78,7 @@ class MessageRows extends Table {
 
   /// Per-request routing/body metadata persisted on the originating user
   /// message (schema v15) so regenerate can replay image-mode routing and
-  /// image generation options. See docs/adr/0018-per-message-request-metadata.md.
+  /// image generation options. See docs/adr/0033-per-message-request-metadata.md.
   BoolColumn get requestAllowImagesApiRouting => boolean().nullable()();
   TextColumn get requestExtraBodyJson => text().nullable()();
 
@@ -798,7 +798,7 @@ class AppDatabase extends _$AppDatabase {
       if (from < 18) {
         // Per-message request metadata for image-mode routing + image
         // generation options replay on regenerate. See
-        // docs/adr/0018-per-message-request-metadata.md.
+        // docs/adr/0033-per-message-request-metadata.md.
         try {
           await migrator.addColumn(
             messageRows,

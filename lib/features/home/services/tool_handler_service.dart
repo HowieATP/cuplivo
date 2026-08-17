@@ -754,7 +754,7 @@ class ToolHandlerService {
           }
           // The download tool reports live progress to the LivePanel via
           // DownloadProgressStore, and is aborted when the conversation is
-          // stopped (ADR-0030).
+          // stopped (ADR-0036).
           DownloadJob? downloadJob;
           DownloadProgressStore? downloadStore;
           if (name == WorkspaceToolNames.download) {

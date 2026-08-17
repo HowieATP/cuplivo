@@ -172,7 +172,7 @@ class StreamController {
   }
 
   // ============================================================================
-  // Engine Snapshot Bridge (ADR-0028)
+  // Engine Snapshot Bridge (ADR-0034)
   // ============================================================================
 
   /// Mirrors one [GenerationSlotUiState] snapshot into the page UI state maps

@@ -24,7 +24,7 @@ typedef PlainTextStreamSender =
       bool ocrActive,
     });
 
-/// Layer-① no-tool text-stream collector (ADR-0028): a thin wrapper over
+/// Layer-① no-tool text-stream collector (ADR-0034): a thin wrapper over
 /// [ChatApiService.sendMessageStream] that accumulates `chunk.content` into
 /// plain text, optionally reporting the accumulated buffer per chunk or at a
 /// caller-provided cadence.

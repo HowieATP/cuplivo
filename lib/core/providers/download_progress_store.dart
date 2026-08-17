@@ -51,7 +51,7 @@ class DownloadJob {
 /// Root-level store of in-flight workspace downloads, watched by the
 /// LivePanel. Jobs are keyed per conversation so the panel renders only the
 /// current conversation's downloads. `cancelForConversation` aborts every
-/// active download of a stopped conversation (see ADR-0030).
+/// active download of a stopped conversation (see ADR-0036).
 class DownloadProgressStore extends ChangeNotifier {
   final Map<String, DownloadJob> _jobs = <String, DownloadJob>{};
   int _nextId = 0;
@@ -111,7 +111,7 @@ class DownloadProgressStore extends ChangeNotifier {
   }
 
   /// Aborts every active download of [conversationId] and drops them from the
-  /// store (stop-conversation abort — ADR-0030). The in-flight transfer's raw
+  /// store (stop-conversation abort — ADR-0036). The in-flight transfer's raw
   /// client is force-closed via each job's abort token.
   void cancelForConversation(String conversationId) {
     final jobs = _jobs.values

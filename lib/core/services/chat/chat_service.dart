@@ -1887,7 +1887,7 @@ class ChatService extends ChangeNotifier {
       }
     } catch (_) {}
     // iOS Linux sandbox: the shared iSH rootfs lives OUTSIDE @workspaces
-    // (Application Support, ADR-0029), so wipe it separately. Refuse while
+    // (Application Support, ADR-0035), so wipe it separately. Refuse while
     // the kernel is booted — deleting a live fakefs mount would corrupt the
     // running guest; it goes away on the next clear after a relaunch.
     if (Platform.isIOS) {

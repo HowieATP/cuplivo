@@ -18,7 +18,9 @@ import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/models/incremental_backup.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
+import 'package:Cuplivo/core/services/backup/kelivo_v2_exception.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/search/search_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
@@ -476,7 +478,7 @@ void main() {
       },
     );
 
-    test('cleans temporary restore files when WebDAV restore fails', () async {
+    test('cleans temporary restore files after a file-copy failure', () async {
       final sourceDir = Directory('${root.path}/source_upload');
       await sourceDir.create(recursive: true);
       final sourceFile = File('${sourceDir.path}/file.txt');
@@ -488,6 +490,9 @@ void main() {
       encoder.addFileSync(sourceFile, 'upload/file.txt');
       encoder.closeSync();
 
+      // A file occupying the upload target makes the files-restore step throw
+      // (EEXIST). Since #475, that failure is logged-and-continued — the
+      // restore completes and the downloaded temp file is still cleaned up.
       await File('${root.path}/upload').writeAsString('not a directory');
 
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -510,12 +515,9 @@ void main() {
         lastModified: null,
       );
 
-      await expectLater(
-        sync.restoreFromWebDav(
-          const WebDavConfig(includeChats: false, includeFiles: true),
-          item,
-        ),
-        throwsA(anything),
+      await sync.restoreFromWebDav(
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        item,
       );
 
       expect(await File('${tmpDir.path}/restore_source.zip').exists(), isFalse);
@@ -712,6 +714,7 @@ void main() {
           final data =
               jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[])))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
           final toolEvents = data['toolEvents'] as Map;
@@ -777,6 +780,7 @@ void main() {
           final data =
               jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
 
@@ -1028,6 +1032,122 @@ void main() {
         expect(byId['a2']!.ocrMode, 'never');
       },
     );
+
+    test(
+      'overwrite restore keeps assistants when a later file-copy step fails',
+      () async {
+        // Real initialized service: the chats restore path self-initializes
+        // (restoreConversationsBatch → init), which opens a real SQLite file
+        // under the fake app-data dir. Using an in-memory fake here would
+        // leave that file handle open and break the teardown delete.
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+
+        // Occupy root/fonts with a FILE: the files-restore step's
+        // Directory.create then throws (EEXIST) mid-restore. The restore
+        // must log-and-continue instead of losing the assistants that were
+        // already committed before the file copying (issue #475).
+        final fontsBlocker = File('${root.path}/fonts');
+        await fontsBlocker.writeAsString('blocker');
+
+        final zipFile = File('${root.path}/full-with-files.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final settingsFile = File('${root.path}/settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({
+            'assistants_v1': jsonEncode([
+              {'id': 'a1', 'name': 'Alpha'},
+              {'id': 'a2', 'name': 'Beta'},
+            ]),
+          }),
+        );
+        encoder.addFileSync(settingsFile, 'settings.json');
+        final conv = Conversation(
+          id: 'c1',
+          title: 'Chat 1',
+          createdAt: DateTime(2025, 1, 1),
+          updatedAt: DateTime(2025, 1, 2),
+          messageIds: const ['m1'],
+        );
+        final msg = ChatMessage(
+          id: 'm1',
+          role: 'user',
+          content: 'hello',
+          conversationId: 'c1',
+          timestamp: DateTime(2025, 1, 2),
+          isStreaming: false,
+        );
+        final chatsFile = File('${root.path}/chats.json');
+        await chatsFile.writeAsString(
+          jsonEncode({
+            'version': 2,
+            'conversations': [conv.toJson()],
+            'messages': [msg.toJson()],
+            'toolEvents': <String, dynamic>{},
+            'geminiThoughtSigs': <String, dynamic>{},
+            'groupChats': <dynamic>[],
+            'groupMembers': <dynamic>[],
+          }),
+        );
+        encoder.addFileSync(chatsFile, 'chats.json');
+        final fontEntry = File('${root.path}/font.ttf');
+        await fontEntry.writeAsBytes(List<int>.filled(64, 7));
+        encoder.addFileSync(fontEntry, 'fonts/font.ttf');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants, hasLength(2));
+        expect(assistants.map((a) => a.id), containsAll(['a1', 'a2']));
+        expect(chatService.getAllCompleteConversations(), hasLength(1));
+      },
+    );
+
+    test(
+      'Kelivo v2 backup (manifest.json) throws typed exception before any write',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+
+        final zipFile = File('${root.path}/kelivo-v2.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final manifestFile = File('${root.path}/manifest.json');
+        await manifestFile.writeAsString(
+          jsonEncode({
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'sqlite',
+          }),
+        );
+        encoder.addFileSync(manifestFile, 'manifest.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: chatService);
+        await expectLater(
+          sync.restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: true, includeFiles: true),
+            mode: RestoreMode.overwrite,
+          ),
+          throwsA(isA<KelivoV2BackupException>()),
+        );
+
+        // No side effects: prefs untouched, DB untouched.
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('assistants_v1'), isFalse);
+        expect(await chatService.getAllAssistants(), isEmpty);
+        expect(chatService.getAllCompleteConversations(), isEmpty);
+      },
+    );
   });
 
   group('DataSync Kelivo image-settings interop', () {
@@ -1215,6 +1335,122 @@ void main() {
                 )
                 as Map<String, dynamic>;
         expect(settings['image_upload_quality_v1'], 'original');
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
+
+    test(
+      'export converts search_services_v1 apiKeys to Kelivo string list',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'search_services_v1': jsonEncode([
+            {
+              'type': 'tavily',
+              'id': 'tavily-1',
+              'url': 'https://api.tavily.com/search',
+              'apiKey': 'primary-key',
+              'apiKeys': [
+                {
+                  'id': 'k1',
+                  'key': 'primary-key',
+                  'isEnabled': true,
+                  'priority': 5,
+                },
+                {
+                  'id': 'k2',
+                  'key': 'backup-key',
+                  'isEnabled': true,
+                  'priority': 6,
+                },
+              ],
+            },
+          ]),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map<String, dynamic>;
+          final services =
+              jsonDecode(settings['search_services_v1'] as String) as List;
+          final service = services.single as Map<String, dynamic>;
+          expect(service['type'], 'tavily');
+          expect(service['apiKey'], 'primary-key');
+          expect(service['apiKeys'], ['primary-key', 'backup-key']);
+          expect(service['keyConfigs'], isA<List>());
+          expect(service['keyConfigs'], hasLength(2));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test('round-trip restores full keyConfigs for search services', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_services_v1': jsonEncode([
+          {
+            'type': 'tavily',
+            'id': 'tavily-1',
+            'url': 'https://api.tavily.com/search',
+            'apiKey': 'primary-key',
+            'apiKeys': [
+              {
+                'id': 'k1',
+                'key': 'primary-key',
+                'isEnabled': true,
+                'priority': 5,
+              },
+              {
+                'id': 'k2',
+                'key': 'backup-key',
+                'isEnabled': true,
+                'priority': 6,
+              },
+            ],
+          },
+        ]),
+      });
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        final settings =
+            jsonDecode(
+                  utf8.decode(archive.findFile('settings.json')!.readBytes()!),
+                )
+                as Map<String, dynamic>;
+        final services =
+            jsonDecode(settings['search_services_v1'] as String) as List;
+        final service = services.single as Map<String, dynamic>;
+
+        final restored = SearchServiceOptions.fromJson(service);
+        expect(restored.apiKeys, hasLength(2));
+        expect(restored.apiKeys.first.key, 'primary-key');
+        expect(restored.apiKeys.last.key, 'backup-key');
+        expect(restored.apiKeys.last.isEnabled, isTrue);
       } finally {
         archive?.clearSync();
         input.closeSync();

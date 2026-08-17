@@ -21,6 +21,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../shared/dialogs/restart_required_dialog.dart';
 import '../../shared/dialogs/rikkahub_migrate_dialog.dart';
+import '../../shared/dialogs/kelivo_compat_dialog.dart';
 import '../../utils/format.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../shared/widgets/lan_sync_section.dart';
@@ -220,6 +221,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       await action(mode);
     } catch (e) {
       if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
+      if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
         message: e.toString(),
@@ -342,7 +345,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              _buildLocalBackupSliver(context, l10n, cs),
+              _buildLocalBackupSliver(context, l10n, cs, busy),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -899,6 +902,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     BuildContext context,
     AppLocalizations l10n,
     ColorScheme cs,
+    bool busy,
   ) {
     return SliverToBoxAdapter(
       child: _sectionCard(
@@ -925,28 +929,30 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageExportToFile,
                 filled: false,
                 dense: true,
-                onTap: () async {
-                  final backupProvider = context.read<BackupProvider>();
-                  await _saveConfig();
-                  final file = await backupProvider.exportToFile();
-                  String? savePath = await FilePicker.platform.saveFile(
-                    dialogTitle: l10n.backupPageExportToFile,
-                    fileName: file.uri.pathSegments.last,
-                    type: FileType.custom,
-                    allowedExtensions: ['zip'],
-                  );
-                  if (savePath != null) {
-                    try {
-                      await File(savePath).parent.create(recursive: true);
-                      await file.copy(savePath);
-                      if (context.mounted) {
-                        await context
-                            .read<BackupReminderProvider>()
-                            .recordBackupCompleted();
-                      }
-                    } catch (_) {}
-                  }
-                },
+                onTap: busy
+                    ? () {}
+                    : () async {
+                        final backupProvider = context.read<BackupProvider>();
+                        await _saveConfig();
+                        final file = await backupProvider.exportToFile();
+                        String? savePath = await FilePicker.platform.saveFile(
+                          dialogTitle: l10n.backupPageExportToFile,
+                          fileName: file.uri.pathSegments.last,
+                          type: FileType.custom,
+                          allowedExtensions: ['zip'],
+                        );
+                        if (savePath != null) {
+                          try {
+                            await File(savePath).parent.create(recursive: true);
+                            await file.copy(savePath);
+                            if (context.mounted) {
+                              await context
+                                  .read<BackupReminderProvider>()
+                                  .recordBackupCompleted();
+                            }
+                          } catch (_) {}
+                        }
+                      },
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportBackupFile,
@@ -1471,6 +1477,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       await widget.restoreFromItem(item, RestoreMode.merge);
     } catch (e) {
       if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
+      if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
         message: e.toString(),
@@ -1501,6 +1509,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     try {
       await action(mode);
     } catch (e) {
+      if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,

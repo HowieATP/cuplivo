@@ -30,7 +30,7 @@ class GlobalSessionSearchService {
     dotAll: true,
   );
   static final RegExp _thinkBlockRe = RegExp(
-    r'<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>',
+    r'<(?:think|thinking|thought)>[\s\S]*?<\/(?:think|thinking|thought)>',
     caseSensitive: false,
   );
   static final RegExp _reasoningBlockRe = RegExp(

@@ -25,6 +25,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../../shared/dialogs/restart_required_dialog.dart';
 import '../../../shared/dialogs/rikkahub_migrate_dialog.dart';
+import '../../../shared/dialogs/kelivo_compat_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../shared/widgets/lan_sync_section.dart';
@@ -604,6 +605,13 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
+                                              if (await maybeShowKelivoCompatError(
+                                                context,
+                                                e,
+                                              )) {
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
                                                 message: e.toString(),
@@ -667,6 +675,13 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
+                                      if (!context.mounted) return;
+                                      if (await maybeShowKelivoCompatError(
+                                        context,
+                                        e,
+                                      )) {
+                                        return;
+                                      }
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -994,6 +1009,13 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
+                                              if (await maybeShowKelivoCompatError(
+                                                context,
+                                                e,
+                                              )) {
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
                                                 message: e.toString(),
@@ -1058,6 +1080,13 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
+                                      if (!context.mounted) return;
+                                      if (await maybeShowKelivoCompatError(
+                                        context,
+                                        e,
+                                      )) {
+                                        return;
+                                      }
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -1409,6 +1438,8 @@ class _BackupPageState extends State<BackupPage> {
         () => vm.restoreFromLocalFile(File(path), mode: mode),
       );
     } catch (e) {
+      if (!context.mounted) return;
+      if (await maybeShowKelivoCompatError(context, e)) return;
       if (!context.mounted) return;
       showAppSnackBar(
         context,

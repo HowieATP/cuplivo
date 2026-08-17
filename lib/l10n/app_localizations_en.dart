@@ -129,6 +129,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryAssistantData => 'Assistants';
 
   @override
+  String get storageSpaceCategoryWorkspaces => 'Workspaces';
+
+  @override
+  String get storageSpaceCategorySkills => 'Skills';
+
+  @override
+  String get storageSpaceCategoryFonts => 'Fonts';
+
+  @override
+  String get storageSpaceCategorySandbox => 'Sandbox';
+
+  @override
   String get storageSpaceCategoryCache => 'Cache';
 
   @override
@@ -179,6 +191,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceSubAssistantImages => 'Images';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => 'Workspace sandboxes';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      'Per-workspace Linux root filesystem and temp files; regenerated when dependencies are re-installed.';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => 'Shared sandbox runtime';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      'Shared Linux sandbox runtime (iOS); re-created automatically.';
 
   @override
   String get storageSpaceSubCacheAvatars => 'Avatar cache';
@@ -246,6 +272,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => 'Clear Logs';
+
+  @override
+  String get storageSpaceClearSandboxButton => 'Clear Sandbox';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone =>
+      'Sandbox cleared. The shared runtime will be removed after the app restarts.';
+
+  @override
+  String get storageSpaceScanning => 'Scanning…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return 'Scanning… $files files, $size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => 'View Logs';
@@ -2029,6 +2070,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get backupPageRikkaHubStep5 =>
       'If you have any issues, join the Cuplivo QQ group to give feedback.';
+
+  @override
+  String get backupPageKelivoCompatTitle => 'Cannot Import Kelivo v2 Backup';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      'This backup uses the Kelivo v2 (v1.2) format, which this version cannot import directly. Please open the kelivo-helper compat tool to downgrade it to a compatible format first, then import the converted file.';
+
+  @override
+  String get backupPageKelivoCompatOpen => 'Open Downgrade Tool';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => 'Not supported yet';
@@ -8333,4 +8388,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => 'Workspace';
+
+  @override
+  String get iosKeepAliveMasterTitle => 'Enhanced Background Execution';
+
+  @override
+  String get iosKeepAliveMasterSubtitle =>
+      'Keep agent tasks running while the app is in the background.';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => 'Silent Audio Keep-Alive';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle =>
+      'Play an inaudible track so iOS keeps the process alive in the background.';
+
+  @override
+  String get iosKeepAliveLocationTitle => 'Location Keep-Alive';
+
+  @override
+  String get iosKeepAliveLocationSubtitle =>
+      'Use background location updates to keep the app alive while backgrounded.';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity Privacy Mode';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle =>
+      'Hide session content from the Lock Screen and Dynamic Island.';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => 'Keep-alive status unavailable';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => 'Silent audio active';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => 'Silent audio inactive';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => 'Location authorized';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized =>
+      'Location not authorized — tap to open system settings';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => 'Extended background survival';
+
+  @override
+  String get iosKeepAliveSurvivalShort => 'Standard background survival (~30s)';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => 'Silent audio ready';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => 'Silent audio off';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => 'Location ready';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded =>
+      'Location permission needed';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => 'Location off';
+
+  @override
+  String get iosKeepAliveInterruptedNotice =>
+      'Interrupted by the system previously';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => 'Background Task';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => 'Task in progress…';
 }

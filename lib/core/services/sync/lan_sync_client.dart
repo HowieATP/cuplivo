@@ -146,7 +146,10 @@ class LanSyncClient extends ChangeNotifier {
         final cfg = const WebDavConfig(includeChats: true, includeFiles: true);
         final incremental = IncrementalBackupConfig(
           since: plan.since!,
-          includeSettings: false,
+          // Settings (including assistants and providers) ride settings.json.
+          // Merge restore fills absent slots + unions mergeable lists, so
+          // both peers converge on the union of their configuration.
+          includeSettings: true,
           includeFiles: true,
           updateBackupTime: false,
         );

@@ -126,6 +126,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -174,6 +186,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -237,6 +263,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -1954,6 +1994,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暂不支持';
@@ -5797,14 +5851,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '委派任务并等待子助手的完整输出作为工具结果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下载 Skills';
+  String get assistantEditSkillDownloadTitle => '下载技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '创建 Skills';
+  String get assistantEditSkillCreateTitle => '创建技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
@@ -6981,7 +7035,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiAIAddModelTooltip => '添加模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手动添加';
@@ -6993,7 +7047,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsImportFileLabel => '从文件导入';
 
   @override
-  String get skillsImportChoiceTitle => '导入 skills';
+  String get skillsImportChoiceTitle => '导入技能';
 
   @override
   String get skillsImportFromFile => '从文件导入';
@@ -7015,13 +7069,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsGitHubDownloadFailed => '下载仓库失败。仓库可能不存在或为私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '选择要导入的 skills';
+  String get skillsGitHubSelectTitle => '选择要导入的技能';
 
   @override
-  String get skillsEmptyMessage => '暂无 skills。从文件导入或手动创建一个。';
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
 
   @override
-  String get skillsDeleteConfirmTitle => '删除 skills';
+  String get skillsDeleteConfirmTitle => '删除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -7030,7 +7084,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已导入 $count 个 skills';
+    return '已导入 $count 个技能';
   }
 
   @override
@@ -7043,29 +7097,29 @@ class AppLocalizationsZh extends AppLocalizations {
       'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
 
   @override
-  String get skillsNameInvalid => 'skills 名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
+  String get skillsNameInvalid => '技能名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '保存 skills 失败：$detail';
+    return '保存技能失败：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '导入 $count 个 skills 失败';
+    return '导入 $count 个技能失败';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '删除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分类';
@@ -7097,11 +7151,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '启用 skills？';
+  String get skillsEnableImportedTitle => '启用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '为“$assistantName”启用 $count 个已导入的 skills？';
+    return '为“$assistantName”启用 $count 个已导入的技能？';
   }
 
   @override
@@ -7111,10 +7165,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsEnableImportedDismiss => '暂不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '导入 skills';
+  String get skillsSheetImportAction => '导入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -7963,6 +8017,75 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -8087,6 +8210,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -8135,6 +8270,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -8198,6 +8347,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -9915,6 +10078,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暂不支持';
@@ -13758,14 +13935,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '委派任务并等待子助手的完整输出作为工具结果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下载 Skills';
+  String get assistantEditSkillDownloadTitle => '下载技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '创建 Skills';
+  String get assistantEditSkillCreateTitle => '创建技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
@@ -14942,7 +15119,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get multiAIAddModelTooltip => '添加模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手动添加';
@@ -14954,7 +15131,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsImportFileLabel => '从文件导入';
 
   @override
-  String get skillsImportChoiceTitle => '导入 skills';
+  String get skillsImportChoiceTitle => '导入技能';
 
   @override
   String get skillsImportFromFile => '从文件导入';
@@ -14976,13 +15153,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsGitHubDownloadFailed => '下载仓库失败。仓库可能不存在或为私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '选择要导入的 skills';
+  String get skillsGitHubSelectTitle => '选择要导入的技能';
 
   @override
-  String get skillsEmptyMessage => '暂无 skills。从文件导入或手动创建一个。';
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
 
   @override
-  String get skillsDeleteConfirmTitle => '删除 skills';
+  String get skillsDeleteConfirmTitle => '删除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -14991,7 +15168,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已导入 $count 个 skills';
+    return '已导入 $count 个技能';
   }
 
   @override
@@ -15004,29 +15181,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
 
   @override
-  String get skillsNameInvalid => 'skills 名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
+  String get skillsNameInvalid => '技能名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '保存 skills 失败：$detail';
+    return '保存技能失败：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '导入 $count 个 skills 失败';
+    return '导入 $count 个技能失败';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '删除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分类';
@@ -15058,11 +15235,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '启用 skills？';
+  String get skillsEnableImportedTitle => '启用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '为“$assistantName”启用 $count 个已导入的 skills？';
+    return '为“$assistantName”启用 $count 个已导入的技能？';
   }
 
   @override
@@ -15072,10 +15249,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsEnableImportedDismiss => '暂不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '导入 skills';
+  String get skillsSheetImportAction => '导入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -15924,6 +16101,75 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16048,6 +16294,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作區';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字體';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '快取';
 
   @override
@@ -16096,6 +16354,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '圖片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作區沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每個工作區內的 Linux 根檔案系統與暫存檔；重新安裝依賴後自動重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱執行環境';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱執行環境（iOS）；會自動重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '頭像快取';
@@ -16159,6 +16431,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone =>
+      '沙箱已清除。共享執行環境將在應用程式重新啟動後移除。';
+
+  @override
+  String get storageSpaceScanning => '掃描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '掃描中… 已掃描 $files 個檔案，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日誌';
@@ -17875,6 +18162,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageRikkaHubStep5 => '如有問題可進入 Cuplivo 的 QQ 群回饋';
+
+  @override
+  String get backupPageKelivoCompatTitle => '無法匯入 Kelivo v2 備份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此備份使用 Kelivo v2（v1.2）格式，目前版本無法直接匯入。請先透過 kelivo-helper 相容工具將其降級為相容格式，再匯入轉換後的檔案。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '開啟降級工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暫不支援';
@@ -21718,14 +22019,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '委派任務並等待子助手的完整輸出作為工具結果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下載 Skills';
+  String get assistantEditSkillDownloadTitle => '下載技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允許助手透過 GitHub 儲存庫 URL 下載並安裝技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '建立 Skills';
+  String get assistantEditSkillCreateTitle => '建立技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允許助手根據 SKILL.md 內容建立新技能。';
@@ -22902,7 +23203,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get multiAIAddModelTooltip => '新增模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手動新增';
@@ -22914,7 +23215,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsImportFileLabel => '從檔案匯入';
 
   @override
-  String get skillsImportChoiceTitle => '匯入 skills';
+  String get skillsImportChoiceTitle => '匯入技能';
 
   @override
   String get skillsImportFromFile => '從檔案匯入';
@@ -22936,13 +23237,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsGitHubDownloadFailed => '下載儲存庫失敗。儲存庫可能不存在或為私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '選擇要匯入的 skills';
+  String get skillsGitHubSelectTitle => '選擇要匯入的技能';
 
   @override
-  String get skillsEmptyMessage => '暫無 skills。從檔案匯入或手動建立一個。';
+  String get skillsEmptyMessage => '暫無技能。從檔案匯入或手動建立一個。';
 
   @override
-  String get skillsDeleteConfirmTitle => '刪除 skills';
+  String get skillsDeleteConfirmTitle => '刪除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -22951,7 +23252,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已匯入 $count 個 skills';
+    return '已匯入 $count 個技能';
   }
 
   @override
@@ -22964,29 +23265,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'SKILL.md 必須包含有效的 YAML 前置元資料且包含 name 欄位。';
 
   @override
-  String get skillsNameInvalid => 'skills 名稱無效。僅允許小寫字母、數字和連字號（不能包含空格、斜線或點號）。';
+  String get skillsNameInvalid => '技能名稱無效。僅允許小寫字母、數字和連字號（不能包含空格、斜線或點號）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元資料必須包含 name 欄位。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '儲存 skills 失敗：$detail';
+    return '儲存技能失敗：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '匯入 $count 個 skills 失敗';
+    return '匯入 $count 個技能失敗';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '刪除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分類';
@@ -23018,11 +23319,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '啟用 skills？';
+  String get skillsEnableImportedTitle => '啟用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '為「$assistantName」啟用 $count 個已匯入的 skills？';
+    return '為「$assistantName」啟用 $count 個已匯入的技能？';
   }
 
   @override
@@ -23032,10 +23333,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsEnableImportedDismiss => '暫不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '匯入 skills';
+  String get skillsSheetImportAction => '匯入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -23885,4 +24186,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作區';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增強背景執行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在 App 進入背景時保持代理任務繼續運行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '靜默音訊保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段聽不見的音軌，讓 iOS 在背景保持程序存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用背景定位更新，在 App 退到背景時保持程序存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隱私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在鎖定畫面與動態島上隱藏會話內容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活狀態不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '靜默音訊運行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '靜默音訊未運行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授權';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授權——點擊開啟系統設定';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延長背景存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '標準背景存活（約 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '靜默音訊就緒';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '靜默音訊未開啟';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就緒';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位權限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未開啟';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系統中斷';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '背景任務';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任務進行中…';
 }

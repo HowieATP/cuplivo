@@ -966,6 +966,40 @@ class DataSync {
     // prefs never hold a mirror copy (no dual truth, no staleness).
     map.addAll(KelivoImageSettingsMapper.translateToUpstream(map));
     _retainCloudAsrForExport(map);
+
+    // Kelivo's business router validates search_services_v1 entries and
+    // requires `apiKeys` to be a plain List<String> (round-robin pool).
+    // Cuplivo persists structured ApiKeyConfig objects there, so on export
+    // we split the payload: full objects move to `keyConfigs` (Cuplivo reads
+    // them back losslessly) and `apiKeys` becomes the string list Kelivo
+    // accepts. `apiKey` stays as the primary key string both sides read.
+    final searchServicesRaw = map['search_services_v1'];
+    if (searchServicesRaw is String && searchServicesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(searchServicesRaw) as List;
+        final converted = <Map<String, dynamic>>[];
+        for (final entry in decoded) {
+          final service = (entry as Map).cast<String, dynamic>();
+          final rawKeys = service['apiKeys'];
+          if (rawKeys is List &&
+              rawKeys.isNotEmpty &&
+              rawKeys.every((e) => e is Map)) {
+            service['keyConfigs'] = rawKeys;
+            service['apiKeys'] = [
+              for (final k in rawKeys.cast<Map<String, dynamic>>())
+                if ((k['key'] as String? ?? '').trim().isNotEmpty)
+                  (k['key'] as String).trim(),
+            ];
+          }
+          converted.add(service);
+        }
+        map['search_services_v1'] = jsonEncode(converted);
+      } catch (e) {
+        debugPrint(
+          'prepareBackupFile: search_services_v1 conversion failed: $e',
+        );
+      }
+    }
     return jsonEncode(map);
   }
 

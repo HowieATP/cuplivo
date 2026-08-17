@@ -44,6 +44,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   bool _loading = false;
   bool _clearing = false;
   StorageUsageCategoryKey _selected = StorageUsageCategoryKey.images;
+  final _scanProgress = ValueNotifier<({int files, int bytes})?>(null);
+  DateTime _lastProgressEmit = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -51,18 +53,49 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     _refreshReport();
   }
 
+  @override
+  void dispose() {
+    _scanProgress.dispose();
+    super.dispose();
+  }
+
+  /// Collects the effective host path of every workspace so customHostPath
+  /// workspaces (which live outside the managed roots) are scanned too.
+  List<String> _workspaceHostPaths() {
+    final wp = context.read<WorkspaceProvider>();
+    return [
+      for (final w in wp.workspaces)
+        if (wp.hostPathFor(w) case final host?) host,
+    ];
+  }
+
+  /// Throttled progress feed from the scan; loading UI renders the latest
+  /// running totals so huge trees do not look frozen.
+  void _onScanProgress(int files, int bytes) {
+    final now = DateTime.now();
+    if (now.difference(_lastProgressEmit).inMilliseconds < 250) return;
+    _lastProgressEmit = now;
+    _scanProgress.value = (files: files, bytes: bytes);
+  }
+
   Future<StorageUsageReport?> _refreshReport() async {
     if (_loading) return _report;
     setState(() => _loading = true);
+    _scanProgress.value = null;
     try {
-      final rep = await StorageUsageService.computeReport();
+      final rep = await StorageUsageService.computeReport(
+        workspaceHostPaths: _workspaceHostPaths(),
+        onProgress: _onScanProgress,
+      );
       if (!mounted) return rep;
       setState(() {
         _report = rep;
         _loading = false;
-        final keys = rep.categories.map((c) => c.key).toSet();
+        // Empty categories are hidden; keep the selection on a visible one
+        // (deletedRecords is always shown, so the set is never empty).
+        final keys = _visibleCategories(rep).map((c) => c.key).toSet();
         if (!keys.contains(_selected)) {
-          _selected = StorageUsageCategoryKey.images;
+          _selected = keys.first;
         }
       });
       return rep;
@@ -72,6 +105,48 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       return null;
     }
   }
+
+  /// Loading state while the full scan runs. Shows the throttled running
+  /// totals from the scan so huge trees (e.g. sandbox rootfs) do not look
+  /// like a frozen spinner.
+  Widget _buildLoading(AppLocalizations l10n) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
+          ValueListenableBuilder<({int files, int bytes})?>(
+            valueListenable: _scanProgress,
+            builder: (context, progress, _) {
+              final cs = Theme.of(context).colorScheme;
+              final style = TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.7),
+              );
+              final progressText = progress == null
+                  ? l10n.storageSpaceScanning
+                  : l10n.storageSpaceScanningProgress(
+                      progress.files,
+                      formatBytes(progress.bytes),
+                    );
+              return Text(progressText, style: style);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Categories shown in menus/legends: empty ones are hidden, except the
+  /// informational Trash entry which is always visible.
+  List<StorageUsageCategory> _visibleCategories(StorageUsageReport report) =>
+      report.categories
+          .where(
+            (c) =>
+                c.key == StorageUsageCategoryKey.deletedRecords ||
+                c.stats.bytes > 0,
+          )
+          .toList();
 
   Color _barColorFor(StorageUsageCategoryKey key, ColorScheme cs) {
     switch (key) {
@@ -83,6 +158,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return const Color(0xFF22C55E);
       case StorageUsageCategoryKey.assistantData:
         return const Color(0xFF3B82F6); // blue (distinct from chat green)
+      case StorageUsageCategoryKey.workspaces:
+        return const Color(0xFF14B8A6); // teal
+      case StorageUsageCategoryKey.skills:
+        return const Color(0xFFFB923C); // orange
+      case StorageUsageCategoryKey.fonts:
+        return const Color(0xFFEC4899); // pink
+      case StorageUsageCategoryKey.sandbox:
+        return const Color(0xFF78716C); // stone
       case StorageUsageCategoryKey.cache:
         return const Color(0xFFEF4444); // red
       case StorageUsageCategoryKey.logs:
@@ -104,6 +187,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.MessagesSquare;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
+      case StorageUsageCategoryKey.workspaces:
+        return Lucide.HardDrive;
+      case StorageUsageCategoryKey.skills:
+        return Lucide.Wand2;
+      case StorageUsageCategoryKey.fonts:
+        return Lucide.Type;
+      case StorageUsageCategoryKey.sandbox:
+        return Lucide.Layers;
       case StorageUsageCategoryKey.cache:
         return Lucide.Boxes;
       case StorageUsageCategoryKey.logs:
@@ -125,6 +216,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryChatData;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
+      case StorageUsageCategoryKey.workspaces:
+        return l10n.storageSpaceCategoryWorkspaces;
+      case StorageUsageCategoryKey.skills:
+        return l10n.storageSpaceCategorySkills;
+      case StorageUsageCategoryKey.fonts:
+        return l10n.storageSpaceCategoryFonts;
+      case StorageUsageCategoryKey.sandbox:
+        return l10n.storageSpaceCategorySandbox;
       case StorageUsageCategoryKey.cache:
         return l10n.storageSpaceCategoryCache;
       case StorageUsageCategoryKey.logs:
@@ -156,6 +255,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubAssistantImages;
       case 'avatar_cache':
         return l10n.storageSpaceSubCacheAvatars;
+      case 'sandbox_per_ws':
+        return l10n.storageSpaceSubSandboxPerWorkspace;
+      case 'sandbox_shared_runtime':
+        return l10n.storageSpaceSubSandboxSharedRuntime;
       case 'other_cache':
         return l10n.storageSpaceSubCacheOther;
       case 'system_cache':
@@ -177,6 +280,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     switch (id) {
       case 'avatar_cache':
         return l10n.storageSpaceSubDescAvatarCache;
+      case 'sandbox_per_ws':
+        return l10n.storageSpaceSubDescSandboxPerWorkspace;
+      case 'sandbox_shared_runtime':
+        return l10n.storageSpaceSubDescSandboxSharedRuntime;
       case 'other_cache':
         return l10n.storageSpaceSubDescOtherCache;
       case 'system_cache':
@@ -389,6 +496,45 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearSandbox() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategorySandbox;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      if (!mounted) return;
+      final keptRuntime = await StorageUsageService.clearSandbox(
+        workspaceHostPaths: _workspaceHostPaths(),
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: keptRuntime
+            ? l10n.storageSpaceSandboxClearPartialDone
+            : l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openWorkspaceHub() async {
     final navigator = Navigator.of(context);
     await navigator.push(
@@ -432,7 +578,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final isDesktop = PlatformUtils.isDesktopTarget;
 
     final body = _loading && _report == null
-        ? const Center(child: CircularProgressIndicator())
+        ? _buildLoading(l10n)
         : _report == null
         ? Center(
             child: Text(
@@ -574,7 +720,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                           const SizedBox(height: 12),
                           Expanded(
                             child: _CategoryMenu(
-                              categories: report.categories,
+                              categories: _visibleCategories(report),
                               selected: _selected,
                               iconFor: _iconFor,
                               titleFor: (k) => _titleFor(k, l10n),
@@ -612,6 +758,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                                   ? null
                                   : _doClearTmpCache,
                               onClearLogs: _clearing ? null : _doClearLogs,
+                              onClearSandbox: _clearing
+                                  ? null
+                                  : _doClearSandbox,
                               refreshReport: _refreshReport,
                             ),
                     ),
@@ -642,6 +791,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final cs = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final total = report.totalBytes;
+    final cats = _visibleCategories(report);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -700,19 +850,18 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         _iosSectionCard(
           child: Column(
             children: [
-              for (int i = 0; i < report.categories.length; i++) ...[
+              for (int i = 0; i < cats.length; i++) ...[
                 _iosNavRow(
                   context,
-                  icon: _iconFor(report.categories[i].key),
-                  label: _titleFor(report.categories[i].key, l10n),
+                  icon: _iconFor(cats[i].key),
+                  label: _titleFor(cats[i].key, l10n),
                   detailText:
-                      report.categories[i].key ==
-                          StorageUsageCategoryKey.deletedRecords
+                      cats[i].key == StorageUsageCategoryKey.deletedRecords
                       ? null
-                      : '${formatBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
-                  onTap: () => _openCategoryDetail(report.categories[i].key),
+                      : '${formatBytes(cats[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(cats[i].stats.fileCount)}',
+                  onTap: () => _openCategoryDetail(cats[i].key),
                 ),
-                if (i != report.categories.length - 1) _iosDivider(context),
+                if (i != cats.length - 1) _iosDivider(context),
               ],
             ],
           ),
@@ -960,6 +1109,49 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearSandbox() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategorySandbox;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      if (!mounted) return;
+      final wp = context.read<WorkspaceProvider>();
+      final hostPaths = [
+        for (final w in wp.workspaces)
+          if (wp.hostPathFor(w) case final host?) host,
+      ];
+      final keptRuntime = await StorageUsageService.clearSandbox(
+        workspaceHostPaths: hostPaths,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: keptRuntime
+            ? l10n.storageSpaceSandboxClearPartialDone
+            : l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1011,6 +1203,9 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
               : null,
           onClearLogs: (category.key == StorageUsageCategoryKey.logs)
               ? _clearLogs
+              : null,
+          onClearSandbox: (category.key == StorageUsageCategoryKey.sandbox)
+              ? _clearSandbox
               : null,
           refreshReport: _refresh,
         ),
@@ -1214,6 +1409,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearSystemCache,
     required this.onClearTmpCache,
     required this.onClearLogs,
+    required this.onClearSandbox,
     required this.refreshReport,
   });
 
@@ -1228,6 +1424,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearSystemCache;
   final Future<void> Function()? onClearTmpCache;
   final Future<void> Function()? onClearLogs;
+  final Future<void> Function()? onClearSandbox;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1239,7 +1436,8 @@ class _CategoryDetail extends StatelessWidget {
         '${fmtBytes(category.stats.bytes)} · ${l10n.storageSpaceFilesCount(category.stats.fileCount)}';
     final bool safeToClear =
         category.key == StorageUsageCategoryKey.cache ||
-        category.key == StorageUsageCategoryKey.logs;
+        category.key == StorageUsageCategoryKey.logs ||
+        category.key == StorageUsageCategoryKey.sandbox;
     final String hint = safeToClear
         ? l10n.storageSpaceSafeToClearHint
         : l10n.storageSpaceNotSafeToClearHint;
@@ -1287,6 +1485,20 @@ class _CategoryDetail extends StatelessWidget {
             backgroundColor: cs.primary,
             enabled: !clearing && onClearLogs != null,
             onTap: () => onClearLogs?.call(),
+          ),
+        ],
+      );
+    } else if (category.key == StorageUsageCategoryKey.sandbox) {
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          IosTileButton(
+            label: l10n.storageSpaceClearSandboxButton,
+            icon: Lucide.Layers,
+            backgroundColor: cs.primary,
+            enabled: !clearing && onClearSandbox != null,
+            onTap: () => onClearSandbox?.call(),
           ),
         ],
       );

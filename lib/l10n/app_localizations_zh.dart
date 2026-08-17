@@ -126,6 +126,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -174,6 +186,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -237,6 +263,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -8170,6 +8210,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -8218,6 +8270,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -8281,6 +8347,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -16214,6 +16294,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作區';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字體';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '快取';
 
   @override
@@ -16262,6 +16354,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '圖片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作區沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每個工作區內的 Linux 根檔案系統與暫存檔；重新安裝依賴後自動重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱執行環境';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱執行環境（iOS）；會自動重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '頭像快取';
@@ -16325,6 +16431,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceSandboxClearPartialDone =>
+      '沙箱已清除。共享執行環境將在應用程式重新啟動後移除。';
+
+  @override
+  String get storageSpaceScanning => '掃描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '掃描中… 已掃描 $files 個檔案，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日誌';

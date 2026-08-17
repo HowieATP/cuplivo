@@ -40,7 +40,9 @@ Directory _sandboxTree() {
   File('${root.path}/.profile').writeAsStringSync('export EDITOR=vi\n');
   File('${root.path}/etc_hosts').writeAsStringSync('127.0.0.1 localhost');
   // Usrmerge-style symlink: a rootfs's /bin usually IS a link to usr/bin.
-  Link('${root.path}/bin').createSync('usr/bin');
+  // Use an absolute target: Windows treats a relative forward-slash target as
+  // dangling, so the followLinks listing would drop the entry there.
+  Link('${root.path}/bin').createSync(Directory('${root.path}/usr/bin').path);
   addTearDown(() {
     try {
       tmp.deleteSync(recursive: true);

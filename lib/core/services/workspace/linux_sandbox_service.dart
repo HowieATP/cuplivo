@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../models/workspace.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/utf16_safe_cut.dart';
 
 enum SandboxStatus {
   /// Not a supported mobile platform (or plugin missing entirely).
@@ -1019,9 +1020,7 @@ class LinuxSandboxService {
             // diagnostics (dpkg lock held, missing package, network) reach
             // the user instead of a bare exit code.
             final stderrDetail = r.stderr.trim();
-            final excerpt = stderrDetail.length > 500
-                ? stderrDetail.substring(0, 500)
-                : stderrDetail;
+            final excerpt = truncateHeadUtf16Safe(stderrDetail, 500);
             throw StateError(
               '$label failed (${r.exitCode})'
               '${excerpt.isEmpty ? '' : ': $excerpt'}',
@@ -1111,8 +1110,8 @@ class LinuxSandboxService {
       }
       final rawStdout = (map['stdout'] ?? '').toString();
       final rawStderr = (map['stderr'] ?? '').toString();
-      final stdout = _boundOutput(rawStdout);
-      final stderr = _boundOutput(rawStderr);
+      final stdout = boundOutput(rawStdout);
+      final stderr = boundOutput(rawStderr);
       if (_cancelledRequestIds.remove(requestId)) {
         throw SandboxCancelledException(requestId);
       }
@@ -1197,15 +1196,16 @@ class LinuxSandboxService {
     );
   }
 
-  static String _boundOutput(String value) {
-    if (value.length <= maxOutputChars) return value;
-    const marker = '\n...[truncated]...\n';
-    final available = maxOutputChars - marker.length;
-    final head = available ~/ 2;
-    final tail = available - head;
-    return '${value.substring(0, head)}$marker'
-        '${value.substring(value.length - tail)}';
-  }
+  /// Bounds [value] to [maxOutputChars] characters, keeping a head/tail
+  /// preview. Cut points are adjusted so a UTF-16 surrogate pair is never
+  /// split: a lone surrogate would make the truncated string unencodable by
+  /// `jsonEncode` and would fail the whole shell tool result serialization.
+  @visibleForTesting
+  static String boundOutput(String value) => truncateHeadTailUtf16Safe(
+    value,
+    maxOutputChars,
+    marker: '\n...[truncated]...\n',
+  );
 
   /// Allow only plain http(s) mirror base URLs without shell metacharacters.
   static String? _sanitizeMirrorUrl(String raw) {

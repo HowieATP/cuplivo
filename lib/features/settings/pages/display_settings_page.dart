@@ -2670,9 +2670,9 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                 subtitle: l10n.iosKeepAliveMasterSubtitle,
                 value: sp.iosKeepAliveEnabled,
                 onChanged: (v) async {
-                  await context
-                      .read<SettingsProvider>()
-                      .setIosKeepAliveEnabled(v);
+                  await context.read<SettingsProvider>().setIosKeepAliveEnabled(
+                    v,
+                  );
                   await _pushKeepAliveConfig();
                   _refreshStatus();
                 },

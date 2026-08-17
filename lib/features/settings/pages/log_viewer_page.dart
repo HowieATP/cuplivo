@@ -78,9 +78,10 @@ Future<void> _startRequestLogAiAnalysis(
         ],
       ),
     );
-    Navigator.of(context, rootNavigator: true).popUntil(
-      (route) => route.isFirst,
-    );
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => route.isFirst);
   } catch (error, stackTrace) {
     debugPrint(
       'LogViewerPage: failed to prepare AI request-log analysis: '
@@ -1394,10 +1395,8 @@ class _RequestLogDetailPageState extends State<_RequestLogDetailPage> {
             IconButton(
               icon: Icon(Lucide.Bot, color: cs.onSurface, size: 20),
               tooltip: l10n.requestLogAiAnalysisTooltip,
-              onPressed: () => _startRequestLogAiAnalysis(
-                context,
-                <RequestLogEntry>[entry],
-              ),
+              onPressed: () =>
+                  _startRequestLogAiAnalysis(context, <RequestLogEntry>[entry]),
             ),
           IconButton(
             icon: Icon(Lucide.Copy, color: cs.onSurface, size: 20),

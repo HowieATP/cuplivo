@@ -29,11 +29,11 @@ void main() {
         }),
       );
 
-      final payload = RequestLogAiAnalysisExporter.buildPayload(<RequestLogEntry>[
-        entry,
-      ]);
-      final request = (payload['requests'] as List<dynamic>).single
-          as Map<String, dynamic>;
+      final payload = RequestLogAiAnalysisExporter.buildPayload(
+        <RequestLogEntry>[entry],
+      );
+      final request =
+          (payload['requests'] as List<dynamic>).single as Map<String, dynamic>;
       final headers = request['request_headers'] as Map<String, dynamic>;
       final body = request['request_body'] as Map<String, dynamic>;
       final nested = body['nested'] as Map<String, dynamic>;
@@ -64,11 +64,11 @@ void main() {
         }),
       );
 
-      final payload = RequestLogAiAnalysisExporter.buildPayload(<RequestLogEntry>[
-        entry,
-      ]);
-      final request = (payload['requests'] as List<dynamic>).single
-          as Map<String, dynamic>;
+      final payload = RequestLogAiAnalysisExporter.buildPayload(
+        <RequestLogEntry>[entry],
+      );
+      final request =
+          (payload['requests'] as List<dynamic>).single as Map<String, dynamic>;
       final body = request['request_body'] as Map<String, dynamic>;
       final transformed = body['image_data'] as String;
 
@@ -85,11 +85,11 @@ void main() {
         requestBody: '{not valid json',
       );
 
-      final payload = RequestLogAiAnalysisExporter.buildPayload(<RequestLogEntry>[
-        entry,
-      ]);
-      final request = (payload['requests'] as List<dynamic>).single
-          as Map<String, dynamic>;
+      final payload = RequestLogAiAnalysisExporter.buildPayload(
+        <RequestLogEntry>[entry],
+      );
+      final request =
+          (payload['requests'] as List<dynamic>).single as Map<String, dynamic>;
 
       expect(request['request_body'], '{not valid json');
     });

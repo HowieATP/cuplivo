@@ -1394,8 +1394,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
     _iosBackgroundNotificationsEnabled =
         prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
-    _iosKeepAliveEnabled =
-        prefs.getBool(_iosKeepAliveEnabledKey) ?? false;
+    _iosKeepAliveEnabled = prefs.getBool(_iosKeepAliveEnabledKey) ?? false;
     _iosSilentAudioKeepAliveEnabled =
         prefs.getBool(_iosSilentAudioKeepAliveEnabledKey) ?? false;
     _iosLocationKeepAliveEnabled =
@@ -2845,8 +2844,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   bool _iosSilentAudioKeepAliveEnabled = false;
-  bool get iosSilentAudioKeepAliveEnabled =>
-      _iosSilentAudioKeepAliveEnabled;
+  bool get iosSilentAudioKeepAliveEnabled => _iosSilentAudioKeepAliveEnabled;
   Future<void> setIosSilentAudioKeepAliveEnabled(bool v) async {
     if (_iosSilentAudioKeepAliveEnabled == v) return;
     _iosSilentAudioKeepAliveEnabled = v;

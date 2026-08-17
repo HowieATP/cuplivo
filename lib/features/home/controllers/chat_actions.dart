@@ -168,9 +168,7 @@ class ChatActions {
         detail: privacy
             ? l10n.iosBackgroundGenerationPrivacyActiveDetail
             : l10n.iosBackgroundGenerationActiveDetail,
-        tokenLabel: privacy
-            ? ''
-            : l10n.iosBackgroundGenerationTokenCount(0),
+        tokenLabel: privacy ? '' : l10n.iosBackgroundGenerationTokenCount(0),
       );
     } catch (error, stackTrace) {
       _logIosBackgroundGenerationFailure('start', error, stackTrace);

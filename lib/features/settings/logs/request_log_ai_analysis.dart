@@ -76,9 +76,9 @@ class RequestLogAiAnalysisExporter {
         '${RequestLogger.logSkipMarker}_${prefix}_$timestamp.json',
       ),
     );
-    final text = const JsonEncoder.withIndent('  ').convert(
-      buildPayload(entries, generatedAt: now),
-    );
+    final text = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(buildPayload(entries, generatedAt: now));
     await file.writeAsString(text, flush: true);
     return file;
   }
@@ -199,10 +199,7 @@ class RequestLogAiAnalysisExporter {
       final transformed = <String, dynamic>{};
       value.forEach((key, nestedValue) {
         final name = key.toString();
-        transformed[name] = _transformJsonValue(
-          nestedValue,
-          fieldName: name,
-        );
+        transformed[name] = _transformJsonValue(nestedValue, fieldName: name);
       });
       return transformed;
     }
@@ -284,8 +281,7 @@ class RequestLogAiAnalysisExporter {
   static String _truncateLongString(String value) {
     if (value.length <= _maxStringCharacters) return value;
 
-    final omittedCharacters =
-        value.length - (_retainedCharactersPerSide * 2);
+    final omittedCharacters = value.length - (_retainedCharactersPerSide * 2);
     final head = value.substring(
       0,
       utf16SafeHeadEnd(value, _retainedCharactersPerSide),

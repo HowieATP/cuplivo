@@ -36,8 +36,7 @@ class IosKeepAliveStatus {
       locationAuthorized: readBool('locationAuthorized'),
       survivalTier: (map?['survivalTier'] as String?) ?? 'short',
       interruptionCount: (map?['interruptionCount'] as int?) ?? 0,
-      lastInterruptedAt:
-          ((map?['lastInterruptedAt'] as num?) ?? 0).toDouble(),
+      lastInterruptedAt: ((map?['lastInterruptedAt'] as num?) ?? 0).toDouble(),
     );
   }
 

@@ -3621,10 +3621,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _showGroupChatItemMenu(
-    GroupChat group, {
-    Offset? anchor,
-  }) async {
+  Future<void> _showGroupChatItemMenu(GroupChat group, {Offset? anchor}) async {
     if (_isDesktop) {
       if (anchor == null) return;
       final l10n = AppLocalizations.of(context)!;

@@ -78,14 +78,8 @@ void main() {
     });
 
     test('strips long <thinking> blocks entirely', () {
-      expect(
-        miniMapOneLine('hi <thinking>inner</thinking> x'),
-        'hi x',
-      );
-      expect(
-        miniMapOneLine('<THINKING>t</THINKING>only'),
-        'only',
-      );
+      expect(miniMapOneLine('hi <thinking>inner</thinking> x'), 'hi x');
+      expect(miniMapOneLine('<THINKING>t</THINKING>only'), 'only');
     });
 
     test('strips image and file markers', () {

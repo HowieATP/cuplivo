@@ -81,9 +81,7 @@ void main() {
     });
 
     test('legacy <think> content stays stripped (regression)', () {
-      chatService.matches = [
-        _match(content: '<think>secret</think> visible'),
-      ];
+      chatService.matches = [_match(content: '<think>secret</think> visible')];
 
       final results = GlobalSessionSearchService.search(
         chatService: chatService,

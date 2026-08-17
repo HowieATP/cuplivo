@@ -404,7 +404,11 @@ object RootfsExtractor {
 
   private fun sanitizeEntryPath(raw: String): String {
     val cleaned = raw.replace('\\', '/').trim().trimStart('/').removePrefix("./")
-    if (cleaned.isEmpty()) throw IllegalArgumentException("Entry path is empty")
+    // A bare "." / "./" is the tarball root directory entry (Alpine
+    // minirootfs archives carry one). It maps to the extraction root and is
+    // skipped by nextEntry(), so return an empty name instead of failing the
+    // whole extraction.
+    if (cleaned.isEmpty()) return ""
     if (cleaned.contains('\u0000')) throw IllegalArgumentException("Entry path contains a NUL byte")
     if (cleaned.split('/').contains("..")) {
       throw IllegalArgumentException("Entry path escapes the extraction root: $raw")

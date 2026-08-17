@@ -238,7 +238,9 @@ class LanSyncServer extends ChangeNotifier {
     if (since != null) {
       final incremental = IncrementalBackupConfig(
         since: since,
-        includeSettings: false,
+        // Settings (including assistants and providers) ride settings.json;
+        // merge restore unions them on the receiving side (issue #476).
+        includeSettings: true,
         includeFiles: true,
         updateBackupTime: false,
       );

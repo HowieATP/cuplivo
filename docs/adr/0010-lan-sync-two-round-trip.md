@@ -50,9 +50,11 @@ per-conversation messageId 比对用于 **sync plan 和 fork 检测**（协议�
 
 文件（upload / images / avatars / fonts / skills）由现有 `since` 过滤（`lastModifiedSync >= since`）自动覆盖。
 
-### Assistant 同步：set difference
+### Assistant 同步与设置同步（v2 修订）
 
-比对双方 assistant ID 集合，只传对方没有的。已存在的不动，避免冲突。保证接收端 conversation 引用的 `assistantId` 不悬空。与现有 `_mergeAssistantMaps()`（`data_sync.dart:1550`）语义一致。
+v1 的 `includeSettings: false` 意味着 zip 里没有 settings.json，助手/供应商等设置数据实际不会传输——sync plan 里的 assistant set difference 只出现在计划中，无法落地。
+
+**v2 修订（issue #476）**：增量 zip 改为 `includeSettings: true`。助手随 settings.json 的 `assistants_v1` 全量携带，恢复端走标准 settings 合并（`mergeableKeys` 并集 + `_mergeAssistantMaps` 字段级合并，avatar/background 本地优先）。sync plan 中的 assistant set difference（`missingAssistantIds` / `remoteMissingAssistantIds`）保留为计划信息，不再承担传输职责。设备绑定键（窗口几何、输入草稿、热键、OAuth token）由 `SharedPreferencesAsync._localOnlyKeys` 排除，永不跨设备。双端各自打包 → 各自 merge → 配置收敛为并集。
 
 ### 不更新上次备份时间
 

@@ -2031,6 +2031,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'If you have any issues, join the Cuplivo QQ group to give feedback.';
 
   @override
+  String get backupPageKelivoCompatTitle => 'Cannot Import Kelivo v2 Backup';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      'This backup uses the Kelivo v2 (v1.2) format, which this version cannot import directly. Please open the kelivo-helper compat tool to downgrade it to a compatible format first, then import the converted file.';
+
+  @override
+  String get backupPageKelivoCompatOpen => 'Open Downgrade Tool';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
   String get backupPageNotSupportedYet => 'Not supported yet';
 
   @override

@@ -21,6 +21,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../shared/dialogs/restart_required_dialog.dart';
 import '../../shared/dialogs/rikkahub_migrate_dialog.dart';
+import '../../shared/dialogs/kelivo_compat_dialog.dart';
 import '../../utils/format.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../shared/widgets/lan_sync_section.dart';
@@ -219,6 +220,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     try {
       await action(mode);
     } catch (e) {
+      if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
@@ -1471,6 +1474,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       await widget.restoreFromItem(item, RestoreMode.merge);
     } catch (e) {
       if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
+      if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
         message: e.toString(),
@@ -1501,6 +1506,8 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     try {
       await action(mode);
     } catch (e) {
+      if (!rootCtx.mounted) return;
+      if (await maybeShowKelivoCompatError(rootCtx, e)) return;
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,

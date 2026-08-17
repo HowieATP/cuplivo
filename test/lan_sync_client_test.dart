@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
@@ -12,9 +16,28 @@ import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_client.dart';
+import 'package:Cuplivo/core/services/sync/lan_sync_logic.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_models.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_server.dart';
 import 'package:Cuplivo/core/services/sync/windows_firewall.dart';
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.root);
+
+  final String root;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => root;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$root/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$root/tmp';
+}
 
 /// Minimal ChatService fake: only the index-building surface is real,
 /// backed by an in-memory Drift repo.
@@ -26,6 +49,12 @@ class _FakeChatService extends ChatService {
 
   @override
   ChatDatabaseRepository get repo => _repo;
+
+  /// Export paths (`_exportChatsToFile`, `_exportSettingsJson`) self-init
+  /// when uninitialized — that would open a real SQLite file under the fake
+  /// app-data dir and leave it locked for the teardown delete.
+  @override
+  bool get initialized => true;
 
   @override
   List<Conversation> getAllCompleteConversations() => _conversations;
@@ -350,5 +379,78 @@ void main() {
       expect(await receivedFile!.readAsBytes(), zipBytes);
       await receivedFile!.delete();
     });
+
+    test(
+      'exchange zip includes settings.json so settings/assistants sync',
+      () async {
+        // Full DataSync export path needs prefs + path provider fakes.
+        SharedPreferences.setMockInitialValues({});
+        PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+
+        final conversation = Conversation(id: 'c1', title: 'Chat 1');
+        await repo.putConversation(conversation);
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm1',
+            role: 'user',
+            content: 'hello',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 1),
+          ),
+        );
+        chatService._conversations.add(conversation);
+
+        final plan = SyncPlan(
+          conversations: const [],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2025, 1, 1),
+        );
+        late http.Request captured;
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/sync/plan') {
+              return http.Response(plan.toJsonString(), 200);
+            }
+            captured = request;
+            return http.Response(
+              '{"empty":true}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+
+        await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+        await lanClient.exchange(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        expect(lanClient.phase, LanSyncPhase.noData);
+        expect(captured, isNotNull);
+        final contentType = captured.headers['content-type']!;
+        expect(contentType, startsWith('multipart/form-data'));
+        final boundary = contentType.split('boundary=').last;
+        final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+        final zipBytes = parts['zip'];
+        expect(zipBytes, isNotNull);
+
+        final archive = ZipDecoder().decodeBytes(zipBytes!);
+        try {
+          expect(archive.findFile('settings.json'), isNotNull);
+          expect(archive.findFile('chats.json'), isNotNull);
+        } finally {
+          archive.clearSync();
+        }
+      },
+    );
   });
 }

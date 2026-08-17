@@ -663,8 +663,6 @@ class SettingsProvider extends ChangeNotifier {
     SharedPreferences prefs,
   ) async {
     Map<String, ProviderConfig>? nextProviderConfigs;
-    int providersChanged = 0;
-    int modelsChanged = 0;
 
     for (final entry in _providerConfigs.entries) {
       final providerKey = entry.key;
@@ -694,7 +692,6 @@ class SettingsProvider extends ChangeNotifier {
           m.remove(k);
         }
         nextOverrides[modelKey] = m;
-        modelsChanged++;
       }
 
       if (nextOverrides == null) continue;
@@ -704,7 +701,6 @@ class SettingsProvider extends ChangeNotifier {
       nextProviderConfigs[providerKey] = cfg.copyWith(
         modelOverrides: nextOverrides,
       );
-      providersChanged++;
     }
 
     if (nextProviderConfigs == null) return _MigrationResult.noChange;
@@ -716,16 +712,11 @@ class SettingsProvider extends ChangeNotifier {
       final encoded = jsonEncode(map);
       final ok = await prefs.setString(_providerConfigsKey, encoded);
       if (!ok) return _MigrationResult.failed;
-    } catch (e, st) {
-      debugPrint('[SettingsProvider] config persist failed: $e');
-      debugPrint('$st');
+    } catch (_) {
       return _MigrationResult.failed;
     }
 
     _providerConfigs = nextProviderConfigs;
-    debugPrint(
-      '[SettingsProvider] overrides cleaned: providers=$providersChanged, models=$modelsChanged',
-    );
     return _MigrationResult.applied;
   }
 
@@ -820,10 +811,7 @@ class SettingsProvider extends ChangeNotifier {
         }
         _providerConfigs = decoded;
         providerConfigsLoaded = true;
-      } catch (e, st) {
-        debugPrint('[SettingsProvider] config decode failed: $e');
-        debugPrint('$st');
-      }
+      } catch (_) {}
     }
 
     try {
@@ -840,10 +828,6 @@ class SettingsProvider extends ChangeNotifier {
             _providerConfigsBackupKey,
             jsonEncode(backup),
           );
-          debugPrint('[SettingsProvider] config snapshot saved.');
-          if (!backupOk) {
-            debugPrint('[SettingsProvider] config snapshot failed.');
-          }
         }
 
         if (backupOk) {
@@ -854,15 +838,9 @@ class SettingsProvider extends ChangeNotifier {
               _embeddingOverridesMigrationVersion,
             );
           }
-          if (result == _MigrationResult.applied) {
-            debugPrint('[SettingsProvider] overrides cleanup applied.');
-          }
         }
       }
-    } catch (e, st) {
-      debugPrint('[SettingsProvider] cleanup failed: $e');
-      debugPrint('$st');
-    }
+    } catch (_) {}
 
     await _normalizeDoublePrefKeys(prefs);
 

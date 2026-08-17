@@ -21,12 +21,12 @@ void main() {
     test('never splits a surrogate pair at the head cut', () {
       const marker = '\n...[truncated]...\n';
       final head = (LinuxSandboxService.maxOutputChars - marker.length) ~/ 2;
-      // The emoji occupies code units head-1..head, so the head cut falls
-      // exactly between its high and low surrogate.
+      // '😀' is U+1F600 = \uD83D\uDE00, a true surrogate pair (two code
+      // units). Its high surrogate lands at head-1 and its low at head, so
+      // the head cut falls exactly between them.
       final value =
-          'a' * (head - 1) +
-          '✅' +
-          'b' * (LinuxSandboxService.maxOutputChars - head + 20);
+          '${'a' * (head - 1)}😀'
+          '${'b' * (LinuxSandboxService.maxOutputChars - head + 20)}';
       final out = LinuxSandboxService.boundOutput(value);
       expectValidUtf16(out);
       expect(() => jsonEncode(out), returnsNormally);
@@ -39,8 +39,10 @@ void main() {
       final tail = available - head;
       final total = LinuxSandboxService.maxOutputChars + 24;
       final tailStart = total - tail;
-      // The emoji straddles the tail start (indices tailStart-1..tailStart).
-      final value = 'a' * (tailStart - 1) + '✅' + 'b' * (total - tailStart - 1);
+      // '😀' straddles the tail start: its high surrogate is at tailStart-1
+      // and its low at tailStart, so the tail cut falls exactly between them.
+      final value =
+          '${'a' * (tailStart - 1)}😀${'b' * (total - tailStart - 1)}';
       final out = LinuxSandboxService.boundOutput(value);
       expectValidUtf16(out);
       expect(() => jsonEncode(out), returnsNormally);

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../utils/app_directories.dart';
+import '../../../utils/utf16_safe_cut.dart';
 import 'request_log_parser.dart';
 
 /// Creates a privacy-scrubbed, AI-readable export of request-log entries.
@@ -238,8 +239,13 @@ class RequestLogAiAnalysisExporter {
 
     final omittedCharacters =
         value.length - (_retainedCharactersPerSide * 2);
-    final head = value.substring(0, _retainedCharactersPerSide);
-    final tail = value.substring(value.length - _retainedCharactersPerSide);
+    final head = value.substring(
+      0,
+      utf16SafeHeadEnd(value, _retainedCharactersPerSide),
+    );
+    final tail = value.substring(
+      utf16SafeTailStart(value, value.length - _retainedCharactersPerSide),
+    );
     return '$head\n<TRUNCATED: $omittedCharacters characters omitted>\n$tail';
   }
 

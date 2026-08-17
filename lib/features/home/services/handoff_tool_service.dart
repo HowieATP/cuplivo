@@ -11,6 +11,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/generation_engine.dart';
+import '../../../utils/utf16_safe_cut.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
@@ -370,7 +371,7 @@ class HandoffToolService {
                 '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}',
           )
           .join('\n\n');
-      final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
+      final content = truncateHeadUtf16Safe(joined, 3000);
       final locale = Localizations.localeOf(context).toLanguageTag();
 
       final prompt = settings.titlePrompt

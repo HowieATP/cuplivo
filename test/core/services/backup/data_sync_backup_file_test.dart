@@ -712,6 +712,7 @@ void main() {
           final data =
               jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[])))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
           final toolEvents = data['toolEvents'] as Map;
@@ -777,6 +778,7 @@ void main() {
           final data =
               jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
 

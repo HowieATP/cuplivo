@@ -32,6 +32,13 @@ class DataSync {
   final Future<Set<String>> Function(String type)? _localIdResolver;
   DataSync({required this.chatService, this._localIdResolver});
 
+  // Upstream (Kelivo) legacy chats.json importer only accepts version 1 (or a
+  // missing field); anything else is rejected with FormatException. Cuplivo's
+  // own importer never reads this field, so exporting v1 keeps backups
+  // importable into Kelivo without affecting Cuplivo round-trips. Never bump
+  // this past 1 without relaxing Kelivo's _parseChatBackup constraint first.
+  static const int _chatsJsonVersion = 1;
+
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
     String base = cfg.url.trim();
@@ -992,11 +999,7 @@ class DataSync {
     final sink = file.openWrite();
 
     try {
-      // Upstream (Kelivo) legacy chats.json importer only accepts version 1
-      // (or a missing field); version 2 is rejected with FormatException.
-      // Cuplivo's own importer never reads this field, so exporting v1 keeps
-      // backups importable into Kelivo without affecting Cuplivo round-trips.
-      sink.write('{"version":1,');
+      sink.write('{"version":$_chatsJsonVersion,');
 
       // --- conversations ---
       sink.write('"conversations":[');
@@ -1050,7 +1053,7 @@ class DataSync {
       sink.write(jsonEncode(geminiThoughtSigs));
       sink.write(',');
 
-      // --- group chats (v2) ---
+      // --- group chats ---
       final groups = await chatService.repo.getAllGroupChats();
       final groupPayload = <Map<String, dynamic>>[];
       final memberPayload = <Map<String, dynamic>>[];
@@ -1537,7 +1540,9 @@ class DataSync {
             }
           }
 
-          // Restore group chat metadata (v2 keys; ignored on v1 backups).
+          // Restore group chat metadata. The groupChats/groupMembers keys are
+          // present on both v1 and v2 exports and are always restored when
+          // non-empty.
           final groupChatsRaw = obj['groupChats'] as List? ?? const [];
           final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
           if (groupChatsRaw.isNotEmpty) {

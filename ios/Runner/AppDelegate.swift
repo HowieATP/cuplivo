@@ -251,8 +251,11 @@ private final class IosBackgroundGenerationHandler {
         self.beginBackgroundTask()
       } else {
         // No keep-alive backing us — the system really will suspend the app.
-        // Record the interruption so the UI can tell the user what happened.
-        BackgroundKeepAliveManager.shared.recordInterruption()
+        // Record the interruption only when keep-alive was actually armed, so
+        // users who never enabled it aren't told they were 'interrupted'.
+        if BackgroundKeepAliveManager.shared.masterEnabled {
+          BackgroundKeepAliveManager.shared.recordInterruption()
+        }
         self.endBackgroundTask()
       }
     }

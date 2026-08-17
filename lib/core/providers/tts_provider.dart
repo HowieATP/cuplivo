@@ -553,26 +553,26 @@ class TtsProvider extends ChangeNotifier {
   }
 
   // Keep-alive media coordination: while TTS plays, suspend the silent-audio
-  // keep-alive leg so both don't fight over the audio session. Counter keeps
-  // nested speak/stop sequences balanced; resume is idempotent (clears to 0).
-  int _keepAliveMediaCount = 0;
+  // keep-alive leg so both don't fight over the audio session. Boolean state
+  // machine — Dart only emits 0→1 / 1→0 transitions, so it can never drift
+  // out of sync with the native counter.
+  bool _keepAliveSuspendedForMedia = false;
 
   void _suspendKeepAliveForMedia() {
-    _keepAliveMediaCount++;
-    if (_keepAliveMediaCount == 1) {
-      unawaited(IosKeepAliveService.instance.suspendSilentAudio());
-    }
+    if (_keepAliveSuspendedForMedia) return;
+    _keepAliveSuspendedForMedia = true;
+    unawaited(IosKeepAliveService.instance.suspendSilentAudio());
   }
 
-  void _clearKeepAliveForMedia() {
-    if (_keepAliveMediaCount <= 0) return;
-    _keepAliveMediaCount = 0;
+  void _resumeKeepAliveForMedia() {
+    if (!_keepAliveSuspendedForMedia) return;
+    _keepAliveSuspendedForMedia = false;
     unawaited(IosKeepAliveService.instance.resumeSilentAudio());
   }
 
   Future<void> stop() async {
     _sessionId++;
-    _clearKeepAliveForMedia();
+    _resumeKeepAliveForMedia();
     await _stopPlaybackEngines();
     _stopInternal(updateState: true);
   }
@@ -940,7 +940,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _finishPlayback({required TtsPlaybackStatus status, String? error}) {
-    _clearKeepAliveForMedia();
+    _resumeKeepAliveForMedia();
     _isSpeaking = false;
     _isPaused = false;
     _usingNetwork = false;
@@ -1192,6 +1192,7 @@ class TtsProvider extends ChangeNotifier {
   @override
   void dispose() {
     _sessionId++;
+    _resumeKeepAliveForMedia();
     _playerCompleteSub?.cancel();
     _playerPositionSub?.cancel();
     _playerDurationSub?.cancel();

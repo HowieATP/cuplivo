@@ -235,7 +235,7 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
   // MARK: - Status
 
   var keepAliveEffective: Bool {
-    silentAudioActive
+    silentAudioActive || locationUpdating
   }
 
   var isLocationAuthorized: Bool {
@@ -518,6 +518,15 @@ final class BackgroundKeepAliveManager: NSObject, CLLocationManagerDelegate {
     if isLocationAuthorized {
       result(true)
       return
+    }
+    // Denied / restricted: requesting again never shows a prompt and the
+    // delegate may not fire — resolve immediately so Dart doesn't hang.
+    switch locationAuthStatus {
+    case .denied, .restricted:
+      result(false)
+      return
+    default:
+      break
     }
     pendingLocationAuthResult = result
     if #available(iOS 14.0, *) {

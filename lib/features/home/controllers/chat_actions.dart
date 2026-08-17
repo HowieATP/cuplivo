@@ -149,7 +149,11 @@ class ChatActions {
         locationEnabled: settings.iosLocationKeepAliveEnabled,
         liveActivityPrivacyMode: settings.iosLiveActivityPrivacyMode,
       );
-      await IosKeepAliveService.instance.beginSession();
+      // Only open a keep-alive session when background generation is enabled;
+      // otherwise there is no task running in the background to keep alive.
+      if (settings.iosBackgroundGenerationEnabled) {
+        await IosKeepAliveService.instance.beginSession();
+      }
       final privacy = settings.iosLiveActivityPrivacyMode;
       await IosBackgroundGenerationService.instance.start(
         enabled: settings.iosBackgroundGenerationEnabled,
@@ -195,10 +199,13 @@ class ChatActions {
     required bool success,
     String? detail,
   }) async {
+    // End the keep-alive session BEFORE the l10n guard — if localization is
+    // unavailable we must still release the native keep-alive, otherwise the
+    // silent-audio / location legs keep running forever.
+    await IosKeepAliveService.instance.endSession();
     final l10n = _l10n;
     if (l10n == null) return;
     try {
-      await IosKeepAliveService.instance.endSession();
       await IosBackgroundGenerationService.instance.finish(
         title: success
             ? l10n.iosBackgroundGenerationCompleteTitle
@@ -216,9 +223,9 @@ class ChatActions {
   }
 
   Future<void> _cancelIosBackgroundGeneration() async {
+    await IosKeepAliveService.instance.endSession();
     final l10n = _l10n;
     try {
-      await IosKeepAliveService.instance.endSession();
       await IosBackgroundGenerationService.instance.cancel(
         detail: l10n?.iosBackgroundGenerationCancelledDetail,
       );

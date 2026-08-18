@@ -53,6 +53,12 @@ android {
         }
     }
 
+    testOptions {
+        // JVM unit tests exercise Java-only Android services such as the
+        // rootfs extractor; framework logging stubs should behave as no-ops.
+        unitTests.isReturnDefaultValues = true
+    }
+
     packaging {
         jniLibs {
             // Extract vendored proot binaries to nativeLibraryDir at install

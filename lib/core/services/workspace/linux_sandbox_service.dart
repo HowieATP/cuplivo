@@ -395,6 +395,8 @@ class LinuxSandboxService {
   static const Map<String, String> defaultRootfsUrls = {
     'arm64-v8a':
         'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
+    'armeabi-v7a':
+        'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
     'x86_64':
         'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz',
   };
@@ -407,6 +409,14 @@ class LinuxSandboxService {
           'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
       'aliyun':
           'https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
+    },
+    'armeabi-v7a': {
+      'official':
+          'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
+      'tuna':
+          'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
+      'aliyun':
+          'https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
     },
     'x86_64': {
       'official':
@@ -505,10 +515,18 @@ class LinuxSandboxService {
     return p.join(runtime.path, 'alpine-rootfs');
   }
 
-  /// Rootfs present? Android: guest shell binary under `.sandbox/linux` of
-  /// the workspace. iOS: shared fakefs tree (meta.db + busybox + arch tag).
+  /// Rootfs present? Android: guest shell under `.sandbox/linux` must match
+  /// the current process ABI. iOS: shared fakefs tree (meta.db + busybox +
+  /// arch tag).
   Future<bool> hasRootfs(String workspaceHostPath) async {
     try {
+      if (Platform.isAndroid) {
+        final compatible = await _channel.invokeMethod<bool>(
+          'hasCompatibleRootfs',
+          {'workspacePath': workspaceHostPath},
+        );
+        return compatible == true;
+      }
       if (Platform.isIOS) {
         final rootfs = await iosRootfsPath();
         final meta = File(p.join(rootfs, 'meta.db'));

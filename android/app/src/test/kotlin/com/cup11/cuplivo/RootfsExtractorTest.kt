@@ -21,15 +21,15 @@ class RootfsExtractorTest {
 
   /** Serializes raw tar bytes (no trailing zero blocks) into an archive file. */
   private fun writeArchive(
-    builder: ByteArrayOutputStream.() -> Unit,
     fileName: String = "rootfs.tar.gz",
+    builder: ByteArrayOutputStream.() -> Unit,
   ): File {
     val raw = ByteArrayOutputStream()
     raw.builder()
     raw.write(ByteArray(1024)) // end-of-archive marker
     val archive = File(work, fileName)
-    archive.parentFile.mkdirs()
-    if (fileName.endsWith(".gz")) {
+    archive.parentFile?.mkdirs()
+    if (fileName.endsWith(".gz") || fileName.endsWith(".tgz")) {
       GZIPOutputStream(archive.outputStream()).use { it.write(raw.toByteArray()) }
     } else {
       archive.writeBytes(raw.toByteArray())
@@ -77,10 +77,15 @@ class RootfsExtractorTest {
     put(dst, offset, width, digits + "\u0000")
   }
 
-  private fun fileRecord(name: String, content: String): ByteArray = buildList {
-    add(header(name, size = content.length.toLong()))
-    addAll(padded(content.toByteArray()).toList())
-  }.toByteArray()
+  private fun records(vararg chunks: ByteArray): ByteArray =
+    ByteArrayOutputStream().apply {
+      chunks.forEach { write(it) }
+    }.toByteArray()
+
+  private fun fileRecord(name: String, content: String): ByteArray = records(
+    header(name, size = content.length.toLong()),
+    padded(content.toByteArray()),
+  )
 
   private fun dirRecord(name: String): ByteArray = header(name, type = '5')
 
@@ -90,22 +95,31 @@ class RootfsExtractorTest {
   private fun hardlinkRecord(name: String, source: String): ByteArray =
     header(name, type = '1', link = source)
 
-  private fun longNameRecord(fullName: String, real: ByteArray): ByteArray = buildList {
-    add(header("././@LongLink", size = fullName.length.toLong(), type = 'L'))
-    addAll(padded(fullName.toByteArray()).toList())
-    addAll(real.toList())
-  }.toByteArray()
+  private fun longNameRecord(fullName: String, real: ByteArray): ByteArray = records(
+    header("././@LongLink", size = fullName.length.toLong(), type = 'L'),
+    padded(fullName.toByteArray()),
+    real,
+  )
 
   private fun paxRecord(fields: Map<String, String>, real: ByteArray): ByteArray {
-    val body = fields.entries.joinToString("") { (key, value) ->
-      val record = "$key=$value\n"
-      "${record.length} $record"
+    val body = fields.entries.joinToString("") { (key, value) -> paxField(key, value) }
+    val bodyBytes = body.toByteArray()
+    return records(
+      header("pax", size = bodyBytes.size.toLong(), type = 'x'),
+      padded(bodyBytes),
+      real,
+    )
+  }
+
+  private fun paxField(key: String, value: String): String {
+    val content = "$key=$value\n"
+    var length = content.toByteArray().size + 2
+    while (true) {
+      val record = "$length $content"
+      val encodedLength = record.toByteArray().size
+      if (encodedLength == length) return record
+      length = encodedLength
     }
-    return buildList {
-      add(header("pax", size = body.length.toLong(), type = 'x'))
-      addAll(padded(body.toByteArray()).toList())
-      addAll(real.toList())
-    }.toByteArray()
   }
 
   private fun base256SizeHeader(name: String, size: Long, type: Char = '0'): ByteArray {
@@ -261,7 +275,8 @@ class RootfsExtractorTest {
   @Test
   fun rejectsNulBytesInNames() {
     val archive = writeArchive {
-      write(fileRecord("bad\u0000name", "x"))
+      write(longNameRecord("bad\u0000name", header("placeholder", size = 1)))
+      write(padded("x".toByteArray()))
     }
     try {
       RootfsExtractor.extract(archive, outDir)
@@ -298,11 +313,11 @@ class RootfsExtractorTest {
 
   @Test
   fun supportsPlainTarAndTgz() {
-    val plain = writeArchive({ write(fileRecord("plain", "1")) }, "rootfs.tar")
+    val plain = writeArchive("rootfs.tar") { write(fileRecord("plain", "1")) }
     RootfsExtractor.extract(plain, outDir)
     assertTrue(File(outDir, "plain").isFile)
 
-    val tgz = writeArchive({ write(fileRecord("tgz", "2")) }, "rootfs.tgz")
+    val tgz = writeArchive("rootfs.tgz") { write(fileRecord("tgz", "2")) }
     RootfsExtractor.extract(tgz, outDir)
     assertTrue(File(outDir, "tgz").isFile)
   }

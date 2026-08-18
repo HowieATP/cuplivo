@@ -797,6 +797,162 @@ void main() {
     );
 
     test(
+      'incremental: edit-only activity exports the conversation with its full version chain',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        const gid = 'test-group-1';
+
+        final conv = Conversation(
+          id: 'test-conv-3',
+          title: 'Edited Conversation',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['msg-v0', 'msg-v1'],
+          versionSelections: {gid: 1},
+        );
+        final v0 = ChatMessage(
+          id: 'msg-v0',
+          role: 'assistant',
+          content: 'original answer',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 0,
+        );
+        final v1 = ChatMessage(
+          id: 'msg-v1',
+          role: 'assistant',
+          content: 'edited answer',
+          // Edited versions preserve the ORIGINAL timestamp.
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 1,
+        );
+        await chatService.restoreConversation(conv, [v0, v1]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+
+          expect(convs, hasLength(1));
+          expect(convs[0]['id'], 'test-conv-3');
+          expect((convs[0]['versionSelections'] as Map)[gid], 1);
+          expect(msgs, hasLength(2));
+          expect(msgs.map((m) => m['id']), containsAll(['msg-v0', 'msg-v1']));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: version groups export atomically when the selected version is the original',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        const gid = 'test-group-2';
+
+        final conv = Conversation(
+          id: 'test-conv-4',
+          title: 'Reverted Conversation',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['msg-rv0', 'msg-rv1'],
+          // User edited to v1 but switched the selection back to v0.
+          versionSelections: {gid: 0},
+        );
+        final v0 = ChatMessage(
+          id: 'msg-rv0',
+          role: 'user',
+          content: 'original prompt',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 0,
+        );
+        final v1 = ChatMessage(
+          id: 'msg-rv1',
+          role: 'user',
+          content: 'edited prompt',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 1,
+        );
+        await chatService.restoreConversation(conv, [v0, v1]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+
+          expect(convs, hasLength(1));
+          expect(msgs, hasLength(2));
+          expect(msgs.map((m) => m['id']), containsAll(['msg-rv0', 'msg-rv1']));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
       'incremental: analyzeIncrementalScope returns correct counts',
       () async {
         final chatService = ChatService();
@@ -891,6 +1047,64 @@ void main() {
         expect(scope.updatedConversations.messageCount, 1);
         expect(scope.updatedConversations.oldestTitle, 'Old Chat');
         expect(scope.newFileCount, 0);
+
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: analyzeIncrementalScope counts edit-only activity as whole version groups',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        const gid = 'scope-group-1';
+
+        // Edit-only conversation: all message timestamps predate since, but
+        // updatedAt is fresh and a version was appended.
+        final conv = Conversation(
+          id: 'scope-conv',
+          title: 'Edit Only',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['scope-v0', 'scope-v1'],
+          versionSelections: {gid: 1},
+        );
+        await chatService.restoreConversation(conv, [
+          ChatMessage(
+            id: 'scope-v0',
+            role: 'assistant',
+            content: 'original',
+            timestamp: oldDate,
+            conversationId: conv.id,
+            isStreaming: false,
+            groupId: gid,
+            version: 0,
+          ),
+          ChatMessage(
+            id: 'scope-v1',
+            role: 'assistant',
+            content: 'edited',
+            timestamp: oldDate,
+            conversationId: conv.id,
+            isStreaming: false,
+            groupId: gid,
+            version: 1,
+          ),
+        ]);
+
+        final sync = DataSync(chatService: chatService);
+        final scope = await sync.analyzeIncrementalScope(
+          IncrementalBackupConfig(since: since, includeFiles: false),
+        );
+
+        expect(scope.newConversations.count, 0);
+        expect(scope.updatedConversations.count, 1);
+        expect(scope.updatedConversations.oldestTitle, 'Edit Only');
+        // Whole version group counts, matching the atomic export.
+        expect(scope.updatedConversations.messageCount, 2);
 
         await chatService.close();
       },

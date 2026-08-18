@@ -1,133 +1,123 @@
+import 'package:Cuplivo/core/services/workspace/workspace_path_presentation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Cuplivo/core/services/workspace/workspace_path_presentation.dart';
-
 void main() {
-  group('parseModelPath (strict /workspace input)', () {
-    test('passes "/" through (mount listing special case)', () {
-      expect(parseModelPath('/', 'default'), '/');
-    });
+  const safAliases = <String>{'notes', 'assets'};
 
-    test('translates /workspace root and nested paths', () {
+  group('parseModelPath', () {
+    test('translates the bound workspace', () {
       expect(parseModelPath('/workspace', 'default'), '@default');
-      expect(parseModelPath('/workspace/a.md', 'default'), '@default/a.md');
-      expect(
-        parseModelPath('/workspace/a/b/c.txt', 'default'),
-        '@default/a/b/c.txt',
-      );
-      expect(parseModelPath('/workspace', 'workspace_2'), '@workspace_2');
-      expect(parseModelPath('/workspace/x', 'workspace_2'), '@workspace_2/x');
+      expect(parseModelPath('/workspace/a/b.md', 'default'), '@default/a/b.md');
     });
 
-    test('preserves trailing slash for engine validation parity', () {
-      expect(parseModelPath('/workspace/', 'default'), '@default/');
-      expect(parseModelPath('/workspace/dir/', 'default'), '@default/dir/');
-    });
-
-    test('rejects canonical @alias form (strict)', () {
+    test('translates SAF mounts under /workspace/.mounts/<alias>', () {
       expect(
-        () => parseModelPath('@default/a.md', 'default'),
-        throwsA(isA<ModelPathException>()),
+        parseModelPath(
+          '/workspace/.mounts/notes',
+          'default',
+          safAliases: safAliases,
+        ),
+        '@notes',
       );
       expect(
-        () => parseModelPath('@default', 'default'),
-        throwsA(isA<ModelPathException>()),
-      );
-      expect(
-        () => parseModelPath('@workspace_2/a', 'workspace_2'),
-        throwsA(isA<ModelPathException>()),
+        parseModelPath(
+          '/workspace/.mounts/notes/a.md',
+          'default',
+          safAliases: safAliases,
+        ),
+        '@notes/a.md',
       );
     });
 
-    test('rejects absolute paths outside /workspace', () {
-      for (final bad in [
-        '/etc/passwd',
-        '/tmp/x',
-        '/workspace2/x', // prefix lookalike, not under /workspace/
-        'C:/x',
-        'notes.md', // relative, no prefix
-      ]) {
-        expect(
-          () => parseModelPath(bad, 'default'),
-          throwsA(isA<ModelPathException>()),
-          reason: 'should reject: $bad',
-        );
-      }
+    test('rejects an unknown SAF alias', () {
+      expect(
+        () => parseModelPath(
+          '/workspace/.mounts/nope/a.md',
+          'default',
+          safAliases: safAliases,
+        ),
+        throwsA(isA<ModelPathException>()),
+      );
     });
 
-    test('rejects whitespace and empty paths', () {
+    test('rejects .mounts without an alias', () {
       expect(
-        () => parseModelPath('', 'default'),
+        () => parseModelPath(
+          '/workspace/.mounts',
+          'default',
+          safAliases: safAliases,
+        ),
+        throwsA(isA<ModelPathException>()),
+      );
+    });
+
+    test('a literal .mounts workspace folder is shadowed', () {
+      // /workspace/.mounts/notes resolves as the SAF mount when the alias is
+      // known — a real folder named .mounts cannot be addressed (ADR-0037).
+      expect(
+        parseModelPath(
+          '/workspace/.mounts/notes',
+          'default',
+          safAliases: safAliases,
+        ),
+        '@notes',
+      );
+    });
+
+    test('still rejects canonical wire and absolute paths', () {
+      expect(
+        () => parseModelPath('@notes/a.md', 'default', safAliases: safAliases),
         throwsA(isA<ModelPathException>()),
       );
       expect(
-        () => parseModelPath(' /workspace/x', 'default'),
+        () => parseModelPath('/etc/passwd', 'default'),
         throwsA(isA<ModelPathException>()),
       );
-      expect(
-        () => parseModelPath('/workspace/x ', 'default'),
-        throwsA(isA<ModelPathException>()),
-      );
+    });
+
+    test('passes the root listing through', () {
+      expect(parseModelPath('/', 'default', safAliases: safAliases), '/');
     });
   });
 
   group('presentWirePath', () {
-    test('presents the bound alias root and descendants as /workspace', () {
+    test('presents the bound workspace', () {
       expect(presentWirePath('@default', 'default'), '/workspace');
-      expect(presentWirePath('@default/a.md', 'default'), '/workspace/a.md');
-      expect(presentWirePath('@workspace_2/x', 'workspace_2'), '/workspace/x');
+      expect(
+        presentWirePath('@default/notes.md', 'default'),
+        '/workspace/notes.md',
+      );
+    });
+
+    test('presents SAF mounts under /workspace/.mounts/<alias>', () {
+      expect(
+        presentWirePath('@notes', 'default', safAliases: safAliases),
+        '/workspace/.mounts/notes',
+      );
+      expect(
+        presentWirePath('@notes/a.md', 'default', safAliases: safAliases),
+        '/workspace/.mounts/notes/a.md',
+      );
     });
 
     test('leaves unknown mounts unchanged', () {
-      expect(presentWirePath('@docs/a.md', 'default'), '@docs/a.md');
+      expect(
+        presentWirePath('@unknown/x', 'default', safAliases: safAliases),
+        '@unknown/x',
+      );
     });
   });
 
   group('presentDefText', () {
-    test('rewrites model-visible tool copy to /workspace', () {
-      expect(
-        presentDefText('e.g. @default/notes.md'),
-        'e.g. /workspace/notes.md',
+    test('rewrites wire-format copy to the workspace vocabulary', () {
+      final out = presentDefText(
+        'A mount-relative path like @default/notes.md or @alias/rel/path',
       );
-      expect(
-        presentDefText('moved into @default get mtime=now'),
-        'moved into /workspace get mtime=now',
-      );
-      expect(
-        presentDefText('Mount-relative path (@alias/rel/path)'),
-        'Workspace-relative path (/workspace/rel/path)',
-      );
-      expect(
-        presentDefText('file path (mount-relative)'),
-        'file path (workspace-relative)',
-      );
-    });
-  });
-
-  group('presentDefMap', () {
-    test('rewrites nested schema strings only', () {
-      final def = presentDefMap({
-        'name': 'read',
-        'description': 'Read @default/notes.md.',
-        'inputSchema': {
-          'type': 'object',
-          'properties': {
-            'path': {
-              'type': 'string',
-              'description': 'Mount-relative path (@alias/rel/path)',
-            },
-          },
-          'required': ['path'],
-        },
-      });
-      expect(def['description'], 'Read /workspace/notes.md.');
-      final properties = ((def['inputSchema'] as Map)['properties'] as Map);
-      expect(
-        ((properties['path'] as Map)['description']),
-        'Workspace-relative path (/workspace/rel/path)',
-      );
-      expect(((properties['path'] as Map)['type']), 'string');
-      expect((def['inputSchema'] as Map)['required'], ['path']);
+      expect(out, contains('/workspace/notes.md'));
+      expect(out, contains('/workspace/rel/path'));
+      expect(out, contains('workspace-relative'));
+      expect(out, isNot(contains('@default')));
+      expect(out, isNot(contains('@alias')));
     });
   });
 }

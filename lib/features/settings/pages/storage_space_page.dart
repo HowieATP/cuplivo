@@ -11,6 +11,7 @@ import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/saf/saf_mount_sync_service.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../workspace/pages/workspace_detail_page.dart';
 import '../../workspace/pages/workspace_list_page.dart';
@@ -893,6 +894,340 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               ],
             ],
           ),
+        ),
+        if (Platform.isAndroid) ...[
+          const SizedBox(height: 12),
+          const _SafMountsPanel(),
+        ],
+      ],
+    );
+  }
+}
+
+/// Android-only panel: SAF external-directory mounts (ADR-0037). Each mount
+/// mirrors a user-picked directory into app-private storage; the AI reads and
+/// writes the mirror, and the sync service keeps the two sides in two-way
+/// mirror sync.
+class _SafMountsPanel extends StatelessWidget {
+  const _SafMountsPanel();
+
+  Future<void> _pickAndAdd(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final service = context.read<SafMountSyncService>();
+    Map<String, dynamic>? picked;
+    try {
+      picked = await service.pickTree();
+    } catch (e) {
+      debugPrint('SafMountsPanel.pickAndAdd: $e');
+      if (context.mounted) {
+        showAppSnackBar(context, message: l10n.safMountErrorPickFailed);
+      }
+      return;
+    }
+    if (picked == null || !context.mounted) return;
+    final uri = (picked['uri'] ?? '').toString();
+    final displayName = (picked['displayName'] ?? '').toString();
+    if (uri.isEmpty) return;
+
+    final controller = TextEditingController();
+    var readOnly = false;
+    String? errorText;
+    await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(l10n.safMountAddTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName.isEmpty ? uri : displayName,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(
+                    ctx,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                maxLength: 32,
+                decoration: InputDecoration(
+                  labelText: l10n.safMountAliasLabel,
+                  hintText: l10n.safMountAliasHint,
+                  errorText: errorText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  IosCheckbox(
+                    value: readOnly,
+                    onChanged: (v) => setDialogState(() => readOnly = v),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.safMountReadOnlyLabel,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: Theme.of(
+                        ctx,
+                      ).colorScheme.onSurface.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.workspaceCancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                final err = await service.addMount(
+                  alias: controller.text.trim(),
+                  uri: uri,
+                  displayName: displayName,
+                  readOnly: readOnly,
+                );
+                if (err == null) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  return;
+                }
+                if (!ctx.mounted) return;
+                setDialogState(() {
+                  errorText = switch (err) {
+                    SafMountSyncService.errorAliasInvalid =>
+                      l10n.safMountErrorAliasInvalid,
+                    SafMountSyncService.errorAliasReserved =>
+                      l10n.safMountErrorAliasReserved,
+                    SafMountSyncService.errorAliasDuplicate =>
+                      l10n.safMountErrorAliasDuplicate,
+                    _ => l10n.safMountErrorAddFailed,
+                  };
+                });
+              },
+              child: Text(l10n.workspaceConfirm),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+  }
+
+  Future<void> _confirmRemove(BuildContext context, SafMountEntry entry) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.safMountRemoveTitle),
+        content: Text(
+          l10n.safMountRemoveMessage(
+            entry.displayName.isEmpty ? entry.alias : entry.displayName,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.workspaceCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.workspaceConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (!context.mounted) return;
+    await context.read<SafMountSyncService>().removeMount(entry.alias);
+  }
+
+  String _statusLabel(AppLocalizations l10n, SafMountState state) {
+    return switch (state.status) {
+      SafMountStatus.idle => l10n.safMountStatusIdle,
+      SafMountStatus.syncing => l10n.safMountStatusSyncing,
+      SafMountStatus.unavailable => l10n.safMountStatusUnavailable,
+      SafMountStatus.error => l10n.safMountStatusError,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final service = context.watch<SafMountSyncService>();
+    final entries = service.entries;
+
+    return _iosSectionCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Lucide.HardDrive,
+                  size: 16,
+                  color: cs.onSurface.withValues(alpha: 0.8),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.safMountSectionTitle,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
+                const Spacer(),
+                IosIconButton(
+                  icon: Lucide.Plus,
+                  size: 16,
+                  minSize: 28,
+                  semanticLabel: l10n.safMountAdd,
+                  onTap: () => _pickAndAdd(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (entries.isEmpty)
+              Text(
+                l10n.safMountEmpty,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              )
+            else
+              for (var i = 0; i < entries.length; i++) ...[
+                if (i > 0) const SizedBox(height: 6),
+                _SafMountRow(
+                  entry: entries[i],
+                  state: service.stateOf(entries[i].alias),
+                  statusLabel: _statusLabel(
+                    l10n,
+                    service.stateOf(entries[i].alias),
+                  ),
+                  onSync: () => service.syncNow(entries[i].alias),
+                  onRemove: () => _confirmRemove(context, entries[i]),
+                ),
+              ],
+            const SizedBox(height: 8),
+            Text(
+              l10n.safMountSectionNote,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SafMountRow extends StatelessWidget {
+  const _SafMountRow({
+    required this.entry,
+    required this.state,
+    required this.statusLabel,
+    required this.onSync,
+    required this.onRemove,
+  });
+
+  final SafMountEntry entry;
+  final SafMountState state;
+  final String statusLabel;
+  final VoidCallback onSync;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final syncing = state.status == SafMountStatus.syncing;
+    final unavailable = state.status == SafMountStatus.unavailable;
+    final error = state.status == SafMountStatus.error;
+    final statusColor = unavailable || error
+        ? cs.error
+        : cs.onSurface.withValues(alpha: 0.55);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '@${entry.alias}',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: AppFontWeights.semibold,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  if (entry.readOnly) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '(ro)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                entry.displayName.isEmpty ? entry.uri : entry.displayName,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                error && state.lastError != null
+                    ? '$statusLabel · ${state.lastError}'
+                    : statusLabel,
+                style: TextStyle(fontSize: 11.5, color: statusColor),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        IosIconButton(
+          icon: syncing ? Lucide.Loader : Lucide.RefreshCw,
+          size: 15,
+          minSize: 30,
+          semanticLabel: l10n.safMountSyncNow,
+          onTap: syncing ? null : onSync,
+        ),
+        const SizedBox(width: 2),
+        IosIconButton(
+          icon: Lucide.Trash2,
+          size: 15,
+          minSize: 30,
+          semanticLabel: l10n.safMountRemove,
+          onTap: onRemove,
         ),
       ],
     );

@@ -215,6 +215,7 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
           .coerceIn(1L, MAX_EXEC_TIMEOUT_MS)
         val requestId = call.argument<String>("requestId")?.takeIf { it.isNotBlank() }
           ?: "shell_${System.nanoTime()}"
+        val binds = call.argument<List<*>>("binds")
         if (workspace.isNullOrBlank() || command.isNullOrBlank()) {
           result.error("bad_args", "workspacePath and command required", null)
           return
@@ -263,6 +264,7 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
                 guestCwd = guestCwd,
                 timeoutMs = timeoutMs,
                 execution = execution,
+                binds = parseBinds(binds),
               )
               // The map's cancelled flag was decided atomically with
               // finished/timedOut inside capture(); a cancel arriving after
@@ -300,13 +302,17 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
       }
       "ptyLaunchSpec" -> {
         val workspace = call.argument<String>("workspacePath")
+        val binds = call.argument<List<*>>("binds")
         if (workspace.isNullOrBlank()) {
           result.error("bad_args", "workspacePath required", null)
           return
         }
         Thread {
           try {
-            val spec = GuestCommandRunner(appContext).ptyLaunchSpec(workspace)
+            val spec = GuestCommandRunner(appContext).ptyLaunchSpec(
+              workspace,
+              binds = parseBinds(binds),
+            )
             android.os.Handler(android.os.Looper.getMainLooper()).post {
               result.success(spec)
             }
@@ -623,6 +629,7 @@ private class GuestCommandRunner(private val appContext: Context) {
     guestCwd: String,
     timeoutMs: Long,
     execution: AndroidExecution,
+    binds: List<SandboxBind> = emptyList(),
   ): Map<String, Any?> {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
       ?: throw IllegalStateException("proot missing (system lib dir, filesDir cache and APK copy all failed)")
@@ -639,6 +646,7 @@ private class GuestCommandRunner(private val appContext: Context) {
         guestCwd = guestCwd,
         hostWorkspace = workspacePath,
         command = command,
+        binds = binds,
       ),
     )
     builder.directory(File(workspacePath))
@@ -657,7 +665,10 @@ private class GuestCommandRunner(private val appContext: Context) {
     return OutputDrainer.capture(process, timeoutMs, execution)
   }
 
-  fun ptyLaunchSpec(workspacePath: String): Map<String, Any> {
+  fun ptyLaunchSpec(
+    workspacePath: String,
+    binds: List<SandboxBind> = emptyList(),
+  ): Map<String, Any> {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
       ?: throw IllegalStateException("proot missing (system lib dir, filesDir cache and APK copy all failed)")
     val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
@@ -674,6 +685,7 @@ private class GuestCommandRunner(private val appContext: Context) {
       guestCwd = "/workspace",
       hostWorkspace = workspacePath,
       command = null,
+      binds = binds,
     )
     return mapOf(
       "executable" to arguments.first(),
@@ -791,6 +803,7 @@ private fun buildGuestCommand(
   guestCwd: String,
   hostWorkspace: String,
   command: String?,
+  binds: List<SandboxBind> = emptyList(),
 ): List<String> {
   val argv = mutableListOf<String>()
   argv += proot.absolutePath
@@ -805,6 +818,12 @@ private fun buildGuestCommand(
     "-b",
     "$hostWorkspace:/workspace",
   )
+  for (bind in binds) {
+    // SAF mount mirrors bind under the reserved .mounts guest directory
+    // (ADR-0037). Read-only mounts append the ro proot flag.
+    val flag = if (bind.readOnly) "${bind.host}:${bind.guest}:ro" else "${bind.host}:${bind.guest}"
+    argv += listOf("-b", flag)
+  }
   for (mount in KERNEL_FS_MOUNTS) {
     argv += listOf("-b", mount)
   }
@@ -824,6 +843,32 @@ private fun buildGuestCommand(
     argv += listOf("/bin/bash", "-lc", command)
   }
   return argv
+}
+
+/** A proot `-b` binding of a host directory into the guest. */
+private data class SandboxBind(
+  val host: String,
+  val guest: String,
+  val readOnly: Boolean,
+)
+
+/** Parse the Dart-side `binds` payload: `{host, guest, readOnly?}` maps. */
+private fun parseBinds(raw: List<*>?): List<SandboxBind> {
+  if (raw.isNullOrEmpty()) return emptyList()
+  val out = mutableListOf<SandboxBind>()
+  for (item in raw) {
+    if (item !is Map<*, *>) continue
+    val host = item["host"]?.toString()?.trim().orEmpty()
+    val guest = item["guest"]?.toString()?.trim().orEmpty()
+    if (host.isEmpty() || guest.isEmpty()) continue
+    if (!guest.startsWith("/")) continue
+    out += SandboxBind(
+      host = host,
+      guest = guest,
+      readOnly = item["readOnly"] == true,
+    )
+  }
+  return out
 }
 
 /** Captures capped stdout/stderr and enforces the exec timeout. */

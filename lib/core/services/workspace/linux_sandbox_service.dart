@@ -1060,6 +1060,7 @@ class LinuxSandboxService {
     String? requestId,
     String? conversationId,
     bool requireReady = false,
+    List<Map<String, Object?>> binds = const [],
   }) async {
     if (!isSandboxPlatform) {
       throw UnsupportedError('shell is only available on Android or iOS');
@@ -1081,6 +1082,7 @@ class LinuxSandboxService {
         timeoutSeconds: timeoutSeconds,
         requestId: effectiveRequestId,
         requireReady: requireReady,
+        binds: binds,
       ),
     );
   }
@@ -1093,6 +1095,7 @@ class LinuxSandboxService {
     required String requestId,
     bool requireReady = false,
     int maxTimeoutSeconds = maxShellTimeoutSeconds,
+    List<Map<String, Object?>> binds = const [],
   }) async {
     if (_cancelledRequestIds.remove(requestId)) {
       throw SandboxCancelledException(requestId);
@@ -1114,6 +1117,7 @@ class LinuxSandboxService {
         if (cwd != null) 'cwd': cwd,
         'timeoutMs': boundedTimeout * 1000,
         'requestId': requestId,
+        if (binds.isNotEmpty) 'binds': binds,
         if (Platform.isIOS) 'rootfsPath': await iosRootfsPath(),
       });
       if (_cancelledRequestIds.remove(requestId)) {
@@ -1167,12 +1171,16 @@ class LinuxSandboxService {
     }
   }
 
-  Future<SandboxPtyLaunchSpec> ptyLaunchSpec(String workspaceHostPath) async {
+  Future<SandboxPtyLaunchSpec> ptyLaunchSpec(
+    String workspaceHostPath, {
+    List<Map<String, Object?>> binds = const [],
+  }) async {
     if (!Platform.isAndroid) {
       throw UnsupportedError('Workspace Terminal is only available on Android');
     }
     final map = await _channel.invokeMethod<Map>('ptyLaunchSpec', {
       'workspacePath': workspaceHostPath,
+      if (binds.isNotEmpty) 'binds': binds,
     });
     if (map == null) {
       throw StateError('ptyLaunchSpec returned null');

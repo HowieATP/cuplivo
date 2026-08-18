@@ -400,6 +400,71 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
 
   @override
+  String get safMountSectionTitle => '安卓 SAF 挂载';
+
+  @override
+  String get safMountAdd => '添加 SAF 挂载';
+
+  @override
+  String get safMountAddTitle => '添加外部目录';
+
+  @override
+  String get safMountAliasLabel => '别名';
+
+  @override
+  String get safMountAliasHint => '小写字母开头，如 notes';
+
+  @override
+  String get safMountReadOnlyLabel => '只读（AI 只能读取）';
+
+  @override
+  String get safMountErrorAliasInvalid => '别名必须以小写字母或数字开头，只能包含 a-z 0-9 _ -';
+
+  @override
+  String get safMountErrorAliasReserved => '该别名与工作区别名冲突';
+
+  @override
+  String get safMountErrorAliasDuplicate => '该别名已被使用';
+
+  @override
+  String get safMountErrorAddFailed => '添加挂载失败';
+
+  @override
+  String get safMountErrorPickFailed => '打开目录选择器失败';
+
+  @override
+  String get safMountRemoveTitle => '移除挂载';
+
+  @override
+  String safMountRemoveMessage(Object name) {
+    return '移除“$name”？应用内的镜像副本将被删除，原目录中的文件不受影响。';
+  }
+
+  @override
+  String get safMountEmpty => '暂无 SAF 挂载。添加后 AI 即可读写外部文件夹。';
+
+  @override
+  String get safMountSectionNote => 'AI 的修改会镜像到外部目录，外部修改也会同步回来；删除会双向传播。';
+
+  @override
+  String get safMountSyncNow => '立即同步';
+
+  @override
+  String get safMountRemove => '移除挂载';
+
+  @override
+  String get safMountStatusIdle => '已同步';
+
+  @override
+  String get safMountStatusSyncing => '同步中…';
+
+  @override
+  String get safMountStatusUnavailable => '不可用——请在系统选择器中重新授权或重新挂载';
+
+  @override
+  String get safMountStatusError => '同步失败——将自动重试';
+
+  @override
   String get storageMountsErrorAliasDuplicate => '该别名已存在';
 
   @override
@@ -8827,6 +8892,71 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
 
   @override
+  String get safMountSectionTitle => '安卓 SAF 挂载';
+
+  @override
+  String get safMountAdd => '添加 SAF 挂载';
+
+  @override
+  String get safMountAddTitle => '添加外部目录';
+
+  @override
+  String get safMountAliasLabel => '别名';
+
+  @override
+  String get safMountAliasHint => '小写字母开头，如 notes';
+
+  @override
+  String get safMountReadOnlyLabel => '只读（AI 只能读取）';
+
+  @override
+  String get safMountErrorAliasInvalid => '别名必须以小写字母或数字开头，只能包含 a-z 0-9 _ -';
+
+  @override
+  String get safMountErrorAliasReserved => '该别名与工作区别名冲突';
+
+  @override
+  String get safMountErrorAliasDuplicate => '该别名已被使用';
+
+  @override
+  String get safMountErrorAddFailed => '添加挂载失败';
+
+  @override
+  String get safMountErrorPickFailed => '打开目录选择器失败';
+
+  @override
+  String get safMountRemoveTitle => '移除挂载';
+
+  @override
+  String safMountRemoveMessage(Object name) {
+    return '移除“$name”？应用内的镜像副本将被删除，原目录中的文件不受影响。';
+  }
+
+  @override
+  String get safMountEmpty => '暂无 SAF 挂载。添加后 AI 即可读写外部文件夹。';
+
+  @override
+  String get safMountSectionNote => 'AI 的修改会镜像到外部目录，外部修改也会同步回来；删除会双向传播。';
+
+  @override
+  String get safMountSyncNow => '立即同步';
+
+  @override
+  String get safMountRemove => '移除挂载';
+
+  @override
+  String get safMountStatusIdle => '已同步';
+
+  @override
+  String get safMountStatusSyncing => '同步中…';
+
+  @override
+  String get safMountStatusUnavailable => '不可用——请在系统选择器中重新授权或重新挂载';
+
+  @override
+  String get safMountStatusError => '同步失败——将自动重试';
+
+  @override
   String get storageMountsErrorAliasDuplicate => '该别名已存在';
 
   @override
@@ -17252,6 +17382,71 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageMountsErrorAliasReserved => '「workspaces」為保留別名';
+
+  @override
+  String get safMountSectionTitle => 'Android SAF 掛載';
+
+  @override
+  String get safMountAdd => '新增 SAF 掛載';
+
+  @override
+  String get safMountAddTitle => '新增外部目錄';
+
+  @override
+  String get safMountAliasLabel => '別名';
+
+  @override
+  String get safMountAliasHint => '小寫字母開頭，如 notes';
+
+  @override
+  String get safMountReadOnlyLabel => '唯讀（AI 只能讀取）';
+
+  @override
+  String get safMountErrorAliasInvalid => '別名必須以小寫字母或數字開頭，只能包含 a-z 0-9 _ -';
+
+  @override
+  String get safMountErrorAliasReserved => '該別名與工作區別名衝突';
+
+  @override
+  String get safMountErrorAliasDuplicate => '該別名已被使用';
+
+  @override
+  String get safMountErrorAddFailed => '新增掛載失敗';
+
+  @override
+  String get safMountErrorPickFailed => '開啟目錄選擇器失敗';
+
+  @override
+  String get safMountRemoveTitle => '移除掛載';
+
+  @override
+  String safMountRemoveMessage(Object name) {
+    return '移除「$name」？應用內的鏡像副本將被刪除，原目錄中的檔案不受影響。';
+  }
+
+  @override
+  String get safMountEmpty => '尚無 SAF 掛載。新增後 AI 即可讀寫外部資料夾。';
+
+  @override
+  String get safMountSectionNote => 'AI 的修改會鏡像到外部目錄，外部修改也會同步回來；刪除會雙向傳播。';
+
+  @override
+  String get safMountSyncNow => '立即同步';
+
+  @override
+  String get safMountRemove => '移除掛載';
+
+  @override
+  String get safMountStatusIdle => '已同步';
+
+  @override
+  String get safMountStatusSyncing => '同步中…';
+
+  @override
+  String get safMountStatusUnavailable => '無法使用——請在系統選擇器中重新授權或重新掛載';
+
+  @override
+  String get safMountStatusError => '同步失敗——將自動重試';
 
   @override
   String get storageMountsErrorAliasDuplicate => '該別名已存在';

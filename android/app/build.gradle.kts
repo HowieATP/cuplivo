@@ -82,5 +82,7 @@ flutter {
 dependencies {
     // Required for core library desugaring (used by flutter_local_notifications)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // SAF document-tree access for external-directory mounts (ADR-0037)
+    implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
 }

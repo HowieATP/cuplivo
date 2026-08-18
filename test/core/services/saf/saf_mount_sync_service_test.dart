@@ -1,0 +1,916 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:Cuplivo/core/services/saf/saf_mount_sync_service.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// In-memory SAF tree keyed by content URIs (`content://tree/...`).
+class _FakeSafNode {
+  _FakeSafNode({
+    required this.name,
+    required this.isDirectory,
+    required this.uri,
+  });
+
+  final String name;
+  final bool isDirectory;
+  final String uri;
+  Uint8List bytes = Uint8List(0);
+  int mtimeMs = 1_000_000_000;
+
+  final List<_FakeSafNode> children = <_FakeSafNode>[];
+}
+
+class _FakeSafChannel extends SafChannel {
+  static const String rootUri = 'content://tree';
+
+  final _FakeSafNode root = _FakeSafNode(
+    name: 'tree',
+    isDirectory: true,
+    uri: rootUri,
+  );
+  bool granted = true;
+  int _nextId = 0;
+
+  /// Provider-side "now" for writeFile stamps. Year 2033 so provider mtimes
+  /// are always NEWER than any real wall-clock mirror mtime (~1.7e12 ms) —
+  /// LWW comparisons in the tests stay deterministic.
+  int nowMs = 2_000_000_000_000;
+
+  /// URIs whose listing fails with an access error (transient provider
+  /// hiccup simulation).
+  final Set<String> failingListUris = <String>{};
+
+  /// When true, delete() persistently returns false (provider refuses the
+  /// deletion without raising).
+  bool failDeletes = false;
+
+  void seedFile(String relPath, String content, {int? mtimeMs}) {
+    final parts = relPath.split('/');
+    final parent = _ensureDirChain(parts.sublist(0, parts.length - 1));
+    final uri = 'content://tree/${_nextId++}';
+    final node = _FakeSafNode(name: parts.last, isDirectory: false, uri: uri)
+      ..bytes = Uint8List.fromList(utf8.encode(content))
+      ..mtimeMs = mtimeMs ?? nowMs;
+    parent.children.add(node);
+  }
+
+  void seedDir(String relPath) {
+    _ensureDirChain(relPath.split('/'));
+  }
+
+  _FakeSafNode _ensureDirChain(List<String> parts) {
+    var parent = root;
+    for (final part in parts) {
+      parent = parent.children.firstWhere(
+        (c) => c.name == part && c.isDirectory,
+        orElse: () {
+          final node = _FakeSafNode(
+            name: part,
+            isDirectory: true,
+            uri: 'content://tree/${_nextId++}',
+          );
+          parent.children.add(node);
+          return node;
+        },
+      );
+    }
+    return parent;
+  }
+
+  void touchFile(String relPath, {int? mtimeMs, String? content}) {
+    final node = findByRel(relPath);
+    if (content != null) {
+      node.bytes = Uint8List.fromList(utf8.encode(content));
+    }
+    node.mtimeMs = mtimeMs ?? nowMs;
+  }
+
+  void deleteRel(String relPath) {
+    final parts = relPath.split('/');
+    final parent = parts.length == 1
+        ? root
+        : _ensureDirChain(parts.sublist(0, parts.length - 1));
+    parent.children.removeWhere((c) => c.name == parts.last);
+  }
+
+  _FakeSafNode findByRel(String relPath) {
+    _FakeSafNode current = root;
+    for (final part in relPath.split('/')) {
+      final next = current.children.where((c) => c.name == part).firstOrNull;
+      if (next == null) {
+        throw StateError('not found: $relPath');
+      }
+      current = next;
+    }
+    return current;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> pickTree() async => null;
+
+  @override
+  Future<List<Map<String, dynamic>>> list(String uri) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    if (failingListUris.contains(uri)) {
+      throw PlatformException(code: 'access_denied');
+    }
+    final parent = uri == rootUri ? root : _nodeByUri(uri);
+    return parent.children
+        .map(
+          (n) => {
+            'name': n.name,
+            'isDirectory': n.isDirectory,
+            'lastModified': n.mtimeMs,
+            'size': n.bytes.length,
+            'uri': n.uri,
+          },
+        )
+        .toList();
+  }
+
+  _FakeSafNode _nodeByUri(String uri) {
+    _FakeSafNode? found;
+    void walk(_FakeSafNode node) {
+      if (found != null) return;
+      if (node.uri == uri) {
+        found = node;
+        return;
+      }
+      for (final c in node.children) {
+        walk(c);
+      }
+    }
+
+    walk(root);
+    if (found == null) throw StateError('unknown uri: $uri');
+    return found!;
+  }
+
+  @override
+  Future<Uint8List> readFile(String uri) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    final node = _nodeByUri(uri);
+    return node.bytes;
+  }
+
+  @override
+  Future<void> writeFile(String uri, Uint8List bytes) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    final node = _nodeByUri(uri);
+    node.bytes = bytes;
+    node.mtimeMs = nowMs;
+  }
+
+  @override
+  Future<String> createFile(String parentUri, String name) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    final parent = _nodeByUri(parentUri);
+    final node = _FakeSafNode(
+      name: name,
+      isDirectory: false,
+      uri: 'content://tree/${_nextId++}',
+    );
+    parent.children.add(node);
+    return node.uri;
+  }
+
+  @override
+  Future<String> mkdir(String parentUri, String name) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    final parent = _nodeByUri(parentUri);
+    final node = _FakeSafNode(
+      name: name,
+      isDirectory: true,
+      uri: 'content://tree/${_nextId++}',
+    );
+    parent.children.add(node);
+    return node.uri;
+  }
+
+  @override
+  Future<bool> delete(String uri) async {
+    if (!granted) throw PlatformException(code: 'access_denied');
+    if (failDeletes) return false;
+    final target = _nodeByUri(uri);
+    _FakeSafNode? parent;
+    void walk(_FakeSafNode node) {
+      if (parent != null) return;
+      if (node.children.contains(target)) {
+        parent = node;
+        return;
+      }
+      for (final c in node.children) {
+        walk(c);
+      }
+    }
+
+    walk(root);
+    parent?.children.remove(target);
+    return true;
+  }
+
+  @override
+  Future<bool> checkAccess(String uri) async => granted;
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.root);
+  final Directory root;
+
+  @override
+  Future<String> getApplicationDocumentsPath() async => root.path;
+
+  @override
+  Future<String> getApplicationSupportPath() async => root.path;
+
+  @override
+  Future<String> getApplicationCachePath() async => p.join(root.path, 'cache');
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory tempDir;
+  late _FakeSafChannel channel;
+  late SafMountSyncService service;
+
+  Future<void> pump() async {
+    // Let debounce timers / async continuations settle.
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+
+  String mirrorPath(String alias) => p.join(tempDir.path, 'saf_mounts', alias);
+
+  File mirrorFile(String alias, String rel) =>
+      File(p.join(mirrorPath(alias), rel));
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    tempDir = await Directory.systemTemp.createTemp('saf_mount_test');
+    PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
+    SafMountSyncService.androidProbe = () => true;
+    channel = _FakeSafChannel();
+    service = SafMountSyncService(
+      channel: channel,
+      reservedAliasesProvider: () => const <String>{'default'},
+    );
+    await service.init();
+    await pump();
+  });
+
+  tearDown(() async {
+    await service.removeMount('notes');
+    try {
+      await tempDir.delete(recursive: true);
+    } catch (_) {}
+  });
+
+  group('initial pull', () {
+    test('mirrors the SAF tree and aligns mtimes', () async {
+      channel.seedDir('docs');
+      channel.seedFile('docs/a.txt', 'hello', mtimeMs: 1_000_000_000);
+      channel.seedFile('top.bin', 'x' * 100, mtimeMs: 1_000_500_000);
+
+      final err = await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'My Notes',
+      );
+      expect(err, isNull);
+      await pump();
+
+      expect(await mirrorFile('notes', 'docs/a.txt').readAsString(), 'hello');
+      expect(await mirrorFile('notes', 'top.bin').length(), 100);
+      expect(service.stateOf('notes').status, SafMountStatus.idle);
+      // mtime aligned so the next round sees "same" and does not re-copy.
+      final aligned = (await mirrorFile('notes', 'docs/a.txt').stat()).modified;
+      expect(aligned.millisecondsSinceEpoch, closeTo(1_000_000_000, 1));
+    });
+
+    test('rejects an invalid alias', () async {
+      final err = await service.addMount(
+        alias: 'Notes!',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      expect(err, SafMountSyncService.errorAliasInvalid);
+    });
+
+    test('rejects a reserved alias colliding with a workspace', () async {
+      final err = await service.addMount(
+        alias: 'default',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      expect(err, SafMountSyncService.errorAliasReserved);
+    });
+
+    test('rejects workspace_N aliases (marker-protocol collision)', () async {
+      final err = await service.addMount(
+        alias: 'workspace_4',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      expect(err, SafMountSyncService.errorAliasReserved);
+    });
+
+    test('rejects a duplicate alias', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      final err = await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      expect(err, SafMountSyncService.errorAliasDuplicate);
+    });
+  });
+
+  group('two-way changes', () {
+    test('SAF-side new file is pulled', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      channel.seedFile('new.txt', 'from outside', mtimeMs: 1_500_000_000);
+      await service.syncNow('notes');
+      await pump();
+
+      expect(
+        await mirrorFile('notes', 'new.txt').readAsString(),
+        'from outside',
+      );
+    });
+
+    test('mirror-side new file is pushed to SAF', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      await mirrorFile('notes', 'ai.md').writeAsString('by AI');
+      await service.syncNow('notes');
+      await pump();
+
+      final node = channel.findByRel('ai.md');
+      expect(utf8.decode(node.bytes), 'by AI');
+    });
+
+    test('SAF-side newer content overwrites the mirror', () async {
+      channel.seedFile('a.txt', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+      expect(await mirrorFile('notes', 'a.txt').readAsString(), 'v1');
+
+      channel.touchFile('a.txt', mtimeMs: 2_000_000_000, content: 'v2');
+      await service.syncNow('notes');
+      await pump();
+
+      expect(await mirrorFile('notes', 'a.txt').readAsString(), 'v2');
+    });
+
+    test('mirror-side newer content is pushed to SAF', () async {
+      channel.seedFile('a.txt', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      final f = mirrorFile('notes', 'a.txt');
+      final now = DateTime.now();
+      await f.writeAsString('v2');
+      await f.setLastModified(now.add(const Duration(seconds: 10)));
+      await service.syncNow('notes');
+      await pump();
+
+      expect(utf8.decode(channel.findByRel('a.txt').bytes), 'v2');
+      // The mirror mtime was aligned to the SAF post-write mtime so the next
+      // round is a no-op (no ping-pong pull-back).
+      await service.syncNow('notes');
+      await pump();
+      expect(utf8.decode(channel.findByRel('a.txt').bytes), 'v2');
+      expect(await mirrorFile('notes', 'a.txt').readAsString(), 'v2');
+    });
+
+    test('conflict: newer mtime wins; mtime tie favors the mirror', () async {
+      channel.seedFile('a.txt', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // Both sides change; SAF is newer → SAF wins.
+      channel.touchFile('a.txt', mtimeMs: 3_000_000_000, content: 'saf-new');
+      final f = mirrorFile('notes', 'a.txt');
+      await f.writeAsString('mirror-new');
+      await f.setLastModified(
+        DateTime.fromMillisecondsSinceEpoch(2_000_000_000),
+      );
+      await service.syncNow('notes');
+      await pump();
+      expect(await mirrorFile('notes', 'a.txt').readAsString(), 'saf-new');
+
+      // Both sides change with equal mtimes → mirror wins.
+      channel.touchFile('a.txt', mtimeMs: 4_000_000_000, content: 'saf-tie');
+      await f.writeAsString('mirror-tie');
+      await f.setLastModified(
+        DateTime.fromMillisecondsSinceEpoch(4_000_000_000),
+      );
+      await service.syncNow('notes');
+      await pump();
+      expect(utf8.decode(channel.findByRel('a.txt').bytes), 'mirror-tie');
+    });
+  });
+
+  group('deletion propagation', () {
+    test('SAF-side deletion removes the mirror file', () async {
+      // A second file stays behind: deleting the LAST file would make the
+      // whole tree empty and trip the whole-tree-gone guard (unmount
+      // protection), which deliberately aborts instead.
+      channel.seedFile('gone.txt', 'data', mtimeMs: 1_000_000_000);
+      channel.seedFile('kept.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+      expect(await mirrorFile('notes', 'gone.txt').exists(), isTrue);
+
+      channel.deleteRel('gone.txt');
+      await service.syncNow('notes');
+      await pump();
+      expect(await mirrorFile('notes', 'gone.txt').exists(), isFalse);
+      expect(await mirrorFile('notes', 'kept.txt').exists(), isTrue);
+    });
+
+    test('mirror-side deletion removes the SAF file', () async {
+      channel.seedFile('gone.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      await mirrorFile('notes', 'gone.txt').delete();
+      await service.syncNow('notes');
+      await pump();
+      expect(() => channel.findByRel('gone.txt'), throwsStateError);
+      // One round must be enough: pass 1 must NOT resurrect the deleted file
+      // into the mirror (ADR-0037 pending-deletion skip).
+      expect(await mirrorFile('notes', 'gone.txt').exists(), isFalse);
+    });
+
+    test(
+      'delete-then-recreate after a deletion round is pushed, not destroyed',
+      () async {
+        channel.seedFile('a.md', 'v1', mtimeMs: 1_000_000_000);
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+        expect(await mirrorFile('notes', 'a.md').readAsString(), 'v1');
+
+        // Round 1: the AI deletes a.md — the SAF copy goes away and the
+        // snapshot forgets the path.
+        await mirrorFile('notes', 'a.md').delete();
+        await service.syncNow('notes');
+        await pump();
+        expect(() => channel.findByRel('a.md'), throwsStateError);
+
+        // Round 2: the AI re-creates a.md before the next poll. The path is
+        // NO LONGER in the snapshot, so the new content must be pushed, not
+        // misread as a pending deletion and destroyed.
+        await mirrorFile('notes', 'a.md').writeAsString('v2');
+        await service.syncNow('notes');
+        await pump();
+        expect(utf8.decode(channel.findByRel('a.md').bytes), 'v2');
+        expect(await mirrorFile('notes', 'a.md').readAsString(), 'v2');
+      },
+    );
+
+    test(
+      'a file absent from the snapshot is never treated as a deletion',
+      () async {
+        // First round: snapshot only knows a.txt. Add b.txt to the mirror
+        // BEFORE any snapshot round exists for it via a manual pre-seed, then
+        // delete it — it was never in the snapshot, so it must NOT propagate.
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+        await mirrorFile('notes', 'b.txt').writeAsString('never synced');
+        await service.syncNow('notes');
+        await pump();
+        // b.txt is now in the snapshot (pushed). Delete it → propagates.
+        await mirrorFile('notes', 'b.txt').delete();
+        await service.syncNow('notes');
+        await pump();
+        expect(() => channel.findByRel('b.txt'), throwsStateError);
+      },
+    );
+
+    test(
+      'empty SAF tree while the mirror is also empty aborts the round',
+      () async {
+        channel.seedFile('only.txt', 'data', mtimeMs: 1_000_000_000);
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+        expect(await mirrorFile('notes', 'only.txt').exists(), isTrue);
+
+        // Volume "unmounted": SAF tree becomes empty and the mirror is wiped
+        // externally too. The guard must abort, not delete anything new.
+        channel.deleteRel('only.txt');
+        await mirrorFile('notes', 'only.txt').delete();
+        channel.granted = false;
+        await service.syncNow('notes');
+        await pump();
+        expect(service.stateOf('notes').status, SafMountStatus.unavailable);
+      },
+    );
+
+    test('empty SAF tree never propagates deletions, even with a non-empty '
+        'mirror (AI edits survive the unmount case)', () async {
+      channel.seedFile('only.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // AI edit lands in the mirror AFTER the last completed round; the
+      // SAF side then goes empty (unmounted volume). The snapshot-known
+      // file must NOT be treated as deleted — the edit survives.
+      await mirrorFile('notes', 'only.txt').writeAsString('ai edit');
+      channel.deleteRel('only.txt');
+      await service.syncNow('notes');
+      await pump();
+
+      expect(await mirrorFile('notes', 'only.txt').exists(), isTrue);
+      expect(await mirrorFile('notes', 'only.txt').readAsString(), 'ai edit');
+      expect(service.stateOf('notes').status, SafMountStatus.unavailable);
+    });
+  });
+
+  group('access failures', () {
+    test(
+      'revoked grant marks the mount unavailable and keeps the mirror',
+      () async {
+        channel.seedFile('keep.txt', 'data', mtimeMs: 1_000_000_000);
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+
+        await mirrorFile('notes', 'keep.txt').writeAsString('ai edit');
+        channel.granted = false;
+        await service.syncNow('notes');
+        await pump();
+
+        expect(service.stateOf('notes').status, SafMountStatus.unavailable);
+        expect(await mirrorFile('notes', 'keep.txt').readAsString(), 'ai edit');
+      },
+    );
+
+    test('recovers to idle once the grant is back', () async {
+      channel.seedFile('a.txt', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      channel.granted = false;
+      await service.syncNow('notes');
+      await pump();
+      expect(service.stateOf('notes').status, SafMountStatus.unavailable);
+
+      channel.granted = true;
+      await service.syncNow('notes');
+      await pump();
+      expect(service.stateOf('notes').status, SafMountStatus.idle);
+    });
+  });
+
+  group('removal and failure races', () {
+    test('a round started after removeMount is a no-op', () async {
+      channel.seedFile('keep.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      await service.removeMount('notes');
+      await pump();
+      await service.syncNow('notes');
+      await pump();
+
+      // The SAF side is untouched and the mirror is NOT recreated.
+      expect(channel.findByRel('keep.txt').bytes, isNotEmpty);
+      expect(await Directory(mirrorPath('notes')).exists(), isFalse);
+    });
+
+    test('a corrupted mirror aborts the round without touching SAF', () async {
+      channel.seedFile('keep.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // Corrupt the mirror: replace the directory with a plain file. The
+      // round must abort (error state) — pass 3 must never misread the
+      // broken mirror as deletions in the user's real directory.
+      await Directory(mirrorPath('notes')).delete(recursive: true);
+      await File(mirrorPath('notes')).writeAsString('junk');
+
+      await service.syncNow('notes');
+      await pump();
+      expect(service.stateOf('notes').status, SafMountStatus.error);
+      expect(channel.findByRel('keep.txt').bytes, isNotEmpty);
+    });
+
+    test('a transient SAF subdirectory listing failure aborts without '
+        'touching the mirror', () async {
+      channel.seedDir('sub');
+      channel.seedFile('sub/a.txt', 'data', mtimeMs: 1_000_000_000);
+      channel.seedFile('top.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+      expect(await mirrorFile('notes', 'sub/a.txt').exists(), isTrue);
+
+      // Provider hiccup: listing "sub" fails. The mirror must NOT interpret
+      // the missing subtree as deletions.
+      channel.failingListUris.add(channel.findByRel('sub').uri);
+      await service.syncNow('notes');
+      await pump();
+
+      expect(service.stateOf('notes').status, SafMountStatus.unavailable);
+      expect(await mirrorFile('notes', 'sub/a.txt').exists(), isTrue);
+      expect(await mirrorFile('notes', 'top.txt').exists(), isTrue);
+    });
+
+    test('stale .saf_tmp leftovers are pruned, never pushed to SAF', () async {
+      channel.seedFile('a.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // Simulate a leftover copy temp inside the mirror (pre-ADR-0037-build
+      // interruption). The round must prune it — pushing it into the user's
+      // real directory would be data pollution.
+      await mirrorFile('notes', 'b.txt.saf_tmp').writeAsString('junk');
+      await service.syncNow('notes');
+      await pump();
+
+      expect(await mirrorFile('notes', 'b.txt.saf_tmp').exists(), isFalse);
+      expect(() => channel.findByRel('b.txt.saf_tmp'), throwsStateError);
+      expect(service.stateOf('notes').status, SafMountStatus.idle);
+    });
+
+    test('a persistently refused SAF delete surfaces an error state', () async {
+      channel.seedFile('gone.txt', 'data', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // Mirror-side deletion propagates to SAF, but the provider refuses the
+      // delete without raising. The round must NOT claim "Synced".
+      await mirrorFile('notes', 'gone.txt').delete();
+      channel.failDeletes = true;
+      await service.syncNow('notes');
+      await pump();
+
+      expect(service.stateOf('notes').status, SafMountStatus.error);
+      expect(channel.findByRel('gone.txt').bytes, isNotEmpty);
+
+      // Provider recovers: the next round completes and clears the state.
+      channel.failDeletes = false;
+      await service.syncNow('notes');
+      await pump();
+      expect(service.stateOf('notes').status, SafMountStatus.idle);
+      expect(() => channel.findByRel('gone.txt'), throwsStateError);
+    });
+  });
+
+  group('file↔directory type conflicts', () {
+    test(
+      'mirror file over SAF directory: the SAF directory is replaced',
+      () async {
+        channel.seedDir('x');
+        channel.seedFile('x/inner.txt', 'inner', mtimeMs: 1_000_000_000);
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+        expect(await mirrorFile('notes', 'x/inner.txt').exists(), isTrue);
+
+        // The AI replaces the whole directory with a file (newer side).
+        await Directory(mirrorFile('notes', 'x').path).delete(recursive: true);
+        await mirrorFile('notes', 'x').writeAsString('now a file');
+        await service.syncNow('notes');
+        await pump();
+
+        final saf = channel.findByRel('x');
+        expect(saf.isDirectory, isFalse);
+        expect(utf8.decode(saf.bytes), 'now a file');
+        expect(await mirrorFile('notes', 'x').readAsString(), 'now a file');
+      },
+    );
+
+    test(
+      'SAF file over mirror directory: the mirror directory is replaced',
+      () async {
+        channel.seedFile('y', 'file content', mtimeMs: 1_000_000_000);
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+
+        // The AI replaces the file with a directory tree (newer side).
+        await mirrorFile('notes', 'y').delete();
+        await Directory(mirrorFile('notes', 'y').path).create();
+        await mirrorFile('notes', 'y/c.txt').writeAsString('new child');
+        await service.syncNow('notes');
+        await pump();
+
+        final saf = channel.findByRel('y');
+        expect(saf.isDirectory, isTrue);
+        expect(utf8.decode(channel.findByRel('y/c.txt').bytes), 'new child');
+        expect(
+          await mirrorFile('notes', 'y/c.txt').readAsString(),
+          'new child',
+        );
+      },
+    );
+
+    test('SAF-side file wins over a stale mirror directory', () async {
+      channel.seedFile('z', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+
+      // The AI replaces the file with a directory, but an external edit
+      // lands on the SAF file afterwards with a NEWER mtime.
+      await mirrorFile('notes', 'z').delete();
+      await Directory(mirrorFile('notes', 'z').path).create();
+      channel.touchFile('z', mtimeMs: channel.nowMs, content: 'v2');
+      await service.syncNow('notes');
+      await pump();
+
+      final mirrorZ = File(mirrorFile('notes', 'z').path);
+      expect(await mirrorZ.exists(), isTrue);
+      expect(await Directory(mirrorFile('notes', 'z').path).exists(), isFalse);
+      expect(await mirrorZ.readAsString(), 'v2');
+      expect(utf8.decode(channel.findByRel('z').bytes), 'v2');
+    });
+  });
+
+  group('mutation triggers', () {
+    test(
+      'notifyMutated schedules a debounced push for SAF mounts only',
+      () async {
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+
+        await mirrorFile('notes', 'triggered.txt').writeAsString('hello');
+        // Non-SAF aliases are ignored.
+        service.notifyMutated('default');
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(() => channel.findByRel('triggered.txt'), throwsStateError);
+
+        service.notifyMutated('notes');
+        await Future<void>.delayed(
+          SafMountSyncService.mutationDebounce +
+              const Duration(milliseconds: 300),
+        );
+        await pump();
+        expect(utf8.decode(channel.findByRel('triggered.txt').bytes), 'hello');
+      },
+    );
+  });
+
+  group('guest binds and persistence', () {
+    test('guestBinds expose host mirrors under /workspace/.mounts', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await service.addMount(
+        alias: 'robox',
+        uri: _FakeSafChannel.rootUri,
+        displayName: 'x',
+        readOnly: true,
+      );
+      await pump();
+
+      final binds = service.guestBinds;
+      expect(binds, hasLength(2));
+      expect(binds[0]['guest'], '/workspace/.mounts/notes');
+      expect(binds[0]['host'], mirrorPath('notes'));
+      expect(binds[0]['readOnly'], isFalse);
+      expect(binds[1]['guest'], '/workspace/.mounts/robox');
+      expect(binds[1]['readOnly'], isTrue);
+    });
+
+    test('mount config survives a service restart via prefs', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'My Notes',
+      );
+      await pump();
+
+      final restarted = SafMountSyncService(
+        channel: channel,
+        reservedAliasesProvider: () => const <String>{},
+      );
+      await restarted.init();
+      await pump();
+      expect(restarted.entries, hasLength(1));
+      expect(restarted.entries.first.alias, 'notes');
+      expect(restarted.entries.first.uri, 'content://tree');
+      expect(restarted.mounts.first.isSafMount, isTrue);
+      expect(restarted.mounts.first.path, mirrorPath('notes'));
+    });
+
+    test('removeMount wipes the mirror and the snapshot', () async {
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+      await mirrorFile('notes', 'a.txt').writeAsString('x');
+
+      await service.removeMount('notes');
+      await pump();
+      expect(await Directory(mirrorPath('notes')).exists(), isFalse);
+      expect(
+        await File(
+          p.join(tempDir.path, 'saf_mounts', '.state', 'notes.json'),
+        ).exists(),
+        isFalse,
+      );
+    });
+  });
+}

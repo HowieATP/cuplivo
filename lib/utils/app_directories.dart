@@ -208,6 +208,26 @@ class AppDirectories {
     return Directory(p.join(root.path, 'linux-sandbox'));
   }
 
+  /// Root directory that holds every Android SAF mount mirror
+  /// (`<alias>` subdirectories) plus the `.state/` snapshot directory.
+  ///
+  /// Deliberately OUTSIDE the sync roots (upload/images/avatars/fonts/
+  /// skills/workspaces): SAF mount content is external user data and never
+  /// enters backups or LAN sync (ADR-0037), mirroring the "external mounts
+  /// never sync" rule for desktop mounts.
+  static Future<Directory> getSafMountsDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory(p.join(root.path, 'saf_mounts'));
+  }
+
+  /// Snapshot state for the SAF mirror-sync engine (deletion gating). Kept
+  /// outside the mirror roots so the Linux guest and the model tools never
+  /// see it (mirrors bind at `/workspace/.mounts/<alias>`).
+  static Future<Directory> getSafMountStateDirectory() async {
+    final root = await getSafMountsDirectory();
+    return Directory(p.join(root.path, '.state'));
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

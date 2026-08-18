@@ -8,6 +8,7 @@ import '../../models/workspace.dart';
 import '../../providers/workspace_provider.dart';
 import '../../services/chat/chat_service.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
+import '../saf/saf_mount_sync_service.dart';
 import 'guest_cwd.dart';
 import 'linux_sandbox_service.dart';
 import 'workspace_download_service.dart';
@@ -17,11 +18,62 @@ import 'workspace_path_presentation.dart';
 class WorkspaceToolsService {
   const WorkspaceToolsService._();
 
+  /// Workspace mounts plus any global Android SAF mounts (ADR-0037). SAF
+  /// mounts are global: every bound workspace sees the same set.
+  static List<FilesystemMount> combinedMounts(
+    WorkspaceProvider workspaces,
+    Workspace ws,
+    SafMountSyncService? safMounts,
+  ) => dedupeMounts(
+    workspaces.mountsFor(ws),
+    safMounts?.mounts ?? const <FilesystemMount>[],
+  );
+
+  /// SAF mounts whose alias collides with a workspace mount are shadowed —
+  /// the engine resolves `@alias` with first-match (workspace listed first),
+  /// and mounting both would silently route the model's reads/writes to the
+  /// workspace while `onMountMutated` still fires SAF sync rounds. A restored
+  /// backup can carry workspace aliases that never existed at SAF-add time,
+  /// so this guard is checked on every composition, not only at add/load.
+  static List<FilesystemMount> dedupeMounts(
+    List<FilesystemMount> workspaceMounts,
+    List<FilesystemMount> safMounts,
+  ) {
+    final out = <FilesystemMount>[...workspaceMounts];
+    final used = out.map((m) => m.alias).toSet();
+    for (final m in safMounts) {
+      if (used.contains(m.alias)) {
+        debugPrint(
+          'combinedMounts: SAF mount @${m.alias} shadowed by a workspace '
+          'mount with the same alias',
+        );
+        continue;
+      }
+      out.add(m);
+    }
+    return out;
+  }
+
+  /// SAF aliases that actually reach the model — derived from the DEDUPED
+  /// composition so an alias shadowed by a workspace mount is rejected at
+  /// parse time with a clear error instead of silently routing the model's
+  /// reads/writes to the workspace mount (ADR-0037 restore-collision case).
+  static Set<String> safAliasesFrom(List<FilesystemMount> mounts) =>
+      mounts.where((m) => m.isSafMount).map((m) => m.alias).toSet();
+
+  /// Guest binds for the Linux sandbox shell (one-shot) and the Workspace
+  /// Terminal (PTY): `{host, guest, readOnly}` pairs for the proot `-b`
+  /// flags. `readOnly` is a real boolean for the native parser.
+  static List<Map<String, Object?>> _sandboxBinds(
+    SafMountSyncService? safMounts,
+  ) => safMounts?.guestBinds ?? const <Map<String, Object?>>[];
+
   static List<Map<String, dynamic>> buildToolDefinitions({
     required Assistant? assistant,
     required WorkspaceProvider workspaces,
     required bool supportsTools,
     LinuxSandboxService? sandbox,
+    SafMountSyncService? safMounts,
   }) {
     if (!supportsTools || assistant == null || !assistant.workspaceEnabled) {
       return const <Map<String, dynamic>>[];
@@ -40,7 +92,7 @@ class WorkspaceToolsService {
     }
 
     final engine = KelivoFilesystemMcpServerEngine(
-      mountsProvider: () => workspaces.mountsFor(ws),
+      mountsProvider: () => combinedMounts(workspaces, ws, safMounts),
     );
     final defs = engine.toolDefinitionsFor(enabled);
     final out = <Map<String, dynamic>>[];
@@ -140,6 +192,7 @@ class WorkspaceToolsService {
     required WorkspaceProvider workspaces,
     ChatService? chatService,
     LinuxSandboxService? sandbox,
+    SafMountSyncService? safMounts,
     void Function(int receivedBytes, int? totalBytes)? onDownloadProgress,
     WorkspaceDownloadAbortToken? downloadAbortToken,
     String? toolCallId,
@@ -171,14 +224,21 @@ class WorkspaceToolsService {
         ws: ws,
         workspaces: workspaces,
         sandbox: sandbox,
+        safMounts: safMounts,
         requestId: toolCallId,
         conversationId: conversationId,
       );
     }
 
+    // Derived from the DEDUPED composition: an alias shadowed by a workspace
+    // mount must be rejected at parse time, not routed to the workspace.
+    final safAliases = safAliasesFrom(
+      combinedMounts(workspaces, ws, safMounts),
+    );
     final engine = KelivoFilesystemMcpServerEngine(
-      mountsProvider: () => workspaces.mountsFor(ws),
-      pathPresenter: (wire) => presentWirePath(wire, ws.alias),
+      mountsProvider: () => combinedMounts(workspaces, ws, safMounts),
+      pathPresenter: (wire) =>
+          presentWirePath(wire, ws.alias, safAliases: safAliases),
       onWorkspaceFileDeleted: (wirePath) {
         final store = chatService?.deletedRecordsStore;
         if (store == null) return Future<void>.value();
@@ -187,10 +247,17 @@ class WorkspaceToolsService {
           deletedAt: DateTime.now(),
         );
       },
+      onMountMutated: safMounts == null
+          ? null
+          : (alias) => safMounts.notifyMutated(alias),
     );
     final Map<String, dynamic> translatedArgs;
     try {
-      translatedArgs = _translateModelArgs(args, ws.alias);
+      translatedArgs = _translateModelArgs(
+        args,
+        ws.alias,
+        safAliases: safAliases,
+      );
     } on ModelPathException catch (e) {
       return jsonEncode({'error': 'invalid_path', 'message': e.message});
     }
@@ -208,13 +275,14 @@ class WorkspaceToolsService {
   /// `workspace_path_presentation.dart`).
   static Map<String, dynamic> _translateModelArgs(
     Map<String, dynamic> args,
-    String alias,
-  ) {
+    String alias, {
+    Set<String> safAliases = const <String>{},
+  }) {
     final out = Map<String, dynamic>.from(args);
     for (final key in const ['path', 'source', 'destination']) {
       final v = out[key];
       if (v == null || v is! String) continue;
-      out[key] = parseModelPath(v, alias);
+      out[key] = parseModelPath(v, alias, safAliases: safAliases);
     }
     return out;
   }
@@ -242,6 +310,7 @@ class WorkspaceToolsService {
     required Workspace ws,
     required WorkspaceProvider workspaces,
     LinuxSandboxService? sandbox,
+    SafMountSyncService? safMounts,
     String? requestId,
     String? conversationId,
   }) async {
@@ -286,6 +355,7 @@ class WorkspaceToolsService {
         requestId: requestId,
         conversationId: conversationId,
         requireReady: true,
+        binds: _sandboxBinds(safMounts),
       );
       return jsonEncode({
         'exitCode': result.exitCode,

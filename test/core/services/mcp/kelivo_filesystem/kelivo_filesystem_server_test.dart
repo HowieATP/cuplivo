@@ -1111,4 +1111,140 @@ void main() {
       },
     );
   });
+
+  group('FilesystemMount SAF fields', () {
+    test('uri survives toJson/fromJson round-trip', () {
+      const m = FilesystemMount(
+        alias: 'notes',
+        path: '/tmp/mirror/notes',
+        readOnly: false,
+        uri: 'content://tree/1',
+      );
+      final restored = FilesystemMount.fromJson(m.toJson());
+      expect(restored.alias, 'notes');
+      expect(restored.uri, 'content://tree/1');
+      expect(restored.isSafMount, isTrue);
+    });
+
+    test('copyWith can clear the uri', () {
+      const m = FilesystemMount(
+        alias: 'notes',
+        path: '/tmp/mirror/notes',
+        uri: 'content://tree/1',
+      );
+      expect(m.copyWith(clearUri: true).uri, isNull);
+      expect(m.copyWith(uri: 'content://tree/2').uri, 'content://tree/2');
+    });
+
+    test('plain mounts are not SAF mounts', () {
+      const m = FilesystemMount(alias: 'default', path: '/tmp/ws');
+      expect(m.isSafMount, isFalse);
+      expect(m.uri, isNull);
+    });
+  });
+
+  group('KelivoFilesystemMcpServerEngine SAF mounts', () {
+    late Directory root;
+    late Directory wsDir;
+    late Directory mirrorDir;
+    late List<FilesystemMount> mounts;
+    final mutated = <String>[];
+    late KelivoFilesystemMcpServerEngine engine;
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('kelivo_fs_saf_');
+      wsDir = Directory('${root.path}/ws')..createSync();
+      mirrorDir = Directory('${root.path}/mirror')..createSync();
+      mounts = [
+        FilesystemMount(alias: 'default', path: wsDir.path, readOnly: false),
+        FilesystemMount(
+          alias: 'notes',
+          path: mirrorDir.path,
+          readOnly: false,
+          uri: 'content://tree/1',
+        ),
+      ];
+      mutated.clear();
+      engine = KelivoFilesystemMcpServerEngine(
+        mountsProvider: () => mounts,
+        onMountMutated: (alias) => mutated.add(alias),
+      );
+    });
+
+    tearDown(() {
+      engine.close();
+      try {
+        root.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    test('mutation callback fires for write/patch/mkdir/delete', () async {
+      var r = await callTool(engine, 'write', {
+        'path': '@notes/a.md',
+        'content': 'hello',
+      });
+      expect(r['isError'], false);
+      r = await callTool(engine, 'patch', {
+        'path': '@notes/a.md',
+        'old_string': 'hello',
+        'new_string': 'hello world',
+      });
+      expect(r['isError'], false);
+      r = await callTool(engine, 'mkdir', {'path': '@notes/sub'});
+      expect(r['isError'], false);
+      r = await callTool(engine, 'delete', {'path': '@notes/a.md'});
+      expect(r['isError'], false);
+      expect(mutated, ['notes', 'notes', 'notes', 'notes']);
+    });
+
+    test('mutation callback does not fire for reads', () async {
+      File('${mirrorDir.path}/r.txt').writeAsStringSync('x');
+      final r = await callTool(engine, 'read', {'path': '@notes/r.txt'});
+      expect(r['isError'], false);
+      expect(mutated, isEmpty);
+    });
+
+    test('SAF mounts do not produce deletion markers', () async {
+      File('${mirrorDir.path}/d.txt').writeAsStringSync('x');
+      final r = await callTool(engine, 'delete', {'path': '@notes/d.txt'});
+      expect(r['isError'], false);
+      expect(mutated, ['notes']);
+    });
+
+    test('download into a SAF mount is rejected', () async {
+      final r = await callTool(engine, 'download', {
+        'path': '@notes/fetched.html',
+        'url': 'https://example.com/page',
+      });
+      expect(r['isError'], true);
+      expect(textOf(r), contains('external SAF mount'));
+      expect(File('${mirrorDir.path}/fetched.html').existsSync(), isFalse);
+      expect(mutated, isEmpty);
+    });
+
+    test('download into a workspace mount bypasses the SAF guard', () async {
+      final r = await callTool(engine, 'download', {
+        'path': '@default/fetched.txt',
+        'url': 'https://example.com/a.txt',
+      });
+      // The network itself may be unreachable in the test env; the point is
+      // that the SAF-mount guard is NOT what rejected the call.
+      expect(textOf(r), isNot(contains('external SAF mount')));
+    });
+
+    test('mount listing presents SAF mounts via the presenter', () async {
+      final engine2 = KelivoFilesystemMcpServerEngine(
+        mountsProvider: () => mounts,
+        pathPresenter: (wire) =>
+            presentWirePath(wire, 'default', safAliases: {'notes'}),
+      );
+      final r = await callTool(engine2, 'read', {'path': '/'});
+      expect(r['isError'], false);
+      final text = textOf(r);
+      expect(text, contains('/workspace (rw)'));
+      expect(text, contains('/workspace/.mounts/notes (rw)'));
+      expect(text, isNot(contains('@notes')));
+      engine2.close();
+    });
+  });
 }

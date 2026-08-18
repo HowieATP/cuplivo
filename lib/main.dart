@@ -24,6 +24,7 @@ import 'core/providers/codex_device_code_controller.dart';
 import 'core/providers/grok_device_code_controller.dart';
 import 'core/providers/mcp_provider.dart';
 import 'core/providers/workspace_provider.dart';
+import 'core/services/saf/saf_mount_sync_service.dart';
 import 'features/workspace/controllers/dependency_install_controller.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/asr_provider.dart';
@@ -214,6 +215,15 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) => SafMountSyncService(
+            // SAF aliases must never collide with workspace aliases.
+            reservedAliasesProvider: () {
+              final wp = ctx.read<WorkspaceProvider>();
+              return wp.workspaces.map((w) => w.alias).toSet();
+            },
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(
           create: (ctx) => AssistantProvider(

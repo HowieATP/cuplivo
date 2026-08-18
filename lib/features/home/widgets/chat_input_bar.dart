@@ -76,7 +76,7 @@ class ChatInputBar extends StatefulWidget {
     this.onStop,
     this.onSelectModel,
     this.onLongPressSelectModel,
-    this.onOpenMcp,
+    this.onOpenToolsHub,
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onMore,
@@ -94,8 +94,8 @@ class ChatInputBar extends StatefulWidget {
     this.reasoningActive = false,
     this.reasoningBudget,
     this.supportsReasoning = true,
-    this.showMcpButton = false,
-    this.mcpActive = false,
+    this.showToolsHubButton = false,
+    this.toolsHubActive = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -138,7 +138,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onLongPressSelectModel;
   final int? multiAIModelCount;
   final VoidCallback? onMultiSelectModel;
-  final VoidCallback? onOpenMcp;
+  final VoidCallback? onOpenToolsHub;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
@@ -156,8 +156,8 @@ class ChatInputBar extends StatefulWidget {
   final bool reasoningActive;
   final int? reasoningBudget;
   final bool supportsReasoning;
-  final bool showMcpButton;
-  final bool mcpActive;
+  final bool showToolsHubButton;
+  final bool toolsHubActive;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -2005,22 +2005,22 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // MCP button
-        if (widget.showMcpButton) {
+        // Tools Hub button
+        if (widget.showToolsHubButton) {
           actions.add(
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarMcpServersTooltip,
-                icon: Lucide.Hammer,
-                active: widget.mcpActive,
-                onTap: lockTap(widget.onOpenMcp),
+                tooltip: l10n.chatInputBarToolsTooltip,
+                icon: Lucide.Wrench,
+                active: widget.toolsHubActive,
+                onTap: lockTap(widget.onOpenToolsHub),
                 onLongPress: lockTap(widget.onLongPressMcp),
               ),
               menu: DesktopContextMenuItem(
-                icon: Lucide.Hammer,
-                label: l10n.chatInputBarMcpServersTooltip,
-                onTap: lockTap(widget.onOpenMcp),
+                icon: Lucide.Wrench,
+                label: l10n.chatInputBarToolsTooltip,
+                onTap: lockTap(widget.onOpenToolsHub),
               ),
             ),
           );

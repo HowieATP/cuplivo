@@ -54,6 +54,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import '../widgets/proactive_care_datetime_picker.dart';
+import '../../workspace/widgets/workspace_bind_sheet.dart';
 import 'assistant_regex_tab.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';

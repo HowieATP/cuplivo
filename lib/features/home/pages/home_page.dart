@@ -32,7 +32,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
-import '../../../desktop/mcp_servers_popover.dart';
+import '../../../desktop/tools_hub_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
@@ -48,7 +48,7 @@ import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
-import '../../assistant/widgets/mcp_assistant_sheet.dart';
+import '../../home/widgets/tools_hub_sheet.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
@@ -1550,17 +1550,17 @@ class _HomePageState extends State<HomePage>
               context,
             ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
           },
-          onOpenMcp: () {
+          onOpenToolsHub: () {
             final a = context.read<AssistantProvider>().currentAssistant;
             if (a != null) {
               if (PlatformUtils.isDesktop) {
-                showDesktopMcpServersPopover(
+                showDesktopToolsHubPopover(
                   context,
                   anchorKey: _inputBarKey,
                   assistantId: a.id,
                 );
               } else {
-                showAssistantMcpSheet(context, assistantId: a.id);
+                showToolsHubSheet(context, assistantId: a.id);
               }
             }
           },

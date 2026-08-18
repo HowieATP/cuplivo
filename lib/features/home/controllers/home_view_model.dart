@@ -9,6 +9,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/notification_service.dart';
@@ -1745,6 +1746,8 @@ class HomeViewModel extends ChangeNotifier {
     final history = ProactiveCareMessageFlow.buildHistory(
       conversation: convo,
       messages: _chatService.getMessages(convo.id),
+      assistant: assistant,
+      applySendRegexes: false,
     );
 
     final l10n = AppLocalizations.of(_contextProvider);
@@ -1844,7 +1847,16 @@ class HomeViewModel extends ChangeNotifier {
       final history = ProactiveCareMessageFlow.buildHistory(
         conversation: convo,
         messages: _chatService.getMessages(convo.id),
+        assistant: assistant,
+        applySendRegexes: true,
       );
+      final recentChats = assistant.enableRecentChatsReference
+          ? ChatContextTransforms.selectRecentChats(
+              _chatService.getAllConversations(),
+              assistantId: assistant.id,
+              currentConversationId: convo.id,
+            )
+          : const <Conversation>[];
       final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
           ? assistant.proactiveCarePrompt
           : (l10n?.assistantEditProactiveCarePromptDefault ?? '');
@@ -1855,6 +1867,7 @@ class HomeViewModel extends ChangeNotifier {
         history: history,
         carePrompt: carePrompt,
         now: DateTime.now(),
+        recentChats: recentChats,
       );
 
       final reply = await ProactiveCareMessageFlow.requestCareReply(

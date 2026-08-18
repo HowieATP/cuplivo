@@ -12,6 +12,7 @@ import '../../utils/app_directories.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../models/assistant.dart';
+import '../models/conversation.dart';
 import 'logging/flutter_logger.dart';
 import 'notification_service.dart';
 import 'proactive_care_message_flow.dart';
@@ -103,12 +104,34 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
         await ProactiveCareHeadlessChatStore.loadRecentConversationFor(
           assistant.id,
         );
-    final history = recent.conversation == null
+    final careHistory = recent.conversation == null
         ? const <Map<String, dynamic>>[]
         : ProactiveCareMessageFlow.buildHistory(
             conversation: recent.conversation!,
             messages: recent.messages,
+            assistant: assistant,
+            applySendRegexes: true,
           );
+    final decisionHistory = recent.conversation == null
+        ? const <Map<String, dynamic>>[]
+        : ProactiveCareMessageFlow.buildHistory(
+            conversation: recent.conversation!,
+            messages: recent.messages,
+            assistant: assistant,
+            applySendRegexes: false,
+          );
+    var recentChats = const <Conversation>[];
+    if (assistant.enableRecentChatsReference) {
+      try {
+        recentChats =
+            await ProactiveCareHeadlessChatStore.loadRecentChatReferencesFor(
+              assistant.id,
+              currentConversationId: recent.conversation?.id,
+            );
+      } catch (e) {
+        debugPrint('[ProactiveCare] Recent chat references load failed: $e');
+      }
+    }
 
     final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
         ? assistant.proactiveCarePrompt
@@ -117,9 +140,11 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
       assistant: assistant,
       userNickname: await ProactiveCareMessageFlow.loadUserNicknameFromPrefs(),
       modelId: modelCfg.modelId,
-      history: history,
+      history: careHistory,
       carePrompt: carePrompt,
       now: DateTime.now(),
+      recentChats: recentChats,
+      reloadWorldBooks: true,
     );
 
     final reply = await ProactiveCareMessageFlow.requestCareReply(
@@ -164,7 +189,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
           userNickname:
               await ProactiveCareMessageFlow.loadUserNicknameFromPrefs(),
           history: <Map<String, dynamic>>[
-            ...history,
+            ...decisionHistory,
             {'role': 'assistant', 'content': reply},
           ],
           decisionPrompt: decisionPrompt,

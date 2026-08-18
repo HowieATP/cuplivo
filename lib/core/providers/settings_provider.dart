@@ -647,8 +647,11 @@ class SettingsProvider extends ChangeNotifier {
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
 
+  late final Future<void> _loaded;
+  Future<void> get loaded => _loaded;
+
   SettingsProvider() {
-    _load();
+    _loaded = _load();
   }
 
   Future<_MigrationResult> _migrateEmbeddingModelOverrides(

@@ -173,8 +173,11 @@ class BackupReminderProvider extends ChangeNotifier {
     }
     _timer = Timer(next.difference(now), () {
       evaluateDue(DateTime.now());
-      // No reschedule here: the reminder stays visible until the user backs
-      // up or snoozes, both of which call _schedule() with the new anchor.
+      // Re-arm instead of dead-ending: normally a no-op (reminder is due and
+      // stays visible until the user backs up or snoozes), but if the wall
+      // clock moved backward since arming (DST fall-back, manual time/zone
+      // change), the timer fired before `next` and this re-arms it.
+      _schedule();
     });
   }
 

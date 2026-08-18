@@ -7831,6 +7831,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceBindTitle => '绑定工作区';
 
   @override
+  String get workspaceBindDisabledHint => '开启工作区后选择';
+
+  @override
   String get workspaceEntryTitle => '工作区';
 
   @override
@@ -15928,6 +15931,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceBindTitle => '绑定工作区';
+
+  @override
+  String get workspaceBindDisabledHint => '开启工作区后选择';
 
   @override
   String get workspaceEntryTitle => '工作区';
@@ -24028,6 +24034,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceBindTitle => '綁定工作區';
+
+  @override
+  String get workspaceBindDisabledHint => '開啟工作區後選擇';
 
   @override
   String get workspaceEntryTitle => '工作區';

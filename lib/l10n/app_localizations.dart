@@ -14802,6 +14802,12 @@ abstract class AppLocalizations {
   /// **'Bound workspace'**
   String get workspaceBindTitle;
 
+  /// No description provided for @workspaceBindDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable workspace to select'**
+  String get workspaceBindDisabledHint;
+
   /// No description provided for @workspaceEntryTitle.
   ///
   /// In en, this message translates to:

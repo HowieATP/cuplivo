@@ -3697,6 +3697,7 @@
   "workspaceInstallDeps": "Install dependencies",
   "workspaceEnableTitle": "Enable workspace",
   "workspaceBindTitle": "Bound workspace",
+  "workspaceBindDisabledHint": "Enable workspace to select",
   "workspaceEntryTitle": "Workspace",
   "workspaceEntrySubtitleOff": "Off",
   "workspaceShellMobileOnly": "Shell is only available on Android or iOS",

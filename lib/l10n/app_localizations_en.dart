@@ -8195,6 +8195,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceBindTitle => 'Bound workspace';
 
   @override
+  String get workspaceBindDisabledHint => 'Enable workspace to select';
+
+  @override
   String get workspaceEntryTitle => 'Workspace';
 
   @override

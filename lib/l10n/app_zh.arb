@@ -3113,6 +3113,7 @@
   "workspaceInstallDeps": "安装依赖",
   "workspaceEnableTitle": "开启工作区",
   "workspaceBindTitle": "绑定工作区",
+  "workspaceBindDisabledHint": "开启工作区后选择",
   "workspaceEntryTitle": "工作区",
   "workspaceEntrySubtitleOff": "未开启",
   "workspaceShellMobileOnly": "Shell 仅在 Android 或 iOS 可用",

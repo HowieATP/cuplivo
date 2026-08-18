@@ -145,6 +145,7 @@ class _ToolsHubPopoverState extends State<_ToolsHubPopover>
                             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                             child: ToolsHubContent(
                               assistantId: widget.assistantId,
+                              onClose: () => widget.onClose(),
                             ),
                           ),
                         ),

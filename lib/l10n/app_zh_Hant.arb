@@ -3114,6 +3114,7 @@
   "workspaceInstallDeps": "安裝依賴",
   "workspaceEnableTitle": "開啟工作區",
   "workspaceBindTitle": "綁定工作區",
+  "workspaceBindDisabledHint": "開啟工作區後選擇",
   "workspaceEntryTitle": "工作區",
   "workspaceEntrySubtitleOff": "未開啟",
   "workspaceShellMobileOnly": "Shell 僅在 Android 或 iOS 可用",

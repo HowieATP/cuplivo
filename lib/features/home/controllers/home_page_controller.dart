@@ -68,10 +68,12 @@ class UserMessageEditState {
   const UserMessageEditState({
     required this.messageId,
     required this.previewText,
+    required this.originalTimestamp,
   });
 
   final String messageId;
   final String previewText;
+  final DateTime originalTimestamp;
 }
 
 /// Controller that manages all state and service wiring for HomePage.
@@ -1372,6 +1374,7 @@ class HomePageController extends ChangeNotifier {
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,
       content: result.content,
+      timestamp: message.timestamp,
     );
     if (newMsg == null) return;
 
@@ -1444,7 +1447,11 @@ class HomePageController extends ChangeNotifier {
         input.documents.isEmpty) {
       return;
     }
-    final newMsg = await _saveEditedUserMessageVersion(input, editState);
+    final newMsg = await _saveEditedUserMessageVersion(
+      input,
+      editState,
+      timestamp: editState.originalTimestamp,
+    );
     if (newMsg == null) return;
     _exitUserMessageEdit(clearDraft: true);
   }
@@ -1477,6 +1484,7 @@ class HomePageController extends ChangeNotifier {
     _userMessageEditState = UserMessageEditState(
       messageId: message.id,
       previewText: input.text.isNotEmpty ? input.text : message.content.trim(),
+      originalTimestamp: message.timestamp,
     );
     notifyListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1500,8 +1508,9 @@ class HomePageController extends ChangeNotifier {
 
   Future<ChatMessage?> _saveEditedUserMessageVersion(
     ChatInputData input,
-    UserMessageEditState editState,
-  ) async {
+    UserMessageEditState editState, {
+    DateTime? timestamp,
+  }) async {
     final conversation = currentConversation;
     if (conversation == null) return null;
     final assistant = _context.read<AssistantProvider>().currentAssistant;
@@ -1518,6 +1527,7 @@ class HomePageController extends ChangeNotifier {
     final newMsg = await _chatService.appendMessageVersion(
       messageId: editState.messageId,
       content: content,
+      timestamp: timestamp,
     );
     if (newMsg == null) return null;
     // Overwrite the version's request metadata with the CURRENT composer

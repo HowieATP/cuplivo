@@ -834,6 +834,27 @@ class DataSync {
     return out;
   }
 
+  /// Messages qualifying for incremental export, at version-group granularity.
+  ///
+  /// Edited versions preserve the original message timestamp, so a
+  /// timestamp-only filter would drop them while `versionSelections` still
+  /// references the missing version. `version > 0` also matches multi-AI
+  /// adopted threads (renumbered without being edited), which only ever
+  /// produces superset exports. Qualify by group: every message whose group
+  /// contains a changed or versioned message is included.
+  List<ChatMessage> _incrementalQualifiedMessages(
+    List<ChatMessage> msgs,
+    bool Function(DateTime) sinceCheck,
+  ) {
+    final qualifiedGroups = msgs
+        .where((m) => sinceCheck(m.timestamp) || m.version > 0)
+        .map((m) => m.groupId ?? m.id)
+        .toSet();
+    return msgs
+        .where((m) => qualifiedGroups.contains(m.groupId ?? m.id))
+        .toList();
+  }
+
   /// Analyze incremental scope for preview purposes — scans conversations and
   /// files to produce metadata counts and representative titles.
   /// Does not modify any state; safe to call repeatedly.
@@ -859,9 +880,10 @@ class DataSync {
         newConvs.add(c);
       } else if (c.updatedAt.isAfter(since) ||
           c.updatedAt.isAtSameMomentAs(since)) {
-        final filtered = chatService
-            .getMessages(c.id)
-            .where((m) => sinceCheck(m.timestamp));
+        final filtered = _incrementalQualifiedMessages(
+          chatService.getMessages(c.id),
+          sinceCheck,
+        );
         final count = filtered.length;
         if (count > 0) {
           updatedMsgCount += count;
@@ -1027,7 +1049,9 @@ class DataSync {
         }
         if (c.updatedAt.isBefore(since)) return false;
         final msgs = chatService.getMessages(c.id);
-        return msgs.any((m) => sinceCheck(m.timestamp));
+        // Edited versions keep the original message timestamp, so a
+        // timestamp-only check would miss edit-only activity.
+        return _incrementalQualifiedMessages(msgs, sinceCheck).isNotEmpty;
       }).toList();
     }
     final file = File(p.join(directory.path, '_bk_chats.json'));
@@ -1058,9 +1082,7 @@ class DataSync {
         if (incremental != null &&
             !c.isGroup &&
             c.createdAt.isBefore(incremental.since)) {
-          msgs = msgs
-              .where((m) => incremental.sinceCheck(m.timestamp))
-              .toList();
+          msgs = _incrementalQualifiedMessages(msgs, incremental.sinceCheck);
         }
         for (final m in msgs) {
           if (!firstMsg) sink.write(',');

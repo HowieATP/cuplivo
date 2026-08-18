@@ -744,7 +744,14 @@ class MultiAIEngine extends ChangeNotifier {
     for (final entry in byGid.entries) {
       final gid = entry.key;
       final msgs = entry.value;
-      msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      // Edited versions share the original message timestamp, so a
+      // timestamp-only sort has tied keys and List.sort is not stable.
+      // Break ties by version for deterministic renumbering.
+      msgs.sort((a, b) {
+        final byTime = a.timestamp.compareTo(b.timestamp);
+        if (byTime != 0) return byTime;
+        return a.version.compareTo(b.version);
+      });
 
       for (int i = 0; i < msgs.length; i++) {
         final msg = msgs[i];

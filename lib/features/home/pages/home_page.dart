@@ -1595,9 +1595,14 @@ class _HomePageState extends State<HomePage>
               context,
               anchorKey: _inputBarKey,
               assistantId: a.id,
+              conversationId: _controller.currentConversation?.id,
             );
           } else {
-            showToolsHubSheet(context, assistantId: a.id);
+            showToolsHubSheet(
+              context,
+              assistantId: a.id,
+              conversationId: _controller.currentConversation?.id,
+            );
           }
         }
       },
@@ -2035,7 +2040,11 @@ class _HomePageState extends State<HomePage>
                 : () {
                     Navigator.of(ctx).maybePop();
                     if (a != null) {
-                      showToolsHubSheet(context, assistantId: a.id);
+                      showToolsHubSheet(
+                        context,
+                        assistantId: a.id,
+                        conversationId: _controller.currentConversation?.id,
+                      );
                     }
                   },
           ),

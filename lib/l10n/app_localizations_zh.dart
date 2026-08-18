@@ -8389,6 +8389,44 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntrySubtitleOff => '未开启';
 
   @override
+  String get workspaceDefaultDirectoryTitle => '默认工作目录';
+
+  @override
+  String get workspaceConversationDirectoryTitle => '当前会话工作目录';
+
+  @override
+  String get workspaceDirectoryHint => '/workspace 或相对于工作区根目录的路径';
+
+  @override
+  String get workspaceDirectoryBrowse => '浏览';
+
+  @override
+  String get workspaceDirectorySave => '保存';
+
+  @override
+  String get workspaceDirectoryUseAssistantDefault => '使用助手默认目录';
+
+  @override
+  String get workspaceDirectoryInherited => '正在继承助手默认目录';
+
+  @override
+  String get workspaceDirectoryOverride => '当前会话已覆盖';
+
+  @override
+  String get workspaceDirectorySaved => '工作目录已保存';
+
+  @override
+  String workspaceDirectorySaveFailed(String error) {
+    return '保存工作目录失败：$error';
+  }
+
+  @override
+  String get workspaceDirectoryPickerTitle => '选择工作目录';
+
+  @override
+  String get workspaceDirectorySelectCurrent => '选择当前文件夹';
+
+  @override
   String get workspaceShellMobileOnly => 'Shell 仅在 Android 或 iOS 可用';
 
   @override
@@ -17077,6 +17115,44 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySubtitleOff => '未开启';
+
+  @override
+  String get workspaceDefaultDirectoryTitle => '默认工作目录';
+
+  @override
+  String get workspaceConversationDirectoryTitle => '当前会话工作目录';
+
+  @override
+  String get workspaceDirectoryHint => '/workspace 或相对于工作区根目录的路径';
+
+  @override
+  String get workspaceDirectoryBrowse => '浏览';
+
+  @override
+  String get workspaceDirectorySave => '保存';
+
+  @override
+  String get workspaceDirectoryUseAssistantDefault => '使用助手默认目录';
+
+  @override
+  String get workspaceDirectoryInherited => '正在继承助手默认目录';
+
+  @override
+  String get workspaceDirectoryOverride => '当前会话已覆盖';
+
+  @override
+  String get workspaceDirectorySaved => '工作目录已保存';
+
+  @override
+  String workspaceDirectorySaveFailed(String error) {
+    return '保存工作目录失败：$error';
+  }
+
+  @override
+  String get workspaceDirectoryPickerTitle => '选择工作目录';
+
+  @override
+  String get workspaceDirectorySelectCurrent => '选择当前文件夹';
 
   @override
   String get workspaceShellMobileOnly => 'Shell 仅在 Android 或 iOS 可用';
@@ -25769,6 +25845,44 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEntrySubtitleOff => '未開啟';
+
+  @override
+  String get workspaceDefaultDirectoryTitle => '預設工作目錄';
+
+  @override
+  String get workspaceConversationDirectoryTitle => '目前對話工作目錄';
+
+  @override
+  String get workspaceDirectoryHint => '/workspace 或相對於工作區根目錄的路徑';
+
+  @override
+  String get workspaceDirectoryBrowse => '瀏覽';
+
+  @override
+  String get workspaceDirectorySave => '儲存';
+
+  @override
+  String get workspaceDirectoryUseAssistantDefault => '使用助手預設目錄';
+
+  @override
+  String get workspaceDirectoryInherited => '正在沿用助手預設目錄';
+
+  @override
+  String get workspaceDirectoryOverride => '目前對話已覆寫';
+
+  @override
+  String get workspaceDirectorySaved => '工作目錄已儲存';
+
+  @override
+  String workspaceDirectorySaveFailed(String error) {
+    return '儲存工作目錄失敗：$error';
+  }
+
+  @override
+  String get workspaceDirectoryPickerTitle => '選擇工作目錄';
+
+  @override
+  String get workspaceDirectorySelectCurrent => '選擇目前資料夾';
 
   @override
   String get workspaceShellMobileOnly => 'Shell 僅在 Android 或 iOS 可用';

@@ -201,6 +201,17 @@ class MessageGenerationService {
     );
     await messageBuilderService.injectSkillListPrompt(apiMessages, assistantId);
 
+    final workspaceExecutionContext = generationController
+        .resolveWorkspaceExecutionContext(assistant, currentConversation);
+    messageBuilderService.injectWorkspacePrompt(
+      apiMessages,
+      generationController.buildWorkspacePromptReminder(
+        assistant: assistant,
+        conversation: currentConversation,
+        workspaceExecutionContext: workspaceExecutionContext,
+      ),
+    );
+
     // Inject time note (at the end of system message, after all other injections)
     messageBuilderService.injectTimeNote(apiMessages, assistant);
 
@@ -215,6 +226,8 @@ class MessageGenerationService {
       providerKey,
       modelId,
       hasBuiltInSearch,
+      conversation: currentConversation,
+      workspaceExecutionContext: workspaceExecutionContext,
     );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
@@ -223,6 +236,8 @@ class MessageGenerationService {
             approvalService: approvalService,
             askUserService: askUserService,
             conversationId: currentConversation?.id,
+            conversation: currentConversation,
+            workspaceExecutionContext: workspaceExecutionContext,
           )
         : null;
 

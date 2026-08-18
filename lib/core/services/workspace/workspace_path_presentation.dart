@@ -8,7 +8,9 @@
 /// shell view; filesystem tools and shell now share one vocabulary).
 library;
 
-/// Thrown when a model-supplied path does not use the `/workspace/...` form.
+import 'workspace_execution_context.dart';
+
+/// Thrown when a model-supplied path cannot be resolved inside `/workspace`.
 class ModelPathException implements Exception {
   final String message;
   ModelPathException(this.message);
@@ -17,7 +19,7 @@ class ModelPathException implements Exception {
   String toString() => message;
 }
 
-/// Strict input translation: the model must use `/workspace/...`; canonical
+/// Resolves relative model paths from [workingDirectory]. Canonical
 /// `@alias/...` paths and arbitrary absolute paths are rejected.
 ///
 /// - `/` is passed through unchanged (engine special case: list mounts).
@@ -27,62 +29,44 @@ class ModelPathException implements Exception {
 ///   be a known SAF mount alias; anything else under `.mounts/` is rejected.
 /// - Trailing slashes are preserved so the engine's existing validation
 ///   applies unchanged (read tolerates one, the other tools reject it).
-/// - Segment-level validation (traversal, malformed segments) still happens
-///   inside the engine against the translated canonical path.
+/// - `.` and `..` are normalized, but traversal above `/workspace` is rejected.
+/// - Remaining malformed segments are also checked by the filesystem engine.
 String parseModelPath(
   String raw,
   String alias, {
+  String workingDirectory = '/workspace',
   Set<String> safAliases = const <String>{},
 }) {
-  if (raw.trim() != raw) {
-    throw ModelPathException(
-      'Invalid path: leading/trailing whitespace is not allowed: $raw',
+  try {
+    final resolved = resolveWorkspaceGuestPath(
+      raw,
+      baseDirectory: workingDirectory,
+      preserveTrailingSlash: true,
     );
-  }
-  if (raw.isEmpty) {
-    throw ModelPathException('Invalid path: path is required');
-  }
-  if (raw == '/') return '/';
-  if (raw.startsWith('@')) {
-    throw ModelPathException(
-      'Invalid path: use the /workspace/rel/path form, not $raw',
-    );
-  }
-  if (raw != '/workspace' && !raw.startsWith('/workspace/')) {
-    throw ModelPathException(
-      'Invalid path: only paths under /workspace are allowed: $raw',
-    );
-  }
-  if (raw == '/workspace') return '@$alias';
-  final rest = raw.substring('/workspace/'.length);
-  // External SAF mounts live under the reserved .mounts/ guest directory.
-  // The path is ONLY interpreted as a mount reference; a literal workspace
-  // folder named ".mounts" is shadowed by design (ADR-0037) — same
-  // convention as .sandbox/.fetch_cache dotdirs.
-  if (rest == '.mounts') {
-    throw ModelPathException(
-      'Invalid path: name a mount: /workspace/.mounts/<alias>',
-    );
-  }
-  if (rest.startsWith('.mounts/')) {
-    final seg = rest.substring('.mounts/'.length);
-    final slash = seg.indexOf('/');
-    final mountAlias = slash < 0 ? seg : seg.substring(0, slash);
-    if (mountAlias.isEmpty) {
-      throw ModelPathException(
-        'Invalid path: name a mount: /workspace/.mounts/<alias>',
+    if (resolved == '/') return '/';
+    if (resolved == '/workspace') return '@$alias';
+    final rest = resolved.substring('/workspace/'.length);
+    if (rest == '.mounts' || rest == '.mounts/') {
+      throw const WorkspacePathException(
+        'Name a mount: /workspace/.mounts/<alias>.',
       );
     }
-    if (!safAliases.contains(mountAlias)) {
-      throw ModelPathException(
-        'Invalid path: unknown mount alias: /workspace/.mounts/$mountAlias',
-      );
+    if (rest.startsWith('.mounts/')) {
+      final mountPath = rest.substring('.mounts/'.length);
+      final slash = mountPath.indexOf('/');
+      final mountAlias = slash < 0 ? mountPath : mountPath.substring(0, slash);
+      if (mountAlias.isEmpty || !safAliases.contains(mountAlias)) {
+        throw WorkspacePathException(
+          'Unknown mount alias: /workspace/.mounts/$mountAlias.',
+        );
+      }
+      if (slash < 0) return '@$mountAlias';
+      return '@$mountAlias/${mountPath.substring(slash + 1)}';
     }
-    if (slash < 0) return '@$mountAlias';
-    final rel = seg.substring(slash + 1);
-    return '@$mountAlias/$rel';
+    return '@$alias/$rest';
+  } on WorkspacePathException catch (e) {
+    throw ModelPathException('Invalid path: ${e.message}');
   }
-  return '@$alias/$rest';
 }
 
 /// Canonical wire path → model-facing `/workspace/...` form.

@@ -6093,11 +6093,41 @@ abstract class AppLocalizations {
   /// **'Reasoning Strength'**
   String get chatInputBarReasoningStrengthTooltip;
 
-  /// No description provided for @chatInputBarMcpServersTooltip.
+  /// No description provided for @chatInputBarToolsTooltip.
   ///
   /// In en, this message translates to:
-  /// **'MCP Servers'**
-  String get chatInputBarMcpServersTooltip;
+  /// **'Tools'**
+  String get chatInputBarToolsTooltip;
+
+  /// No description provided for @toolsHubLocalToolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Tools'**
+  String get toolsHubLocalToolsTitle;
+
+  /// No description provided for @toolsHubWorkspaceUnbound.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace bound'**
+  String get toolsHubWorkspaceUnbound;
+
+  /// No description provided for @toolsHubOpenTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Terminal'**
+  String get toolsHubOpenTerminal;
+
+  /// No description provided for @toolsHubTerminalDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind and enable a workspace first'**
+  String get toolsHubTerminalDisabledHint;
+
+  /// No description provided for @toolsHubWorkspaceManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Workspaces'**
+  String get toolsHubWorkspaceManage;
 
   /// No description provided for @chatInputBarMoreTooltip.
   ///

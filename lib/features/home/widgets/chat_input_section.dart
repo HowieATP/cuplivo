@@ -44,7 +44,7 @@ class ChatInputSection extends StatelessWidget {
     this.onMore,
     this.onSelectModel,
     this.onLongPressSelectModel,
-    this.onOpenMcp,
+    this.onOpenToolsHub,
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onConfigureReasoning,
@@ -92,7 +92,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressSelectModel;
   final int? multiAIModelCount;
   final VoidCallback? onMultiSelectModel;
-  final VoidCallback? onOpenMcp;
+  final VoidCallback? onOpenToolsHub;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
@@ -149,7 +149,7 @@ class ChatInputSection extends StatelessWidget {
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
-      onOpenMcp: onOpenMcp,
+      onOpenToolsHub: onOpenToolsHub,
       onLongPressMcp: onLongPressMcp,
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
@@ -186,8 +186,14 @@ class ChatInputSection extends StatelessWidget {
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
-      showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
-      mcpActive: _isMcpActive(context, a),
+      showToolsHubButton: _shouldShowToolsHubButton(
+        context,
+        settings,
+        a,
+        pk,
+        mid,
+      ),
+      toolsHubActive: _isToolsActive(context, a),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
@@ -279,7 +285,7 @@ class ChatInputSection extends StatelessWidget {
     }
   }
 
-  bool _shouldShowMcpButton(
+  bool _shouldShowToolsHubButton(
     BuildContext context,
     SettingsProvider settings,
     Assistant? a,
@@ -290,14 +296,20 @@ class ChatInputSection extends StatelessWidget {
     final mid3 = a?.chatModelId ?? settings.currentModelId;
     if (pk2 == null || mid3 == null) return false;
     final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    return isToolModel(pk2, mid3) && hasEnabledMcp;
+    final hasLocalTools = a?.localToolIds.isNotEmpty ?? false;
+    final workspaceOn = a?.workspaceEnabled ?? false;
+    return isToolModel(pk2, mid3) &&
+        (hasEnabledMcp || hasLocalTools || workspaceOn);
   }
 
-  bool _isMcpActive(BuildContext context, Assistant? a) {
+  bool _isToolsActive(BuildContext context, Assistant? a) {
     final connected = context.watch<McpProvider>().connectedServers;
     final selected = a?.mcpServerIds ?? const <String>[];
-    if (selected.isEmpty || connected.isEmpty) return false;
-    return connected.any((s) => selected.contains(s.id));
+    if (selected.isNotEmpty && connected.any((s) => selected.contains(s.id))) {
+      return true;
+    }
+    if (a == null) return false;
+    return a.localToolIds.isNotEmpty || a.workspaceEnabled;
   }
 
   bool _hasQuickPhrases(BuildContext context, Assistant? a) {

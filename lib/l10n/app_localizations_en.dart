@@ -3347,7 +3347,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarReasoningStrengthTooltip => 'Reasoning Strength';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP Servers';
+  String get chatInputBarToolsTooltip => 'Tools';
+
+  @override
+  String get toolsHubLocalToolsTitle => 'Local Tools';
+
+  @override
+  String get toolsHubWorkspaceUnbound => 'No workspace bound';
+
+  @override
+  String get toolsHubOpenTerminal => 'Open Terminal';
+
+  @override
+  String get toolsHubTerminalDisabledHint =>
+      'Bind and enable a workspace first';
+
+  @override
+  String get toolsHubWorkspaceManage => 'Manage Workspaces';
 
   @override
   String get chatInputBarMoreTooltip => 'Add';

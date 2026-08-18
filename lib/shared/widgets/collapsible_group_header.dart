@@ -15,6 +15,7 @@ class CollapsibleGroupHeader extends StatelessWidget {
     this.fontSize = 12,
     this.fontWeight,
     this.padding = const EdgeInsets.fromLTRB(4, 12, 4, 6),
+    this.trailing,
   });
 
   final String groupName;
@@ -24,6 +25,10 @@ class CollapsibleGroupHeader extends StatelessWidget {
   final double fontSize;
   final FontWeight? fontWeight;
   final EdgeInsetsGeometry padding;
+
+  /// Optional widget pinned to the right end of the header row (e.g. a
+  /// per-group manage action).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +66,8 @@ class CollapsibleGroupHeader extends StatelessWidget {
                 color: cs.onSurface.withValues(alpha: 0.38),
               ),
             ),
+            const Spacer(),
+            if (trailing != null) trailing!,
           ],
         ),
       ),
@@ -127,9 +134,19 @@ class _CollapsibleGroupBodyState extends State<CollapsibleGroupBody>
 
 /// Collapsible-group state shared by grouped list pages: tracks which category
 /// groups are collapsed and toggles them via [State.setState]. All groups
-/// start expanded by default.
+/// start expanded by default unless [initialCollapsedGroups] is overridden.
 mixin CollapsibleGroupsMixin<T extends StatefulWidget> on State<T> {
   final Set<String> _collapsedGroups = {};
+
+  /// Group keys (see [toggleGroup]) that start collapsed. Override to set the
+  /// default expansion state per page.
+  Set<String> get initialCollapsedGroups => const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _collapsedGroups.addAll(initialCollapsedGroups);
+  }
 
   /// A stable key for a group, used to track collapsed state.
   String _groupKey(String? group) => group ?? '__uncategorized__';

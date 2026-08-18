@@ -3224,7 +3224,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarReasoningStrengthTooltip => '思维链强度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP服务器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本地工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未绑定工作区';
+
+  @override
+  String get toolsHubOpenTerminal => '打开终端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先绑定并开启工作区';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作区';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -11308,7 +11323,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarReasoningStrengthTooltip => '思维链强度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP服务器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本地工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未绑定工作区';
+
+  @override
+  String get toolsHubOpenTerminal => '打开终端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先绑定并开启工作区';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作区';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -19391,7 +19421,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarReasoningStrengthTooltip => '思維鏈強度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP伺服器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本機工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未綁定工作區';
+
+  @override
+  String get toolsHubOpenTerminal => '開啟終端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先綁定並開啟工作區';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作區';
 
   @override
   String get chatInputBarMoreTooltip => '更多';

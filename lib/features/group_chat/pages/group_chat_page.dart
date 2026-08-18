@@ -483,7 +483,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
               focusNode: _inputFocus,
               loading: _loading || _orchestrator.isBusy,
               mode: ChatInputMode.groupChat,
-              showMcpButton: false,
+              showToolsHubButton: false,
               supportsReasoning: false,
               showMoreButton: false,
               showQuickPhraseButton: false,

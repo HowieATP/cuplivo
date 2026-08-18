@@ -1,5 +1,33 @@
 # 更新日志
 
+## [3.0.2] - 2026-08-18
+
+### 新增
+
+- **工具中心 (Tools Hub)**: 将 MCP 服务器、本地工具、工作区管理（含挂载、安卓终端启动）统一到原 MCP 入口，供对话时快捷调整 (#491 by @cup113)
+- **iOS 后台保活**: 移植 OpenMinis 的进阶后台保活到 iOS，iOS 上 Ta 的来信与后台任务可正常保活 (#434 by @banana4432, @OpenMinis)
+- **Markdown 透明渲染**：代码块、表格块、`<details>` 块底色改为半透明，增强有背景图时的观感 (#452 by @cup113)
+- 批量置顶: 在对话多选模式下可一次置顶或取消置顶多个对话 (#487 by @cup113)
+
+### 修复
+
+- **修复记忆竞态**: 为记忆编辑加锁，避免并行 `create_memory` 调用产生重复 ID 等情形 (#479 by @xuanxuan9929, @cup113)
+- **备份兼容**: `chats.json` 以版本 1 导出，使 Cuplivo 可导回 Kelivo (#453 by @banana4432)
+- **备份与同步**: 引导 Kelivo v1.2.x 备份文件导入时前往网站降级而非静默覆盖使数据丢失；确保导入文件时备份能恢复；使局域网能够同步设置 (#480 by @cup113)
+- **存储空间管理**: 新增 workspace/skills/fonts/sandbox 用量分类，使存储空间大小分布显示完整；新增沙箱清理功能；将统计改为流式扫描防止卡死 (#451 by @cup113)
+- 编辑过的消息版本保留原始时间戳 (#488 by @cup113, @xuanxuan9929)
+- 存储空间清理: iOS 自动清理剪贴板粘贴临时文件，保存时尊重 Dart 传入的 fileName (#469 by @HowieATP)
+- Google API: 过滤非字符串枚举值，避免 Gemini 3.5 Flash Lite 等模型工具调用请求出错 (#489 by @cup113, @rikkahub)
+- Ta 的来信: 构建 Ta 的来信上下文时注入世界观时间，让 AI 感知当前故事内时间 (#494 by @Pheobe-Southwood)
+- 日志分析优化: 通过文件名标记与 Token 预算防止日志分析 Token 爆炸 (#435 by @banana4432)
+- 工作区文件: 手机端打开工作区文件时，网页用内置 WebView 渲染，图片用内置渲染，防止系统自带不支持格式 (#492 by @cup113)
+- 公式 PNG 导出: 将背景改为透明、将手机端保存 PNG 文件改为保存到相册 (#490 by @cup113)
+- 提醒功能完善: 备份提醒由每分钟轮询改为一次性定时器；更新检查尊重关闭状态 (#375 by @HowieATP, @cup113, @Chevey339)
+- 沙箱: Android rootfs 解压跳过 `./` 根目录项，不再解压失败 (#472 by @HowieATP)
+- 沙箱: 截断 Shell 输出时不再切断 UTF-16 代理对 (#468 by @HowieATP, @cup113)
+- 迷你地图与全局搜索去除 `<thinking>` 标签，与消息渲染一致 (#455 by @HowieATP)
+- 中文语言：剩余 "skills" 字符串本地化为“技能” (#482 by @banana4432, @cup113)
+
 ## [3.0.1] - 2026-08-15
 
 > ℹ️ v3.0.1 是 v3 的第一个稳定版本，v3 主要引入了沙箱、语音识别功能，优化了多工作区，退役了内置 fetch、filesystem、subagent MCP 服务器，可能有破坏性变更，详情请见 [https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0](https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0)

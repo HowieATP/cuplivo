@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.0.2] - 2026-08-18
+
+### Added
+
+- **Tools Hub**: MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat (#491 by @cup113)
+- **iOS background keep-alive**: ported OpenMinis' advanced background keep-alive to iOS, so proactive care and background tasks can run on iOS (#434 by @banana4432, @OpenMinis)
+- **Translucent Markdown blocks**: code, table, and `<details>` blocks now use translucent backgrounds, improving the look over chat background images (#452 by @cup113)
+- **Batch pin/unpin**: pin or unpin multiple conversations at once from conversation select mode (#487 by @cup113)
+
+### Fixed
+
+- **Memory race**: memory edits are now serialized to prevent duplicate IDs from parallel `create_memory` calls and similar issues (#479 by @xuanxuan9929, @cup113)
+- **Backup compatibility**: `chats.json` is exported as version 1, so Cuplivo backups can be imported back into Kelivo (#453 by @banana4432)
+- **Backup & sync**: importing Kelivo v1.2.x backup files now guides users to the website to downgrade instead of silently overwriting and losing data; backups restore reliably when importing files; LAN sync now covers settings (#480 by @cup113)
+- **Storage space manager**: new usage categories (workspace/skills/fonts/sandbox) so the size distribution displays completely; new sandbox cleanup; statistics now use streaming scanning to avoid freezes (#451 by @cup113)
+- Edited message versions now keep their original timestamp (#488 by @cup113, @xuanxuan9929)
+- Storage cleanup: iOS automatically cleans up clipboard paste temp files and honors the Dart-provided file name on save (#469 by @HowieATP)
+- Google API: non-string enum values are filtered out so tool calls no longer fail for models like Gemini 3.5 Flash Lite (#489 by @cup113, @rikkahub)
+- Ta's message: world-book time is now injected into the context, grounding the AI in the current in-world time (#494 by @Pheobe-Southwood)
+- Log analysis: a filename marker with a token budget prevents token explosion during log analysis (#435 by @banana4432)
+- Workspace files: on mobile, HTML files render in the built-in WebView and images render in-app, avoiding system viewers that lack format support (#492 by @cup113)
+- Math formula PNG export: transparent background; mobile now saves the PNG to the gallery (#490 by @cup113)
+- Reminder improvements: backup reminder now uses a one-shot timer instead of 1-minute polling; update checks respect the disabled setting (#375 by @HowieATP, @cup113, @Chevey339)
+- Sandbox: Android rootfs extraction skips `./` root-dir entries instead of failing (#472 by @HowieATP)
+- Sandbox: shell output truncation no longer splits UTF-16 surrogate pairs (#468 by @HowieATP, @cup113)
+- Mini-map and global search strip `<thinking>` tags, matching message rendering (#455 by @HowieATP)
+- Chinese locales: remaining "skills" strings localized to 技能 (#482 by @banana4432, @cup113)
+
 ## [3.0.1] - 2026-08-15
 
 > ℹ️ v3.0.1 is the first stable release of the v3 line. v3 mainly introduced the sandbox and speech recognition, improved multi-workspace, and retired the built-in fetch, filesystem, and subagent MCP servers — this may be a breaking change. See [https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0](https://github.com/cuplivo/cuplivo/releases/tag/v3.0.0) for details.

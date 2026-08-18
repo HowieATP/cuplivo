@@ -99,15 +99,17 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 9. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI (#390).
 
+10. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat (#491).
+
 ### UI & Rendering
 
-1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
+1. **Translucent block rendering** — Code, table, and `<details>` blocks use translucent backgrounds so they blend better with chat background images (#452).
 
-2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
+2. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
 
-3. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+3. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
 
-4. **Beautify request logs** — Split messages from config in the log viewer so message turns in the request body are easier to read (#127).
+4. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
 5. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
 

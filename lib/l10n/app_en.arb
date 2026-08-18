@@ -710,6 +710,7 @@
   "markdownMathCopyLatexLabel": "Copy LaTeX",
   "markdownMathCopyPngLabel": "Copy as PNG",
   "markdownMathDownloadPngLabel": "Download PNG",
+  "markdownMathSavePngLabel": "Save to Gallery",
   "markdownMathDefaultFileNameStem": "math",
   "codeBlockCollapsedLines": "… {n} lines folded",
   "@codeBlockCollapsedLines": {

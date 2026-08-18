@@ -28,6 +28,36 @@ class WorldBookStore {
         .toList(growable: false);
   }
 
+  static List<WorldBook> _decodeItems(String? raw) {
+    if (raw == null || raw.isEmpty) return const <WorldBook>[];
+    final list = jsonDecode(raw) as List;
+    return list
+        .whereType<Map>()
+        .map((e) => WorldBook.fromJson(e.cast<String, dynamic>()))
+        .toList(growable: true);
+  }
+
+  static Map<String, List<String>> _decodeActiveIdsMap(String? raw) {
+    final map = <String, List<String>>{};
+    if (raw == null || raw.isEmpty) return map;
+    final decoded = jsonDecode(raw) as Map;
+    decoded.forEach((key, value) {
+      final list = (value is List) ? value : const [];
+      map[key.toString()] = _cleanIds(list);
+    });
+    return map;
+  }
+
+  static List<String> _activeIdsForAssistant(
+    Map<String, List<String>> map,
+    String? assistantId,
+  ) {
+    final key = assistantKey(assistantId);
+    if (map.containsKey(key)) return List<String>.from(map[key]!);
+    final fallback = map[_defaultAssistantKey];
+    return fallback == null ? const <String>[] : List<String>.from(fallback);
+  }
+
   static Map<String, List<String>> _cloneActiveIdsMap(
     Map<String, List<String>> src,
   ) {
@@ -41,17 +71,8 @@ class WorldBookStore {
   static Future<List<WorldBook>> getAll() async {
     if (_cache != null) return List<WorldBook>.from(_cache!);
     final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_itemsKey);
-    if (json == null || json.isEmpty) {
-      _cache = const <WorldBook>[];
-      return const <WorldBook>[];
-    }
     try {
-      final list = jsonDecode(json) as List;
-      _cache = list
-          .whereType<Map>()
-          .map((e) => WorldBook.fromJson(e.cast<String, dynamic>()))
-          .toList(growable: true);
+      _cache = _decodeItems(prefs.getString(_itemsKey));
       return List<WorldBook>.from(_cache!);
     } catch (_) {
       _cache = const <WorldBook>[];
@@ -136,13 +157,27 @@ class WorldBookStore {
 
   static Future<List<String>> getActiveIds({String? assistantId}) async {
     final map = await _loadActiveIdsMap();
-    final key = assistantKey(assistantId);
-    if (map.containsKey(key)) {
-      return List<String>.from(map[key]!);
-    }
-    final fallback = map[_defaultAssistantKey];
-    if (fallback != null) return List<String>.from(fallback);
-    return const <String>[];
+    return _activeIdsForAssistant(map, assistantId);
+  }
+
+  /// Reads the world-book selection from persistent storage without using
+  /// this isolate's static or SharedPreferences caches.
+  ///
+  /// Android alarm callbacks can reuse one background isolate across multiple
+  /// invocations. Reloading here ensures edits made by the foreground isolate
+  /// after an earlier alarm are visible to the next headless request.
+  static Future<({List<WorldBook> books, List<String> activeBookIds})>
+  loadFreshForAssistant({String? assistantId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final books = _decodeItems(prefs.getString(_itemsKey));
+    final activeIdsMap = _decodeActiveIdsMap(
+      prefs.getString(_activeIdsByAssistantKey),
+    );
+    return (
+      books: books,
+      activeBookIds: _activeIdsForAssistant(activeIdsMap, assistantId),
+    );
   }
 
   static Future<Map<String, List<String>>> getActiveIdsByAssistant() async {
@@ -198,17 +233,11 @@ class WorldBookStore {
     }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_activeIdsByAssistantKey);
-    Map<String, List<String>> map = <String, List<String>>{};
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw) as Map;
-        decoded.forEach((key, value) {
-          final list = (value is List) ? value : const [];
-          map[key.toString()] = _cleanIds(list);
-        });
-      } catch (_) {
-        map = <String, List<String>>{};
-      }
+    Map<String, List<String>> map;
+    try {
+      map = _decodeActiveIdsMap(raw);
+    } catch (_) {
+      map = <String, List<String>>{};
     }
     _activeIdsByAssistantCache = map;
     return _cloneActiveIdsMap(map);

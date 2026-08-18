@@ -13,10 +13,12 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
+import '../../../core/services/world_book_prompt_injector.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -43,9 +45,6 @@ class MessageBuilderService {
   static const String internalMediaPathsKey = multimodalInternalMediaPathsKey;
   static const String _isPresetKey = '_isPreset';
   static const String _timestampKey = '_timestamp';
-
-  static const String _timeNote =
-      '<time-note>A timestamp will be injected by the system after every user message. Just keep it in mind, and don\'t mention it when irrelevant.</time-note>';
 
   MessageBuilderService({
     required this.chatService,
@@ -578,8 +577,10 @@ class MessageBuilderService {
         if (tsStr != null) {
           final ts = DateTime.tryParse(tsStr);
           if (ts != null) {
-            apiMessages[i]['content'] =
-                '${apiMessages[i]['content']}\n\n(${_formatTimestamp(ts)})';
+            apiMessages[i]['content'] = ChatContextTransforms.appendTimestamp(
+              (apiMessages[i]['content'] ?? '').toString(),
+              ts,
+            );
           }
         }
       }
@@ -685,36 +686,16 @@ These memories are automatically included in future conversation contexts within
         _appendToSystemMessage(apiMessages, buf.toString());
       }
       if (assistant?.enableRecentChatsReference == true) {
-        final chats = chatService.getAllConversations();
-        final relevantChats = chats
-            .where(
-              (c) =>
-                  !c.isGroup &&
-                  c.assistantId == assistant!.id &&
-                  c.id != currentConversationId,
-            )
-            .where((c) => c.title.trim().isNotEmpty)
-            .take(10)
-            .toList();
+        final relevantChats = ChatContextTransforms.selectRecentChats(
+          chatService.getAllConversations(),
+          assistantId: assistant!.id,
+          currentConversationId: currentConversationId,
+        );
         if (relevantChats.isNotEmpty) {
-          final sb = StringBuffer();
-          sb.writeln('<recent_chats>');
-          sb.writeln('这是用户最近的一些对话标题和摘要，你可以参考这些内容了解用户偏好和关注点');
-          for (final c in relevantChats) {
-            sb.writeln('<conversation>');
-            // Format: timestamp: title || summary
-            final timestamp = c.updatedAt.toIso8601String().substring(0, 10);
-            final title = c.title.trim();
-            final summary = (c.summary ?? '').trim();
-            if (summary.isNotEmpty) {
-              sb.writeln('  $timestamp: $title || $summary');
-            } else {
-              sb.writeln('  $timestamp: $title');
-            }
-            sb.writeln('</conversation>');
-          }
-          sb.writeln('</recent_chats>');
-          _appendToSystemMessage(apiMessages, sb.toString());
+          _appendToSystemMessage(
+            apiMessages,
+            ChatContextTransforms.buildRecentChatsBlock(relevantChats),
+          );
         }
       }
     } catch (_) {}
@@ -742,24 +723,13 @@ These memories are automatically included in future conversation contexts within
         '${now.second.toString().padLeft(2, '0')}';
   }
 
-  static String _formatTimestamp(DateTime dt) {
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return '${weekdays[dt.weekday % 7]} '
-        '${(dt.year % 100).toString().padLeft(2, '0')}-'
-        '${dt.month.toString().padLeft(2, '0')}-'
-        '${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}:'
-        '${dt.second.toString().padLeft(2, '0')}';
-  }
-
   /// Inject `<time-note>` into the system message when time injection is enabled.
   void injectTimeNote(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
   ) {
     if (assistant?.enableTimeInjection == true) {
-      _appendToSystemMessage(apiMessages, _timeNote);
+      ChatContextTransforms.injectTimeNote(apiMessages);
     }
   }
 
@@ -872,229 +842,11 @@ These memories are automatically included in future conversation contexts within
       }
 
       if (all.isEmpty || activeBookIds.isEmpty) return;
-
-      final activeSet = activeBookIds.toSet();
-      final books = all
-          .where((b) => b.enabled && activeSet.contains(b.id))
-          .toList(growable: false);
-      if (books.isEmpty) return;
-
-      String extractContextForDepth(int scanDepth) {
-        final depth = scanDepth <= 0 ? 1 : scanDepth;
-        final parts = <String>[];
-        for (
-          int i = apiMessages.length - 1;
-          i >= 0 && parts.length < depth;
-          i--
-        ) {
-          final role = (apiMessages[i]['role'] ?? '').toString();
-          if (role != 'user' && role != 'assistant') continue;
-          final content = (apiMessages[i]['content'] ?? '').toString().trim();
-          if (content.isEmpty) continue;
-          parts.add(content);
-        }
-        return parts.reversed.join('\n');
-      }
-
-      bool isTriggered(WorldBookEntry entry, String context) {
-        if (!entry.enabled) return false;
-        if (entry.constantActive) return true;
-        if (entry.keywords.isEmpty) return false;
-
-        for (final raw in entry.keywords) {
-          final keyword = raw.trim();
-          if (keyword.isEmpty) continue;
-
-          if (entry.useRegex) {
-            try {
-              final re = RegExp(keyword, caseSensitive: entry.caseSensitive);
-              if (re.hasMatch(context)) return true;
-            } catch (_) {}
-          } else {
-            if (entry.caseSensitive) {
-              if (context.contains(keyword)) return true;
-            } else {
-              if (context.toLowerCase().contains(keyword.toLowerCase())) {
-                return true;
-              }
-            }
-          }
-        }
-        return false;
-      }
-
-      final contextCache = <int, String>{};
-      final triggered = <({WorldBookEntry entry, int seq})>[];
-      int seq = 0;
-
-      for (final book in books) {
-        for (final entry in book.entries) {
-          final depth = (entry.scanDepth <= 0 ? 1 : entry.scanDepth)
-              .clamp(1, 200)
-              .toInt();
-          final ctx = contextCache.putIfAbsent(
-            depth,
-            () => extractContextForDepth(depth),
-          );
-          if (isTriggered(entry, ctx)) {
-            triggered.add((entry: entry, seq: seq));
-          }
-          seq++;
-        }
-      }
-
-      if (triggered.isEmpty) return;
-
-      triggered.sort((a, b) {
-        final pa = a.entry.priority;
-        final pb = b.entry.priority;
-        if (pb != pa) return pb.compareTo(pa);
-        return a.seq.compareTo(b.seq);
-      });
-
-      String wrapSystemTag(String content) => '<system>\n$content\n</system>';
-
-      String joinContents(Iterable<WorldBookEntry> items) {
-        return items
-            .map((e) => e.content.trim())
-            .where((c) => c.isNotEmpty)
-            .join('\n');
-      }
-
-      List<Map<String, dynamic>> createMergedInjectionMessages(
-        List<WorldBookEntry> injections,
-      ) {
-        final byRole = <WorldBookInjectionRole, List<WorldBookEntry>>{};
-        for (final e in injections) {
-          if (e.content.trim().isEmpty) continue;
-          byRole.putIfAbsent(e.role, () => <WorldBookEntry>[]).add(e);
-        }
-
-        final result = <Map<String, dynamic>>[];
-        for (final role in byRole.keys) {
-          final group = byRole[role]!;
-          final merged = joinContents(group);
-          if (merged.isEmpty) continue;
-          if (role == WorldBookInjectionRole.assistant) {
-            result.add({'role': 'assistant', 'content': merged});
-          } else {
-            result.add({'role': 'user', 'content': wrapSystemTag(merged)});
-          }
-        }
-        return result;
-      }
-
-      int findSafeInsertIndex(List<Map<String, dynamic>> messages, int target) {
-        var index = target.clamp(0, messages.length);
-        while (index > 0 && index < messages.length) {
-          final role = (messages[index]['role'] ?? '').toString();
-          if (role != 'tool') break;
-          index--;
-        }
-        return index;
-      }
-
-      final byPosition = <WorldBookInjectionPosition, List<WorldBookEntry>>{};
-      for (final t in triggered) {
-        byPosition
-            .putIfAbsent(t.entry.position, () => <WorldBookEntry>[])
-            .add(t.entry);
-      }
-
-      // BEFORE/AFTER_SYSTEM_PROMPT: merge into system message.
-      final beforeContent = joinContents(
-        byPosition[WorldBookInjectionPosition.beforeSystemPrompt] ??
-            const <WorldBookEntry>[],
+      WorldBookPromptInjector.inject(
+        messages: apiMessages,
+        books: all,
+        activeBookIds: activeBookIds,
       );
-      final afterContent = joinContents(
-        byPosition[WorldBookInjectionPosition.afterSystemPrompt] ??
-            const <WorldBookEntry>[],
-      );
-
-      if (beforeContent.isNotEmpty || afterContent.isNotEmpty) {
-        final systemIndex = apiMessages.indexWhere(
-          (m) => (m['role'] ?? '').toString() == 'system',
-        );
-        if (systemIndex >= 0) {
-          final original = (apiMessages[systemIndex]['content'] ?? '')
-              .toString();
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) {
-            sb.write(beforeContent);
-            sb.write('\n');
-          }
-          sb.write(original);
-          if (afterContent.isNotEmpty) {
-            sb.write('\n');
-            sb.write(afterContent);
-          }
-          apiMessages[systemIndex]['content'] = sb.toString();
-        } else {
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) sb.write(beforeContent);
-          if (afterContent.isNotEmpty) {
-            if (sb.isNotEmpty) sb.write('\n');
-            sb.write(afterContent);
-          }
-          if (sb.isNotEmpty) {
-            apiMessages.insert(0, {'role': 'system', 'content': sb.toString()});
-          }
-        }
-      }
-
-      // TOP_OF_CHAT: insert before first user message.
-      final topInjections = byPosition[WorldBookInjectionPosition.topOfChat];
-      if (topInjections != null && topInjections.isNotEmpty) {
-        var insertIndex = apiMessages.indexWhere(
-          (m) => (m['role'] ?? '').toString() == 'user',
-        );
-        if (insertIndex < 0) insertIndex = apiMessages.length;
-        insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-        apiMessages.insertAll(
-          insertIndex,
-          createMergedInjectionMessages(topInjections),
-        );
-      }
-
-      // BOTTOM_OF_CHAT: insert before last message.
-      final bottomInjections =
-          byPosition[WorldBookInjectionPosition.bottomOfChat];
-      if (bottomInjections != null && bottomInjections.isNotEmpty) {
-        var insertIndex = apiMessages.isEmpty ? 0 : (apiMessages.length - 1);
-        insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-        apiMessages.insertAll(
-          insertIndex,
-          createMergedInjectionMessages(bottomInjections),
-        );
-      }
-
-      // AT_DEPTH: insert at depth from end (depth=1 means before last message).
-      final atDepthInjections = byPosition[WorldBookInjectionPosition.atDepth];
-      if (atDepthInjections != null && atDepthInjections.isNotEmpty) {
-        final byDepth = <int, List<WorldBookEntry>>{};
-        for (final e in atDepthInjections) {
-          final depth = (e.injectDepth <= 0 ? 1 : e.injectDepth)
-              .clamp(1, 200)
-              .toInt();
-          byDepth.putIfAbsent(depth, () => <WorldBookEntry>[]).add(e);
-        }
-
-        final depths = byDepth.keys.toList(growable: false)
-          ..sort((a, b) => b.compareTo(a));
-
-        for (final depth in depths) {
-          final injections = byDepth[depth] ?? const <WorldBookEntry>[];
-          var insertIndex = (apiMessages.length - depth).clamp(
-            0,
-            apiMessages.length,
-          );
-          insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-          apiMessages.insertAll(
-            insertIndex,
-            createMergedInjectionMessages(injections),
-          );
-        }
-      }
     } catch (_) {}
   }
 
@@ -1116,29 +868,7 @@ These memories are automatically included in future conversation contexts within
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
   ) {
-    if ((assistant?.limitContextMessages ?? true) &&
-        (assistant?.contextMessageSize ?? 0) > 0) {
-      final int keep = (assistant!.contextMessageSize).clamp(
-        Assistant.minContextMessageSize,
-        Assistant.maxContextMessageSize,
-      );
-      int startIdx = 0;
-      if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
-        startIdx = 1;
-      }
-      final tail = apiMessages.sublist(startIdx);
-      if (tail.length > keep) {
-        final trimmed = tail.sublist(tail.length - keep);
-        apiMessages
-          ..removeRange(startIdx, apiMessages.length)
-          ..addAll(trimmed);
-      }
-      // Context trimming can cut in the middle of a tool-call triplet; avoid sending dangling tool messages.
-      while (apiMessages.length > startIdx &&
-          (apiMessages[startIdx]['role'] ?? '').toString() == 'tool') {
-        apiMessages.removeAt(startIdx);
-      }
-    }
+    ChatContextTransforms.applyMessageLimit(apiMessages, assistant);
   }
 
   /// Convert local Markdown image links to inline base64 for model context.

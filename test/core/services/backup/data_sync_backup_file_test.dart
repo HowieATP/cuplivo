@@ -669,6 +669,307 @@ void main() {
       },
     );
 
+    group('merge restore: provider proxy is device-local (issue #512)', () {
+      Future<void> restoreMerge(Map<String, dynamic> backupSettings) async {
+        final settingsFile = File('${root.path}/proxy_settings.json');
+        await settingsFile.writeAsString(jsonEncode(backupSettings));
+
+        final zipFile = File('${root.path}/proxy_merge_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.merge,
+        );
+      }
+
+      Map<String, dynamic> providerConfig(
+        String id,
+        String baseUrl,
+        Map<String, dynamic> proxy,
+      ) => {
+        'id': id,
+        'type': 'openai',
+        'name': id,
+        'baseUrl': baseUrl,
+        'apiKey': 'key-$id',
+        'models': <String>[],
+        ...proxy,
+      };
+
+      const localProxy = {
+        'proxyEnabled': true,
+        'proxyType': 'socks5',
+        'proxyHost': '127.0.0.1',
+        'proxyPort': '1080',
+        'proxyUsername': 'local-user',
+        'proxyPassword': 'local-pass',
+      };
+
+      const backupProxy = {
+        'proxyEnabled': false,
+        'proxyType': 'http',
+        'proxyHost': 'proxy.backup.example',
+        'proxyPort': '3128',
+        'proxyUsername': '',
+        'proxyPassword': '',
+      };
+
+      test(
+        'existing provider keeps local proxy, backup updates other fields',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'MyProvider': providerConfig(
+                'MyProvider',
+                'https://local.example/v1',
+                localProxy,
+              ),
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'MyProvider': providerConfig(
+                'MyProvider',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['MyProvider'] as Map<String, dynamic>;
+
+          // Non-proxy fields come from the backup.
+          expect(merged['baseUrl'], 'https://backup.example/v1');
+          expect(merged['apiKey'], 'key-MyProvider');
+
+          // Proxy fields stay local.
+          expect(merged['proxyEnabled'], isTrue);
+          expect(merged['proxyType'], 'socks5');
+          expect(merged['proxyHost'], '127.0.0.1');
+          expect(merged['proxyPort'], '1080');
+          expect(merged['proxyUsername'], 'local-user');
+          expect(merged['proxyPassword'], 'local-pass');
+        },
+      );
+
+      test('new provider imported from backup keeps its proxy', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'Existing': providerConfig(
+              'Existing',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'Existing': providerConfig(
+              'Existing',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+            'NewProvider': providerConfig(
+              'NewProvider',
+              'https://new.example/v1',
+              backupProxy,
+            ),
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        // Existing provider: proxy preserved locally, other fields updated.
+        final existing = configs['Existing'] as Map<String, dynamic>;
+        expect(existing['baseUrl'], 'https://backup.example/v1');
+        expect(existing['proxyHost'], '127.0.0.1');
+
+        // New provider: proxy imported as-is.
+        final added = configs['NewProvider'] as Map<String, dynamic>;
+        expect(added['proxyEnabled'], isFalse);
+        expect(added['proxyHost'], 'proxy.backup.example');
+        expect(added['proxyPort'], '3128');
+      });
+
+      test(
+        'legacy local provider without a proxy block gets no-proxy defaults',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'Legacy': {
+                'id': 'Legacy',
+                'type': 'openai',
+                'name': 'Legacy',
+                'baseUrl': 'https://local.example/v1',
+                'apiKey': 'legacy-key',
+                'models': <String>[],
+              },
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'Legacy': providerConfig(
+                'Legacy',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['Legacy'] as Map<String, dynamic>;
+
+          // Other fields still come from the backup.
+          expect(merged['baseUrl'], 'https://backup.example/v1');
+
+          // But the backup's proxy is replaced by the no-proxy defaults.
+          expect(merged['proxyEnabled'], isFalse);
+          expect(merged['proxyType'], 'http');
+          expect(merged['proxyHost'], '');
+          expect(merged['proxyPort'], '8080');
+          expect(merged['proxyUsername'], '');
+          expect(merged['proxyPassword'], '');
+        },
+      );
+
+      test(
+        'partial local proxy block never blends backup proxy fields',
+        () async {
+          // A local config imported from a third-party tool may carry only part
+          // of the proxy block (e.g. no password fields at all).
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'Partial': {
+                'id': 'Partial',
+                'type': 'openai',
+                'name': 'Partial',
+                'baseUrl': 'https://local.example/v1',
+                'apiKey': 'partial-key',
+                'models': <String>[],
+                'proxyEnabled': true,
+                'proxyType': 'socks5',
+                'proxyHost': '127.0.0.1',
+                'proxyPort': '1080',
+              },
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'Partial': providerConfig(
+                'Partial',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['Partial'] as Map<String, dynamic>;
+
+          // Present local fields win.
+          expect(merged['proxyEnabled'], isTrue);
+          expect(merged['proxyHost'], '127.0.0.1');
+
+          // Missing local fields fall to the no-proxy defaults, never the
+          // backup's values (backup had username/password empty, host
+          // proxy.backup.example — none of it may survive).
+          expect(merged['proxyUsername'], '');
+          expect(merged['proxyPassword'], '');
+        },
+      );
+
+      test('malformed provider entry does not abort the whole merge', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'LocalOnly': providerConfig(
+              'LocalOnly',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'GoodProvider': providerConfig(
+              'GoodProvider',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+            // Non-object provider value (hand-edited or legacy data).
+            'BrokenProvider': 'not-a-config',
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        // The malformed entry is carried over verbatim and the merge of the
+        // valid entries still completes.
+        expect(configs['BrokenProvider'], 'not-a-config');
+        expect(configs.keys, containsAll(['LocalOnly', 'GoodProvider']));
+        final added = configs['GoodProvider'] as Map<String, dynamic>;
+        expect(added['proxyHost'], 'proxy.backup.example');
+      });
+
+      test('local providers absent from the backup survive merge', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'LocalOnly': providerConfig(
+              'LocalOnly',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'BackupOnly': providerConfig(
+              'BackupOnly',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        expect(configs.keys, containsAll(['LocalOnly', 'BackupOnly']));
+        final local = configs['LocalOnly'] as Map<String, dynamic>;
+        expect(local['baseUrl'], 'https://local.example/v1');
+        expect(local['proxyHost'], '127.0.0.1');
+      });
+    });
+
     test('cleans temporary restore files after a file-copy failure', () async {
       final sourceDir = Directory('${root.path}/source_upload');
       await sourceDir.create(recursive: true);

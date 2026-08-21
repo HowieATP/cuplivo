@@ -113,6 +113,12 @@
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
+## Backup Merge Semantics (智能合并)
+
+- **Flat scalar settings**: restored only if absent locally — an existing local preference is preserved (per the "仅添加不存在的数据" contract).
+- **Structured JSON keys** (`provider_configs_v1`, `assistant_memories_v1`, `mcp_servers_v1`, `asr_services_v1`, `pinned_models_v1`, tags/maps, groups): merged per-structure; the backup wins on conflicts (dedup by id where applicable).
+- **Provider proxy is device-local**: within `provider_configs_v1`, a provider that already exists locally keeps its 6 proxy fields (`proxyEnabled/Type/Host/Port/Username/Password`) from the backup NEVER — local values win; a legacy local config with no proxy block at all is forced to the app's no-proxy defaults instead of adopting the backup's proxy. Brand-new providers imported by the merge keep their backup proxy as-is (nothing local to preserve). (issue #512) LAN sync rides the same merge path, so a sync peer's proxy never lands on the device either; overwrite restore still imports proxy settings wholesale.
+
 ## Markdown Batch Export (批量导出 Markdown)
 
 - **Markdown 批量导出 (batch Markdown export)**: Conversation-level batch export producing one human-readable `.md` file per selected conversation. Distinct from **备份/backup** (data-level JSON ZIP) and from message-level 导出 (single conversation, curated selection). Entry: the conversation batch-select mode in `SideDrawer` (mobile drawer + desktop sidebars).

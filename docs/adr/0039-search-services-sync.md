@@ -1,4 +1,4 @@
-# ADR-0037: Search Services Sync with Upstream (Providers, Multi-Key UI, Usage)
+# ADR-0039: Search Services Sync with Upstream (Providers, Multi-Key UI, Usage)
 
 Cuplivo syncs the search-service layer from upstream Kelivo (issue #311):
 four new providers (Doubao, Firecrawl, StepFun, TinyFish), the account-usage

@@ -1258,6 +1258,7 @@ class _WorldBookEntryEditSheet extends StatefulWidget {
 class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _keywordInputController;
+  final FocusNode _keywordFocusNode = FocusNode();
   late final TextEditingController _contentController;
   late final TextEditingController _priorityController;
   late final TextEditingController _scanDepthController;
@@ -1300,6 +1301,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   void dispose() {
     _nameController.dispose();
     _keywordInputController.dispose();
+    _keywordFocusNode.dispose();
     _contentController.dispose();
     _priorityController.dispose();
     _scanDepthController.dispose();
@@ -1822,10 +1824,13 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                         ),
                                         child: TextField(
                                           controller: _keywordInputController,
+                                          focusNode: _keywordFocusNode,
                                           onChanged: (_) => setState(() {}),
                                           textInputAction: TextInputAction.done,
-                                          onSubmitted: (_) =>
-                                              addKeywordsFromInput(),
+                                          onSubmitted: (_) {
+                                            addKeywordsFromInput();
+                                            _keywordFocusNode.requestFocus();
+                                          },
                                           textAlignVertical:
                                               TextAlignVertical.center,
                                           style: TextStyle(

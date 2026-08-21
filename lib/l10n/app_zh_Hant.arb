@@ -2448,7 +2448,7 @@
   "worldBookEntryEnabledLabel": "啟用條目",
   "worldBookEntryPriorityLabel": "優先級",
   "worldBookEntryKeywordsLabel": "關鍵詞",
-  "worldBookEntryKeywordsHint": "輸入關鍵詞後點 + 新增。",
+  "worldBookEntryKeywordsHint": "輸入關鍵詞後點 + 或按 Enter 新增。",
   "worldBookEntryKeywordInputHint": "輸入關鍵詞",
   "worldBookEntryKeywordAddTooltip": "新增關鍵詞",
   "worldBookEntryUseRegexLabel": "使用正則",

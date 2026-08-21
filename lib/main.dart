@@ -216,8 +216,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
         ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              AssistantProvider(chatService: ctx.read<ChatService>()),
+          create: (ctx) => AssistantProvider(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (ctx) =>

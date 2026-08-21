@@ -5085,6 +5085,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次启动时自动切换到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
@@ -13507,6 +13520,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次启动时自动切换到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
@@ -21925,6 +21951,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageNewChatOnLaunchTitle => '啟動時新建對話';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定啟動助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次啟動時自動切換到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '啟動助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
 
   @override
   String get displaySettingsPageEnterToSendTitle => '回車鍵發送訊息';

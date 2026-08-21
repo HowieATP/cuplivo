@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../database/chat_database_repository.dart';
+import 'settings_provider.dart';
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
 import '../models/assistant.dart';
@@ -32,6 +33,7 @@ class AssistantProvider extends ChangeNotifier {
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
   final ChatService? chatService;
+  final SettingsProvider? settings;
   bool _loaded = false;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
@@ -46,7 +48,7 @@ class AssistantProvider extends ChangeNotifier {
   bool get isLoaded => _loaded;
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
-  AssistantProvider({this.chatService});
+  AssistantProvider({this.chatService, this.settings});
 
   /// Ensures loading completes, then returns [currentAssistant].
   Future<Assistant?> getLoadedCurrentAssistant() async {
@@ -827,6 +829,16 @@ class AssistantProvider extends ChangeNotifier {
           : null;
     }
     await _deleteSingle(id);
+    // If the deleted assistant was the pinned startup assistant, clear the pin
+    // and revert to most-recent startup behavior (no dangling reference). Use
+    // the live SettingsProvider when available so its in-memory state stays in
+    // sync; otherwise fall back to a prefs-only clear.
+    final settings = this.settings;
+    if (settings != null) {
+      await settings.clearPinnedAssistantIfPinned(id);
+    } else {
+      await SettingsProvider.clearPinnedAssistantPrefsIfPinned(id);
+    }
     final prefs = await SharedPreferences.getInstance();
     if (_currentAssistantId != null) {
       await prefs.setString(_currentAssistantKey, _currentAssistantId!);

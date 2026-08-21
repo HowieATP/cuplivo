@@ -50,6 +50,9 @@ enum DesktopMessageNavButtonsMode {
 // Mobile: message navigation buttons visibility mode
 enum MobileMessageNavButtonsMode { always, scroll, never }
 
+// Which assistant becomes current on cold start.
+enum StartupAssistantMode { mostRecent, pinned }
+
 enum _MigrationResult { noChange, applied, failed }
 
 class SettingsProvider extends ChangeNotifier {
@@ -189,6 +192,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_new_chat_on_launch_v1';
   static const String _displayNewChatAfterDeleteKey =
       'display_new_chat_after_delete_v1';
+  static const String _startupAssistantModeKey = 'startup_assistant_mode_v1';
+  static const String _pinnedAssistantIdKey = 'pinned_assistant_id_v1';
   static const String _displayEnterToSendOnMobileKey =
       'display_enter_to_send_on_mobile_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
@@ -1225,6 +1230,10 @@ class SettingsProvider extends ChangeNotifier {
     _newChatOnAssistantSwitch =
         prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
+    _startupAssistantMode = _startupAssistantModeFromString(
+      prefs.getString(_startupAssistantModeKey),
+    );
+    _pinnedAssistantId = prefs.getString(_pinnedAssistantIdKey);
     // Enter to send on mobile: iOS defaults to true, Android defaults to false
     final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
     if (enterToSendPref == null) {
@@ -4228,6 +4237,85 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayNewChatAfterDeleteKey, v);
   }
 
+  // Startup assistant: which assistant becomes current on cold start.
+  // mostRecent = follow the most-recently opened conversation (default);
+  // pinned = always switch to the designated [pinnedAssistantId].
+  StartupAssistantMode _startupAssistantMode = StartupAssistantMode.mostRecent;
+  StartupAssistantMode get startupAssistantMode => _startupAssistantMode;
+  Future<void> setStartupAssistantMode(StartupAssistantMode v) async {
+    if (_startupAssistantMode == v) return;
+    _startupAssistantMode = v;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  String? _pinnedAssistantId;
+  String? get pinnedAssistantId => _pinnedAssistantId;
+  Future<void> setPinnedAssistantId(String? id) async {
+    if (_pinnedAssistantId == id) return;
+    _pinnedAssistantId = id;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  static StartupAssistantMode _startupAssistantModeFromString(String? raw) {
+    for (final mode in StartupAssistantMode.values) {
+      if (mode.name == raw) return mode;
+    }
+    return StartupAssistantMode.mostRecent;
+  }
+
+  /// Clears the pinned assistant and reverts to
+  /// [StartupAssistantMode.mostRecent], unconditionally. Used to self-heal a
+  /// dangling pin (a `pinned` mode whose id no longer resolves — e.g. after a
+  /// backup restore from a device that had a different assistant set). Updates
+  /// the live in-memory state (single source of truth), notifies listeners,
+  /// and persists.
+  Future<void> clearPinnedAssistant() async {
+    if (_startupAssistantMode == StartupAssistantMode.mostRecent &&
+        _pinnedAssistantId == null) {
+      return;
+    }
+    _pinnedAssistantId = null;
+    _startupAssistantMode = StartupAssistantMode.mostRecent;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  /// Clears the pinned assistant (and reverts to [StartupAssistantMode.mostRecent])
+  /// when [assistantId] is the currently pinned assistant. Used by
+  /// [AssistantProvider.deleteAssistant] so a deleted assistant never leaves a
+  /// dangling pin.
+  Future<void> clearPinnedAssistantIfPinned(String assistantId) async {
+    if (_pinnedAssistantId != assistantId) return;
+    await clearPinnedAssistant();
+  }
+
+  /// Prefs-only variant of [clearPinnedAssistantIfPinned] for callers without
+  /// access to the live [SettingsProvider] instance. The running instance's
+  /// in-memory state is NOT updated — prefer the instance method when available.
+  static Future<void> clearPinnedAssistantPrefsIfPinned(
+    String assistantId,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(_pinnedAssistantIdKey) != assistantId) return;
+    await prefs.setString(
+      _startupAssistantModeKey,
+      StartupAssistantMode.mostRecent.name,
+    );
+    await prefs.remove(_pinnedAssistantIdKey);
+  }
+
+  Future<void> _persistStartupAssistant() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_startupAssistantModeKey, _startupAssistantMode.name);
+    if (_pinnedAssistantId == null) {
+      await prefs.remove(_pinnedAssistantIdKey);
+    } else {
+      await prefs.setString(_pinnedAssistantIdKey, _pinnedAssistantId!);
+    }
+  }
+
   // Display: enter key sends message on mobile (iOS defaults true, Android defaults false)
   bool _enterToSendOnMobile = false;
   bool get enterToSendOnMobile => _enterToSendOnMobile;
@@ -5093,6 +5181,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._startupAssistantMode = _startupAssistantMode;
+    copy._pinnedAssistantId = _pinnedAssistantId;
     copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
     copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
     copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;

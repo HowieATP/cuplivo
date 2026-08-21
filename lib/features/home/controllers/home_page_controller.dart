@@ -694,31 +694,71 @@ class HomePageController extends ChangeNotifier {
         );
       }
     }
+    final pinnedId = await _applyStartupAssistant(prefs, assistantProvider);
     if (prefs.newChatOnLaunch) {
       await _createNewConversation();
     } else {
       final conversations = _chatService.getAllConversations();
-      if (conversations.isNotEmpty) {
-        final recent = conversations.first;
-        if ((recent.assistantId ?? '').isNotEmpty) {
-          try {
-            await assistantProvider.setCurrentAssistant(recent.assistantId!);
-          } catch (_) {}
+      final startup = selectStartupConversation(
+        conversations,
+        pinnedAssistantId: pinnedId,
+      );
+      if (startup != null) {
+        if (pinnedId == null) {
+          // mostRecent mode: follow the opened conversation's assistant.
+          final recentAssistantId = startup.assistantId;
+          if ((recentAssistantId ?? '').isNotEmpty) {
+            try {
+              await assistantProvider.setCurrentAssistant(recentAssistantId!);
+            } catch (_) {}
+          }
         }
-        _chatService.setCurrentConversation(recent.id);
-        _chatController.setCurrentConversation(recent);
+        _chatService.setCurrentConversation(startup.id);
+        _chatController.setCurrentConversation(startup);
         _streamController.clearGeminiThoughtSigs();
         _restoreMessageUiState();
         notifyListeners();
         _scrollToBottomSoon(animate: false);
       } else {
-        // No conversations exist — create a new empty one so the UI
-        // correctly shows the temporary-chat toggle button instead of
-        // falling back to "new conversation" button.
+        // No conversation to open (or none owned by the pinned assistant) —
+        // create a new empty one so the UI correctly shows the temporary-chat
+        // toggle button instead of falling back to "new conversation" button.
         await _createNewConversation();
       }
       recoverMultiAIState();
     }
+  }
+
+  /// Applies the startup-assistant policy (settings `startupAssistantMode`):
+  /// `pinned` → switch [assistantProvider] to the pinned assistant (when it
+  /// still exists; otherwise degrade to mostRecent with a log). Returns the
+  /// pinned assistant id when pinned mode is active and resolvable, else null.
+  Future<String?> _applyStartupAssistant(
+    SettingsProvider settings,
+    AssistantProvider assistantProvider,
+  ) async {
+    final assistantIds = assistantProvider.assistants.map((a) => a.id).toSet();
+    final pinnedId = resolveStartupAssistantId(
+      settings.startupAssistantMode,
+      settings.pinnedAssistantId,
+      assistantIds,
+    );
+    if (pinnedId != null) {
+      await assistantProvider.setCurrentAssistant(pinnedId);
+      return pinnedId;
+    }
+    if (settings.startupAssistantMode == StartupAssistantMode.pinned) {
+      debugPrint(
+        '[HomePageController] pinned startup assistant unavailable '
+        '(${settings.pinnedAssistantId}); clearing dangling pin and '
+        'falling back to most-recent',
+      );
+      // Self-heal: a dangling pin (e.g. restored from a backup made on a
+      // device with a different assistant set) is cleared once so it stops
+      // falling back on every launch.
+      await settings.clearPinnedAssistant();
+    }
+    return null;
   }
 
   void initDesktopUi() {
@@ -2847,4 +2887,42 @@ class HomePageController extends ChangeNotifier {
     _streamController.dispose();
     super.dispose();
   }
+}
+
+/// Pure cold-start conversation selection (see Startup Assistant in
+/// CONTEXT.md). `conversations` is sorted by `updatedAt` desc (as returned by
+/// `ChatService.getAllConversations`).
+///
+/// - `pinnedAssistantId != null`: the pinned assistant's most-recent
+///   conversation, or null when it owns none (the caller then creates a new
+///   one). Conversation list order defines "most-recent".
+/// - `pinnedAssistantId == null` (mostRecent mode): the globally most-recent
+///   conversation, or null when there are none.
+Conversation? selectStartupConversation(
+  List<Conversation> conversations, {
+  required String? pinnedAssistantId,
+}) {
+  if (pinnedAssistantId != null) {
+    for (final c in conversations) {
+      if (c.assistantId == pinnedAssistantId) return c;
+    }
+    return null;
+  }
+  return conversations.isNotEmpty ? conversations.first : null;
+}
+
+/// Pure resolution of the startup-assistant policy (see Startup Assistant in
+/// CONTEXT.md). Returns the pinned assistant id when `pinned` mode is active
+/// AND the id resolves to a live assistant; null otherwise (mostRecent mode,
+/// or a dangling pin that the caller should self-heal).
+String? resolveStartupAssistantId(
+  StartupAssistantMode mode,
+  String? pinnedAssistantId,
+  Set<String> assistantIds,
+) {
+  if (mode != StartupAssistantMode.pinned) return null;
+  if (pinnedAssistantId == null || !assistantIds.contains(pinnedAssistantId)) {
+    return null;
+  }
+  return pinnedAssistantId;
 }

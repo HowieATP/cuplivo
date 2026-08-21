@@ -35,6 +35,7 @@ import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/group_chat_provider.dart';
+import '../features/assistant/widgets/assistant_select_sheet.dart';
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';
 import '../features/group_chat/pages/group_chat_settings_page.dart';

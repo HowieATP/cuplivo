@@ -119,6 +119,34 @@ jobs:
       - name: 🏗️ 构建 APK
         run: flutter build apk --release --split-per-abi
 
+      - name: 🧪 校验 Sandbox 原生运行时
+        run: |
+          set -euo pipefail
+          verify_dir=$(mktemp -d)
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            apk="build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            case "$abi" in
+              arm64-v8a)
+                expected_class=ELF64
+                expected_machine=AArch64
+                ;;
+              armeabi-v7a)
+                expected_class=ELF32
+                expected_machine=ARM
+                ;;
+              x86_64)
+                expected_class=ELF64
+                expected_machine="Advanced Micro Devices X86-64"
+                ;;
+            esac
+            for runtime in libproot_exec.so libproot_loader.so; do
+              extracted="$verify_dir/${abi}-${runtime}"
+              unzip -p "$apk" "lib/${abi}/${runtime}" > "$extracted"
+              readelf -h "$extracted" | grep -F "Class:" | grep -F "$expected_class"
+              readelf -h "$extracted" | grep -F "Machine:" | grep -F "$expected_machine"
+            done
+          done
+
       - name: 📦 重命名 APK
         run: |
           cd build/app/outputs/flutter-apk

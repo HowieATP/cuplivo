@@ -85,4 +85,43 @@ void main() {
     expect(urls, hasLength(1));
     expect(urls.single, contains('aliyun'));
   });
+
+  test('armeabi-v7a rootfs auto sources all use Ubuntu armhf', () {
+    final urls = LinuxSandboxService.resolveRootfsUrls(
+      abi: 'armeabi-v7a',
+      pref: const DependencyInstallPref(sourceId: 'auto'),
+    );
+    expect(urls, hasLength(3));
+    expect(urls, everyElement(contains('base-armhf.tar.gz')));
+  });
+
+  test('armeabi-v7a named rootfs sources retain the selected mirror', () {
+    const expectedHosts = {
+      'official': 'cdimage.ubuntu.com',
+      'tuna': 'tuna.tsinghua.edu.cn',
+      'aliyun': 'mirrors.aliyun.com',
+    };
+    for (final entry in expectedHosts.entries) {
+      final urls = LinuxSandboxService.resolveRootfsUrls(
+        abi: 'armeabi-v7a',
+        pref: DependencyInstallPref(sourceId: entry.key),
+      );
+      expect(urls, hasLength(1));
+      expect(urls.single, contains(entry.value));
+      expect(urls.single, contains('base-armhf.tar.gz'));
+    }
+  });
+
+  test('64-bit rootfs source architecture mappings are unchanged', () {
+    final arm64 = LinuxSandboxService.resolveRootfsUrls(
+      abi: 'arm64-v8a',
+      pref: const DependencyInstallPref(sourceId: 'official'),
+    );
+    final x86 = LinuxSandboxService.resolveRootfsUrls(
+      abi: 'x86_64',
+      pref: const DependencyInstallPref(sourceId: 'official'),
+    );
+    expect(arm64.single, contains('base-arm64.tar.gz'));
+    expect(x86.single, contains('base-amd64.tar.gz'));
+  });
 }

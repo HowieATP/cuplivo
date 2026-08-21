@@ -586,6 +586,53 @@ abstract class AppLocalizations {
   /// **'Clear Sandbox'**
   String get storageSpaceClearSandboxButton;
 
+  /// No description provided for @storageSpaceCompactDbButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact Database'**
+  String get storageSpaceCompactDbButton;
+
+  /// No description provided for @storageSpaceCompactDbConfirmPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to compact'**
+  String get storageSpaceCompactDbConfirmPrompt;
+
+  /// No description provided for @storageSpaceCompactDbRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Compacting…'**
+  String get storageSpaceCompactDbRunning;
+
+  /// No description provided for @storageSpaceCompactDbHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted data leaves gaps in the database file. Compacting reclaims that space.'**
+  String get storageSpaceCompactDbHint;
+
+  /// No description provided for @storageSpaceCompactDbResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Database compacted: {before} → {after}, saved {saved} ({pct}%)'**
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  );
+
+  /// No description provided for @storageSpaceCompactDbNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to compact'**
+  String get storageSpaceCompactDbNone;
+
+  /// No description provided for @storageSpaceCompactDbFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact failed: {error}'**
+  String storageSpaceCompactDbFailed(Object error);
+
   /// No description provided for @storageSpaceSandboxClearPartialDone.
   ///
   /// In en, this message translates to:

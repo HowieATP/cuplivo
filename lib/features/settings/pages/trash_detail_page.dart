@@ -14,6 +14,7 @@ import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.da
 import '../../../core/services/trash_restore_coordinator.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/database_compact_button.dart';
 import '../../../shared/widgets/expansion_setting_tile.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -24,10 +25,16 @@ class TrashDetailPage extends StatefulWidget {
     super.key,
     this.embedded = false,
     this.initialTab = 0,
+    this.onDataChanged,
   });
 
   final bool embedded;
   final int initialTab;
+
+  /// Invoked after the manual database compaction so the hosting page
+  /// (StorageSpacePage) can refresh its size report. Optional — when this
+  /// page is pushed as a standalone route, the caller refreshes on return.
+  final Future<void> Function()? onDataChanged;
 
   @override
   State<TrashDetailPage> createState() => _TrashDetailPageState();
@@ -255,6 +262,31 @@ class _TrashDetailPageState extends State<TrashDetailPage>
       ),
     );
 
+    final compactRow = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.storageSpaceCompactDbHint,
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          DatabaseCompactButton(
+            compact: () => context.read<ChatService>().repo.compactDatabase(),
+            onDone: () async {
+              await _loadData();
+              await widget.onDataChanged?.call();
+            },
+          ),
+        ],
+      ),
+    );
+
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -265,6 +297,7 @@ class _TrashDetailPageState extends State<TrashDetailPage>
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: [
+            compactRow,
             TabBar(controller: _tabController, tabs: tabs),
             tabBarView,
           ],
@@ -277,7 +310,7 @@ class _TrashDetailPageState extends State<TrashDetailPage>
         title: Text(l10n.storageSpaceCategoryDeletedRecords),
         bottom: TabBar(controller: _tabController, tabs: tabs),
       ),
-      body: Column(children: [tabBarView]),
+      body: Column(children: [compactRow, tabBarView]),
     );
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../models/chat_message.dart';
@@ -78,6 +79,45 @@ class ChatDatabaseRepository {
 
   Future<void> checkpoint() async {
     await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+  }
+
+  /// Manually reclaims freelist pages so the on-disk database shrinks after
+  /// soft-deletes / trash evictions (which otherwise leave holes forever).
+  ///
+  /// In WAL mode (always used in production) [VACUUM] writes the packed
+  /// database into the WAL file; the main file only shrinks on a subsequent
+  /// TRUNCATE checkpoint, so the checkpoint MUST run after the VACUUM. The
+  /// sync connection is closed for the duration to avoid concurrent reads
+  /// observing a stale file, and reopened afterwards. Returns the combined
+  /// main + WAL file size before/after, so [DbCompactResult.savedBytes]
+  /// reflects actual disk space reclaimed (VACUUM folds WAL content into the
+  /// main file, so tracking the main file alone would under-report).
+  Future<DbCompactResult> compactDatabase() async {
+    final file = _databaseFile;
+    if (file == null) {
+      throw StateError('compactDatabase: no database file path available');
+    }
+    final walFile = File('${file.path}-wal');
+    int sizeOf(File f) => f.existsSync() ? f.lengthSync() : 0;
+    final beforeBytes = sizeOf(file) + sizeOf(walFile);
+
+    _closeSync();
+    try {
+      await _db.customStatement('VACUUM;');
+      await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    } finally {
+      // Reopen even if VACUUM threw, so sync reads keep working. A reopen
+      // failure must not mask the compaction result (or, on failure, the
+      // real error) — it only leaves the sync connection null until the
+      // next reopen, which all sync reads already null-guard.
+      try {
+        reopenSyncConnection();
+      } catch (e, st) {
+        debugPrint('compactDatabase: reopen sync connection failed: $e\n$st');
+      }
+    }
+    final afterBytes = sizeOf(file) + sizeOf(walFile);
+    return DbCompactResult(beforeBytes: beforeBytes, afterBytes: afterBytes);
   }
 
   Future<List<Conversation>> getAllConversations({
@@ -1497,6 +1537,17 @@ class ChatDatabaseRepository {
       return <String>[];
     }
   }
+}
+
+/// Result of a manual database compaction ([ChatDatabaseRepository.compactDatabase]).
+class DbCompactResult {
+  const DbCompactResult({required this.beforeBytes, required this.afterBytes});
+
+  final int beforeBytes;
+  final int afterBytes;
+
+  /// Bytes reclaimed from the on-disk file, or 0 when the file did not shrink.
+  int get savedBytes => beforeBytes > afterBytes ? beforeBytes - afterBytes : 0;
 }
 
 class ConversationSearchMatch {

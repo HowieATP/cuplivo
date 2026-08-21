@@ -968,6 +968,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
   late final TextEditingController _scanDepthController;
   late final TextEditingController _injectDepthController;
   late final TextEditingController _keywordInputController;
+  final FocusNode _keywordFocusNode = FocusNode();
 
   late bool _enabled;
   late bool _useRegex;
@@ -1011,6 +1012,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     _scanDepthController.dispose();
     _injectDepthController.dispose();
     _keywordInputController.dispose();
+    _keywordFocusNode.dispose();
     super.dispose();
   }
 
@@ -1299,6 +1301,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                                             child: TextField(
                                               controller:
                                                   _keywordInputController,
+                                              focusNode: _keywordFocusNode,
                                               decoration:
                                                   _deskInputDecoration(
                                                     context,
@@ -1306,8 +1309,11 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                                                     hintText: l10n
                                                         .worldBookEntryKeywordInputHint,
                                                   ),
-                                              onSubmitted: (_) =>
-                                                  _addKeywordsFromInput(),
+                                              onSubmitted: (_) {
+                                                _addKeywordsFromInput();
+                                                _keywordFocusNode
+                                                    .requestFocus();
+                                              },
                                             ),
                                           ),
                                           const SizedBox(width: 8),

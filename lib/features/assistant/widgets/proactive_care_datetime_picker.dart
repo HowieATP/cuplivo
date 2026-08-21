@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 String proactiveCareNextMessageLabel(BuildContext context, DateTime? value) {
   final l10n = AppLocalizations.of(context)!;
@@ -369,9 +370,7 @@ class _ProactiveCareDateTimePanelState
               onTap: _save,
               haptics: false,
               borderRadius: BorderRadius.circular(13),
-              baseColor: isDark
-                  ? Colors.white.withValues(alpha: 0.16)
-                  : const Color(0xFFDADDE2),
+              baseColor: context.appColors.surfaceFill,
               padding: const EdgeInsets.symmetric(vertical: 11),
               child: Center(
                 child: Text(

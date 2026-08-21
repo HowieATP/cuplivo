@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
+import '../../theme/app_semantic_colors.dart';
 import 'ios_switch.dart';
 
 /// An iOS-style settings card: rounded container with a subtle border used by
@@ -15,9 +16,7 @@ class IosSettingsSection extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final Color bg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final Color bg = context.appColors.surfaceCard;
     return Container(
       decoration: BoxDecoration(
         color: bg,

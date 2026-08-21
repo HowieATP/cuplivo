@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 /// iOS-style expandable settings group: one card containing a tappable
 /// header (leading icon + title + rotating chevron) and an
@@ -57,7 +58,7 @@ class _IosExpandableSectionState extends State<IosExpandableSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.1)),
       ),

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/services/haptics.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 import 'emoji_picker_dialog.dart';
 import 'ios_tactile.dart';
 import 'snackbar.dart';
@@ -156,9 +157,7 @@ Future<void> _inputAvatarUrl(
           decoration: InputDecoration(
             hintText: l10n.assistantEditImageUrlDialogHint,
             filled: true,
-            fillColor: Theme.of(ctx).brightness == Brightness.dark
-                ? Colors.white10
-                : const Color(0xFFF2F3F5),
+            fillColor: ctx.appColors.surfaceFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.transparent),
@@ -261,9 +260,7 @@ Future<void> _inputQQAvatar(
               decoration: InputDecoration(
                 hintText: l10n.assistantEditQQAvatarDialogHint,
                 filled: true,
-                fillColor: Theme.of(ctx).brightness == Brightness.dark
-                    ? Colors.white10
-                    : const Color(0xFFF2F3F5),
+                fillColor: ctx.appColors.surfaceFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.transparent),

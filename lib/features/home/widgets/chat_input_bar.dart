@@ -42,6 +42,7 @@ import '../../../shared/dialogs/image_compression_dialog.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import '../../group_chat/models/chat_input_mode.dart';
 
 class ChatInputBarController {
@@ -2433,10 +2434,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     final previewFill = isDark
-        ? Colors.white.withValues(alpha: 0.08)
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
         : theme.colorScheme.onSurface.withValues(alpha: 0.045);
     final previewBorder = isDark
-        ? Colors.white.withValues(alpha: 0.10)
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
         : theme.colorScheme.outline.withValues(alpha: 0.13);
 
     return Padding(
@@ -2688,7 +2689,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.10)
+                ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                 : theme.colorScheme.outline.withValues(alpha: 0.13),
             width: 1,
           ),
@@ -2706,7 +2707,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                   : theme.colorScheme.outline.withValues(alpha: 0.13),
               width: 1,
             ),
@@ -2745,7 +2746,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                   : theme.colorScheme.outline.withValues(alpha: 0.13),
               width: 1,
             ),
@@ -2855,7 +2856,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                         // Use previous gray border for better contrast on white
                         border: Border.all(
                           color: isDark
-                              ? Colors.white.withValues(alpha: 0.10)
+                              ? theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.10,
+                                )
                               : theme.colorScheme.outline.withValues(
                                   alpha: 0.20,
                                 ),
@@ -3198,7 +3201,7 @@ class _QueuedInputBanner extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withValues(alpha: 0.08)
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
             : Colors.white.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -3309,10 +3312,9 @@ class _CompactIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final fgColor = active
         ? theme.colorScheme.primary
-        : (isDark ? Colors.white70 : Colors.black54);
+        : theme.colorScheme.onSurfaceVariant;
     final bool isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
@@ -3388,11 +3390,12 @@ class _CompactSendButton extends StatelessWidget {
     final bg = (enabled || loading)
         ? color
         : (isDark
-              ? Colors.white12
+              ? context.appColors.surfaceFill
+              // color-gate: ignore
               : Colors.grey.shade300.withValues(alpha: 0.84));
     final fg = (enabled || loading)
         ? (isDark ? Colors.black : Colors.white)
-        : (isDark ? Colors.white70 : Colors.grey.shade600);
+        : Theme.of(context).colorScheme.onSurfaceVariant;
 
     final button = Material(
       color: bg,

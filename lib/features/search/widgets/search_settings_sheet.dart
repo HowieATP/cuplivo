@@ -28,7 +28,6 @@ Future<void> showSearchSettingsSheet(BuildContext context) async {
 
 class _SearchSettingsSheet extends StatelessWidget {
   const _SearchSettingsSheet();
-
   String _nameOf(BuildContext context, SearchServiceOptions s) {
     final svc = SearchService.getService(s);
     return svc.name;
@@ -119,7 +118,6 @@ class _SearchSettingsSheet extends StatelessWidget {
       services.isNotEmpty ? services.length - 1 : 0,
     );
     final enabled = ap.currentSearchEnabled;
-
     // Determine if current selected model supports built-in search
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
     final modelId = a?.chatModelId ?? settings.currentModelId;
@@ -136,7 +134,6 @@ class _SearchSettingsSheet extends StatelessWidget {
           cfg: cfg,
           modelId: modelId,
         );
-
     // Read current built-in search toggle from modelOverrides
     final hasBuiltInSearch = BuiltInToolsHelper.isBuiltInSearchEnabled(
       cfg: cfg,
@@ -148,7 +145,6 @@ class _SearchSettingsSheet extends StatelessWidget {
           modelId: modelId,
         );
     final builtInMode = hasBuiltInSearch;
-
     final maxHeight = MediaQuery.of(context).size.height * 0.8;
     return SafeArea(
       top: false,
@@ -345,7 +341,6 @@ class _SearchSettingsSheet extends StatelessWidget {
                       },
                     ),
                 ],
-
                 // Toggle card
                 if (!builtInMode) ...[
                   IosCardPress(
@@ -481,7 +476,6 @@ class _BrandBadge extends StatelessWidget {
   const _BrandBadge({required this.name, this.size = 20});
   final String name;
   final double size;
-
   static Widget forService(SearchServiceOptions s, {double size = 24}) {
     final n = _nameForService(s);
     return _BrandBadge(name: n, size: size);
@@ -516,6 +510,7 @@ class _BrandBadge extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Use BrandAssets to get the icon path
     final asset = BrandAssets.assetForName(name);
+    // color-gate: ignore
     final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {

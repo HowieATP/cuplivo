@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -18,10 +17,10 @@ import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class DefaultModelPage extends StatelessWidget {
   const DefaultModelPage({super.key});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -376,9 +375,7 @@ class DefaultModelPage extends StatelessWidget {
                       decoration: InputDecoration(
                         hintText: l10n.defaultModelPageTitlePromptHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
@@ -604,9 +601,7 @@ class DefaultModelPage extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.defaultModelPageTranslatePromptHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
@@ -728,9 +723,7 @@ class DefaultModelPage extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.defaultModelPageSummaryPromptHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
@@ -866,9 +859,7 @@ class DefaultModelPage extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.defaultModelPageCompressPromptHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
@@ -987,9 +978,7 @@ class DefaultModelPage extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.defaultModelPageSuggestionPromptHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
@@ -1064,7 +1053,6 @@ class _ModelCard extends StatelessWidget {
     this.disabledWhenUnset = false,
     this.configAction,
   });
-
   final IconData icon;
   final String title;
   final String subtitle;
@@ -1076,21 +1064,17 @@ class _ModelCard extends StatelessWidget {
   final VoidCallback onPick;
   final VoidCallback? onReset;
   final VoidCallback? configAction;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-
     // Check if using fallback (not explicitly set)
     final usingFallback = modelProvider == null || modelId == null;
-
     // Use fallback values if needed
     final effectiveProvider = modelProvider ?? fallbackProvider;
     final effectiveModelId = modelId ?? fallbackModelId;
-
     String? providerName;
     String? modelDisplay;
     if (effectiveProvider != null && effectiveModelId != null) {
@@ -1113,16 +1097,13 @@ class _ModelCard extends StatelessWidget {
         modelDisplay = effectiveModelId;
       }
     }
-
     // Override display text if using fallback
     if (usingFallback) {
       modelDisplay = disabledWhenUnset
           ? l10n.defaultModelPageNotEnabled
           : l10n.defaultModelPageUseCurrentModel;
     }
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     return Container(
       decoration: BoxDecoration(
         color: baseBg,
@@ -1185,10 +1166,10 @@ class _ModelCard extends StatelessWidget {
             _TactileRow(
               onTap: onPick,
               builder: (pressed) {
-                final bg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
-                final overlay = isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05);
+                final bg = context.appColors.surfaceFill;
+                final overlay = cs.onSurface.withValues(
+                  alpha: isDark ? 0.06 : 0.05,
+                );
                 final pressedBg = Color.alphaBlend(overlay, bg);
                 return AnimatedScale(
                   scale: pressed ? 0.98 : 1.0,
@@ -1240,7 +1221,6 @@ class _BrandAvatar extends StatelessWidget {
   const _BrandAvatar({required this.name, this.size = 20});
   final String name;
   final double size;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1282,6 +1262,7 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
@@ -1299,13 +1280,11 @@ class _ModelThinkingSwitchRow extends StatelessWidget {
     required this.semanticLabel,
     required this.cs,
   });
-
   final bool value;
   final ValueChanged<bool> onChanged;
   final String label;
   final String semanticLabel;
   final ColorScheme cs;
-
   @override
   Widget build(BuildContext context) {
     return _TactileRow(

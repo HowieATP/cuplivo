@@ -11,6 +11,7 @@ import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../workspace/pages/workspace_detail_page.dart';
 import '../../workspace/pages/workspace_list_page.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
@@ -2143,7 +2144,7 @@ class _UploadManagerState extends State<_UploadManager> {
     final selBg = isDark
         ? cs.primary.withValues(alpha: 0.20)
         : cs.primary.withValues(alpha: 0.12);
-    final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final baseBg = context.appColors.surfaceFill;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -2802,9 +2803,7 @@ Widget _iosSectionCard({required Widget child}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,

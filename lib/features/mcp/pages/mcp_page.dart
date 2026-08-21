@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class McpPage extends StatelessWidget {
   const McpPage({super.key});
@@ -19,12 +20,12 @@ class McpPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     switch (s) {
       case McpStatus.connected:
-        return Colors.green;
+        return context.appColors.success;
       case McpStatus.connecting:
         return cs.primary;
       case McpStatus.error:
       case McpStatus.idle:
-        return Colors.red;
+        return cs.error;
     }
   }
 
@@ -75,9 +76,7 @@ class McpPage extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white10
-                          : const Color(0xFFF7F7F9),
+                      color: context.appColors.surfaceFill,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -102,10 +101,7 @@ class McpPage extends StatelessWidget {
                           ),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size.fromHeight(44),
-                            backgroundColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF2F3F5),
+                            backgroundColor: context.appColors.surfaceFill,
                             side: BorderSide(
                               color: cs.outlineVariant.withValues(alpha: 0.35),
                             ),
@@ -250,15 +246,13 @@ class McpPage extends StatelessWidget {
                       base: base,
                       builder: (c) {
                         final overlay = pressed
-                            ? (isDark
-                                  ? Colors.black.withValues(alpha: 0.06)
-                                  : Colors.white.withValues(alpha: 0.05))
+                            ? cs.onSurface.withValues(
+                                alpha: isDark ? 0.06 : 0.05,
+                              )
                             : Colors.transparent;
                         return Container(
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white10
-                                : Colors.white.withValues(alpha: 0.96),
+                            color: context.appColors.surfaceCard,
                             // Soften the list card corners a bit
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
@@ -283,9 +277,7 @@ class McpPage extends StatelessWidget {
                                       width: 42,
                                       height: 42,
                                       decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.white10
-                                            : const Color(0xFFF2F3F5),
+                                        color: context.appColors.surfaceFill,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       alignment: Alignment.center,
@@ -365,10 +357,12 @@ class McpPage extends StatelessWidget {
                                                       ? l10n.mcpPageStatusConnecting
                                                       : l10n.mcpPageStatusDisconnected),
                                             color: st == McpStatus.connected
-                                                ? Colors.green
+                                                ? context.appColors.success
                                                 : (st == McpStatus.connecting
                                                       ? cs.primary
-                                                      : Colors.redAccent),
+                                                      : Theme.of(
+                                                          context,
+                                                        ).colorScheme.error),
                                           ),
                                           tagStyled(
                                             s.transport ==
@@ -404,7 +398,7 @@ class McpPage extends StatelessWidget {
                                             Icon(
                                               Lucide.MessageCircleWarning,
                                               size: 14,
-                                              color: Colors.red,
+                                              color: cs.error,
                                             ),
                                             const SizedBox(width: 6),
                                             Expanded(
@@ -412,7 +406,7 @@ class McpPage extends StatelessWidget {
                                                 l10n.mcpPageConnectionFailed,
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Colors.red,
+                                                  color: cs.error,
                                                 ),
                                               ),
                                             ),

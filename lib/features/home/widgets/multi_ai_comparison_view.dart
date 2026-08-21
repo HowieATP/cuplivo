@@ -3,6 +3,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/reading_mode_page.dart';
 import '../../chat/widgets/chat_message_widget.dart'
@@ -529,7 +530,7 @@ class _ModeButtonState extends State<_ModeButton> {
             decoration: BoxDecoration(
               color: widget.active
                   ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
-                  : (isDark ? Colors.white10 : const Color(0xFFF2F3F5)),
+                  : context.appColors.surfaceFill,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: widget.active

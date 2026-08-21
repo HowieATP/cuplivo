@@ -128,10 +128,7 @@ class _MemoryTabState extends State<_MemoryTab> {
                           decoration: InputDecoration(
                             hintText: l10n.assistantEditMemoryDialogHint,
                             filled: true,
-                            fillColor:
-                                Theme.of(ctx).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF7F7F9),
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderSide: BorderSide(
                                 color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -261,9 +258,7 @@ class _MemoryTabState extends State<_MemoryTab> {
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditMemoryDialogHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
                             color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -350,7 +345,7 @@ class _MemoryTabState extends State<_MemoryTab> {
       child: Container(
         decoration: BoxDecoration(
           // Match Settings page: Light uses translucent white; Dark uses subtle white10
-          color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+          color: context.appColors.surfaceCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -603,9 +598,7 @@ class _MemoryTabState extends State<_MemoryTab> {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             child: Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white10
-                    : Colors.white.withValues(alpha: 0.96),
+                color: context.appColors.surfaceCard,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: cs.outlineVariant.withValues(
@@ -700,9 +693,7 @@ class _MemoryTabState extends State<_MemoryTab> {
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white10
-                          : Colors.white.withValues(alpha: 0.96),
+                      color: context.appColors.surfaceCard,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(
@@ -874,10 +865,7 @@ class _MemoryTabState extends State<_MemoryTab> {
                           decoration: InputDecoration(
                             hintText: l10n.assistantEditSummaryDialogHint,
                             filled: true,
-                            fillColor:
-                                Theme.of(ctx).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF7F7F9),
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderSide: BorderSide(
                                 color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -991,9 +979,7 @@ class _MemoryTabState extends State<_MemoryTab> {
                   decoration: InputDecoration(
                     hintText: l10n.assistantEditSummaryDialogHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF7F7F9),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderSide: BorderSide(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1250,9 +1236,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                         hintText: l10n
                             .assistantEditRecentChatsSummaryFrequencyCustomHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
                             color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1397,7 +1381,7 @@ class _FrequencyChipButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseBackground = selected
         ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
-        : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
+        : context.appColors.surfaceFill;
     final borderColor = selected
         ? cs.primary.withValues(alpha: 0.38)
         : (emphasized
@@ -1597,7 +1581,7 @@ class _ModeOption extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
-                : (isDark ? Colors.white10 : const Color(0xFFF2F3F5)),
+                : context.appColors.surfaceFill,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: selected

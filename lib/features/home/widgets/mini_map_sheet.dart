@@ -7,6 +7,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/mini_map/mini_map_shared.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 Future<String?> showMiniMapSheet(
   BuildContext context,
@@ -270,11 +271,8 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     ScrollController controller,
   ) {
     final l10n = AppLocalizations.of(context)!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textBase = isDark ? Colors.white : Colors.black;
-    final highlightColor = isDark
-        ? const Color(0xFFB8860B).withValues(alpha: 0.55)
-        : const Color(0xFFFFD700).withValues(alpha: 0.55);
+    final cs = Theme.of(context).colorScheme;
+    final highlightColor = context.appColors.searchHighlight;
 
     if (_tokens.isEmpty) {
       // Debounce window: query entered but no result set computed yet.
@@ -288,7 +286,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
           l10n.miniMapSearchNoResults,
           style: TextStyle(
             fontSize: 13,
-            color: textBase.withValues(alpha: 0.45),
+            color: cs.onSurface.withValues(alpha: 0.45),
           ),
         ),
       );
@@ -303,7 +301,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
             l10n.miniMapSearchResultCount(_searchResults.length),
             style: TextStyle(
               fontSize: 12,
-              color: textBase.withValues(alpha: 0.5),
+              color: cs.onSurface.withValues(alpha: 0.5),
               fontWeight: AppFontWeights.medium,
             ),
           ),

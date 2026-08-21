@@ -1,7 +1,6 @@
 part of '../desktop_settings_page.dart';
 
 // ===== Display Settings Body =====
-
 class _DisplaySettingsBody extends StatelessWidget {
   const _DisplaySettingsBody({super.key});
   @override
@@ -179,7 +178,6 @@ class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.title, required this.children});
   final String title;
   final List<Widget> children;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -188,13 +186,13 @@ class _SettingsCard extends StatelessWidget {
     return Material(
       color: sp.usePureBackground
           ? (isDark ? Colors.black : Colors.white)
-          : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+          : context.appColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           width: 0.5,
           color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
+              ? cs.onSurface.withValues(alpha: 0.06)
               : cs.outlineVariant.withValues(alpha: 0.12),
         ),
       ),
@@ -312,16 +310,12 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final items = [
       (ThemeMode.light, l10n.settingsPageLightMode, lucide.Lucide.Sun),
       (ThemeMode.dark, l10n.settingsPageDarkMode, lucide.Lucide.Moon),
       (ThemeMode.system, l10n.settingsPageSystemMode, lucide.Lucide.Monitor),
     ];
-
-    final trackBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
+    final trackBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
     return Container(
       decoration: BoxDecoration(
         color: trackBg,
@@ -355,9 +349,9 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         );
                       }
                       if (_hover == i) {
-                        return isDark
-                            ? Colors.white.withValues(alpha: 0.10)
-                            : Colors.black.withValues(alpha: 0.06);
+                        return cs.onSurface.withValues(
+                          alpha: isDark ? 0.10 : 0.06,
+                        );
                       }
                       return Colors.transparent;
                     }(),
@@ -745,7 +739,6 @@ class _TopicPositionDropdownState extends State<_TopicPositionDropdown> {
         label: l10n.desktopDisplaySettingsTopicPositionRight,
       ),
     ];
-
     return DesktopSelectDropdown<DesktopTopicPosition>(
       value: sp.desktopTopicPosition,
       options: options,
@@ -781,7 +774,6 @@ class _BackgroundStyleDropdownState extends State<_BackgroundStyleDropdown> {
         label: l10n.displaySettingsPageChatMessageBackgroundSolid,
       ),
     ];
-
     return DesktopSelectDropdown<ChatMessageBackgroundStyle>(
       value: sp.chatMessageBackgroundStyle,
       options: options,
@@ -814,9 +806,7 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.12)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -884,7 +874,6 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
   final GlobalKey _key = GlobalKey();
   OverlayEntry? _entry;
   final LayerLink _link = LayerLink();
-
   void _openDropdownOverlay() {
     if (_entry != null) return;
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
@@ -1027,9 +1016,7 @@ class _HoverDropdownButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = hovered || open
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     final angle = open ? 3.1415926 : 0.0;
     return MouseRegion(
@@ -1132,9 +1119,7 @@ class _OverlayMenuItemState extends State<_OverlayMenuItem> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.08)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1184,7 +1169,6 @@ class _OverlayItem extends StatefulWidget {
   final Color background;
   final bool selected;
   final VoidCallback onTap;
-
   @override
   State<_OverlayItem> createState() => _OverlayItemState();
 }
@@ -1197,9 +1181,7 @@ class _OverlayItemState extends State<_OverlayItem> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? Color.alphaBlend(
-            (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.04)),
+            cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
             widget.background,
           )
         : widget.background;
@@ -1323,9 +1305,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1C1C1E)
-                  : Colors.white,
+              color: context.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -1432,9 +1412,7 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: _hover
-                ? (isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.black.withValues(alpha: 0.04))
+                ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -1571,7 +1549,6 @@ class _BorderInputState extends State<_BorderInput> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     // hover to change border color (not background)
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -1603,7 +1580,7 @@ class _BorderInputState extends State<_BorderInput> {
         decoration: InputDecoration(
           isDense: true,
           filled: true,
-          fillColor: isDark ? Colors.white10 : Colors.white,
+          fillColor: context.appColors.surfaceFill,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 6,
             vertical: 8,
@@ -1736,9 +1713,7 @@ class _DesktopFontDropdownButtonState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1798,7 +1773,6 @@ Future<String?> _showDesktopFontChooserDialog(
   final rootNavigator = Navigator.of(context, rootNavigator: true);
   final ctrl = TextEditingController();
   String? result;
-
   Future<List<String>> fetchSystemFonts() async {
     try {
       final sf = SystemFonts();
@@ -1840,8 +1814,7 @@ Future<String?> _showDesktopFontChooserDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+        final bg = ctx.appColors.surfaceCard;
         final cs2 = Theme.of(ctx).colorScheme;
         return Dialog(
           elevation: 0,
@@ -1931,10 +1904,7 @@ Future<String?> _showDesktopFontChooserDialog(
                         isDense: true,
                         filled: true,
                         hintText: l10n.desktopFontFilterHint,
-                        fillColor:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(
@@ -1972,6 +1942,7 @@ Future<String?> _showDesktopFontChooserDialog(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: Theme.of(context).brightness == Brightness.dark
+                              // color-gate: ignore
                               ? Colors.white10
                               : Colors.black.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(10),
@@ -2049,9 +2020,7 @@ class _FontRowItemState extends State<_FontRowItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     final sample = 'Aa字';
     return MouseRegion(
@@ -2711,7 +2680,6 @@ class _ToggleRowMsgNavButtons extends StatelessWidget {
         label: l10n.displaySettingsPageMessageNavButtonsModeNever,
       ),
     ];
-
     return _LabeledRow(
       label: l10n.displaySettingsPageMessageNavButtonsTitle,
       trailing: DesktopSelectDropdown<DesktopMessageNavButtonsMode>(
@@ -3146,7 +3114,6 @@ class _OpacityInputGroup extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final VoidCallback onCommit;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3211,7 +3178,6 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
   final LayerLink _link = LayerLink();
   final GlobalKey _triggerKey = GlobalKey();
   OverlayEntry? _entry;
-
   void _toggle() {
     if (_open) {
       _close();
@@ -3244,7 +3210,6 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
     if (rb == null) return;
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
-
     _entry = OverlayEntry(
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -3254,9 +3219,8 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
         ).usePureBackground;
         final bgColor = usePure
             ? (isDark ? Colors.black : Colors.white)
-            : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
+            : ctx.appColors.surfaceCard;
         final sp = Provider.of<SettingsProvider>(ctx, listen: false);
-
         return Stack(
           children: [
             Positioned.fill(
@@ -3291,14 +3255,11 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
     final label = _labelFor(context, sp.desktopSendShortcut);
-
     final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
-
     return CompositedTransformTarget(
       link: _link,
       child: MouseRegion(
@@ -3314,7 +3275,7 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
             constraints: const BoxConstraints(minWidth: 130, minHeight: 34),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF141414) : Colors.white,
+              color: context.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: _open
@@ -3379,7 +3340,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
-
   @override
   void initState() {
     super.initState();
@@ -3406,7 +3366,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
-
     // Platform-specific modifier key
     final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
     final items = <(DesktopSendShortcut, String)>[
@@ -3416,7 +3375,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
       ),
       (DesktopSendShortcut.ctrlEnter, '$modifier + Enter'),
     ];
-
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(

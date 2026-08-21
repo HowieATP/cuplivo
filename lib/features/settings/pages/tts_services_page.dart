@@ -16,6 +16,7 @@ import '../widgets/asr_services_section.dart';
 import '../widgets/mimo_reference_audio_picker.dart';
 import '../widgets/voice_service_widgets.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -358,7 +359,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = _appSurfaceCard(cs);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1718,7 +1719,7 @@ class _TtsEditorTextFieldState extends State<_TtsEditorTextField> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fieldBg = _appSurfaceFill(cs);
+    final fieldBg = context.appColors.surfaceFill;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
@@ -2315,25 +2316,4 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
     case NetworkTtsKind.fishAudio:
       return l10n.ttsServicesFieldVoiceIdLabel;
   }
-}
-
-Color _appSurfaceCard(ColorScheme cs) {
-  final isDark = cs.brightness == Brightness.dark;
-  return isDark
-      ? Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-          cs.surface,
-        )
-      : Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.96),
-          cs.surface,
-        );
-}
-
-Color _appSurfaceFill(ColorScheme cs) {
-  final isDark = cs.brightness == Brightness.dark;
-  return Color.alphaBlend(
-    cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.05),
-    cs.surface,
-  );
 }

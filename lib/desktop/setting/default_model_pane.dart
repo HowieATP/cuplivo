@@ -14,10 +14,10 @@ import '../../features/model/utils/ocr_model_capability.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -60,7 +60,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   _ModelCard(
                     icon: lucide.Lucide.MessageCircle,
                     title: l10n.defaultModelPageChatModelTitle,
@@ -86,7 +85,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       }
                     },
                   ),
-
                   const SizedBox(height: 16),
                   _ModelCard(
                     icon: lucide.Lucide.NotebookTabs,
@@ -114,7 +112,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     configAction: () => _showTitlePromptDialog(context),
                   ),
-
                   const SizedBox(height: 16),
                   _ModelCard(
                     icon: lucide.Lucide.FileText,
@@ -147,7 +144,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     configAction: () => _showSummaryPromptDialog(context),
                   ),
-
                   const SizedBox(height: 16),
                   _ModelCard(
                     icon: lucide.Lucide.MessagesSquare,
@@ -176,7 +172,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     configAction: () => _showSuggestionPromptDialog(context),
                   ),
-
                   const SizedBox(height: 16),
                   _ModelCard(
                     icon: lucide.Lucide.package2,
@@ -212,7 +207,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     configAction: () => _showCompressPromptDialog(context),
                   ),
-
                   const SizedBox(height: 16),
                   _ModelCard(
                     icon: lucide.Lucide.Languages,
@@ -943,7 +937,6 @@ class _ModelCard extends StatefulWidget {
     this.onReset,
     this.configAction,
   });
-
   final IconData icon;
   final String title;
   final String subtitle;
@@ -955,7 +948,6 @@ class _ModelCard extends StatefulWidget {
   final VoidCallback? onReset;
   final VoidCallback onPick;
   final VoidCallback? configAction;
-
   @override
   State<_ModelCard> createState() => _ModelCardState();
 }
@@ -968,12 +960,10 @@ class _ModelCardState extends State<_ModelCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-
     final usingFallback =
         widget.modelProvider == null || widget.modelId == null;
     final effectiveProvider = widget.modelProvider ?? widget.fallbackProvider;
     final effectiveModelId = widget.modelId ?? widget.fallbackModelId;
-
     String? providerName;
     String? modelDisplay;
     if (effectiveProvider != null && effectiveModelId != null) {
@@ -1001,18 +991,12 @@ class _ModelCardState extends State<_ModelCard> {
           ? l10n.defaultModelPageNotEnabled
           : l10n.defaultModelPageUseCurrentModel;
     }
-
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.08 : 0.06,
     );
-    final rowBase = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
-    final hoverOverlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
-
+    final rowBase = context.appColors.surfaceFill;
+    final hoverOverlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     return Container(
       decoration: BoxDecoration(
         color: baseBg,
@@ -1063,7 +1047,6 @@ class _ModelCardState extends State<_ModelCard> {
               ),
             ),
             const SizedBox(height: 8),
-
             MouseRegion(
               cursor: SystemMouseCursors.click,
               onEnter: (_) => setState(() => _hover = true),
@@ -1122,14 +1105,12 @@ class _ModelThinkingSwitchRow extends StatelessWidget {
     required this.cs,
     required this.trailing,
   });
-
   final bool value;
   final ValueChanged<bool> onChanged;
   final String label;
   final String semanticLabel;
   final ColorScheme cs;
   final Widget trailing;
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1207,9 +1188,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final bg = widget.filled
         ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
@@ -1269,9 +1248,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1332,6 +1309,7 @@ class _BrandCircle extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.10),
         shape: BoxShape.circle,
       ),
@@ -1365,12 +1343,11 @@ Widget _promptEditor(
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: false,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(

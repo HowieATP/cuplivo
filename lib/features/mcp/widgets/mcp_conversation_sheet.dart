@@ -7,6 +7,7 @@ import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 Future<void> showConversationMcpSheet(
   BuildContext context, {
@@ -27,19 +28,16 @@ Future<void> showConversationMcpSheet(
 class _ConversationMcpSheet extends StatelessWidget {
   const _ConversationMcpSheet({required this.conversationId});
   final String conversationId;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final mcp = context.watch<McpProvider>();
     final chat = context.watch<ChatService>();
-
     final selected = chat.getConversationMcpServers(conversationId).toSet();
     final servers = mcp.servers
         .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
         .toList();
-
     Widget tag(String text) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -56,7 +54,6 @@ class _ConversationMcpSheet extends StatelessWidget {
         ),
       ),
     );
-
     return SafeArea(
       top: false,
       child: DraggableScrollableSheet(
@@ -163,12 +160,12 @@ class _ConversationMcpSheet extends StatelessWidget {
                                       : 0.10,
                                 )
                               : (Theme.of(context).brightness == Brightness.dark
+                                    // color-gate: ignore
                                     ? Colors.white10
                                     : cs.surface);
                           final borderColor = isSelected
                               ? cs.primary.withValues(alpha: 0.45)
                               : cs.outlineVariant.withValues(alpha: 0.25);
-
                           return Material(
                             color: Colors.transparent,
                             shape: RoundedRectangleBorder(
@@ -209,11 +206,7 @@ class _ConversationMcpSheet extends StatelessWidget {
                                         width: 42,
                                         height: 42,
                                         decoration: BoxDecoration(
-                                          color:
-                                              Theme.of(context).brightness ==
-                                                  Brightness.dark
-                                              ? Colors.white10
-                                              : const Color(0xFFF2F3F5),
+                                          color: context.appColors.surfaceFill,
                                           borderRadius: BorderRadius.circular(
                                             10,
                                           ),

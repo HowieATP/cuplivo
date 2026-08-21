@@ -87,6 +87,31 @@ class DataSync {
   // this past 1 without relaxing Kelivo's _parseChatBackup constraint first.
   static const int _chatsJsonVersion = 1;
 
+  // Proxy fields inside a provider config. Proxy is device-local: during a
+  // merge restore these fields are never adopted from the backup for
+  // providers that already exist locally (issue #512).
+  static const List<String> _providerProxyFields = [
+    'proxyEnabled',
+    'proxyType',
+    'proxyHost',
+    'proxyPort',
+    'proxyUsername',
+    'proxyPassword',
+  ];
+
+  // The no-proxy state the app writes for fresh configs (mirrors
+  // SettingsProvider's defaults). Used when a legacy local provider config
+  // carries no proxy block at all, so the backup's proxy never survives even
+  // in disabled form.
+  static const Map<String, dynamic> _noProxyProviderDefaults = {
+    'proxyEnabled': false,
+    'proxyType': 'http',
+    'proxyHost': '',
+    'proxyPort': '8080',
+    'proxyUsername': '',
+    'proxyPassword': '',
+  };
+
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
     String base = cfg.url.trim();
@@ -1448,7 +1473,12 @@ class DataSync {
               if (mergeableKeys.contains(key)) {
                 // Special handling for mergeable configurations
                 if (key == 'provider_configs_v1' && existing.containsKey(key)) {
-                  // Merge provider configs: combine both maps
+                  // Merge provider configs per provider key. The backup wins
+                  // for all fields EXCEPT the proxy block, which is
+                  // device-local: an existing provider's proxy is composed
+                  // from its local block over the no-proxy defaults — the
+                  // backup's proxy never lands on the device (issue #512).
+                  // Brand-new providers keep their backup proxy.
                   try {
                     final existingConfigs =
                         jsonDecode(existing[key] as String)
@@ -1456,8 +1486,34 @@ class DataSync {
                     final newConfigs =
                         jsonDecode(newValue as String) as Map<String, dynamic>;
 
-                    // Merge configs, new values override existing for same keys
-                    final mergedConfigs = {...existingConfigs, ...newConfigs};
+                    // Start from the local configs so providers absent from
+                    // the backup survive the merge untouched.
+                    final mergedConfigs = <String, dynamic>{...existingConfigs};
+                    for (final entry in newConfigs.entries) {
+                      final providerKey = entry.key;
+                      final incoming = entry.value;
+                      final local = existingConfigs[providerKey];
+                      if (incoming is! Map || local is! Map) {
+                        // Malformed entry: keep the prior verbatim behavior
+                        // for this entry and continue merging the rest.
+                        mergedConfigs[providerKey] = incoming;
+                        continue;
+                      }
+                      final localMap = local.cast<String, dynamic>();
+                      // The proxy fields of an existing provider are composed
+                      // from the local block (where present) over the
+                      // no-proxy defaults — the backup's proxy never lands on
+                      // the device, whether the local block is full, partial,
+                      // or absent entirely.
+                      final merged = <String, dynamic>{
+                        ...incoming.cast<String, dynamic>(),
+                        ..._noProxyProviderDefaults,
+                        for (final field in _providerProxyFields)
+                          if (localMap.containsKey(field))
+                            field: localMap[field],
+                      };
+                      mergedConfigs[providerKey] = merged;
+                    }
                     await prefs.restoreSingle(key, jsonEncode(mergedConfigs));
                   } catch (e) {
                     // If merge fails, keep existing

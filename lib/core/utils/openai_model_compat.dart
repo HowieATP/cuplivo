@@ -76,7 +76,7 @@ const OpenAIReasoningSupport _grok45Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high'],
   offFallback: 'low',
 );
-const OpenAIReasoningSupport _museSpark11Support = OpenAIReasoningSupport(
+const OpenAIReasoningSupport _museFamilySupport = OpenAIReasoningSupport(
   supportedEfforts: <String>[],
   effortParameterSupported: false,
 );
@@ -215,11 +215,15 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
       ).hasMatch(normalized)) {
     return _kimiK3Support;
   }
-  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.5(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.(?:5|6)(?:$|[-.])')) {
     return _grok45Support;
   }
-  if (_matchesModel(normalized, r'(^|[/_:@])muse-spark-1\.1(?:$|[-.])')) {
-    return _museSpark11Support;
+  if (_matchesModel(
+        normalized,
+        r'(^|[/_:@])muse-spark(?:$|[-.]1\.[12](?:$|[-.]))',
+      ) ||
+      _matchesModel(normalized, r'(^|[/_:@])muse-glimmer-30b(?:$|[-.])')) {
+    return _museFamilySupport;
   }
   if (!isOpenAIGpt5FamilyModel(normalized)) return null;
 

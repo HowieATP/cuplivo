@@ -5309,6 +5309,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => 'New Chat on Launch';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle =>
+      'Start with a pinned assistant';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      'Always switch to the designated assistant on launch';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel =>
+      'Startup assistant';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => 'None';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => 'Enter Key to Send';
 
   @override

@@ -10,6 +10,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/assistant_provider.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
@@ -17,6 +18,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
+import '../../../features/assistant/widgets/assistant_select_sheet.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
@@ -2311,6 +2313,67 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setNewChatOnLaunch(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Pin,
+                label: l10n.displaySettingsPageStartupAssistantPinnedTitle,
+                subtitle:
+                    l10n.displaySettingsPageStartupAssistantPinnedSubtitle,
+                value: sp.startupAssistantMode == StartupAssistantMode.pinned,
+                onChanged: (v) async {
+                  final settings = context.read<SettingsProvider>();
+                  if (v) {
+                    var pinnedId = settings.pinnedAssistantId;
+                    pinnedId ??= context
+                        .read<AssistantProvider>()
+                        .currentAssistantId;
+                    if (pinnedId == null) return;
+                    await settings.setPinnedAssistantId(pinnedId);
+                    await settings.setStartupAssistantMode(
+                      StartupAssistantMode.pinned,
+                    );
+                  } else {
+                    await settings.setStartupAssistantMode(
+                      StartupAssistantMode.mostRecent,
+                    );
+                  }
+                },
+              ),
+              if (sp.startupAssistantMode == StartupAssistantMode.pinned) ...[
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Bot,
+                  label: l10n.displaySettingsPageStartupAssistantPickerLabel,
+                  detailBuilder: (ctx) {
+                    final ap = ctx.read<AssistantProvider>();
+                    final pinnedId = context
+                        .read<SettingsProvider>()
+                        .pinnedAssistantId;
+                    String? name;
+                    for (final a in ap.assistants) {
+                      if (a.id == pinnedId) {
+                        name = a.name;
+                        break;
+                      }
+                    }
+                    return Text(
+                      name ?? l10n.displaySettingsPageStartupAssistantNone,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                  onTap: () async {
+                    final id = await showAssistantMoveSelector(context);
+                    if (id != null && context.mounted) {
+                      await context
+                          .read<SettingsProvider>()
+                          .setPinnedAssistantId(id);
+                    }
+                  },
+                ),
+              ],
               _iosDivider(context),
               _iosSwitchRow(
                 context,

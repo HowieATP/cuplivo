@@ -126,6 +126,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowNewChatOnLaunch(),
                   _RowDivider(),
+                  _StartupAssistantSection(),
+                  _RowDivider(),
                   _ToggleRowMsgNavButtons(),
                   _RowDivider(),
                   _SendShortcutRow(),
@@ -2796,6 +2798,81 @@ class _ToggleRowNewChatOnLaunch extends StatelessWidget {
       label: l10n.displaySettingsPageNewChatOnLaunchTitle,
       value: sp.newChatOnLaunch,
       onChanged: (v) => context.read<SettingsProvider>().setNewChatOnLaunch(v),
+    );
+  }
+}
+
+class _StartupAssistantSection extends StatelessWidget {
+  const _StartupAssistantSection();
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SettingsProvider>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _ToggleRowStartupAssistantPinned(),
+        if (sp.startupAssistantMode == StartupAssistantMode.pinned) ...[
+          const _RowDivider(),
+          const _StartupAssistantPickerRow(),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToggleRowStartupAssistantPinned extends StatelessWidget {
+  const _ToggleRowStartupAssistantPinned();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageStartupAssistantPinnedTitle,
+      value: sp.startupAssistantMode == StartupAssistantMode.pinned,
+      onChanged: (v) async {
+        final settings = context.read<SettingsProvider>();
+        if (v) {
+          var pinnedId = settings.pinnedAssistantId;
+          pinnedId ??= context.read<AssistantProvider>().currentAssistantId;
+          if (pinnedId == null) return;
+          await settings.setPinnedAssistantId(pinnedId);
+          await settings.setStartupAssistantMode(StartupAssistantMode.pinned);
+        } else {
+          await settings.setStartupAssistantMode(
+            StartupAssistantMode.mostRecent,
+          );
+        }
+      },
+    );
+  }
+}
+
+class _StartupAssistantPickerRow extends StatelessWidget {
+  const _StartupAssistantPickerRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final ap = context.watch<AssistantProvider>();
+    final pinnedId = sp.pinnedAssistantId;
+    String? name;
+    for (final a in ap.assistants) {
+      if (a.id == pinnedId) {
+        name = a.name;
+        break;
+      }
+    }
+    return _LabeledRow(
+      label: l10n.displaySettingsPageStartupAssistantPickerLabel,
+      trailing: _DesktopFontDropdownButton(
+        display: name ?? l10n.displaySettingsPageStartupAssistantNone,
+        onTap: () async {
+          final id = await showAssistantMoveSelector(context);
+          if (id != null && context.mounted) {
+            await context.read<SettingsProvider>().setPinnedAssistantId(id);
+          }
+        },
+      ),
     );
   }
 }

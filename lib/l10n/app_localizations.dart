@@ -9599,6 +9599,30 @@ abstract class AppLocalizations {
   /// **'New Chat on Launch'**
   String get displaySettingsPageNewChatOnLaunchTitle;
 
+  /// No description provided for @displaySettingsPageStartupAssistantPinnedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a pinned assistant'**
+  String get displaySettingsPageStartupAssistantPinnedTitle;
+
+  /// No description provided for @displaySettingsPageStartupAssistantPinnedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Always switch to the designated assistant on launch'**
+  String get displaySettingsPageStartupAssistantPinnedSubtitle;
+
+  /// No description provided for @displaySettingsPageStartupAssistantPickerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Startup assistant'**
+  String get displaySettingsPageStartupAssistantPickerLabel;
+
+  /// No description provided for @displaySettingsPageStartupAssistantNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get displaySettingsPageStartupAssistantNone;
+
   /// No description provided for @displaySettingsPageEnterToSendTitle.
   ///
   /// In en, this message translates to:

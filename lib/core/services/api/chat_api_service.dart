@@ -1558,6 +1558,31 @@ class ChatApiService {
 
     return result;
   }
+
+  /// Recursively remove `additionalProperties` from every JSON Schema node.
+  ///
+  /// The Gemini API rejects this key with HTTP 400 (issue #425). Unlike
+  /// [_cleanSchemaForGemini], this walks every nested map/list (properties,
+  /// items, anyOf/oneOf/allOf, tuple-form items, $defs, ...) and only strips
+  /// that one key, leaving the rest of the schema byte-identical. MCP tool
+  /// schemas are already stripped by
+  /// `ToolHandlerService.sanitizeToolParametersForProvider`; this is
+  /// defense-in-depth for built-in tools (search/memory/workspace/local) that
+  /// bypass that sanitizer.
+  static dynamic _stripAdditionalProperties(dynamic node) {
+    if (node is Map) {
+      final m = <String, dynamic>{};
+      for (final entry in node.entries) {
+        if (entry.key == 'additionalProperties') continue;
+        m[entry.key] = _stripAdditionalProperties(entry.value);
+      }
+      return m;
+    }
+    if (node is List) {
+      return node.map(_stripAdditionalProperties).toList();
+    }
+    return node;
+  }
 }
 
 class _ImageRef {

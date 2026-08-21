@@ -66,6 +66,16 @@ class LanSyncServer extends ChangeNotifier {
   LanSyncPhase _phase = LanSyncPhase.idle;
   LanSyncPhase get phase => _phase;
 
+  /// Restore progress snapshot, non-null only while this device is
+  /// merge-restoring a received zip (the mask content in the UI).
+  RestoreProgress? _restoreProgress;
+  RestoreProgress? get restoreProgress => _restoreProgress;
+
+  /// Non-null when a received-zip restore failed; the UI shows the failed
+  /// state (with a close action) instead of the progress mask.
+  String? _restoreError;
+  String? get restoreError => _restoreError;
+
   /// Called when the initiator's zip arrives and has been saved to disk.
   /// The UI is responsible for merge-restoring and restarting.
   SyncServerZipReceivedCallback? onZipReceived;
@@ -114,6 +124,24 @@ class LanSyncServer extends ChangeNotifier {
     _port = null;
     _phase = LanSyncPhase.idle;
     _receivedZip = null;
+    _restoreProgress = null;
+    _restoreError = null;
+    notifyListeners();
+  }
+
+  /// Sets the restore progress snapshot for the mask UI. Passing null clears
+  /// it (and any error). Notifies listeners so the dialog rebuilds.
+  void setRestoreProgress(RestoreProgress? progress) {
+    _restoreProgress = progress;
+    if (progress == null) _restoreError = null;
+    notifyListeners();
+  }
+
+  /// Marks the received-zip restore as failed with [message]. The UI shows
+  /// the failed state (close action) instead of the progress mask.
+  void setRestoreError(String message) {
+    _restoreError = message;
+    _restoreProgress = null;
     notifyListeners();
   }
 
@@ -167,7 +195,7 @@ class LanSyncServer extends ChangeNotifier {
         .map((a) => a.id)
         .toList();
 
-    final plan = _computePlan(
+    final plan = await _computePlan(
       initiatorIndex: index,
       myConversations: myConversations,
       myAssistantIds: myAssistantIds,
@@ -280,11 +308,11 @@ class LanSyncServer extends ChangeNotifier {
   }
 
   /// Computes the sync plan by comparing the initiator's index with our data.
-  SyncPlan _computePlan({
+  Future<SyncPlan> _computePlan({
     required SyncIndex initiatorIndex,
     required List<Conversation> myConversations,
     required List<String> myAssistantIds,
-  }) {
+  }) async {
     final plans = <SyncConvPlan>[];
 
     final myConvsById = <String, Conversation>{};
@@ -358,11 +386,19 @@ class LanSyncServer extends ChangeNotifier {
     final missingOnServer = theirSet.difference(mySet).toList();
     final missingOnInitiator = mySet.difference(theirSet).toList();
 
+    // What the server would pack in round 2 (mirrors _packZipSync rules),
+    // so the initiator's plan preview can show the inbound file payload.
+    final fileStats = since != null
+        ? await _dataSync.countFilesForSince(since)
+        : null;
+
     return SyncPlan(
       conversations: plans,
       missingAssistantIds: missingOnServer,
       remoteMissingAssistantIds: missingOnInitiator,
       since: since,
+      serverFileCount: fileStats?.fileCount,
+      serverFileSizeBytes: fileStats?.totalBytes,
     );
   }
 

@@ -2429,6 +2429,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lanSyncPlanNoChanges => 'No changes to sync.';
 
   @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '$count files to send ($size)';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '$count files to receive ($size)';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => 'Extracting sync data...';
+
+  @override
+  String get lanSyncRestoreMergingChats => 'Merging chats...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => 'Writing files...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => 'Restoring skills...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total files · $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total conversations';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => 'Sync data merge failed';
+
+  @override
   String get lanSyncErrorInvalidPin => 'Invalid PIN';
 
   @override

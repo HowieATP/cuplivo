@@ -16,6 +16,7 @@ import '../../core/services/sync/lan_sync_server.dart';
 import '../../core/services/sync/windows_firewall.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
+import '../../utils/format.dart';
 import '../dialogs/restart_required_dialog.dart';
 import 'ios_form_text_field.dart';
 import 'ios_tactile.dart';
@@ -85,6 +86,11 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   final _portController = TextEditingController(text: '9527');
   final _pinController = TextEditingController();
 
+  /// The zip received for merge-restore, kept so a failed restore can be
+  /// cleaned up when the section is disposed (the temp dir must not
+  /// accumulate large sync payloads).
+  File? _receivedZipFile;
+
   bool get _isDesktop =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.windows ||
@@ -123,26 +129,103 @@ class _LanSyncSectionState extends State<LanSyncSection> {
     _pinController.dispose();
     _server.stop();
     _client.close();
+    // Clean up a received-but-not-restored sync zip (e.g. after a failed
+    // restore) so the temp dir does not accumulate large payloads.
+    final received = _receivedZipFile;
+    if (received != null) {
+      unawaited(() async {
+        try {
+          if (await received.exists()) {
+            await received.delete();
+          }
+        } catch (_) {
+          // Best-effort: a still-locked file (e.g. open handle on Windows)
+          // must not surface as an unhandled async error during teardown.
+        }
+      }());
+    }
     super.dispose();
   }
 
   Future<void> _restoreAndRestart(File zipFile) async {
     if (!mounted) return;
-    // Pop the sync dialog (server or client) before showing the restart
-    // dialog. The sync dialog is the topmost route at this point.
-    Navigator.of(context, rootNavigator: true).pop();
-    await _dataSync.restoreFromLocalFile(
-      zipFile,
-      const WebDavConfig(includeChats: true, includeFiles: true),
-      mode: RestoreMode.merge,
-    );
-    if (!mounted) return;
-    // Keep the in-memory providers consistent with the merged disk state
-    // while the restart prompt is up (and defensively if it is dismissed).
-    await refreshProvidersAfterRestore(context);
-    if (!mounted) return;
-    await showRestartRequiredDialog(context);
+    // The sync dialog/sheet stays mounted throughout the write window — its
+    // non-dismissible barrier IS the full-screen mask. Never pop it here.
+    // A second sync session within this section's lifetime (e.g. after a
+    // failed restore) would otherwise leak the previous session's zip.
+    final previous = _receivedZipFile;
+    if (previous != null && previous.path != zipFile.path) {
+      unawaited(() async {
+        try {
+          if (await previous.exists()) {
+            await previous.delete();
+          }
+        } catch (_) {
+          // Best-effort: a still-locked file must not surface as an
+          // unhandled async error.
+        }
+      }());
+    }
+    _receivedZipFile = zipFile;
+    // Reset the notify throttle so the first progress frame of this session
+    // always renders (a stale stage/timestamp could otherwise swallow it).
+    _lastRestoreNotify = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastRestoreNotifyStage = null;
+    _setRestoreProgress(const RestoreProgress(stage: RestoreStage.extracting));
+    try {
+      await _dataSync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: true),
+        mode: RestoreMode.merge,
+        onProgress: _setRestoreProgress,
+      );
+      if (!mounted) return;
+      // Keep the in-memory providers consistent with the merged disk state
+      // while the restart prompt is up (and defensively if it is dismissed).
+      await refreshProvidersAfterRestore(context);
+      if (!mounted) return;
+      // The write window is over. The non-dismissible restart dialog takes
+      // over the screen from the sync dialog/sheet below.
+      _setRestoreProgress(null);
+      await showRestartRequiredDialog(context);
+    } catch (e) {
+      if (!mounted) return;
+      // Close-with-error: the peer already received its zip, so the sync
+      // simply did not complete on this side. Never rethrow — a restore
+      // failure must not surface as a transport error to the exchange layer.
+      final message = e.toString();
+      _server.setRestoreError(message);
+      _client.setRestoreError(message);
+    }
   }
+
+  /// Mirrors the restore progress onto both notifiers so whichever dialog or
+  /// sheet is mounted rebuilds its mask content. Null clears the mask.
+  ///
+  /// Throttled to ~100 ms: the restore loop reports per file, and thousands
+  /// of rebuilds per second buy nothing on an I/O-bound write. Stage changes,
+  /// indeterminate stages, the final step and the null clear always pass.
+  void _setRestoreProgress(RestoreProgress? progress) {
+    if (progress != null) {
+      final now = DateTime.now();
+      final stageChanged = progress.stage != _lastRestoreNotifyStage;
+      final indeterminate = progress.fraction == null;
+      final finalStep = (progress.fraction ?? 0) >= 1.0;
+      final withinThrottle =
+          now.difference(_lastRestoreNotify) < _restoreNotifyThrottle;
+      if (!stageChanged && !indeterminate && !finalStep && withinThrottle) {
+        return;
+      }
+      _lastRestoreNotify = now;
+    }
+    _lastRestoreNotifyStage = progress?.stage;
+    _server.setRestoreProgress(progress);
+    _client.setRestoreProgress(progress);
+  }
+
+  static const Duration _restoreNotifyThrottle = Duration(milliseconds: 100);
+  DateTime _lastRestoreNotify = DateTime.fromMillisecondsSinceEpoch(0);
+  RestoreStage? _lastRestoreNotifyStage;
 
   @override
   Widget build(BuildContext context) {
@@ -583,84 +666,102 @@ class _ServerDialogState extends State<_ServerDialog> {
     final port = server.port;
     final phaseText = serverPhaseText(server.phase, l10n);
 
-    return AlertDialog(
-      backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(Icons.wifi_tethering, size: 20, color: cs.primary),
-          const SizedBox(width: 8),
-          Text(l10n.lanSyncServerDialogTitle),
-        ],
-      ),
-      content: SizedBox(
-        width: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return PopScope(
+      // The mask contract: the system back button / Esc must not dismiss the
+      // dialog while the merge-restore write window is open (barrierDismissible
+      // does not intercept back — only PopScope does).
+      canPop: server.restoreProgress == null,
+      child: AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
-            Text(
-              l10n.lanSyncSecurityNote,
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.5),
+            Icon(Icons.wifi_tethering, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(l10n.lanSyncServerDialogTitle),
+          ],
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.lanSyncSecurityNote,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Every non-loopback IPv4 of this device — the user picks the
-            // one on the peer's subnet (multi-NIC / VPN machines).
-            if (server.addresses.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(
-                  l10n.lanSyncNoLanAddress,
+              const SizedBox(height: 16),
+              // Every non-loopback IPv4 of this device — the user picks the
+              // one on the peer's subnet (multi-NIC / VPN machines).
+              if (server.addresses.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    l10n.lanSyncNoLanAddress,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                )
+              else
+                for (final (index, ip) in server.addresses.indexed)
+                  _AddressDisplay(
+                    label: index == 0 ? l10n.lanSyncServerAddress : '',
+                    value: ip,
+                    cs: cs,
+                  ),
+              _AddressDisplay(
+                label: l10n.lanSyncServerPort,
+                value: port?.toString() ?? '...',
+                cs: cs,
+              ),
+              _AddressDisplay(
+                label: l10n.lanSyncServerPin,
+                value: server.pin ?? '...',
+                cs: cs,
+                emphasize: true,
+              ),
+              if (!kIsWeb && Platform.isWindows) ...[
+                const SizedBox(height: 10),
+                ..._buildFirewallSection(l10n, cs, port),
+              ],
+              if (phaseText.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  phaseText,
                   style: TextStyle(
                     fontSize: 13,
                     color: cs.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
-              )
-            else
-              for (final (index, ip) in server.addresses.indexed)
-                _AddressDisplay(
-                  label: index == 0 ? l10n.lanSyncServerAddress : '',
-                  value: ip,
-                  cs: cs,
+              ],
+              if (server.restoreProgress != null) ...[
+                const SizedBox(height: 12),
+                buildRestoreProgress(server.restoreProgress!, l10n, cs),
+              ] else if (server.restoreError != null) ...[
+                const SizedBox(height: 12),
+                buildRestoreError(
+                  server.restoreError!,
+                  l10n,
+                  cs,
+                  onClose: widget.onClose,
                 ),
-            _AddressDisplay(
-              label: l10n.lanSyncServerPort,
-              value: port?.toString() ?? '...',
-              cs: cs,
-            ),
-            _AddressDisplay(
-              label: l10n.lanSyncServerPin,
-              value: server.pin ?? '...',
-              cs: cs,
-              emphasize: true,
-            ),
-            if (!kIsWeb && Platform.isWindows) ...[
-              const SizedBox(height: 10),
-              ..._buildFirewallSection(l10n, cs, port),
+              ],
             ],
-            if (phaseText.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                phaseText,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: cs.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: server.restoreProgress != null ? null : widget.onClose,
+            child: Text(l10n.lanSyncServerStop),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: widget.onClose,
-          child: Text(l10n.lanSyncServerStop),
-        ),
-      ],
     );
   }
 
@@ -814,109 +915,135 @@ class _ClientDialogState extends State<_ClientDialog> {
     final client = widget.client;
     final phaseText = clientPhaseText(client.phase, l10n);
 
-    return AlertDialog(
-      backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(Icons.link, size: 20, color: cs.primary),
-          const SizedBox(width: 8),
-          Text(l10n.lanSyncClientDialogTitle),
-        ],
-      ),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return PopScope(
+      // The mask contract: the system back button / Esc must not dismiss the
+      // dialog while the merge-restore write window is open (barrierDismissible
+      // does not intercept back — only PopScope does).
+      canPop: client.restoreProgress == null,
+      child: AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
           children: [
-            TextField(
-              controller: widget.hostController,
-              decoration: InputDecoration(
-                labelText: l10n.lanSyncClientHost,
-                hintText: '192.168.1.100',
-                isDense: true,
-                border: const OutlineInputBorder(),
+            Icon(Icons.link, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(l10n.lanSyncClientDialogTitle),
+          ],
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: widget.hostController,
+                decoration: InputDecoration(
+                  labelText: l10n.lanSyncClientHost,
+                  hintText: '192.168.1.100',
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: widget.portController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: l10n.lanSyncClientPort,
-                      isDense: true,
-                      border: const OutlineInputBorder(),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: widget.portController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: l10n.lanSyncClientPort,
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: widget.pinController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    decoration: InputDecoration(
-                      labelText: l10n.lanSyncClientPin,
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                      counterText: '',
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: widget.pinController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: InputDecoration(
+                        labelText: l10n.lanSyncClientPin,
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        counterText: '',
+                      ),
                     ),
+                  ),
+                ],
+              ),
+              if (phaseText.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  phaseText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
-            ),
-            if (phaseText.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                phaseText,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: cs.onSurface.withValues(alpha: 0.6),
+              if (client.plan != null) ...[
+                const SizedBox(height: 12),
+                ...buildPlanSummary(
+                  l10n,
+                  client.plan!,
+                  cs,
+                  outboundFileCount: client.outboundFileCount,
+                  outboundFileSizeBytes: client.outboundFileSizeBytes,
                 ),
-              ),
+              ],
+              if (client.restoreProgress != null) ...[
+                const SizedBox(height: 12),
+                buildRestoreProgress(client.restoreProgress!, l10n, cs),
+              ] else if (client.restoreError != null) ...[
+                const SizedBox(height: 12),
+                buildRestoreError(
+                  client.restoreError!,
+                  l10n,
+                  cs,
+                  onClose: widget.onClose,
+                ),
+              ],
             ],
-            if (client.plan != null) ...[
-              const SizedBox(height: 12),
-              ...buildPlanSummary(l10n, client.plan!, cs),
-            ],
-          ],
+          ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: client.busy ? null : widget.onClose,
-          child: Text(l10n.backupPageCancel),
-        ),
-        FilledButton(
-          onPressed: client.busy
-              ? null
-              : () async {
-                  if (client.plan == null) {
-                    await widget.onNegotiate();
-                  } else {
-                    await widget.onExchange();
-                  }
-                },
-          child: client.busy
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: cs.onPrimary,
+        actions: [
+          TextButton(
+            onPressed: client.busy || client.restoreError != null
+                ? null
+                : widget.onClose,
+            child: Text(l10n.backupPageCancel),
+          ),
+          FilledButton(
+            onPressed: client.busy || client.restoreError != null
+                ? null
+                : () async {
+                    if (client.plan == null) {
+                      await widget.onNegotiate();
+                    } else {
+                      await widget.onExchange();
+                    }
+                  },
+            child: client.busy
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.onPrimary,
+                    ),
+                  )
+                : Text(
+                    client.plan == null
+                        ? l10n.lanSyncClientConnect
+                        : l10n.lanSyncClientConfirm,
                   ),
-                )
-              : Text(
-                  client.plan == null
-                      ? l10n.lanSyncClientConnect
-                      : l10n.lanSyncClientConfirm,
-                ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -975,105 +1102,131 @@ class _ClientSheetState extends State<_ClientSheet> {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     final phaseText = clientPhaseText(client.phase, l10n);
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.lanSyncClientDialogTitle,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            IosFormTextField(
-              label: l10n.lanSyncClientHost,
-              controller: widget.hostController,
-              hintText: '192.168.1.100',
-            ),
-            const SizedBox(height: 10),
-            // Stacked, not side-by-side: two fields in one row are too
-            // cramped for phone widths (issue #182).
-            IosFormTextField(
-              label: l10n.lanSyncClientPort,
-              controller: widget.portController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 10),
-            IosFormTextField(
-              label: l10n.lanSyncClientPin,
-              controller: widget.pinController,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-            ),
-            const SizedBox(height: 16),
-            if (phaseText.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  phaseText,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurface.withValues(alpha: 0.6),
+    return PopScope(
+      // The mask contract: the system back button / Esc must not dismiss the
+      // sheet while the merge-restore write window is open (isDismissible does
+      // not intercept back — only PopScope does).
+      canPop: client.restoreProgress == null,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
-            if (client.plan != null) ...[
-              ...buildPlanSummary(l10n, client.plan!, cs),
               const SizedBox(height: 12),
-            ],
-            FilledButton(
-              onPressed: client.busy
-                  ? null
-                  : () async {
-                      if (client.plan == null) {
-                        await widget.onNegotiate();
-                      } else {
-                        final shouldClose = await widget.onExchange();
-                        if (context.mounted && shouldClose) {
-                          widget.onClose();
-                        }
-                      }
-                    },
-              child: client.busy
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.onPrimary,
-                      ),
-                    )
-                  : Text(
-                      client.plan == null
-                          ? l10n.lanSyncClientConnect
-                          : l10n.lanSyncClientConfirm,
+              Text(
+                l10n.lanSyncClientDialogTitle,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: AppFontWeights.semibold,
+                  color: cs.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              IosFormTextField(
+                label: l10n.lanSyncClientHost,
+                controller: widget.hostController,
+                hintText: '192.168.1.100',
+              ),
+              const SizedBox(height: 10),
+              // Stacked, not side-by-side: two fields in one row are too
+              // cramped for phone widths (issue #182).
+              IosFormTextField(
+                label: l10n.lanSyncClientPort,
+                controller: widget.portController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              IosFormTextField(
+                label: l10n.lanSyncClientPin,
+                controller: widget.pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+              ),
+              const SizedBox(height: 16),
+              if (phaseText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    phaseText,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
                     ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: client.busy ? null : widget.onClose,
-              child: Text(l10n.backupPageCancel),
-            ),
-          ],
+                  ),
+                ),
+              if (client.plan != null) ...[
+                ...buildPlanSummary(
+                  l10n,
+                  client.plan!,
+                  cs,
+                  outboundFileCount: client.outboundFileCount,
+                  outboundFileSizeBytes: client.outboundFileSizeBytes,
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (client.restoreProgress != null) ...[
+                buildRestoreProgress(client.restoreProgress!, l10n, cs),
+                const SizedBox(height: 12),
+              ] else if (client.restoreError != null) ...[
+                buildRestoreError(
+                  client.restoreError!,
+                  l10n,
+                  cs,
+                  onClose: widget.onClose,
+                ),
+                const SizedBox(height: 12),
+              ],
+              FilledButton(
+                onPressed: client.busy || client.restoreError != null
+                    ? null
+                    : () async {
+                        if (client.plan == null) {
+                          await widget.onNegotiate();
+                        } else {
+                          final shouldClose = await widget.onExchange();
+                          if (context.mounted && shouldClose) {
+                            widget.onClose();
+                          }
+                        }
+                      },
+                child: client.busy
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.onPrimary,
+                        ),
+                      )
+                    : Text(
+                        client.plan == null
+                            ? l10n.lanSyncClientConnect
+                            : l10n.lanSyncClientConfirm,
+                      ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: client.busy || client.restoreError != null
+                    ? null
+                    : widget.onClose,
+                child: Text(l10n.backupPageCancel),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1081,11 +1234,17 @@ class _ClientSheetState extends State<_ClientSheet> {
 }
 
 /// Shared plan summary widget builder for sync plan display.
+///
+/// [outboundFileCount]/[outboundFileSizeBytes] are the initiator's own file
+/// payload (computed client-side); [SyncPlan.serverFileCount] is the peer's.
+/// File lines render only when the count is known and > 0.
 List<Widget> buildPlanSummary(
   AppLocalizations l10n,
   SyncPlan plan,
-  ColorScheme cs,
-) {
+  ColorScheme cs, {
+  int? outboundFileCount,
+  int? outboundFileSizeBytes,
+}) {
   if (plan.initiatorOnlyCount == 0 &&
       plan.serverOnlyCount == 0 &&
       plan.forkCount == 0) {
@@ -1119,5 +1278,129 @@ List<Widget> buildPlanSummary(
         ),
       ),
     ],
+    if (outboundFileCount != null && outboundFileCount > 0) ...[
+      const SizedBox(height: 4),
+      Text(
+        l10n.lanSyncPlanToSendFiles(
+          outboundFileCount,
+          formatBytes(outboundFileSizeBytes ?? 0),
+        ),
+        style: TextStyle(fontSize: 14, color: cs.onSurface),
+      ),
+    ],
+    if (plan.serverFileCount != null && plan.serverFileCount! > 0) ...[
+      const SizedBox(height: 4),
+      Text(
+        l10n.lanSyncPlanToReceiveFiles(
+          plan.serverFileCount!,
+          formatBytes(plan.serverFileSizeBytes ?? 0),
+        ),
+        style: TextStyle(fontSize: 14, color: cs.onSurface),
+      ),
+    ],
   ];
+}
+
+/// Shared restore-progress content for the sync dialog/sheet mask: stage
+/// text + determinate bar (indeterminate stages render a busy bar).
+Widget buildRestoreProgress(
+  RestoreProgress progress,
+  AppLocalizations l10n,
+  ColorScheme cs,
+) {
+  final stageText = switch (progress.stage) {
+    RestoreStage.extracting => l10n.lanSyncRestoreExtracting,
+    RestoreStage.mergingChats => l10n.lanSyncRestoreMergingChats,
+    RestoreStage.copyingFiles => l10n.lanSyncRestoreCopyingFiles,
+    RestoreStage.restoringSkills => l10n.lanSyncRestoreRestoringSkills,
+  };
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        stageText,
+        style: TextStyle(
+          fontSize: 13,
+          color: cs.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      const SizedBox(height: 8),
+      LinearProgressIndicator(
+        value: progress.fraction,
+        minHeight: 4,
+        borderRadius: BorderRadius.circular(2),
+      ),
+      if (progress.stage == RestoreStage.copyingFiles &&
+          progress.filesTotal > 0) ...[
+        const SizedBox(height: 6),
+        Text(
+          // gen-l10n orders Object params alphabetically: count, size, total.
+          l10n.lanSyncRestoreFilesProgress(
+            progress.filesCopied,
+            formatBytes(progress.bytesTotal),
+            progress.filesTotal,
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.5),
+          ),
+        ),
+      ],
+      if (progress.stage == RestoreStage.mergingChats &&
+          progress.conversationsTotal > 0) ...[
+        const SizedBox(height: 6),
+        Text(
+          l10n.lanSyncRestoreChatsProgress(
+            progress.conversationsMerged,
+            progress.conversationsTotal,
+          ),
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.5),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// Shared restore-failure content for the sync dialog/sheet: localized error
+/// headline + the exception message + a single close action.
+Widget buildRestoreError(
+  String message,
+  AppLocalizations l10n,
+  ColorScheme cs, {
+  required VoidCallback onClose,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        l10n.lanSyncRestoreFailed,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.error,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        message,
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.onSurface.withValues(alpha: 0.6),
+        ),
+        maxLines: 4,
+        overflow: TextOverflow.ellipsis,
+      ),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          onPressed: onClose,
+          child: Text(l10n.backupPageCancel),
+        ),
+      ),
+    ],
+  );
 }

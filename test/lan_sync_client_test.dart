@@ -280,10 +280,10 @@ void main() {
     test(
       'exchange keeps phase done when the restore callback throws',
       () async {
-        // The restore flow pops the sheet itself (widget layer). When the
-        // restore callback throws, the phase must stay `done` (NOT reset to
-        // planReceived) so the widget's `_exchange` returns false and the
-        // caller does not pop a second time (issue #182 double-pop guard).
+        // The section's _restoreAndRestart catches restore failures itself,
+        // but if the callback still throws, the phase must stay `done` (NOT
+        // reset to planReceived) so the widget's `_exchange` returns false
+        // and the caller does not close twice (issue #182 double-pop guard).
         final zipBytes = utf8.encode('PK fake zip content');
         final lanClient = LanSyncClient(
           chatService: chatService,
@@ -450,6 +450,56 @@ void main() {
         } finally {
           archive.clearSync();
         }
+      },
+    );
+
+    test(
+      'negotiate computes outbound file stats from the plan since',
+      () async {
+        // Install the fake path provider so countFilesForSince walks real
+        // temp dirs; restore the previous instance afterwards.
+        final prevProvider = PathProviderPlatform.instance;
+        final support = Directory('${tempDir.path}/support');
+        await support.create(recursive: true);
+        PathProviderPlatform.instance = _FakePathProviderPlatform(support.path);
+        addTearDown(() => PathProviderPlatform.instance = prevProvider);
+
+        // One qualifying upload file (mtime after the plan's since).
+        final uploadDir = Directory('${support.path}/upload');
+        await uploadDir.create(recursive: true);
+        final f = File('${uploadDir.path}/a.bin');
+        await f.writeAsBytes(List<int>.filled(16, 7));
+        await f.setLastModified(DateTime(2026, 1, 2));
+
+        final planWithSince = SyncPlan(
+          conversations: const [],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2026, 1, 1),
+          serverFileCount: 3,
+          serverFileSizeBytes: 999,
+        );
+
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient(
+            (request) async => http.Response(planWithSince.toJsonString(), 200),
+          ),
+        );
+
+        final plan = await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        // Peer's inbound payload comes from the plan...
+        expect(plan.serverFileCount, 3);
+        expect(plan.serverFileSizeBytes, 999);
+        // ...our own outbound payload is computed locally (1 file, 16 bytes).
+        expect(lanClient.outboundFileCount, 1);
+        expect(lanClient.outboundFileSizeBytes, 16);
       },
     );
   });

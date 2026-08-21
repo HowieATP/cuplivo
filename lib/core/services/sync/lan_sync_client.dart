@@ -48,6 +48,24 @@ class LanSyncClient extends ChangeNotifier {
   SyncPlan? _plan;
   SyncPlan? get plan => _plan;
 
+  /// Outbound file payload for the current plan (mirrors `_packZipSync`),
+  /// computed from the plan's `since`. Null until [negotiate] completes or
+  /// when `since` is null (nothing will be packed).
+  int? _outboundFileCount;
+  int? _outboundFileSizeBytes;
+  int? get outboundFileCount => _outboundFileCount;
+  int? get outboundFileSizeBytes => _outboundFileSizeBytes;
+
+  /// Restore progress snapshot, non-null only while this device is
+  /// merge-restoring a received zip (the mask content in the UI).
+  RestoreProgress? _restoreProgress;
+  RestoreProgress? get restoreProgress => _restoreProgress;
+
+  /// Non-null when a received-zip restore failed; the UI shows the failed
+  /// state (with a close action) instead of the progress mask.
+  String? _restoreError;
+  String? get restoreError => _restoreError;
+
   /// Whether a sync operation is in progress.
   bool _busy = false;
   bool get busy => _busy;
@@ -114,6 +132,13 @@ class LanSyncClient extends ChangeNotifier {
 
       final plan = SyncPlan.fromJsonString(response.body);
       _plan = plan;
+      // Compute our own outbound file payload so the plan preview can show
+      // "will send N files". Stat-only; the expensive pack happens later.
+      final outboundStats = plan.since != null
+          ? await _dataSync.countFilesForSince(plan.since!)
+          : null;
+      _outboundFileCount = outboundStats?.fileCount;
+      _outboundFileSizeBytes = outboundStats?.totalBytes;
       _phase = LanSyncPhase.planReceived;
       notifyListeners();
       return plan;
@@ -252,8 +277,28 @@ class LanSyncClient extends ChangeNotifier {
   /// Resets the client state for a new sync session.
   void reset() {
     _plan = null;
+    _outboundFileCount = null;
+    _outboundFileSizeBytes = null;
+    _restoreProgress = null;
+    _restoreError = null;
     _phase = LanSyncPhase.idle;
     _busy = false;
+    notifyListeners();
+  }
+
+  /// Sets the restore progress snapshot for the mask UI. Passing null clears
+  /// it (and any error). Notifies listeners so the dialog/sheet rebuilds.
+  void setRestoreProgress(RestoreProgress? progress) {
+    _restoreProgress = progress;
+    if (progress == null) _restoreError = null;
+    notifyListeners();
+  }
+
+  /// Marks the received-zip restore as failed with [message]. The UI shows
+  /// the failed state (close action) instead of the progress mask.
+  void setRestoreError(String message) {
+    _restoreError = message;
+    _restoreProgress = null;
     notifyListeners();
   }
 }

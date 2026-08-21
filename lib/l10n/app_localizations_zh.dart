@@ -2317,6 +2317,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lanSyncPlanNoChanges => '无待同步内容。';
 
   @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '将发送 $count 个文件（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '将接收 $count 个文件（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解压同步数据...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合并聊天记录...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在写入文件...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢复技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 个文件 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 个会话';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步数据合并失败';
+
+  @override
   String get lanSyncErrorInvalidPin => 'PIN 错误';
 
   @override
@@ -10441,6 +10476,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get lanSyncPlanNoChanges => '无待同步内容。';
 
   @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '将发送 $count 个文件（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '将接收 $count 个文件（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解压同步数据...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合并聊天记录...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在写入文件...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢复技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 个文件 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 个会话';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步数据合并失败';
+
+  @override
   String get lanSyncErrorInvalidPin => 'PIN 错误';
 
   @override
@@ -18563,6 +18633,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get lanSyncPlanNoChanges => '無待同步內容。';
+
+  @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '將傳送 $count 個檔案（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '將接收 $count 個檔案（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解壓同步資料...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合併聊天記錄...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在寫入檔案...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢復技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 個檔案 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 個對話';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步資料合併失敗';
 
   @override
   String get lanSyncErrorInvalidPin => 'PIN 錯誤';

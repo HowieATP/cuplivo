@@ -127,6 +127,12 @@ class SyncPlan {
   /// Both sides use this to build their zip.
   final DateTime? since;
 
+  /// Number of files the server (B) will pack into its incremental zip, and
+  /// their total size in bytes. Null when unknown (old peer, or `since` was
+  /// null so no zip will be built). Optional — forward/backward compatible.
+  final int? serverFileCount;
+  final int? serverFileSizeBytes;
+
   /// Convenience: total conversations with initiator-only increments.
   int get initiatorOnlyCount =>
       conversations.where((c) => c.state == SyncConvState.initiatorOnly).length;
@@ -144,6 +150,8 @@ class SyncPlan {
     required this.missingAssistantIds,
     required this.remoteMissingAssistantIds,
     required this.since,
+    this.serverFileCount,
+    this.serverFileSizeBytes,
   });
 
   Map<String, dynamic> toJson() => {
@@ -151,6 +159,8 @@ class SyncPlan {
     'missingAssistantIds': missingAssistantIds,
     'remoteMissingAssistantIds': remoteMissingAssistantIds,
     'since': since?.toIso8601String(),
+    if (serverFileCount != null) 'serverFileCount': serverFileCount,
+    if (serverFileSizeBytes != null) 'serverFileSizeBytes': serverFileSizeBytes,
   };
 
   String toJsonString() => jsonEncode(toJson());
@@ -174,6 +184,8 @@ class SyncPlan {
       remoteMissingAssistantIds: (json['remoteMissingAssistantIds'] as List)
           .cast<String>(),
       since: sinceStr != null ? DateTime.parse(sinceStr) : null,
+      serverFileCount: json['serverFileCount'] as int?,
+      serverFileSizeBytes: json['serverFileSizeBytes'] as int?,
     );
   }
 

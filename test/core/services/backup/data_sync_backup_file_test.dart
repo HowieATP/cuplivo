@@ -293,6 +293,197 @@ void main() {
       },
     );
 
+    test('merge restore replaces workspaces files only when the backup entry '
+        'is newer', () async {
+      final sourceDir = Directory('${root.path}/source_ws');
+      await sourceDir.create(recursive: true);
+      final sourceFile = File('${sourceDir.path}/default/report.md');
+      await sourceFile.create(recursive: true);
+      await sourceFile.writeAsString('backup version');
+      // Even seconds: ZIP DOS timestamps round down to 2s granularity.
+      await sourceFile.setLastModified(DateTime(2026, 1, 2));
+
+      final zipFile = File('${root.path}/ws_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(sourceFile, 'workspaces/default/report.md');
+      encoder.closeSync();
+
+      final wsDir = Directory('${root.path}/workspaces');
+      await wsDir.create(recursive: true);
+      final localFile = File('${wsDir.path}/default/report.md');
+      await localFile.create(recursive: true);
+      await localFile.writeAsString('local version');
+      await localFile.setLastModified(DateTime(2026, 1, 1));
+
+      final sync = DataSync(chatService: ChatService());
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      // Backup entry (Jan 2) is newer than the local copy (Jan 1) →
+      // replaced (newer-wins, same rule as skills).
+      expect(await localFile.readAsString(), contains('backup version'));
+
+      // Local copy becomes newer than the backup entry (Jan 3) → kept.
+      await localFile.writeAsString('local version');
+      await localFile.setLastModified(DateTime(2026, 1, 3));
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      expect(await localFile.readAsString(), contains('local version'));
+    });
+
+    test(
+      'countFilesForSince mirrors pack rules (mtime, dot, skills)',
+      () async {
+        final since = DateTime(2026, 1, 1, 12);
+        // upload/: one file before since (excluded), one after (included).
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final oldFile = File('${uploadDir.path}/old.bin');
+        await oldFile.writeAsBytes(List<int>.filled(10, 1));
+        await oldFile.setLastModified(DateTime(2026, 1, 1, 11));
+        final newFile = File('${uploadDir.path}/new.bin');
+        await newFile.writeAsBytes(List<int>.filled(20, 2));
+        await newFile.setLastModified(DateTime(2026, 1, 2));
+
+        // workspaces/: visible file after since (included), dot-prefixed file
+        // after since (excluded — one dotfile rule, mirrors _packZipSync).
+        final wsDir = Directory('${root.path}/workspaces/default');
+        await wsDir.create(recursive: true);
+        final wsFile = File('${wsDir.path}/note.md');
+        await wsFile.writeAsBytes(List<int>.filled(30, 3));
+        await wsFile.setLastModified(DateTime(2026, 1, 2));
+        final dotFile = File('${wsDir.path}/.fetch_cache/x.md');
+        await dotFile.create(recursive: true);
+        await dotFile.writeAsBytes(List<int>.filled(40, 4));
+        await dotFile.setLastModified(DateTime(2026, 1, 2));
+
+        // skills/: one file after since (always counted).
+        final skillsDir = Directory('${root.path}/skills');
+        await skillsDir.create(recursive: true);
+        final skillFile = File('${skillsDir.path}/pdf-processing/SKILL.md');
+        await skillFile.create(recursive: true);
+        await skillFile.writeAsBytes(List<int>.filled(50, 5));
+        await skillFile.setLastModified(DateTime(2026, 1, 2));
+
+        final sync = DataSync(chatService: ChatService());
+        final result = await sync.countFilesForSince(since);
+
+        // upload new.bin (20) + workspaces note.md (30) + skill (50).
+        expect(result.fileCount, 3);
+        expect(result.totalBytes, 100);
+      },
+    );
+
+    test(
+      'merge restore newer-wins survives odd-second mtimes (UT timestamp)',
+      () async {
+        // Round-trip through the PRODUCTION writer + extractor: a genuinely
+        // newer peer copy whose mtime is an odd second (2026-01-02 00:00:57)
+        // must win over a local copy 500 ms older. DOS timestamps round down
+        // to even seconds (56) and would lose to 56.5; the UT (0x5455) extra
+        // field must carry the true second.
+        final wsDir = Directory('${root.path}/workspaces/default');
+        await wsDir.create(recursive: true);
+        final liveFile = File('${wsDir.path}/report.md');
+        await liveFile.create(recursive: true);
+        await liveFile.writeAsString('backup version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 57));
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+          ),
+        );
+
+        // The live copy now becomes device B's genuinely older copy (56.5s,
+        // inside the 2s DOS rounding window).
+        await liveFile.writeAsString('local version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 56, 500));
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        // Odd-second backup mtime must win (57 > 56.5).
+        expect(await liveFile.readAsString(), contains('backup version'));
+
+        // Local copy becomes genuinely newer (57.5s) → kept.
+        await liveFile.writeAsString('local version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 57, 500));
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        expect(await liveFile.readAsString(), contains('local version'));
+      },
+    );
+
+    test(
+      'restore progress fraction never regresses across directories',
+      () async {
+        // Three trees so the cumulative totalFiles jumps at directory
+        // boundaries (upload → images → workspaces). The raw fraction would
+        // dip to 0.5 after upload/ completes; the reported fraction must be
+        // monotonic non-decreasing.
+        final zipFile = File('${root.path}/progress.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final src = Directory('${root.path}/progress_src');
+        for (final name in [
+          'upload/a.txt',
+          'images/b.txt',
+          'workspaces/c.txt',
+        ]) {
+          final f = File('${src.path}/$name');
+          await f.create(recursive: true);
+          await f.writeAsString(name);
+          encoder.addFileSync(f, name);
+        }
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        final fractions = <double>[];
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+          onProgress: (p) {
+            if (p.stage == RestoreStage.copyingFiles && p.fraction != null) {
+              fractions.add(p.fraction!);
+            }
+          },
+        );
+
+        expect(fractions, isNotEmpty);
+        for (var i = 1; i < fractions.length; i++) {
+          expect(
+            fractions[i],
+            greaterThanOrEqualTo(fractions[i - 1]),
+            reason:
+                'fraction regressed at index $i: ${fractions[i - 1]} -> '
+                '${fractions[i]}',
+          );
+        }
+      },
+    );
+
     test(
       'skills are exported and restored regardless of includeFiles',
       () async {

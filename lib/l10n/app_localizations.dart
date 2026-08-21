@@ -4445,6 +4445,60 @@ abstract class AppLocalizations {
   /// **'No changes to sync.'**
   String get lanSyncPlanNoChanges;
 
+  /// No description provided for @lanSyncPlanToSendFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files to send ({size})'**
+  String lanSyncPlanToSendFiles(Object count, Object size);
+
+  /// No description provided for @lanSyncPlanToReceiveFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files to receive ({size})'**
+  String lanSyncPlanToReceiveFiles(Object count, Object size);
+
+  /// No description provided for @lanSyncRestoreExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting sync data...'**
+  String get lanSyncRestoreExtracting;
+
+  /// No description provided for @lanSyncRestoreMergingChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Merging chats...'**
+  String get lanSyncRestoreMergingChats;
+
+  /// No description provided for @lanSyncRestoreCopyingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing files...'**
+  String get lanSyncRestoreCopyingFiles;
+
+  /// No description provided for @lanSyncRestoreRestoringSkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring skills...'**
+  String get lanSyncRestoreRestoringSkills;
+
+  /// No description provided for @lanSyncRestoreFilesProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{total} files · {size}'**
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total);
+
+  /// No description provided for @lanSyncRestoreChatsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{total} conversations'**
+  String lanSyncRestoreChatsProgress(Object count, Object total);
+
+  /// No description provided for @lanSyncRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync data merge failed'**
+  String get lanSyncRestoreFailed;
+
   /// No description provided for @lanSyncErrorInvalidPin.
   ///
   /// In en, this message translates to:

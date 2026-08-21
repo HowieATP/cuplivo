@@ -155,5 +155,138 @@ void main() {
         ),
       );
     });
+
+    test('cachedUsage returns the result of a previous fetch', () async {
+      var calls = 0;
+      final client = MockClient((_) async {
+        calls++;
+        return http.Response(
+          '{"account":{"plan_usage":100,"plan_limit":500}}',
+          200,
+        );
+      });
+
+      final options = TavilyOptions(
+        id: 'cache-hit',
+        apiKeys: [ApiKeyConfig.create('tvly-cache')],
+      );
+      await SearchServiceUsageService.fetch(options, client: client);
+      expect(calls, 1);
+
+      final cached = SearchServiceUsageService.cachedUsage(options);
+      expect(cached, isNotNull);
+      expect(cached!.remaining, 400);
+      expect(calls, 1, reason: 'cachedUsage must not hit the network');
+    });
+
+    test('cachedUsage keys on id, credential, and endpoint', () async {
+      final client = MockClient(
+        (_) async => http.Response(
+          '{"account":{"plan_usage":10,"plan_limit":100}}',
+          200,
+        ),
+      );
+      await SearchServiceUsageService.fetch(
+        TavilyOptions(id: 'cache-a', apiKeys: [ApiKeyConfig.create('k1')]),
+        client: client,
+      );
+
+      expect(
+        SearchServiceUsageService.cachedUsage(
+          TavilyOptions(id: 'cache-b', apiKeys: [ApiKeyConfig.create('k1')]),
+        ),
+        isNull,
+        reason: 'a different service id must miss the cache',
+      );
+      expect(
+        SearchServiceUsageService.cachedUsage(
+          TavilyOptions(id: 'cache-a', apiKeys: [ApiKeyConfig.create('k2')]),
+        ),
+        isNull,
+        reason: 'a different credential must miss the cache',
+      );
+      expect(
+        SearchServiceUsageService.cachedUsage(
+          TavilyOptions(id: 'cache-a', apiKeys: [ApiKeyConfig.create('k1')]),
+        ),
+        isNotNull,
+      );
+    });
+
+    test(
+      'cachedUsage and hasCredential reject unsupported providers',
+      () async {
+        final options = ExaOptions(
+          id: 'exa',
+          apiKeys: [ApiKeyConfig.create('k')],
+        );
+        expect(SearchServiceUsageService.cachedUsage(options), isNull);
+        expect(SearchServiceUsageService.hasCredential(options), isFalse);
+      },
+    );
+
+    test(
+      'hasCredential requires a non-empty key for supported providers',
+      () async {
+        expect(
+          SearchServiceUsageService.hasCredential(
+            TavilyOptions(id: 't', apiKeys: [ApiKeyConfig.create(' k ')]),
+          ),
+          isTrue,
+        );
+        expect(
+          SearchServiceUsageService.hasCredential(
+            LinkUpOptions(id: 'l', apiKeys: [ApiKeyConfig.create('lk')]),
+          ),
+          isTrue,
+        );
+        expect(
+          SearchServiceUsageService.hasCredential(
+            TavilyOptions(id: 't', apiKeys: [ApiKeyConfig.create('')]),
+          ),
+          isFalse,
+        );
+        expect(
+          SearchServiceUsageService.hasCredential(LinkUpOptions(id: 'l')),
+          isFalse,
+        );
+      },
+    );
+
+    test('cache evicts all entries when it exceeds 50', () async {
+      final client = MockClient(
+        (_) async =>
+            http.Response('{"account":{"plan_usage":1,"plan_limit":10}}', 200),
+      );
+      for (var i = 0; i < 51; i++) {
+        await SearchServiceUsageService.fetch(
+          TavilyOptions(
+            id: 'evict-$i',
+            apiKeys: [ApiKeyConfig.create('evict-key')],
+          ),
+          client: client,
+        );
+      }
+
+      expect(
+        SearchServiceUsageService.cachedUsage(
+          TavilyOptions(
+            id: 'evict-0',
+            apiKeys: [ApiKeyConfig.create('evict-key')],
+          ),
+        ),
+        isNull,
+        reason: 'the oldest entries must be evicted',
+      );
+      expect(
+        SearchServiceUsageService.cachedUsage(
+          TavilyOptions(
+            id: 'evict-50',
+            apiKeys: [ApiKeyConfig.create('evict-key')],
+          ),
+        ),
+        isNotNull,
+      );
+    });
   });
 }

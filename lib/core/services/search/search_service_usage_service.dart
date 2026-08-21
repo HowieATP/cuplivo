@@ -31,8 +31,55 @@ class SearchServiceUsageInfo {
 class SearchServiceUsageService {
   const SearchServiceUsageService._();
 
+  static final Map<SearchUsageCacheKey, SearchServiceUsageInfo> _usageCache =
+      {};
+  static const int _usageCacheMaxEntries = 50;
+
   static bool supports(SearchServiceOptions options) =>
       options is TavilyOptions || options is LinkUpOptions;
+
+  static bool hasCredential(SearchServiceOptions options) {
+    return switch (options) {
+      TavilyOptions value => value.apiKey.trim().isNotEmpty,
+      LinkUpOptions value => value.apiKey.trim().isNotEmpty,
+      _ => false,
+    };
+  }
+
+  static SearchServiceUsageInfo? cachedUsage(SearchServiceOptions options) {
+    final key = cacheKey(options);
+    return key == null ? null : _usageCache[key];
+  }
+
+  static void _storeUsage(
+    SearchServiceOptions options,
+    SearchServiceUsageInfo usage,
+  ) {
+    final key = cacheKey(options);
+    if (key == null) return;
+    if (_usageCache.length >= _usageCacheMaxEntries) _usageCache.clear();
+    _usageCache[key] = usage;
+  }
+
+  static SearchUsageCacheKey? cacheKey(SearchServiceOptions options) {
+    if (options is TavilyOptions) {
+      return (
+        id: options.id,
+        provider: 'tavily',
+        credential: options.apiKey.trim(),
+        endpoint: options.resolvedUrl,
+      );
+    }
+    if (options is LinkUpOptions) {
+      return (
+        id: options.id,
+        provider: 'linkup',
+        credential: options.apiKey.trim(),
+        endpoint: '',
+      );
+    }
+    return null;
+  }
 
   static Future<SearchServiceUsageInfo> fetch(
     SearchServiceOptions options, {
@@ -53,15 +100,18 @@ class SearchServiceUsageService {
       whenError: _shouldRetryUsageRequest,
     );
     try {
+      SearchServiceUsageInfo usage;
       if (options is TavilyOptions) {
-        return await _fetchTavily(options, effectiveClient, timeout);
+        usage = await _fetchTavily(options, effectiveClient, timeout);
+      } else if (options is LinkUpOptions) {
+        usage = await _fetchLinkUp(options, effectiveClient, timeout);
+      } else {
+        throw const SearchServiceUsageException(
+          'Usage query is not supported for this search provider',
+        );
       }
-      if (options is LinkUpOptions) {
-        return await _fetchLinkUp(options, effectiveClient, timeout);
-      }
-      throw const SearchServiceUsageException(
-        'Usage query is not supported for this search provider',
-      );
+      _storeUsage(options, usage);
+      return usage;
     } on SearchServiceUsageException {
       rethrow;
     } on FormatException {
@@ -178,3 +228,10 @@ class SearchServiceUsageService {
         message.contains('connection reset by peer');
   }
 }
+
+typedef SearchUsageCacheKey = ({
+  String? id,
+  String provider,
+  String credential,
+  String endpoint,
+});

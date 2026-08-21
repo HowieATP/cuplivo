@@ -37,6 +37,13 @@ Cuplivo's model rather than porting upstream's key plumbing verbatim.
   (usage polling must not perturb search distribution). On-demand fetch, no
   persistence, 10s timeout, 2 retries. Tavily `/usage` and LinkUp
   `/credits/balance` only.
+- **Shared usage cache**: a static in-memory cache (keyed by service id +
+  provider + credential + endpoint, capped at 50 entries, full clear on
+  overflow) lives in `SearchServiceUsageService` and is shared by the mobile
+  editor page and the desktop edit dialog, so a query on either surface is
+  instantly visible on the other. Desktop deviation from upstream: the edit
+  dialog shows a compact usage panel (auto-query when a credential exists,
+  manual refresh) because upstream has no desktop usage UI.
 - **Firecrawl is key-optional**: hosted `/v2/search` accepts keyless requests;
   the key field is shown but not required, and no `Authorization` header is
   sent when empty. Matches upstream commit `2257ac13`.

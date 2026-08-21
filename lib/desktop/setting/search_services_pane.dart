@@ -5,8 +5,10 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/search/search_service.dart';
+import '../../core/services/search/search_service_usage_service.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
@@ -1700,6 +1702,21 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       if (fields.isNotEmpty) fields.add(const SizedBox(height: 12));
       fields.addAll(_buildKeyManagement());
     }
+    if (SearchServiceUsageService.supports(s)) {
+      if (fields.isNotEmpty) fields.add(const SizedBox(height: 14));
+      fields.add(
+        _DialogUsagePanel(
+          optionsBuilder: _updateService,
+          timeout: Duration(
+            milliseconds: context
+                .read<SettingsProvider>()
+                .searchCommonOptions
+                .timeout
+                .clamp(1000, 30000),
+          ),
+        ),
+      );
+    }
     return fields;
   }
 
@@ -1989,6 +2006,271 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     }
     return s;
   }
+}
+
+class _DialogUsagePanel extends StatefulWidget {
+  const _DialogUsagePanel({
+    required this.optionsBuilder,
+    required this.timeout,
+  });
+
+  final SearchServiceOptions Function() optionsBuilder;
+  final Duration timeout;
+
+  @override
+  State<_DialogUsagePanel> createState() => _DialogUsagePanelState();
+}
+
+class _DialogUsagePanelState extends State<_DialogUsagePanel> {
+  SearchServiceUsageInfo? _usage;
+  String? _error;
+  bool _loading = false;
+  int _requestGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = widget.optionsBuilder();
+    _usage = SearchServiceUsageService.cachedUsage(draft);
+    if (SearchServiceUsageService.hasCredential(draft)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _query();
+      });
+    }
+  }
+
+  Future<void> _query() async {
+    if (_loading) return;
+    final options = widget.optionsBuilder();
+    final key = SearchServiceUsageService.cacheKey(options);
+    final generation = ++_requestGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final usage = await SearchServiceUsageService.fetch(
+        options,
+        timeout: widget.timeout,
+      );
+      if (!mounted ||
+          generation != _requestGeneration ||
+          SearchServiceUsageService.cacheKey(widget.optionsBuilder()) != key) {
+        return;
+      }
+      setState(() => _usage = usage);
+    } catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      var message = error.toString();
+      while (message.startsWith('Exception: ')) {
+        message = message.substring('Exception: '.length).trim();
+      }
+      setState(() => _error = message);
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final usage = _usage;
+    final draft = widget.optionsBuilder();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(lucide.Lucide.Wallet, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.searchServiceEditorUsageTitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+              ),
+              if (_loading)
+                SizedBox.square(
+                  dimension: 22,
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 13,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Tooltip(
+                  message: l10n.searchServiceEditorUsageQuery,
+                  child: _SmallIconBtn(
+                    icon: lucide.Lucide.RefreshCw,
+                    onTap: _query,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ..._buildStatus(context, draft, usage),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildStatus(
+    BuildContext context,
+    SearchServiceOptions options,
+    SearchServiceUsageInfo? usage,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    if (_loading && usage == null) {
+      return [
+        Text(
+          l10n.searchServiceEditorUsageQuerying,
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ];
+    }
+    final error = _error;
+    final errorRow = error == null
+        ? null
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(lucide.Lucide.TriangleAlert, size: 15, color: cs.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.searchServiceEditorUsageFailed(error),
+                  style: TextStyle(fontSize: 12, height: 1.35, color: cs.error),
+                ),
+              ),
+            ],
+          );
+    if (error != null && usage == null) {
+      return [errorRow!];
+    }
+    final value = usage;
+    if (value == null) {
+      return [
+        Text(
+          l10n.searchServiceEditorUsageNotQueried,
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      ];
+    }
+    final rows = <Widget>[];
+    if (options is TavilyOptions && value.used != null && value.limit != null) {
+      final limit = value.limit!;
+      final progress = limit <= 0
+          ? 0.0
+          : (value.used! / limit).clamp(0.0, 1.0).toDouble();
+      rows.addAll([
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.searchServiceEditorUsageRemaining(
+                  _formatUsageNumber(context, value.remaining),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: AppFontWeights.semibold,
+                  color: cs.primary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l10n.searchServiceEditorUsageUsed(
+                _formatUsageNumber(context, value.used!),
+                _formatUsageNumber(context, limit),
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 5,
+            color: cs.primary,
+            backgroundColor: cs.primary.withValues(alpha: 0.13),
+          ),
+        ),
+      ]);
+    } else if (options is LinkUpOptions) {
+      rows.add(
+        Text(
+          l10n.searchServiceEditorUsageBalance(
+            _formatUsageNumber(context, value.remaining),
+          ),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.primary,
+          ),
+        ),
+      );
+    } else {
+      rows.add(
+        Text(
+          l10n.searchServiceEditorUsageRemaining(
+            _formatUsageNumber(context, value.remaining),
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.primary,
+          ),
+        ),
+      );
+    }
+    if (errorRow != null) {
+      rows.add(const SizedBox(height: 8));
+      rows.add(errorRow);
+    }
+    return rows;
+  }
+}
+
+String _formatUsageNumber(BuildContext context, num value) {
+  final format =
+      NumberFormat.decimalPattern(
+          Localizations.localeOf(context).toLanguageTag(),
+        )
+        ..minimumFractionDigits = 0
+        ..maximumFractionDigits = 2;
+  return format.format(value);
 }
 
 class _ServiceTypeChips extends StatefulWidget {

@@ -29,13 +29,6 @@ typedef SearchServiceUsageFetcher =
 typedef SearchServiceTestFetcher =
     Future<SearchResult> Function(String query, SearchServiceOptions options);
 
-typedef _SearchUsageCacheKey = ({
-  String id,
-  String provider,
-  String credential,
-  String endpoint,
-});
-
 class SearchServiceEditorPage extends StatefulWidget {
   const SearchServiceEditorPage({
     super.key,
@@ -60,10 +53,6 @@ class SearchServiceEditorPage extends StatefulWidget {
 }
 
 class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
-  static final Map<_SearchUsageCacheKey, SearchServiceUsageInfo> _usageCache =
-      {};
-  static const int _usageCacheMaxEntries = 50;
-
   final _formKey = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   final _queryController = TextEditingController();
@@ -97,8 +86,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     _editKeys = List<ApiKeyConfig>.of(initial.apiKeys);
     _keyManagement = initial.keyManagement;
     _initializeControllers(initial);
-    _usage = _cachedUsage(widget.initialService);
-    if (widget.autoQueryUsage && _hasUsageCredential(widget.initialService)) {
+    _usage = widget.initialService == null
+        ? null
+        : SearchServiceUsageService.cachedUsage(widget.initialService!);
+    if (widget.autoQueryUsage &&
+        widget.initialService != null &&
+        SearchServiceUsageService.hasCredential(widget.initialService!)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _queryUsage();
       });
@@ -969,11 +962,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     FocusScope.of(context).unfocus();
     final options = _currentService();
     if (!SearchServiceUsageService.supports(options)) return;
-    final cacheKey = _usageCacheKey(options);
+    final cacheKey = SearchServiceUsageService.cacheKey(options);
     final requestGeneration = ++_usageRequestGeneration;
     setState(() {
       _usageLoading = true;
-      _usage ??= cacheKey == null ? null : _usageCache[cacheKey];
+      _usage ??= cacheKey == null
+          ? null
+          : SearchServiceUsageService.cachedUsage(options);
       _usageError = null;
     });
     try {
@@ -987,18 +982,14 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             );
       if (!mounted ||
           requestGeneration != _usageRequestGeneration ||
-          _usageCacheKey(_currentService()) != cacheKey) {
+          SearchServiceUsageService.cacheKey(_currentService()) != cacheKey) {
         return;
-      }
-      if (cacheKey != null) {
-        if (_usageCache.length >= _usageCacheMaxEntries) _usageCache.clear();
-        _usageCache[cacheKey] = usage;
       }
       setState(() => _usage = usage);
     } catch (error) {
       if (!mounted ||
           requestGeneration != _usageRequestGeneration ||
-          _usageCacheKey(_currentService()) != cacheKey) {
+          SearchServiceUsageService.cacheKey(_currentService()) != cacheKey) {
         return;
       }
       setState(() => _usageError = _cleanError(error));
@@ -1027,7 +1018,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _usageLoading = false;
       _testResult = null;
       _testError = null;
-      _usage = _cachedUsage(_currentService());
+      _usage = SearchServiceUsageService.cachedUsage(_currentService());
       _usageError = null;
     });
     // Dispose the old controllers only after the frame rebuilt with the new
@@ -1049,35 +1040,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _usageLoading = false;
       _testResult = null;
       _testError = null;
-      _usage = _cachedUsage(_currentService());
+      _usage = SearchServiceUsageService.cachedUsage(_currentService());
       _usageError = null;
     });
-  }
-
-  static SearchServiceUsageInfo? _cachedUsage(SearchServiceOptions? options) {
-    if (options == null) return null;
-    final key = _usageCacheKey(options);
-    return key == null ? null : _usageCache[key];
-  }
-
-  static _SearchUsageCacheKey? _usageCacheKey(SearchServiceOptions options) {
-    if (options is TavilyOptions) {
-      return (
-        id: options.id,
-        provider: 'tavily',
-        credential: options.apiKey.trim(),
-        endpoint: options.resolvedUrl,
-      );
-    }
-    if (options is LinkUpOptions) {
-      return (
-        id: options.id,
-        provider: 'linkup',
-        credential: options.apiKey.trim(),
-        endpoint: '',
-      );
-    }
-    return null;
   }
 
   void _save() {
@@ -2301,14 +2266,6 @@ String _cleanError(Object error) {
     message = message.substring('Exception: '.length).trim();
   }
   return message;
-}
-
-bool _hasUsageCredential(SearchServiceOptions? options) {
-  return switch (options) {
-    TavilyOptions value => value.apiKey.trim().isNotEmpty,
-    LinkUpOptions value => value.apiKey.trim().isNotEmpty,
-    _ => false,
-  };
 }
 
 String _typeForService(SearchServiceOptions service) {

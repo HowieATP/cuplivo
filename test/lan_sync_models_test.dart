@@ -68,4 +68,82 @@ void main() {
       expect(decoded.serverFileCount, 7);
     });
   });
+
+  group('file manifest serialization', () {
+    test('SyncIndex round-trips fileManifest', () {
+      final original = SyncIndex(
+        conversations: {
+          'c1': ['m1'],
+        },
+        assistantIds: ['a1'],
+        fileManifest: {
+          'workspaces/x': const FileManifestEntry(size: 12, mtimeMs: 12345),
+          'upload/a.png': const FileManifestEntry(size: 3, mtimeMs: 67890),
+        },
+      );
+      final restored = SyncIndex.fromJsonString(original.toJsonString());
+      expect(restored.conversations, original.conversations);
+      expect(restored.fileManifest?['workspaces/x']?.size, 12);
+      expect(restored.fileManifest?['workspaces/x']?.mtimeMs, 12345);
+      expect(restored.fileManifest?['upload/a.png']?.mtimeMs, 67890);
+    });
+
+    test('SyncIndex without fileManifest parses (old peer)', () {
+      const original = SyncIndex(conversations: {}, assistantIds: []);
+      final restored = SyncIndex.fromJsonString(original.toJsonString());
+      expect(restored.fileManifest, isNull);
+    });
+
+    test('SyncConvPlan round-trips its per-conversation since', () {
+      final original = SyncConvPlan(
+        conversationId: 'c1',
+        state: SyncConvState.initiatorOnly,
+        forkPointMessageId: 'm2',
+        initiatorIncrementCount: 1,
+        serverIncrementCount: 0,
+        since: DateTime(2025, 1, 15, 10, 30),
+      );
+      final restored = SyncConvPlan.fromJson(
+        Map<String, dynamic>.from(original.toJson()),
+      );
+      expect(restored.since, DateTime(2025, 1, 15, 10, 30));
+    });
+
+    test('SyncConvPlan without since parses (old format)', () {
+      final json = <String, dynamic>{
+        'conversationId': 'c1',
+        'state': 'identical',
+        'forkPointMessageId': null,
+        'initiatorIncrementCount': 0,
+        'serverIncrementCount': 0,
+      };
+      final restored = SyncConvPlan.fromJson(json);
+      expect(restored.since, isNull);
+    });
+
+    test('SyncPlan round-trips serverFileManifest', () {
+      final original = SyncPlan(
+        conversations: const [],
+        missingAssistantIds: const [],
+        remoteMissingAssistantIds: const [],
+        since: null,
+        serverFileManifest: {
+          'workspaces/x': const FileManifestEntry(size: 1, mtimeMs: 99),
+        },
+      );
+      final restored = SyncPlan.fromJsonString(original.toJsonString());
+      expect(restored.serverFileManifest?['workspaces/x']?.mtimeMs, 99);
+    });
+
+    test('SyncPlan without serverFileManifest parses (old format)', () {
+      const original = SyncPlan(
+        conversations: [],
+        missingAssistantIds: [],
+        remoteMissingAssistantIds: [],
+        since: null,
+      );
+      final restored = SyncPlan.fromJsonString(original.toJsonString());
+      expect(restored.serverFileManifest, isNull);
+    });
+  });
 }

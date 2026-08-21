@@ -26,13 +26,19 @@ import 'ios_tactile.dart';
 /// Adapts layout for mobile vs desktop based on [Platform.isAndroid]/[isIOS].
 /// Both layouts share the same sync logic via [LanSyncServer] and [LanSyncClient].
 class LanSyncSection extends StatefulWidget {
-  const LanSyncSection({super.key, this.lanSyncHttpClient});
+  const LanSyncSection({super.key, this.lanSyncHttpClient, this.dataSync});
 
   /// HTTP client for the LAN sync client. Mirrors the injected client on
   /// [LanSyncClient]: keeps LAN traffic off the environment proxy, and lets
   /// widget tests stub the wire with a `MockClient`. Null = production
   /// default (direct, proxy-free).
   final http.Client? lanSyncHttpClient;
+
+  /// Optional [DataSync] override. Lets widget tests inject a fake whose
+  /// `buildFileManifest` needs no real filesystem (real file I/O cannot
+  /// complete inside `testWidgets`'s fake-async zone). Null = production
+  /// default built from the ambient [ChatService].
+  final DataSync? dataSync;
 
   @override
   State<LanSyncSection> createState() => _LanSyncSectionState();
@@ -101,7 +107,7 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   void initState() {
     super.initState();
     final chatService = context.read<ChatService>();
-    _dataSync = DataSync(chatService: chatService);
+    _dataSync = widget.dataSync ?? DataSync(chatService: chatService);
     _server = LanSyncServer(chatService: chatService, dataSync: _dataSync);
     _client = LanSyncClient(
       chatService: chatService,
@@ -1245,9 +1251,14 @@ List<Widget> buildPlanSummary(
   int? outboundFileCount,
   int? outboundFileSizeBytes,
 }) {
+  // A file-only delta (all conversations identical) is a real sync: the plan
+  // must not render "No changes" just because there are no chat increments.
+  final hasFilePayload =
+      (outboundFileCount ?? 0) > 0 || (plan.serverFileCount ?? 0) > 0;
   if (plan.initiatorOnlyCount == 0 &&
       plan.serverOnlyCount == 0 &&
-      plan.forkCount == 0) {
+      plan.forkCount == 0 &&
+      !hasFilePayload) {
     return [
       Text(
         l10n.lanSyncPlanNoChanges,

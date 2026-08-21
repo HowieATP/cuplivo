@@ -469,6 +469,60 @@ void main() {
     });
   });
 
+  Map<String, FileManifestEntry> entry(
+    String path,
+    int mtimeMs, {
+    int size = 1,
+  }) => {path: FileManifestEntry(size: size, mtimeMs: mtimeMs)};
+
+  group('computeFileDelta', () {
+    test('sends paths absent on the peer', () {
+      final local = entry('workspaces/x', 1000);
+      final delta = computeFileDelta(local, {});
+      expect(delta, {'workspaces/x'});
+    });
+
+    test('sends strictly-newer mtime, skips equal and older', () {
+      final local = entry('upload/a', 2000)
+        ..addAll(entry('upload/b', 2000))
+        ..addAll(entry('upload/c', 1000));
+      final peer = entry('upload/a', 1999)
+        ..addAll(entry('upload/b', 2000))
+        ..addAll(entry('upload/c', 2000));
+      expect(computeFileDelta(local, peer), {'upload/a'});
+    });
+
+    test('empty local manifest sends nothing', () {
+      expect(
+        computeFileDelta({}, {
+          'upload/a': const FileManifestEntry(size: 1, mtimeMs: 1000),
+        }),
+        isEmpty,
+      );
+    });
+
+    test('equal mtime across peers is treated as synced (no double send)', () {
+      // The receiving side's merge is strictly-newer, so an equal-mtime path
+      // must not be sent by either side.
+      final manifest = entry('workspaces/f', 500);
+      expect(computeFileDelta(manifest, manifest), isEmpty);
+    });
+  });
+
+  group('sumDeltaBytes', () {
+    test('sums only the delta paths', () {
+      final manifest = entry('upload/a', 1, size: 10)
+        ..addAll(entry('upload/b', 1, size: 20))
+        ..addAll(entry('upload/c', 1, size: 30));
+      expect(sumDeltaBytes(manifest, {'upload/b', 'upload/c'}), 50);
+    });
+
+    test('missing path contributes zero', () {
+      final manifest = entry('upload/a', 1, size: 10);
+      expect(sumDeltaBytes(manifest, {'upload/a', 'nope/x'}), 10);
+    });
+  });
+
   group('parseMultipartBytes', () {
     test('parses zip and since fields', () {
       // Build a minimal multipart body:

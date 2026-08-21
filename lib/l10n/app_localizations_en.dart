@@ -277,6 +277,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceClearSandboxButton => 'Clear Sandbox';
 
   @override
+  String get storageSpaceCompactDbButton => 'Compact Database';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => 'Tap again to compact';
+
+  @override
+  String get storageSpaceCompactDbRunning => 'Compacting…';
+
+  @override
+  String get storageSpaceCompactDbHint =>
+      'Deleted data leaves gaps in the database file. Compacting reclaims that space.';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return 'Database compacted: $before → $after, saved $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => 'Nothing to compact';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return 'Compact failed: $error';
+  }
+
+  @override
   String get storageSpaceSandboxClearPartialDone =>
       'Sandbox cleared. The shared runtime will be removed after the app restarts.';
 

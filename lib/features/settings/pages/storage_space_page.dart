@@ -5,6 +5,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/file_reference.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
@@ -16,6 +17,7 @@ import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/database_compact_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
@@ -46,6 +48,11 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   StorageUsageReport? _report;
   bool _loading = false;
   bool _clearing = false;
+
+  /// Set when a refresh was requested while a scan was already running, so
+  /// the scan completion re-runs the report once (e.g. a compaction finishes
+  /// mid-scan — otherwise the page keeps stale sizes).
+  bool _pendingRefresh = false;
   StorageUsageCategoryKey _selected = StorageUsageCategoryKey.images;
   final _scanProgress = ValueNotifier<({int files, int bytes})?>(null);
   DateTime _lastProgressEmit = DateTime.fromMillisecondsSinceEpoch(0);
@@ -82,7 +89,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   }
 
   Future<StorageUsageReport?> _refreshReport() async {
-    if (_loading) return _report;
+    if (_loading) {
+      _pendingRefresh = true;
+      return _report;
+    }
     setState(() => _loading = true);
     _scanProgress.value = null;
     try {
@@ -101,10 +111,15 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           _selected = keys.first;
         }
       });
+      if (_pendingRefresh) {
+        _pendingRefresh = false;
+        await _refreshReport();
+      }
       return rep;
     } catch (_) {
       if (!mounted) return null;
       setState(() => _loading = false);
+      _pendingRefresh = false;
       return null;
     }
   }
@@ -552,9 +567,11 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final l10n = AppLocalizations.of(context)!;
     final title = _titleFor(key, l10n);
     if (key == StorageUsageCategoryKey.deletedRecords) {
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const TrashDetailPage()));
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TrashDetailPage(onDataChanged: _refreshReport),
+        ),
+      );
       // Refresh report after potential trash changes.
       await _refreshReport();
       return;
@@ -742,7 +759,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                       child:
                           selectedCat.key ==
                               StorageUsageCategoryKey.deletedRecords
-                          ? const TrashDetailPage(embedded: true)
+                          ? TrashDetailPage(
+                              embedded: true,
+                              onDataChanged: _refreshReport,
+                            )
                           : _CategoryDetail(
                               category: selectedCat,
                               title: _titleFor(selectedCat.key, l10n),
@@ -765,6 +785,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                                   ? null
                                   : _doClearSandbox,
                               refreshReport: _refreshReport,
+                              onCompactDb: () => context
+                                  .read<ChatService>()
+                                  .repo
+                                  .compactDatabase(),
                             ),
                     ),
                   ],
@@ -902,11 +926,18 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
   bool _refreshing = false;
   bool _clearing = false;
 
+  /// Set when a refresh was requested while one was already running, so the
+  /// in-flight refresh re-runs once (see [_StorageSpacePageState._pendingRefresh]).
+  bool _pendingRefresh = false;
+
   StorageUsageCategory _cat(StorageUsageCategoryKey k) =>
       _report.categories.firstWhere((c) => c.key == k);
 
   Future<void> _refresh() async {
-    if (_refreshing) return;
+    if (_refreshing) {
+      _pendingRefresh = true;
+      return;
+    }
     setState(() => _refreshing = true);
     try {
       final next = await widget.refreshReport();
@@ -914,6 +945,10 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
       if (next != null) setState(() => _report = next);
     } finally {
       if (mounted) setState(() => _refreshing = false);
+    }
+    if (mounted && _pendingRefresh) {
+      _pendingRefresh = false;
+      await _refresh();
     }
   }
 
@@ -1211,6 +1246,7 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
               ? _clearSandbox
               : null,
           refreshReport: _refresh,
+          onCompactDb: () => context.read<ChatService>().repo.compactDatabase(),
         ),
       ),
     );
@@ -1414,6 +1450,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearLogs,
     required this.onClearSandbox,
     required this.refreshReport,
+    this.onCompactDb,
   });
 
   final StorageUsageCategory category;
@@ -1429,6 +1466,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearLogs;
   final Future<void> Function()? onClearSandbox;
   final Future<void> Function() refreshReport;
+  final Future<DbCompactResult> Function()? onCompactDb;
 
   @override
   Widget build(BuildContext context) {
@@ -1446,7 +1484,19 @@ class _CategoryDetail extends StatelessWidget {
         : l10n.storageSpaceNotSafeToClearHint;
 
     Widget? actions;
-    if (category.key == StorageUsageCategoryKey.cache) {
+    if (category.key == StorageUsageCategoryKey.chatData &&
+        onCompactDb != null) {
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          DatabaseCompactButton(
+            compact: onCompactDb!,
+            onDone: () async => refreshReport(),
+          ),
+        ],
+      );
+    } else if (category.key == StorageUsageCategoryKey.cache) {
       actions = Wrap(
         spacing: 10,
         runSpacing: 10,

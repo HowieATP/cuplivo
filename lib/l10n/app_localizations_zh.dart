@@ -268,6 +268,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceClearSandboxButton => '清除沙箱';
 
   @override
+  String get storageSpaceCompactDbButton => '压缩数据库';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次点击确认压缩';
+
+  @override
+  String get storageSpaceCompactDbRunning => '压缩中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '删除的数据会在数据库文件中留下空洞，压缩可回收这部分空间。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '数据库已压缩：$before → $after，节省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '无需压缩';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '压缩失败：$error';
+  }
+
+  @override
   String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
 
   @override
@@ -8625,6 +8655,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceClearSandboxButton => '清除沙箱';
 
   @override
+  String get storageSpaceCompactDbButton => '压缩数据库';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次点击确认压缩';
+
+  @override
+  String get storageSpaceCompactDbRunning => '压缩中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '删除的数据会在数据库文件中留下空洞，压缩可回收这部分空间。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '数据库已压缩：$before → $after，节省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '无需压缩';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '压缩失败：$error';
+  }
+
+  @override
   String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
 
   @override
@@ -16980,6 +17040,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceCompactDbButton => '壓縮資料庫';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次點擊確認壓縮';
+
+  @override
+  String get storageSpaceCompactDbRunning => '壓縮中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '刪除的資料會在資料庫檔案中留下空洞，壓縮可回收這部分空間。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '資料庫已壓縮：$before → $after，節省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '無需壓縮';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '壓縮失敗：$error';
+  }
 
   @override
   String get storageSpaceSandboxClearPartialDone =>

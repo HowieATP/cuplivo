@@ -37,6 +37,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
 
     String paletteName() {
       final settings = context.read<SettingsProvider>();
+      if (settings.themePaletteId == ThemePalettes.customPaletteId) {
+        final custom = settings.selectedCustomTheme;
+        if (custom != null) {
+          final name = custom.name;
+          return name.isEmpty ? l10n.themeSettingsPageCustomPaletteName : name;
+        }
+      }
       final palette = ThemePalettes.byId(settings.themePaletteId);
       return Localizations.localeOf(context).languageCode == 'zh'
           ? palette.displayNameZh

@@ -29,6 +29,8 @@ import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../prompts/constants/compress_prompts.dart' as compress_prompts;
 import '../prompts/constants/ocr_prompts.dart' as ocr_prompts;
+import 'package:Cuplivo/theme/custom_theme.dart';
+import 'package:Cuplivo/theme/palettes.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -112,6 +114,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
   static const String _dynamicColorSeedKey = 'dynamic_color_seed_v1';
+  static const String _customThemesKey = 'custom_themes_v1';
+  static const String _customThemeSelectedKey = 'custom_theme_selected_v1';
   static const String _thinkingBudgetKey = 'thinking_budget_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
@@ -428,9 +432,22 @@ class SettingsProvider extends ChangeNotifier {
   bool _useDynamicColor = true; // when supported on Android
   bool get useDynamicColor => _useDynamicColor;
   int? _dynamicColorSeed;
-  int? get dynamicColorSeed => _dynamicColorSeed;
   bool _dynamicColorSupported = false; // runtime capability, not persisted
   bool get dynamicColorSupported => _dynamicColorSupported;
+
+  List<CustomTheme> _customThemes = const <CustomTheme>[];
+  List<CustomTheme> get customThemes =>
+      List<CustomTheme>.unmodifiable(_customThemes);
+  String? _selectedCustomThemeId;
+  String? get selectedCustomThemeId => _selectedCustomThemeId;
+  CustomTheme? get selectedCustomTheme {
+    final id = _selectedCustomThemeId;
+    if (id == null) return null;
+    for (final t in _customThemes) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 
   // When enabled, force pure white/black backgrounds regardless of theme color
   bool _usePureBackground = false;
@@ -821,6 +838,7 @@ class SettingsProvider extends ChangeNotifier {
     _themePaletteId = prefs.getString(_themePaletteKey) ?? 'default';
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
     _dynamicColorSeed = prefs.getInt(_dynamicColorSeedKey);
+    _loadCustomThemes(prefs);
     var providerConfigsLoaded = false;
     final cfgStr = prefs.getString(_providerConfigsKey);
     if (cfgStr != null && cfgStr.isNotEmpty) {
@@ -2643,16 +2661,146 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_useDynamicColorKey, v);
   }
 
-  Future<void> setDynamicColorSeed(int? seed) async {
-    if (_dynamicColorSeed == seed) return;
-    _dynamicColorSeed = seed;
+  void _loadCustomThemes(SharedPreferences prefs) {
+    final raw = prefs.getStringList(_customThemesKey) ?? const <String>[];
+    final themes = <CustomTheme>[];
+    for (final s in raw) {
+      try {
+        themes.add(CustomTheme.parse(s));
+      } catch (e) {
+        debugPrint(
+          '[SettingsProvider] dropped unparseable custom theme entry: $e',
+        );
+      }
+    }
+    _customThemes = themes;
+    _selectedCustomThemeId = prefs.getString(_customThemeSelectedKey);
+    if (_selectedCustomThemeId != null &&
+        !_customThemes.any((t) => t.id == _selectedCustomThemeId)) {
+      _selectedCustomThemeId = null;
+    }
+    // One-time migration from the legacy single seed (custom_dynamic palette).
+    // The seed becomes a Custom Theme with only a primary color; if the seed
+    // was the active palette, the migrated theme is selected and the palette
+    // becomes 'custom'. See docs/adr/0037-custom-themes-replace-seed.md.
+    final seed = _dynamicColorSeed;
+    if (seed != null) {
+      final migrated = CustomTheme(
+        id: 'migrated_$seed',
+        name: '',
+        primaryArgb: seed,
+      );
+      if (!_customThemes.any((t) => t.id == migrated.id)) {
+        _customThemes = <CustomTheme>[migrated, ..._customThemes];
+      }
+      final wasActive = _themePaletteId == 'custom_dynamic';
+      if (wasActive) {
+        _selectedCustomThemeId ??= migrated.id;
+        _themePaletteId = ThemePalettes.customPaletteId;
+        unawaited(
+          prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId),
+        );
+        if (_selectedCustomThemeId != null) {
+          unawaited(
+            prefs.setString(_customThemeSelectedKey, _selectedCustomThemeId!),
+          );
+        }
+      }
+      unawaited(
+        prefs.setStringList(
+          _customThemesKey,
+          _customThemes.map((t) => t.export()).toList(),
+        ),
+      );
+      unawaited(prefs.remove(_dynamicColorSeedKey));
+    }
+    // Stale cleanup: the 'custom_dynamic' palette id was removed with the
+    // legacy seed feature. If it survived without a seed (e.g. a settings
+    // restore that trimmed the seed key), reset it to the default palette.
+    if (_themePaletteId == 'custom_dynamic') {
+      _themePaletteId = ThemePalettes.defaultId;
+      unawaited(prefs.setString(_themePaletteKey, ThemePalettes.defaultId));
+    }
+  }
+
+  Future<void> _persistCustomThemes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _customThemesKey,
+      _customThemes.map((t) => t.export()).toList(),
+    );
+    final sel = _selectedCustomThemeId;
+    if (sel == null) {
+      await prefs.remove(_customThemeSelectedKey);
+    } else {
+      await prefs.setString(_customThemeSelectedKey, sel);
+    }
+  }
+
+  /// Insert or update a custom theme. Returns the saved theme (with an id
+  /// assigned when [theme.id] is empty).
+  Future<CustomTheme> saveCustomTheme(CustomTheme theme) async {
+    var t = theme;
+    if (t.id.isEmpty) {
+      t = t.copyWith(id: 'ct_${DateTime.now().microsecondsSinceEpoch}');
+    }
+    final idx = _customThemes.indexWhere((e) => e.id == t.id);
+    final next = List<CustomTheme>.of(_customThemes);
+    if (idx >= 0) {
+      next[idx] = t;
+    } else {
+      next.add(t);
+    }
+    _customThemes = next;
+    notifyListeners();
+    await _persistCustomThemes();
+    return t;
+  }
+
+  Future<void> deleteCustomTheme(String id) async {
+    if (!_customThemes.any((t) => t.id == id)) return;
+    final wasSelected = _selectedCustomThemeId == id;
+    _customThemes = _customThemes.where((t) => t.id != id).toList();
+    if (wasSelected) {
+      // Deleting the active theme deselects it and falls back to the default
+      // palette — the user removed what they were using (ADR-0037).
+      _selectedCustomThemeId = null;
+      if (_themePaletteId == ThemePalettes.customPaletteId) {
+        _themePaletteId = ThemePalettes.defaultId;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_themePaletteKey, ThemePalettes.defaultId);
+      }
+    }
+    notifyListeners();
+    await _persistCustomThemes();
+  }
+
+  /// Select a custom theme and make it the active palette.
+  Future<void> selectCustomTheme(String id) async {
+    if (!_customThemes.any((t) => t.id == id)) return;
+    final changed =
+        _selectedCustomThemeId != id ||
+        _themePaletteId != ThemePalettes.customPaletteId;
+    if (!changed) return;
+    _selectedCustomThemeId = id;
+    _themePaletteId = ThemePalettes.customPaletteId;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    if (seed != null) {
-      await prefs.setInt(_dynamicColorSeedKey, seed);
-    } else {
-      await prefs.remove(_dynamicColorSeedKey);
+    await prefs.setString(_customThemeSelectedKey, id);
+    await prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId);
+  }
+
+  /// Parse a shared custom-theme JSON string, save it and return the stored
+  /// theme (a fresh id is assigned when the id is missing or already taken).
+  /// Importing activates the theme, matching the editor flow (ADR-0037).
+  Future<CustomTheme> importCustomTheme(String source) async {
+    var t = CustomTheme.parse(source);
+    if (t.id.isEmpty || _customThemes.any((e) => e.id == t.id)) {
+      t = t.copyWith(id: 'ct_${DateTime.now().microsecondsSinceEpoch}');
     }
+    final saved = await saveCustomTheme(t);
+    await selectCustomTheme(saved.id);
+    return saved;
   }
 
   Future<void> setUsePureBackground(bool v) async {
@@ -4971,6 +5119,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
+    copy._customThemes = _customThemes;
+    copy._selectedCustomThemeId = _selectedCustomThemeId;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;

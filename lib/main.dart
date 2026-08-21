@@ -14,6 +14,7 @@ import 'desktop/windows_paste_fix.dart';
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
 import 'theme/palettes.dart';
+import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'core/providers/chat_provider.dart';
@@ -441,24 +442,21 @@ class MyApp extends StatelessWidget {
               });
 
               final useDyn = isAndroid && settings.useDynamicColor;
-              final palette = ThemePalettes.byId(settings.themePaletteId);
-              final isCustomDyn =
-                  settings.themePaletteId == ThemePalettes.customDynamicId;
+              final custom = settings.selectedCustomTheme;
+              final isCustomPalette =
+                  settings.themePaletteId == ThemePalettes.customPaletteId &&
+                  custom != null;
+              final palette = isCustomPalette
+                  ? buildCustomThemePalette(custom)
+                  : ThemePalettes.byId(settings.themePaletteId);
 
               ColorScheme? lightDynOverride;
               ColorScheme? darkDynOverride;
-              if (isCustomDyn) {
-                final seed = settings.dynamicColorSeed;
-                if (seed != null) {
-                  lightDynOverride = ColorScheme.fromSeed(
-                    seedColor: Color(seed),
-                    brightness: Brightness.light,
-                  );
-                  darkDynOverride = ColorScheme.fromSeed(
-                    seedColor: Color(seed),
-                    brightness: Brightness.dark,
-                  );
-                }
+              if (isCustomPalette) {
+                // Custom theme wins over Android system dynamic color
+                // (ADR-0037) — the custom palette is used as-is.
+                lightDynOverride = null;
+                darkDynOverride = null;
               } else if (useDyn) {
                 lightDynOverride = lightDynamic;
                 darkDynOverride = darkDynamic;

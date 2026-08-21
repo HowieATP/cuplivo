@@ -775,3 +775,16 @@
   - **tool-turns-only**: echo only across turns that involve a tool call — DeepSeek, MiMo, Zhipu, Kimi thinking models (k2.5/k2.6/k2.7).
   - **strip**: never echo — everyone else (Claude additionally requires signed reasoning details; its unsigned echo is dropped).
 - **Coupling**: the message builder always attaches reasoning content to assistant history; the provider layer then applies the replay policy (builder supplies the data, provider strips it). Rationale: providers reject or waste tokens on reasoning echoed outside tool turns. Synced from upstream Kelivo v1.2.1 (issue #343).
+
+## Theme System (主题系统)
+
+- **ThemePalette (主题色板)**: 一组命名的静态 light/dark `ColorScheme` 对(id + 双语名)。9 个内置色板在 `ThemePalettes.all` 里,是设置页预设点/行的唯一来源。
+- **Custom Theme (自定义主题)**: 用户创建的主题 = 必选主色 + 可选次/三级色,以 ARGB int 存储(`CustomTheme` 模型)。完整 M3 ColorScheme 在运行时由主色经 HCT TONAL_SPOT 生成(`material_color_utilities`),不是手写色板。可存多个命名主题,同一时刻只有一个激活(按 id 选中)。
+- **Custom Palette (自定义色板)**: 由激活的 Custom Theme 运行时构建的色板(`ThemePalettes.customPaletteId = 'custom'`)。不是 `ThemePalettes.all` 的成员——仅在 palette id 为 'custom' 时存在。
+- **Dynamic Color (系统动态色)**: Android 12+ 系统配色跟随(`useDynamicColor`)。与 Custom Theme 运行时互斥:激活 Custom Theme 时忽略 Dynamic Color(自定义主题优先)。仅移动端。
+- **Legacy seed (旧种子色)**: 被 Custom Theme 取代的单色相种子功能(`dynamic_color_seed_v1` + `custom_dynamic` 占位色板)。首次加载时迁移为 Custom Theme(primary = seed,无次/三级色);若当时它是激活色板,则迁移后选中该主题并置 palette = 'custom'。
+
+关系:
+- **Custom Theme** 被选中时解析为 **Custom Palette**(运行时)
+- **Dynamic Color** 与 **Custom Theme** 运行时互斥,Custom Theme 优先
+- **Custom Palette** 永不进入预设列表;预设只能是静态 **ThemePalette**

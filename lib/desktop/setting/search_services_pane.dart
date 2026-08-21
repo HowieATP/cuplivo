@@ -614,6 +614,10 @@ class _BrandBadge extends StatelessWidget {
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
+    if (s is StepFunOptions) return 'stepfun';
+    if (s is FirecrawlOptions) return 'firecrawl';
+    if (s is TinyFishOptions) return 'tinyfish';
+    if (s is DoubaoOptions) return 'doubao';
     return 'search';
   }
 
@@ -804,6 +808,11 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'systemPrompt': TextEditingController(
       text: GrokOptions.defaultSystemPrompt,
     ),
+    'category': TextEditingController(),
+    'country': TextEditingController(),
+    'location': TextEditingController(),
+    'includeDomains': TextEditingController(),
+    'excludeDomains': TextEditingController(),
   };
 
   @override
@@ -869,6 +878,22 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  final keyText = (_controllers['apiKey']?.text ?? '').trim();
+                  final keyed =
+                      _selectedType != 'bing_local' &&
+                      _selectedType != 'duckduckgo' &&
+                      _selectedType != 'searxng' &&
+                      _selectedType != 'firecrawl';
+                  if (keyed && keyText.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          l10n.searchServicesEditDialogApiKeyRequired,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   final created = _createService();
                   Navigator.of(context).pop(created);
                 },
@@ -1062,6 +1087,108 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             obscureText: true,
           ),
         ];
+      case 'doubao':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+        ];
+      case 'stepfun':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: StepFunOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['category'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorCategoryLabel,
+              hintText: 'programming / research / gov / business',
+            ),
+          ),
+        ];
+      case 'firecrawl':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesDialogApiKey,
+              hintText: l10n.searchServiceEditorApiKeyOptional,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: FirecrawlOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['country'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorCountryLabel,
+              hintText: 'US',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['location'],
+            decoration: deco(l10n.searchServiceEditorLocationLabel),
+          ),
+        ];
+      case 'tinyfish':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: TinyFishOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['location'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorLocationLabel,
+              hintText: 'US',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['language'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorLanguageLabel,
+              hintText: 'en',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['includeDomains'],
+            decoration: deco(l10n.searchServiceEditorIncludeDomainsLabel),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['excludeDomains'],
+            decoration: deco(l10n.searchServiceEditorExcludeDomainsLabel),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1150,6 +1277,33 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           customUrl: _controllers['customUrl']!.text.trim(),
           systemPrompt: _controllers['systemPrompt']!.text,
         );
+      case 'doubao':
+        return DoubaoOptions(id: id, apiKeys: makeKeys());
+      case 'stepfun':
+        return StepFunOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          category: _controllers['category']!.text.trim(),
+        );
+      case 'firecrawl':
+        return FirecrawlOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          country: _controllers['country']!.text.trim(),
+          location: _controllers['location']!.text.trim(),
+        );
+      case 'tinyfish':
+        return TinyFishOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          location: _controllers['location']!.text.trim(),
+          language: _controllers['language']!.text.trim(),
+          includeDomains: _controllers['includeDomains']!.text.trim(),
+          excludeDomains: _controllers['excludeDomains']!.text.trim(),
+        );
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -1215,6 +1369,23 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['systemPrompt'] = TextEditingController(
         text: s.systemPrompt,
       );
+    } else if (s is StepFunOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['category'] = TextEditingController(text: s.category);
+    } else if (s is FirecrawlOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['country'] = TextEditingController(text: s.country);
+      _controllers['location'] = TextEditingController(text: s.location);
+    } else if (s is TinyFishOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['location'] = TextEditingController(text: s.location);
+      _controllers['language'] = TextEditingController(text: s.language);
+      _controllers['includeDomains'] = TextEditingController(
+        text: s.includeDomains,
+      );
+      _controllers['excludeDomains'] = TextEditingController(
+        text: s.excludeDomains,
+      );
     }
   }
 
@@ -1278,7 +1449,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                   if (_editKeys.isEmpty &&
                       widget.service is! BingLocalOptions &&
                       widget.service is! DuckDuckGoOptions &&
-                      widget.service is! SearXNGOptions) {
+                      widget.service is! SearXNGOptions &&
+                      widget.service is! FirecrawlOptions) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -1445,6 +1617,83 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           obscureText: true,
         ),
       ]);
+    } else if (s is StepFunOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: StepFunOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['category'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorCategoryLabel,
+            hintText: 'programming / research / gov / business',
+          ),
+        ),
+      ]);
+    } else if (s is FirecrawlOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: FirecrawlOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['country'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorCountryLabel,
+            hintText: 'US',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['location'],
+          decoration: deco(l10n.searchServiceEditorLocationLabel),
+        ),
+      ]);
+    } else if (s is TinyFishOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: TinyFishOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['location'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorLocationLabel,
+            hintText: 'US',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['language'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorLanguageLabel,
+            hintText: 'en',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['includeDomains'],
+          decoration: deco(l10n.searchServiceEditorIncludeDomainsLabel),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['excludeDomains'],
+          decoration: deco(l10n.searchServiceEditorExcludeDomainsLabel),
+        ),
+      ]);
     }
 
     if (SearchService.serviceUsesKeys(s)) {
@@ -1510,9 +1759,75 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       rows.add(const SizedBox(height: 8));
     }
 
-    rows.add(_SmallIconBtn(icon: lucide.Lucide.Plus, onTap: () => _addKey()));
+    rows.add(
+      Row(
+        children: [
+          _SmallIconBtn(icon: lucide.Lucide.Plus, onTap: () => _addKey()),
+          const SizedBox(width: 8),
+          _SmallIconBtn(
+            icon: lucide.Lucide.ClipboardPen,
+            onTap: () => _pasteKeys(),
+          ),
+        ],
+      ),
+    );
 
     return [const SizedBox(height: 4), ...rows];
+  }
+
+  Future<void> _pasteKeys() async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(l10n.searchServicesDialogBatchPasteKeys),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 6,
+          decoration: InputDecoration(
+            hintText: l10n.searchApiKeysPageBatchHint,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.searchServicesEditDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.searchServicesEditDialogSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty || !mounted) return;
+    final parsed = _parseBatchKeys(result);
+    if (parsed.isEmpty) return;
+    final existing = _editKeys.map((k) => k.key.trim()).toSet();
+    setState(() {
+      for (final key in parsed) {
+        if (existing.contains(key)) continue;
+        existing.add(key);
+        _editKeys.add(ApiKeyConfig.create(key));
+      }
+    });
+  }
+
+  static List<String> _parseBatchKeys(String input) {
+    final seen = <String>{};
+    final keys = <String>[];
+    for (final part in input.split(RegExp(r'[\s,;]+'))) {
+      final key = part.trim();
+      if (key.isEmpty || !seen.add(key)) continue;
+      keys.add(key);
+    }
+    return keys;
   }
 
   Future<void> _addKey() async {
@@ -1544,8 +1859,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       ),
     );
     controller.dispose();
-    if (result != null && result.isNotEmpty && mounted) {
-      setState(() => _editKeys.add(ApiKeyConfig.create(result)));
+    final key = result?.trim() ?? '';
+    if (key.isNotEmpty && mounted) {
+      setState(() => _editKeys.add(ApiKeyConfig.create(key)));
     }
   }
 
@@ -1638,6 +1954,39 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         systemPrompt: _controllers['systemPrompt']!.text,
       );
     }
+    if (s is DoubaoOptions) {
+      return DoubaoOptions(id: s.id, apiKeys: _editKeys);
+    }
+    if (s is StepFunOptions) {
+      return StepFunOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        category: (_controllers['category']?.text ?? '').trim(),
+      );
+    }
+    if (s is FirecrawlOptions) {
+      return FirecrawlOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        sources: s.sources,
+        categories: s.categories,
+        country: (_controllers['country']?.text ?? '').trim(),
+        location: (_controllers['location']?.text ?? '').trim(),
+      );
+    }
+    if (s is TinyFishOptions) {
+      return TinyFishOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        location: (_controllers['location']?.text ?? '').trim(),
+        language: (_controllers['language']?.text ?? '').trim(),
+        includeDomains: (_controllers['includeDomains']?.text ?? '').trim(),
+        excludeDomains: (_controllers['excludeDomains']?.text ?? '').trim(),
+      );
+    }
     return s;
   }
 }
@@ -1671,6 +2020,10 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'serper', brand: 'serper'),
     (type: 'querit', brand: 'querit'),
     (type: 'grok', brand: 'grok'),
+    (type: 'stepfun', brand: 'stepfun'),
+    (type: 'firecrawl', brand: 'firecrawl'),
+    (type: 'tinyfish', brand: 'tinyfish'),
+    (type: 'doubao', brand: 'doubao'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -1755,6 +2108,14 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameQuerit;
     case 'grok':
       return l10n.searchServiceNameGrok;
+    case 'stepfun':
+      return l10n.searchServiceNameStepFun;
+    case 'firecrawl':
+      return l10n.searchServiceNameFirecrawl;
+    case 'tinyfish':
+      return l10n.searchServiceNameTinyFish;
+    case 'doubao':
+      return l10n.searchServiceNameDoubao;
     default:
       return type;
   }

@@ -4642,6 +4642,163 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesPageUrlRequiredStatus => 'URL Required';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => 'Search provider';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => 'Configuration';
+
+  @override
+  String get searchServiceEditorNoConfiguration =>
+      'This provider does not require additional configuration.';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => 'Multi-key rotation';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => 'Not configured';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '$count keys';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      'Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => 'Primary';
+
+  @override
+  String get searchApiKeysPageRevealKey => 'Reveal API key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => 'Delete API key';
+
+  @override
+  String get searchApiKeysPageBatchHint =>
+      'Paste one or more keys — one per line or comma-separated';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return 'Added $added, skipped $skipped duplicate(s)';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => 'Add';
+
+  @override
+  String get searchApiKeysPageEmpty => 'No keys configured yet.';
+
+  @override
+  String get searchServiceEditorUsageTitle => 'Account usage';
+
+  @override
+  String get searchServiceEditorUsageNotQueried =>
+      'Usage has not been queried yet.';
+
+  @override
+  String get searchServiceEditorUsageQuery => 'Check usage';
+
+  @override
+  String get searchServiceEditorUsageQuerying => 'Checking…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '$remaining credits remaining';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return 'Balance: $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '$used of $limit credits used';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return 'Could not query usage: $message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => 'Test search';
+
+  @override
+  String get searchServiceEditorTestQueryHint => 'Enter a query';
+
+  @override
+  String get searchServiceEditorTestRun => 'Run test search';
+
+  @override
+  String get searchServiceEditorTestRunning => 'Searching…';
+
+  @override
+  String get searchServiceEditorTestNoResults =>
+      'The provider returned no results.';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return 'Search failed: $message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => 'Open result';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => 'Delete search service';
+
+  @override
+  String get searchServiceEditorDeleteTitle => 'Delete search service?';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return 'Delete $provider? This cannot be undone.';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => 'Delete';
+
+  @override
+  String get searchServiceEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get searchServiceEditorDiscardMessage =>
+      'Your unsaved search service settings will be lost.';
+
+  @override
+  String get searchServiceEditorKeepEditing => 'Keep editing';
+
+  @override
+  String get searchServiceEditorDiscard => 'Discard';
+
+  @override
+  String get searchServiceEditorCategoryLabel => 'Category';
+
+  @override
+  String get searchServiceEditorCountryLabel => 'Country';
+
+  @override
+  String get searchServiceEditorLocationLabel => 'Location';
+
+  @override
+  String get searchServiceEditorLanguageLabel => 'Language';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => 'Include domains';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => 'Exclude domains';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key (optional)';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => 'Batch paste keys';
+
+  @override
   String get searchServicesAddDialogTitle => 'Add Search Service';
 
   @override
@@ -5962,6 +6119,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => 'Doubao';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      'StepFun web search via POST /v1/search.';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2. API key is optional. Scrape is not supported here.';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      'Doubao web search API by Volcano Engine.';
 
   @override
   String get searchProviderGrokDescription =>

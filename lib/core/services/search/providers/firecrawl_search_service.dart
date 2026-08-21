@@ -1,0 +1,109 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+
+import '../../../../l10n/app_localizations.dart';
+import '../search_service.dart';
+
+/// Firecrawl Search (v2). Hosted `/v2/search` accepts keyless requests;
+/// a Bearer API key is optional and only used for higher rate limits.
+/// Scrape is intentionally not implemented.
+class FirecrawlSearchService extends SearchService<FirecrawlOptions> {
+  FirecrawlSearchService({super.client});
+
+  @override
+  String get name => 'Firecrawl';
+
+  @override
+  Widget description(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Text(
+      l10n.searchProviderFirecrawlDescription,
+      style: const TextStyle(fontSize: 12),
+    );
+  }
+
+  @override
+  Future<SearchResult> search({
+    required String query,
+    required SearchCommonOptions commonOptions,
+    required FirecrawlOptions serviceOptions,
+    String? apiKeyOverride,
+  }) async {
+    try {
+      final apiKey = (apiKeyOverride ?? serviceOptions.apiKey).trim();
+
+      final body = <String, dynamic>{
+        'query': query,
+        'limit': commonOptions.resultSize.clamp(1, 100),
+        if (serviceOptions.sources.isNotEmpty)
+          'sources': serviceOptions.sources
+              .map((s) => {'type': s})
+              .toList(growable: false),
+        if (serviceOptions.categories.isNotEmpty)
+          'categories': serviceOptions.categories
+              .map((c) => {'type': c})
+              .toList(growable: false),
+        if (serviceOptions.country.trim().isNotEmpty)
+          'country': serviceOptions.country.trim(),
+        if (serviceOptions.location.trim().isNotEmpty)
+          'location': serviceOptions.location.trim(),
+      };
+
+      final response = await client
+          .post(
+            Uri.parse(serviceOptions.resolvedUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(Duration(milliseconds: commonOptions.timeout));
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'API request failed: ${response.statusCode} ${response.body}',
+        );
+      }
+
+      final payload = jsonDecode(response.body);
+      if (payload is! Map<String, dynamic>) {
+        throw Exception(
+          'Unexpected Firecrawl response shape (expected an object). '
+          'A v1 search endpoint was likely configured — this service only '
+          'supports the v2 API.',
+        );
+      }
+      final data =
+          (payload['data'] as Map?)?.cast<String, dynamic>() ?? payload;
+      final items = <SearchResultItem>[];
+
+      void addWeb(List? list) {
+        if (list == null) return;
+        for (final item in list) {
+          if (item is! Map) continue;
+          final m = item.cast<String, dynamic>();
+          items.add(
+            SearchResultItem(
+              title: (m['title'] ?? '').toString(),
+              url: (m['url'] ?? '').toString(),
+              text: (m['description'] ?? m['snippet'] ?? m['markdown'] ?? '')
+                  .toString(),
+            ),
+          );
+          if (items.length >= commonOptions.resultSize) return;
+        }
+      }
+
+      addWeb(data['web'] as List?);
+      if (items.length < commonOptions.resultSize) {
+        addWeb(data['news'] as List?);
+      }
+
+      return SearchResult(items: items.take(commonOptions.resultSize).toList());
+    } catch (e) {
+      throw Exception('Firecrawl search failed: $e');
+    }
+  }
+}

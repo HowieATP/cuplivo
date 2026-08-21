@@ -4462,6 +4462,158 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '显示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '删除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分类';
+
+  @override
+  String get searchServiceEditorCountryLabel => '国家/地区';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '语言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含域名';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除域名';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可选）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批量粘贴 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '添加搜索服务';
 
   @override
@@ -5653,6 +5805,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
 
   @override
   String get searchProviderGrokDescription =>
@@ -12586,6 +12765,158 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '显示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '删除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分类';
+
+  @override
+  String get searchServiceEditorCountryLabel => '国家/地区';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '语言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含域名';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除域名';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可选）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批量粘贴 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '添加搜索服务';
 
   @override
@@ -13777,6 +14108,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
 
   @override
   String get searchProviderGrokDescription =>
@@ -20708,6 +21066,158 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜尋提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服務設定';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商無需額外設定。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 輪詢';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未設定';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 個 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 依序輪詢使用，第一個為主 Key；不查額度，以防觸發服務商風控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '顯示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '刪除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次貼上多個 Key：每行一個，或以逗號分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已新增 $added 個，略過 $skipped 個重複';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '新增';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未設定任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '帳戶用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查詢用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查詢用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查詢中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩餘 $remaining 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '餘額 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查詢失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '測試搜尋';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '輸入測試關鍵字';
+
+  @override
+  String get searchServiceEditorTestRun => '執行測試搜尋';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜尋中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未回傳任何結果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜尋失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '開啟結果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '刪除搜尋服務';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '刪除搜尋服務？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '確定刪除 $provider 嗎？此操作無法復原。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '刪除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放棄變更？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未儲存的搜尋服務設定將會遺失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '繼續編輯';
+
+  @override
+  String get searchServiceEditorDiscard => '放棄';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分類';
+
+  @override
+  String get searchServiceEditorCountryLabel => '國家/地區';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '語言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含網域';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除網域';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可選）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批次貼上 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '新增搜尋服務';
 
   @override
@@ -21900,6 +22410,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '透過 StepFun POST /v1/search 進行網頁搜尋。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可選。此處不支援 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包網頁搜尋 API。';
 
   @override
   String get searchProviderGrokDescription =>

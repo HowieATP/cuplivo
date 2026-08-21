@@ -1672,5 +1672,172 @@ void main() {
 
       await DataSync.cleanupTemporaryBackupFile(backupFile);
     });
+
+    test(
+      'export splits apiKeys to Kelivo string list for all new providers',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'search_services_v1': jsonEncode([
+            {
+              'type': 'doubao',
+              'id': 'doubao-1',
+              'apiKey': 'primary-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'primary-key', 'isEnabled': true},
+                {'id': 'k2', 'key': 'backup-key', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'stepfun',
+              'id': 'stepfun-1',
+              'url': '',
+              'category': 'research',
+              'apiKey': 'sf-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'sf-key', 'isEnabled': true},
+                {'id': 'k2', 'key': 'sf-extra', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'firecrawl',
+              'id': 'firecrawl-1',
+              'url': '',
+              'apiKey': '',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'fc-key', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'tinyfish',
+              'id': 'tinyfish-1',
+              'url': '',
+              'apiKey': 'tf-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'tf-key', 'isEnabled': true},
+              ],
+            },
+          ]),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map<String, dynamic>;
+          final services =
+              jsonDecode(settings['search_services_v1'] as String) as List;
+          final byType = <String, Map<String, dynamic>>{
+            for (final e in services)
+              (e as Map<String, dynamic>)['type'] as String: e,
+          };
+          final doubao = byType['doubao']!;
+          expect(doubao['apiKeys'], ['primary-key', 'backup-key']);
+          expect(doubao['keyConfigs'], hasLength(2));
+
+          final stepfun = byType['stepfun']!;
+          expect(stepfun['apiKeys'], ['sf-key', 'sf-extra']);
+          expect(stepfun['keyConfigs'], hasLength(2));
+
+          final firecrawl = byType['firecrawl']!;
+          expect(firecrawl['apiKeys'], ['fc-key']);
+          expect(firecrawl['keyConfigs'], hasLength(1));
+
+          final tinyfish = byType['tinyfish']!;
+          expect(tinyfish['apiKeys'], ['tf-key']);
+          expect(tinyfish['keyConfigs'], hasLength(1));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test('round-trip restores all new provider types from backup', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_services_v1': jsonEncode([
+          {
+            'type': 'doubao',
+            'id': 'doubao-1',
+            'apiKey': 'primary-key',
+            'apiKeys': ['primary-key', 'backup-key'],
+          },
+          {
+            'type': 'stepfun',
+            'id': 'stepfun-1',
+            'url': 'https://api.stepfun.com/v1/search',
+            'category': 'research',
+            'apiKey': 'sf-key',
+            'apiKeys': ['sf-key', 'sf-extra'],
+          },
+          {
+            'type': 'firecrawl',
+            'id': 'firecrawl-1',
+            'url': '',
+            'apiKey': 'fc-key',
+            'apiKeys': ['fc-key'],
+          },
+          {
+            'type': 'tinyfish',
+            'id': 'tinyfish-1',
+            'url': '',
+            'apiKey': 'tf-key',
+            'apiKeys': ['tf-key'],
+          },
+        ]),
+      });
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        final settings =
+            jsonDecode(
+                  utf8.decode(archive.findFile('settings.json')!.readBytes()!),
+                )
+                as Map<String, dynamic>;
+        final services =
+            jsonDecode(settings['search_services_v1'] as String) as List;
+        final restored = services
+            .map(
+              (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
+            )
+            .toList();
+
+        expect(restored, hasLength(4));
+        expect(restored[0], isA<DoubaoOptions>());
+        expect(restored[0].apiKeys.map((k) => k.key), [
+          'primary-key',
+          'backup-key',
+        ]);
+        expect(restored[1], isA<StepFunOptions>());
+        expect((restored[1] as StepFunOptions).category, 'research');
+        expect(restored[1].apiKeys.map((k) => k.key), ['sf-key', 'sf-extra']);
+        expect(restored[2], isA<FirecrawlOptions>());
+        expect(restored[2].apiKeys.map((k) => k.key), ['fc-key']);
+        expect(restored[3], isA<TinyFishOptions>());
+        expect(restored[3].apiKeys.map((k) => k.key), ['tf-key']);
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
   });
 }

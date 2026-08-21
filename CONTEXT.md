@@ -113,6 +113,12 @@
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
+## Backup Merge Semantics (智能合并)
+
+- **Flat scalar settings**: restored only if absent locally — an existing local preference is preserved (per the "仅添加不存在的数据" contract).
+- **Structured JSON keys** (`provider_configs_v1`, `assistant_memories_v1`, `mcp_servers_v1`, `asr_services_v1`, `pinned_models_v1`, tags/maps, groups): merged per-structure; the backup wins on conflicts (dedup by id where applicable).
+- **Provider proxy is device-local**: within `provider_configs_v1`, a provider that already exists locally keeps its 6 proxy fields (`proxyEnabled/Type/Host/Port/Username/Password`) from the backup NEVER — local values win; a legacy local config with no proxy block at all is forced to the app's no-proxy defaults instead of adopting the backup's proxy. Brand-new providers imported by the merge keep their backup proxy as-is (nothing local to preserve). (issue #512) LAN sync rides the same merge path, so a sync peer's proxy never lands on the device either; overwrite restore still imports proxy settings wholesale.
+
 ## Markdown Batch Export (批量导出 Markdown)
 
 - **Markdown 批量导出 (batch Markdown export)**: Conversation-level batch export producing one human-readable `.md` file per selected conversation. Distinct from **备份/backup** (data-level JSON ZIP) and from message-level 导出 (single conversation, curated selection). Entry: the conversation batch-select mode in `SideDrawer` (mobile drawer + desktop sidebars).
@@ -794,11 +800,19 @@
 - **Custom Palette (自定义色板)**: 由激活的 Custom Theme 运行时构建的色板(`ThemePalettes.customPaletteId = 'custom'`)。不是 `ThemePalettes.all` 的成员——仅在 palette id 为 'custom' 时存在。
 - **Dynamic Color (系统动态色)**: Android 12+ 系统配色跟随(`useDynamicColor`)。与 Custom Theme 运行时互斥:激活 Custom Theme 时忽略 Dynamic Color(自定义主题优先)。仅移动端。
 - **Legacy seed (旧种子色)**: 被 Custom Theme 取代的单色相种子功能(`dynamic_color_seed_v1` + `custom_dynamic` 占位色板)。首次加载时迁移为 Custom Theme(primary = seed,无次/三级色);若当时它是激活色板,则迁移后选中该主题并置 palette = 'custom'。
+- **AppSemanticColors (语义色扩展)**: 提供 `ColorScheme` 没有专属角色的语义色 token 的 `ThemeExtension`——`surfaceFill`、`surfaceCard`、`success`/`warning`(+ container)、`searchHighlight`、`chartSeries`——全部从激活 scheme 推导或 harmonize,因此 Custom Theme 自动获得合理取值。经 `context.appColors` 读取(未挂载 extension 时回退为从环境 scheme 推导)。
+- **surfaceFill (浅填充)**: 文本输入框/chips/小卡片/标签容器的细微填充,替代旧 `white10/12` + `F2F3F5/F7F7F9` 惯例;暗色 alpha 0.16(#300 的「暗色 surfaceFill 调亮」)。
+- **surfaceCard (卡片面)**: iOS 风格分区卡片背景,替代旧 `white10`+`white@0.96` 与 `1C1C1E`/`141414` 凸起面。
+- **surfaceContainer 推导**: M3 `surfaceContainerLowest→Highest` 从 scheme surface 推导(静态色板不再用紫色调的 M3 默认值);浅色 `surfaceContainerHigh` = white@0.85,保证气泡/卡片/弹层保持 ≈白。
+- **searchHighlight / chartSeries**: 金色搜索高亮(alpha 0.55);唯一的分类色阶——统计图表与请求日志角色色(system/user/assistant/tool = 索引 6/0/5/3)共用。
+- **color-gate marker (`color-gate: ignore`)**: 逐行标记刻意保留的固定色(色板定义、Cupertino 灰、头像 tint、彩色面上的对比色)。`tool/check_colors.py` 一次性校验脚本以此白名单;不接入 CI。
 
 关系:
 - **Custom Theme** 被选中时解析为 **Custom Palette**(运行时)
 - **Dynamic Color** 与 **Custom Theme** 运行时互斥,Custom Theme 优先
 - **Custom Palette** 永不进入预设列表;预设只能是静态 **ThemePalette**
+- **AppSemanticColors** 的 **surfaceCard** 是 app 级分区卡片 token,与 M3 **surfaceContainer** 角色不同——前者用于自定义 iOS 风格组件,后者用于 Material 组件,二者不混用
+- **surfaceFill**/**surfaceCard** 从 **ColorScheme** 的 surface/onSurface 推导,因此随 **Custom Theme** 自动适配
 
 ## Startup Assistant (启动助手)
 

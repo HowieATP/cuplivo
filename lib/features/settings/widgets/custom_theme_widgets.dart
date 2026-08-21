@@ -13,6 +13,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/custom_theme.dart';
 import '../../../theme/palettes.dart';
 
@@ -20,23 +21,6 @@ bool get _isDesktop =>
     defaultTargetPlatform == TargetPlatform.macOS ||
     defaultTargetPlatform == TargetPlatform.windows ||
     defaultTargetPlatform == TargetPlatform.linux;
-
-/// iOS-style section card background, matching the app's `_iosSectionCard`
-/// idiom (white overlay over the active scheme's surface). AppSemanticColors
-/// is not ported in phase 1 (see ADR-0037) so this stays local.
-Color _surfaceCardColor(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return isDark
-      ? Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-          cs.surface,
-        )
-      : Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.96),
-          cs.surface,
-        );
-}
 
 // ---------------------------------------------------------------------------
 // Presentation shells (match the app's custom sheet/dialog idioms — no
@@ -302,7 +286,7 @@ InputDecoration _fieldDecoration(
     ),
     isDense: true,
     filled: true,
-    fillColor: _surfaceCardColor(context),
+    fillColor: context.appColors.surfaceCard,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: border(cs.outlineVariant.withValues(alpha: 0.4)),
     enabledBorder: border(cs.outlineVariant.withValues(alpha: 0.4)),

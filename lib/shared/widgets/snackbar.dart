@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 enum NotificationType { success, error, info, warning }
 
@@ -321,16 +322,17 @@ class _NotificationWidgetState extends State<NotificationWidget>
     }
   }
 
-  Color _getIconColor(ColorScheme cs) {
+  Color _getIconColor(BuildContext context) {
+    final appColors = context.appColors;
     switch (widget.notification.type) {
       case NotificationType.success:
-        return const Color(0xFF34C759);
+        return appColors.success;
       case NotificationType.error:
-        return const Color(0xFFFF3B30);
+        return Theme.of(context).colorScheme.error;
       case NotificationType.warning:
-        return const Color(0xFFFF9500);
+        return appColors.warning;
       case NotificationType.info:
-        return cs.primary;
+        return Theme.of(context).colorScheme.primary;
     }
   }
 
@@ -368,9 +370,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
           margin: const EdgeInsets.only(bottom: 8),
           constraints: const BoxConstraints(maxWidth: 400),
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1C1C1E).withValues(alpha: 0.98)
-                : Colors.white.withValues(alpha: 0.98),
+            color: context.appColors.surfaceCard.withValues(alpha: 0.98),
             // color: cs.surface.withValues(alpha: 0.98),
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
@@ -387,7 +387,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Icon(_getIcon(), size: 22, color: _getIconColor(cs)),
+                  Icon(_getIcon(), size: 22, color: _getIconColor(context)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(

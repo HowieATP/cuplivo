@@ -80,10 +80,7 @@ class _QuickPhraseTab extends StatelessWidget {
                           decoration: InputDecoration(
                             labelText: l10n.quickPhraseTitleLabel,
                             filled: true,
-                            fillColor:
-                                Theme.of(ctx).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF2F3F5),
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
@@ -107,10 +104,7 @@ class _QuickPhraseTab extends StatelessWidget {
                             labelText: l10n.quickPhraseContentLabel,
                             alignLabelWithHint: true,
                             filled: true,
-                            fillColor:
-                                Theme.of(ctx).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF2F3F5),
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
@@ -361,12 +355,10 @@ class _QuickPhraseTab extends StatelessWidget {
                       onTap: () => _showAddEditSheet(context, phrase: phrase),
                       pressedScale: 0.98,
                       builder: (pressed) {
-                        final bg = isDark
-                            ? Colors.white10
-                            : Colors.white.withValues(alpha: 0.96);
-                        final overlay = isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : Colors.black.withValues(alpha: 0.05);
+                        final bg = context.appColors.surfaceCard;
+                        final overlay = cs.onSurface.withValues(
+                          alpha: isDark ? 0.06 : 0.05,
+                        );
                         final pressedBg = Color.alphaBlend(overlay, bg);
                         return Container(
                           decoration: BoxDecoration(
@@ -478,9 +470,7 @@ class _GlassCircleButtonQPState extends State<_GlassCircleButtonQP> {
     final glassBase = isDark
         ? Colors.black.withValues(alpha: 0.06)
         : Colors.white.withValues(alpha: 0.06);
-    final overlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
@@ -562,7 +552,6 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafeArea(
       top: false,
@@ -606,7 +595,7 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
               decoration: InputDecoration(
                 labelText: l10n.quickPhraseTitleLabel,
                 filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                fillColor: context.appColors.surfaceFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
@@ -635,7 +624,7 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 labelText: l10n.quickPhraseContentLabel,
                 alignLabelWithHint: true,
                 filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                fillColor: context.appColors.surfaceFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(

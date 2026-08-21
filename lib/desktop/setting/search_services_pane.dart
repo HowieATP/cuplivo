@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -22,7 +23,6 @@ class DesktopSearchServicesPane extends StatefulWidget {
 
 class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
   final Map<String, bool> _testing = <String, bool>{};
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -34,7 +34,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
       services.isNotEmpty ? services.length - 1 : 0,
     );
     final common = settings.searchCommonOptions;
-
     return Container(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -81,7 +80,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
               SliverReorderableList(
                 itemCount: services.length,
                 itemBuilder: (context, index) {
@@ -161,7 +159,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                   }
                 },
               ),
-
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -246,7 +243,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
   }
 
   // list height helper removed after switching to sliver-based list
-
   Future<void> _testConnection(
     BuildContext context,
     SearchServiceOptions s,
@@ -297,13 +293,10 @@ class _ServiceCardState extends State<_ServiceCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = SearchService.getService(widget.service).name;
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover || widget.selected
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
-
     // Connection/testing status capsule
     final l10n = AppLocalizations.of(context)!;
     final conn = context
@@ -318,18 +311,17 @@ class _ServiceCardState extends State<_ServiceCard> {
       statusFg = cs.primary;
     } else if (conn == true) {
       statusText = l10n.searchServicesPageConnectedStatus;
-      statusBg = Colors.green.withValues(alpha: 0.12);
-      statusFg = Colors.green;
+      statusBg = context.appColors.successContainer;
+      statusFg = context.appColors.success;
     } else if (conn == false) {
       statusText = l10n.searchServicesPageFailedStatus;
-      statusBg = Colors.orange.withValues(alpha: 0.12);
-      statusFg = Colors.orange;
+      statusBg = context.appColors.warningContainer;
+      statusFg = context.appColors.warning;
     } else {
       statusText = l10n.searchServicesPageNotTestedStatus;
       statusBg = cs.onSurface.withValues(alpha: 0.06);
       statusFg = cs.onSurface.withValues(alpha: 0.7);
     }
-
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -423,7 +415,6 @@ class _ToggleRow extends StatelessWidget {
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -546,9 +537,7 @@ class _StepperButtonState extends State<_StepperButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = Colors.transparent;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.10)
-              : Colors.black.withValues(alpha: 0.07))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.07)
         : base;
     final c = widget.enabled
         ? cs.onSurface
@@ -628,6 +617,7 @@ class _BrandBadge extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = BrandAssets.assetForName(name);
+    // color-gate: ignore
     final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -689,9 +679,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -719,9 +707,7 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -753,7 +739,6 @@ Widget _divider(BuildContext context) {
 }
 
 // ===== Dialogs =====
-
 Future<SearchServiceOptions?> _showAddServiceDialog(
   BuildContext context,
 ) async {
@@ -816,7 +801,6 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'includeDomains': TextEditingController(),
     'excludeDomains': TextEditingController(),
   };
-
   @override
   void dispose() {
     for (final c in _controllers.values) {
@@ -1199,7 +1183,6 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 
   SearchServiceOptions _createService() {
     final id = const Uuid().v4().substring(0, 8);
-
     List<ApiKeyConfig> makeKeys() {
       final key = _controllers['apiKey']?.text;
       if (key == null || key.isEmpty) return [];
@@ -1323,7 +1306,6 @@ class _EditServiceDialog extends StatefulWidget {
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
   late List<ApiKeyConfig> _editKeys;
-
   @override
   void initState() {
     super.initState();
@@ -1478,9 +1460,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     final s = widget.service;
     InputDecoration deco(String hint) =>
         _deskInputDecoration(context).copyWith(hintText: hint);
-
     final fields = <Widget>[];
-
     if (s is TavilyOptions) {
       fields.addAll([
         TextField(
@@ -1697,7 +1677,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         ),
       ]);
     }
-
     if (SearchService.serviceUsesKeys(s)) {
       if (fields.isNotEmpty) fields.add(const SizedBox(height: 12));
       fields.addAll(_buildKeyManagement());
@@ -1723,7 +1702,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
   List<Widget> _buildKeyManagement() {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-
     final rows = <Widget>[];
     for (int i = 0; i < _editKeys.length; i++) {
       final k = _editKeys[i];
@@ -2321,7 +2299,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
         final name = _serviceTypeName(context, it.type);
         final bg = selected
             ? cs.primary.withValues(alpha: isDark ? 0.18 : 0.12)
-            : (isDark ? Colors.white12 : const Color(0xFFF7F7F9));
+            : context.appColors.surfaceFill;
         final fg = selected ? cs.primary : cs.onSurface.withValues(alpha: 0.85);
         return GestureDetector(
           onTap: () => widget.onChanged(it.type),
@@ -2423,7 +2401,6 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
   final GlobalKey _key = GlobalKey();
   static const List<({String type, String brand})> _types =
       _ServiceTypeChipsState._types;
-
   void _toggle() {
     _open ? _close() : _openOverlay();
   }
@@ -2468,9 +2445,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? const Color(0xFF1C1C1E)
-                            : Colors.white,
+                        color: ctx.appColors.surfaceCard,
                         border: Border.all(
                           color: cs.outlineVariant.withValues(alpha: 0.12),
                           width: 0.5,
@@ -2542,15 +2517,12 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
         orElse: () => _types.first,
       )
       .brand;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover || _open
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     return CompositedTransformTarget(
       link: _link,
@@ -2629,9 +2601,7 @@ class _DropdownItemState extends State<_DropdownItem> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.08)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -2701,9 +2671,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final bg = widget.filled
         ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
@@ -2749,12 +2717,11 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: false,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(

@@ -328,9 +328,9 @@ class _RangeButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedBackground = isDark
         ? Colors.white.withValues(alpha: 0.16)
-        : const Color(0xFFD9DDE2);
+        : const Color(0xFFD9DDE2); // color-gate: ignore
     final idleBackground = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : const Color(0xFFEEF0F3);
     return Semantics(
       button: true,
@@ -465,7 +465,7 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                   onTap: () => Navigator.of(context).pop(),
                   borderRadius: BorderRadius.circular(13),
                   baseColor: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
+                      ? cs.onSurface.withValues(alpha: 0.08)
                       : const Color(0xFFE7E9EC),
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   child: Center(
@@ -489,7 +489,7 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                   borderRadius: BorderRadius.circular(13),
                   baseColor: isDark
                       ? Colors.white.withValues(alpha: 0.16)
-                      : const Color(0xFFDADDE2),
+                      : const Color(0xFFDADDE2), // color-gate: ignore
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   child: Center(
                     child: Text(
@@ -641,7 +641,7 @@ class _StatsDatePickerPanelState extends State<_StatsDatePickerPanel> {
                     }),
                     borderRadius: BorderRadius.circular(13),
                     baseColor: isDark
-                        ? Colors.white.withValues(alpha: 0.08)
+                        ? cs.onSurface.withValues(alpha: 0.08)
                         : const Color(0xFFECEEF1),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -903,9 +903,9 @@ class _MonthCell extends StatelessWidget {
     final background = selected
         ? (isDark
               ? Colors.white.withValues(alpha: 0.18)
-              : const Color(0xFFDADDE2))
+              : const Color(0xFFDADDE2)) // color-gate: ignore
         : (isDark
-              ? Colors.white.withValues(alpha: 0.06)
+              ? cs.onSurface.withValues(alpha: 0.06)
               : const Color(0xFFECEEF1));
     return IosCardPress(
       onTap: enabled ? onTap : null,
@@ -953,7 +953,7 @@ class _DateCell extends StatelessWidget {
     final background = selected
         ? (isDark
               ? Colors.white.withValues(alpha: 0.18)
-              : const Color(0xFFDADDE2))
+              : const Color(0xFFDADDE2)) // color-gate: ignore
         : Colors.transparent;
     final alpha = !enabled
         ? 0.18
@@ -1001,7 +1001,7 @@ class _DateField extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(13),
       baseColor: isDark
-          ? Colors.white.withValues(alpha: 0.07)
+          ? cs.onSurface.withValues(alpha: 0.07)
           : const Color(0xFFECEEF1),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(

@@ -16,6 +16,7 @@ import '../../core/services/sync/lan_sync_server.dart';
 import '../../core/services/sync/windows_firewall.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 import '../../utils/format.dart';
 import '../dialogs/restart_required_dialog.dart';
 import 'ios_form_text_field.dart';
@@ -293,7 +294,7 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
@@ -395,7 +396,7 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),

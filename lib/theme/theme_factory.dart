@@ -2,6 +2,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 
@@ -47,6 +48,29 @@ List<String> getPlatformFontFallback() {
 
 // Internal helper for theme building
 List<String> _getPlatformFontFallback() => getPlatformFontFallback();
+
+/// Derive neutral `surfaceContainer*` roles from the scheme's surface.
+///
+/// Palettes in this app only define the classic ColorScheme roles, leaving the
+/// M3 surface containers at their static (purple-tinted) defaults, which clash
+/// with non-purple palettes. Deriving them here keeps dialogs, menus, cards
+/// and other Material surfaces consistent with the active palette.
+ColorScheme _withDerivedSurfaceContainers(ColorScheme s) {
+  final dark = s.brightness == Brightness.dark;
+  const white = Color(0xFFFFFFFF);
+  const black = Color(0xFF000000);
+  Color over(Color c, double a) =>
+      Color.alphaBlend(c.withValues(alpha: a), s.surface);
+  return s.copyWith(
+    surfaceContainerLowest: dark ? over(black, 0.28) : over(white, 0.72),
+    surfaceContainerLow: dark ? over(white, 0.03) : over(white, 0.55),
+    surfaceContainer: dark ? over(white, 0.045) : over(white, 0.35),
+    // Light "high" containers must stay ≈ white: chat bubbles, cards, menus
+    // and dialogs historically used plain Colors.white in light mode.
+    surfaceContainerHigh: dark ? over(white, 0.06) : over(white, 0.85),
+    surfaceContainerHighest: dark ? over(white, 0.09) : over(s.onSurface, 0.05),
+  );
+}
 
 TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
   TextStyle? f(TextStyle? s) => s?.copyWith(fontFamilyFallback: fallback);
@@ -135,47 +159,49 @@ TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
 
 ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
   final fontFallback = _getPlatformFontFallback();
-  final scheme =
-      (dynamicScheme?.harmonized()) ??
-      const ColorScheme(
-        brightness: Brightness.light,
-        primary: Color(0xFF4D5C92),
-        onPrimary: Color(0xFFFFFFFF),
-        primaryContainer: Color(0xFFDCE1FF),
-        onPrimaryContainer: Color(0xFF03174B),
-        secondary: Color(0xFF595D72),
-        onSecondary: Color(0xFFFFFFFF),
-        secondaryContainer: Color(0xFFDEE1F9),
-        onSecondaryContainer: Color(0xFF161B2C),
-        tertiary: Color(0xFF75546F),
-        onTertiary: Color(0xFFFFFFFF),
-        tertiaryContainer: Color(0xFFFFD7F6),
-        onTertiaryContainer: Color(0xFF2C122A),
-        error: Color(0xFFBB0947),
-        onError: Color(0xFFFFFFFF),
-        errorContainer: Color(0xFFFDDADE),
-        onErrorContainer: Color(0xFF400013),
-        // background: Color(0xFFFEFBFF),
-        // onBackground: Color(0xFF1A1B21),
-        surface: Color(0xFFFEFBFF),
-        onSurface: Color(0xFF1A1B21),
-        // surfaceVariant: Color(0xFFE2E1EC),
-        onSurfaceVariant: Color(0xFF45464F),
-        outline: Color(0xFF75757F),
-        outlineVariant: Color(0xFFC6C6D0),
-        shadow: Color(0xFF000000),
-        scrim: Color(0xFF000000),
-        inverseSurface: Color(0xFF2F3036),
-        onInverseSurface: Color(0xFFF1F0F7),
-        inversePrimary: Color(0xFFB6C4FF),
-        surfaceTint: Color(0xFF4D5C92),
-      );
+  final scheme = _withDerivedSurfaceContainers(
+    (dynamicScheme?.harmonized()) ??
+        const ColorScheme(
+          brightness: Brightness.light,
+          primary: Color(0xFF4D5C92),
+          onPrimary: Color(0xFFFFFFFF),
+          primaryContainer: Color(0xFFDCE1FF),
+          onPrimaryContainer: Color(0xFF03174B),
+          secondary: Color(0xFF595D72),
+          onSecondary: Color(0xFFFFFFFF),
+          secondaryContainer: Color(0xFFDEE1F9),
+          onSecondaryContainer: Color(0xFF161B2C),
+          tertiary: Color(0xFF75546F),
+          onTertiary: Color(0xFFFFFFFF),
+          tertiaryContainer: Color(0xFFFFD7F6),
+          onTertiaryContainer: Color(0xFF2C122A),
+          error: Color(0xFFBB0947),
+          onError: Color(0xFFFFFFFF),
+          errorContainer: Color(0xFFFDDADE),
+          onErrorContainer: Color(0xFF400013),
+          // background: Color(0xFFFEFBFF),
+          // onBackground: Color(0xFF1A1B21),
+          surface: Color(0xFFFEFBFF),
+          onSurface: Color(0xFF1A1B21),
+          // surfaceVariant: Color(0xFFE2E1EC),
+          onSurfaceVariant: Color(0xFF45464F),
+          outline: Color(0xFF75757F),
+          outlineVariant: Color(0xFFC6C6D0),
+          shadow: Color(0xFF000000),
+          scrim: Color(0xFF000000),
+          inverseSurface: Color(0xFF2F3036),
+          onInverseSurface: Color(0xFFF1F0F7),
+          inversePrimary: Color(0xFFB6C4FF),
+          surfaceTint: Color(0xFF4D5C92),
+        ),
+  );
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
+    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light(scheme)],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -190,20 +216,21 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
       actionTextColor: scheme.primary,
       disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.5),
     ),
+    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      foregroundColor: Colors.black,
+      foregroundColor: scheme.onSurface,
       titleTextStyle: TextStyle(
-        color: Colors.black,
+        color: scheme.onSurface,
         fontSize: 18,
         fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
-      iconTheme: const IconThemeData(color: Colors.black),
-      actionsIconTheme: const IconThemeData(color: Colors.black),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
       systemOverlayStyle: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
@@ -234,12 +261,14 @@ ThemeData buildLightThemeForScheme(
       onInverseSurface: const Color(0xFFFFFFFF),
     );
   }
+  scheme = _withDerivedSurfaceContainers(scheme);
   // Align logging behavior with buildLightTheme so diagnostics are consistent.
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
+    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light(scheme)],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -261,14 +290,14 @@ ThemeData buildLightThemeForScheme(
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      foregroundColor: Colors.black,
+      foregroundColor: scheme.onSurface,
       titleTextStyle: TextStyle(
-        color: Colors.black,
+        color: scheme.onSurface,
         fontSize: 18,
         fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
-      iconTheme: const IconThemeData(color: Colors.black),
-      actionsIconTheme: const IconThemeData(color: Colors.black),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
@@ -285,47 +314,49 @@ ThemeData buildLightThemeForScheme(
 
 ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
   final fontFallback = _getPlatformFontFallback();
-  final scheme =
-      (dynamicScheme?.harmonized()) ??
-      const ColorScheme(
-        brightness: Brightness.dark,
-        primary: Color(0xFFB6C4FF),
-        onPrimary: Color(0xFF1D2D61),
-        primaryContainer: Color(0xFF354479),
-        onPrimaryContainer: Color(0xFFDCE1FF),
-        secondary: Color(0xFFC2C5DD),
-        onSecondary: Color(0xFF2B3042),
-        secondaryContainer: Color(0xFF424659),
-        onSecondaryContainer: Color(0xFFDEE1F9),
-        tertiary: Color(0xFFE3BADA),
-        onTertiary: Color(0xFF432740),
-        tertiaryContainer: Color(0xFF5B3D57),
-        onTertiaryContainer: Color(0xFFFFD7F6),
-        error: Color(0xFFFCB4BD),
-        onError: Color(0xFF670023),
-        errorContainer: Color(0xFF910034),
-        onErrorContainer: Color(0xFFFCB4BD),
-        // background: Color(0xFF1A1B21),
-        // onBackground: Color(0xFFE3E1E9),
-        surface: Color(0xFF1A1B21),
-        onSurface: Color(0xFFE3E1E9),
-        // surfaceVariant: Color(0xFF45464F),
-        onSurfaceVariant: Color(0xFFC6C6D0),
-        outline: Color(0xFF90909A),
-        outlineVariant: Color(0xFF45464F),
-        shadow: Color(0xFF000000),
-        scrim: Color(0xFF000000),
-        inverseSurface: Color(0xFFE3E1E9),
-        onInverseSurface: Color(0xFF2F3036),
-        inversePrimary: Color(0xFF4D5C92),
-        surfaceTint: Color(0xFFB6C4FF),
-      );
+  final scheme = _withDerivedSurfaceContainers(
+    (dynamicScheme?.harmonized()) ??
+        const ColorScheme(
+          brightness: Brightness.dark,
+          primary: Color(0xFFB6C4FF),
+          onPrimary: Color(0xFF1D2D61),
+          primaryContainer: Color(0xFF354479),
+          onPrimaryContainer: Color(0xFFDCE1FF),
+          secondary: Color(0xFFC2C5DD),
+          onSecondary: Color(0xFF2B3042),
+          secondaryContainer: Color(0xFF424659),
+          onSecondaryContainer: Color(0xFFDEE1F9),
+          tertiary: Color(0xFFE3BADA),
+          onTertiary: Color(0xFF432740),
+          tertiaryContainer: Color(0xFF5B3D57),
+          onTertiaryContainer: Color(0xFFFFD7F6),
+          error: Color(0xFFFCB4BD),
+          onError: Color(0xFF670023),
+          errorContainer: Color(0xFF910034),
+          onErrorContainer: Color(0xFFFCB4BD),
+          // background: Color(0xFF1A1B21),
+          // onBackground: Color(0xFFE3E1E9),
+          surface: Color(0xFF1A1B21),
+          onSurface: Color(0xFFE3E1E9),
+          // surfaceVariant: Color(0xFF45464F),
+          onSurfaceVariant: Color(0xFFC6C6D0),
+          outline: Color(0xFF90909A),
+          outlineVariant: Color(0xFF45464F),
+          shadow: Color(0xFF000000),
+          scrim: Color(0xFF000000),
+          inverseSurface: Color(0xFFE3E1E9),
+          onInverseSurface: Color(0xFF2F3036),
+          inversePrimary: Color(0xFF4D5C92),
+          surfaceTint: Color(0xFFB6C4FF),
+        ),
+  );
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
+    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark(scheme)],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -340,20 +371,21 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
       actionTextColor: scheme.primary,
       disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.6),
     ),
+    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      foregroundColor: Colors.white,
+      foregroundColor: scheme.onSurface,
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: scheme.onSurface,
         fontSize: 18,
         fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
-      iconTheme: const IconThemeData(color: Colors.white),
-      actionsIconTheme: const IconThemeData(color: Colors.white),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
       systemOverlayStyle: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
@@ -383,12 +415,14 @@ ThemeData buildDarkThemeForScheme(
       onInverseSurface: const Color(0xFF000000),
     );
   }
+  scheme = _withDerivedSurfaceContainers(scheme);
   // Align logging behavior with buildDarkTheme so diagnostics are consistent.
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
+    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark(scheme)],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -410,14 +444,14 @@ ThemeData buildDarkThemeForScheme(
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      foregroundColor: Colors.white,
+      foregroundColor: scheme.onSurface,
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: scheme.onSurface,
         fontSize: 18,
         fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
-      iconTheme: const IconThemeData(color: Colors.white),
-      actionsIconTheme: const IconThemeData(color: Colors.white),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,

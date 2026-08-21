@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
@@ -48,8 +49,7 @@ class BottomToolsSheet extends StatelessWidget {
       required String label,
       VoidCallback? onTap,
     }) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final cardColor = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
+      final cardColor = context.appColors.surfaceFill;
       return Expanded(
         child: SizedBox(
           height: 72,

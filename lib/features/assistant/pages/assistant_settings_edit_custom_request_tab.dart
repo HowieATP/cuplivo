@@ -3,7 +3,6 @@ part of 'assistant_settings_edit_page.dart';
 class _CustomRequestTab extends StatelessWidget {
   const _CustomRequestTab({required this.assistantId});
   final String assistantId;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -11,7 +10,6 @@ class _CustomRequestTab extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(assistantId)!;
-
     Widget card({required Widget child}) => Padding(
       padding: const EdgeInsets.fromLTRB(
         16,
@@ -21,6 +19,7 @@ class _CustomRequestTab extends StatelessWidget {
       ), // Increased right padding
       child: Container(
         decoration: BoxDecoration(
+          // color-gate: ignore
           color: isDark ? Colors.white10 : cs.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
@@ -29,7 +28,6 @@ class _CustomRequestTab extends StatelessWidget {
         child: Padding(padding: const EdgeInsets.all(12), child: child),
       ),
     );
-
     void addHeader() {
       final list = List<Map<String, String>>.of(a.customHeaders);
       list.add({'name': '', 'value': ''});
@@ -161,7 +159,6 @@ class _CustomRequestTab extends StatelessWidget {
             ],
           ),
         ),
-
         // Body
         card(
           child: Column(
@@ -246,7 +243,6 @@ class _HeaderRow extends StatefulWidget {
   final String value;
   final void Function(String name, String value) onChanged;
   final VoidCallback onDelete;
-
   @override
   State<_HeaderRow> createState() => _HeaderRowState();
 }
@@ -256,7 +252,6 @@ class _HeaderRowState extends State<_HeaderRow> {
   late final TextEditingController _valCtrl;
   late final FocusNode _nameFocus;
   late final FocusNode _valFocus;
-
   @override
   void initState() {
     super.initState();
@@ -289,11 +284,10 @@ class _HeaderRowState extends State<_HeaderRow> {
 
   InputDecoration _dec(BuildContext context, String label) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+      fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -360,7 +354,6 @@ class _BodyRow extends StatefulWidget {
   final String value;
   final void Function(String key, String value) onChanged;
   final VoidCallback onDelete;
-
   @override
   State<_BodyRow> createState() => _BodyRowState();
 }
@@ -370,7 +363,6 @@ class _BodyRowState extends State<_BodyRow> {
   late final TextEditingController _valCtrl;
   late final FocusNode _keyFocus;
   late final FocusNode _valFocus;
-
   @override
   void initState() {
     super.initState();
@@ -403,11 +395,10 @@ class _BodyRowState extends State<_BodyRow> {
 
   InputDecoration _dec(BuildContext context, String label) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+      fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,

@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 /// Full-page manager for a search service's API key rotation pool.
 ///
@@ -390,7 +391,7 @@ Widget _card(BuildContext context, {required Widget child}) {
   final isDark = theme.brightness == Brightness.dark;
   return Container(
     decoration: BoxDecoration(
-      color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+      color: context.appColors.surfaceCard,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(
         color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),

@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/app_semantic_colors.dart';
 import '../theme/palettes.dart';
 import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
@@ -368,9 +369,7 @@ class _SettingsMenu extends StatelessWidget {
               onTap: () => onSelect(items[i].$1),
               color: cs.onSurface.withValues(alpha: 0.9),
               selectedColor: cs.primary,
-              hoverBg: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
+              hoverBg: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
             ),
             if (i != items.length - 1) const SizedBox(height: 8),
           ],

@@ -93,6 +93,73 @@ void main() {
       expect(requests[1].containsKey('reasoning_effort'), isFalse);
     });
 
+    test(
+      'glm-5.3 maps reasoning budget to thinking type like glm-5.2',
+      () async {
+        final requests = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requests.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'id': 'cmpl-glm53',
+              'object': 'chat.completion.chunk',
+              'created': 0,
+              'model': 'glm-5.3',
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            })}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        await ChatApiService.sendMessageStream(
+          config: _zhipuConfig(baseUrl),
+          modelId: 'glm-5.3',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          thinkingBudget: 1024,
+        ).toList();
+
+        await ChatApiService.sendMessageStream(
+          config: _zhipuConfig(baseUrl),
+          modelId: 'glm-5.3',
+          messages: const [
+            {'role': 'user', 'content': 'hello again'},
+          ],
+          thinkingBudget: 0,
+        ).toList();
+
+        expect(requests, hasLength(2));
+        expect(requests[0]['thinking'], {'type': 'enabled'});
+        expect(requests[0].containsKey('reasoning_effort'), isFalse);
+        expect(requests[1]['thinking'], {'type': 'disabled'});
+        expect(requests[1].containsKey('reasoning_effort'), isFalse);
+      },
+    );
+
     test('glm-5.2 preserves additionalProperties in tool schema', () async {
       final requests = <Map<String, dynamic>>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

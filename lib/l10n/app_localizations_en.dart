@@ -7176,7 +7176,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => 'Keywords';
 
   @override
-  String get worldBookEntryKeywordsHint => 'Type a keyword and tap + to add.';
+  String get worldBookEntryKeywordsHint =>
+      'Type a keyword and press Enter or tap + to add.';
 
   @override
   String get worldBookEntryKeywordInputHint => 'Type a keyword';

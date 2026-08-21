@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 import '../../theme/design_tokens.dart';
 import 'ios_tactile.dart';
 
@@ -33,7 +34,6 @@ class CustomKeyValueEditor extends StatelessWidget {
     required this.onUpdate,
     this.showCard = true,
   });
-
   final String title;
   final KeyMode keyMode;
   final List<Map<String, String>> entries;
@@ -41,13 +41,11 @@ class CustomKeyValueEditor extends StatelessWidget {
   final void Function(int index) onRemove;
   final void Function(int index, String key, String value) onUpdate;
   final bool showCard;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -99,10 +97,10 @@ class CustomKeyValueEditor extends StatelessWidget {
           ),
       ],
     );
-
     if (showCard) {
       return Container(
         decoration: BoxDecoration(
+          // color-gate: ignore
           color: isDark ? Colors.white10 : cs.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
@@ -121,11 +119,9 @@ class _AddButton extends StatelessWidget {
     required this.label,
     required this.cs,
   });
-
   final VoidCallback onTap;
   final String label;
   final ColorScheme cs;
-
   @override
   Widget build(BuildContext context) {
     return IosCardPress(
@@ -159,14 +155,12 @@ class _KeyValueRow extends StatefulWidget {
     required this.onChanged,
     required this.onDelete,
   });
-
   final int index;
   final KeyMode keyMode;
   final String keyName;
   final String value;
   final void Function(String key, String value) onChanged;
   final VoidCallback onDelete;
-
   @override
   State<_KeyValueRow> createState() => _KeyValueRowState();
 }
@@ -176,7 +170,6 @@ class _KeyValueRowState extends State<_KeyValueRow> {
   late final TextEditingController _valCtrl;
   late final FocusNode _keyFocus;
   late final FocusNode _valFocus;
-
   @override
   void initState() {
     super.initState();
@@ -208,11 +201,10 @@ class _KeyValueRowState extends State<_KeyValueRow> {
 
   InputDecoration _dec(BuildContext context, String label) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+      fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -236,7 +228,6 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     final label = widget.keyMode == KeyMode.header
         ? l10n.assistantEditHeaderNameLabel
         : l10n.assistantEditBodyKeyLabel;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -65,6 +65,15 @@ void main() {
       final muse = ModelRegistry.infer(
         ModelInfo(id: 'muse-spark-1.1', displayName: 'muse-spark-1.1'),
       );
+      final museBase = ModelRegistry.infer(
+        ModelInfo(id: 'muse-spark', displayName: 'muse-spark'),
+      );
+      final muse12 = ModelRegistry.infer(
+        ModelInfo(id: 'muse-spark-1.2', displayName: 'muse-spark-1.2'),
+      );
+      final museGlimmer = ModelRegistry.infer(
+        ModelInfo(id: 'muse-glimmer-30b', displayName: 'muse-glimmer-30b'),
+      );
 
       expect(glm.input, const [Modality.text]);
       expect(glm.output, const [Modality.text]);
@@ -72,7 +81,14 @@ void main() {
         glm.abilities,
         containsAll([ModelAbility.tool, ModelAbility.reasoning]),
       );
-      for (final model in [kimiK2, kimiK3, muse]) {
+      for (final model in [
+        kimiK2,
+        kimiK3,
+        muse,
+        museBase,
+        muse12,
+        museGlimmer,
+      ]) {
         expect(model.input, contains(Modality.image));
         expect(model.output, const [Modality.text]);
         expect(
@@ -112,8 +128,20 @@ void main() {
           isTrue,
         );
         expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
+        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.5'), isFalse);
+        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.6'), isFalse);
+        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.6'), isFalse);
         expect(
           settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
+          isFalse,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'muse-spark'), isFalse);
+        expect(
+          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.2'),
+          isFalse,
+        );
+        expect(
+          settings.supportsMaxReasoning('OpenAI', 'muse-glimmer-30b'),
           isFalse,
         );
       },

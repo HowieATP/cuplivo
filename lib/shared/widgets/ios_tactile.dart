@@ -23,7 +23,6 @@ class IosIconButton extends StatefulWidget {
          icon != null || builder != null,
          'Either icon or builder must be provided',
        );
-
   final IconData? icon;
   // Builder receives the current animated color to render custom child (e.g., SVG).
   final Widget Function(Color color)? builder;
@@ -37,7 +36,6 @@ class IosIconButton extends StatefulWidget {
   final double? minSize; // min tap target (e.g., 44 for AppBar)
   final String? semanticLabel;
   final bool enabled;
-
   @override
   State<IosIconButton> createState() => _IosIconButtonState();
 }
@@ -45,10 +43,10 @@ class IosIconButton extends StatefulWidget {
 class _IosIconButtonState extends State<IosIconButton> {
   bool _pressed = false;
   bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     // Respect provided color opacity when enabled; only dim when disabled.
     final Color base = () {
       if (widget.color != null) {
@@ -72,7 +70,6 @@ class _IosIconButtonState extends State<IosIconButton> {
     final Color target = _pressed
         ? pressTarget
         : (_hovered ? hoverTarget : base);
-
     final child = TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),
       duration: const Duration(milliseconds: 200),
@@ -90,18 +87,12 @@ class _IosIconButtonState extends State<IosIconButton> {
         );
       },
     );
-
     // Subtle hover background for desktop/web
     final Color bgTarget = _pressed
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.black.withValues(alpha: 0.08))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.08)
         : (_hovered
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.06))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06)
               : Colors.transparent);
-
     final content = Semantics(
       button: true,
       enabled: widget.enabled,
@@ -144,7 +135,6 @@ class _IosIconButtonState extends State<IosIconButton> {
         ),
       ),
     );
-
     if (widget.minSize != null) {
       return ConstrainedBox(
         constraints: BoxConstraints(
@@ -175,7 +165,6 @@ class IosCardPress extends StatefulWidget {
     this.duration,
     this.haptics = true,
   });
-
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -192,7 +181,6 @@ class IosCardPress extends StatefulWidget {
   final Duration? duration;
   // Whether to perform a soft haptic on tap (also gated by settings/global toggles)
   final bool haptics;
-
   @override
   State<IosCardPress> createState() => _IosCardPressState();
 }
@@ -200,13 +188,13 @@ class IosCardPress extends StatefulWidget {
 class _IosCardPressState extends State<IosCardPress> {
   bool _pressed = false;
   bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final Color base =
+        // color-gate: ignore
         widget.baseColor ?? (isDark ? Colors.white10 : cs.surface);
     final double k = widget.pressedBlendStrength ?? (isDark ? 0.14 : 0.12);
     final Color pressTarget =
@@ -218,11 +206,9 @@ class _IosCardPressState extends State<IosCardPress> {
         : (_hovered ? hoverTarget : base);
     final double scale = _pressed ? (widget.pressedScale ?? 1.0) : 1.0;
     final Duration dur = widget.duration ?? const Duration(milliseconds: 200);
-
     final content = widget.padding == null
         ? widget.child
         : Padding(padding: widget.padding!, child: widget.child);
-
     return MouseRegion(
       cursor: (widget.onTap != null || widget.onLongPress != null)
           ? SystemMouseCursors.click

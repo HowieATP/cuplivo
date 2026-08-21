@@ -2451,7 +2451,7 @@
   "worldBookEntryEnabledLabel": "启用条目",
   "worldBookEntryPriorityLabel": "优先级",
   "worldBookEntryKeywordsLabel": "关键词",
-  "worldBookEntryKeywordsHint": "输入关键词后点 + 添加。",
+  "worldBookEntryKeywordsHint": "输入关键词后点 + 或按回车添加。",
   "worldBookEntryKeywordInputHint": "输入关键词",
   "worldBookEntryKeywordAddTooltip": "添加关键词",
   "worldBookEntryUseRegexLabel": "使用正则",

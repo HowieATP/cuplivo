@@ -27,6 +27,7 @@ import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../shared/widgets/lan_sync_section.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -1335,9 +1336,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -1805,9 +1804,7 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1871,9 +1868,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1924,9 +1919,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final bg = widget.filled
         ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
@@ -1976,9 +1969,7 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final baseBg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: baseBg,
@@ -2000,12 +1991,11 @@ Widget _sectionCard({required List<Widget> children}) {
 
 InputDecoration _deskInputDecoration(BuildContext context) {
   // Match provider dialog style (compact), but slightly shorter height and 14px font hint
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     hintStyle: TextStyle(
       fontSize: 14,
       color: cs.onSurface.withValues(alpha: 0.5),

@@ -22,6 +22,7 @@ import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -667,7 +668,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.providerDetailPageDeleteButton,
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
             ),
           ),
         ],
@@ -754,7 +755,7 @@ class _ProvidersList extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final bg = context.appColors.surfaceCard;
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.08 : 0.06,
     );
@@ -878,7 +879,7 @@ class _GroupedProvidersList extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final bg = context.appColors.surfaceCard;
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.08 : 0.06,
     );
@@ -1052,7 +1053,6 @@ class _ProvidersSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final hasText = controller.text.trim().isNotEmpty;
 
     return Padding(
@@ -1060,10 +1060,7 @@ class _ProvidersSearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
-        style: TextStyle(
-          color: isDark ? Colors.white : Colors.black87,
-          fontSize: 14,
-        ),
+        style: TextStyle(color: cs.onSurface, fontSize: 14),
         cursorColor: cs.primary,
         decoration: InputDecoration(
           hintText: hintText,
@@ -1104,9 +1101,7 @@ class _ProvidersSearchField extends StatelessWidget {
             minHeight: 34,
           ),
           filled: true,
-          fillColor: isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : const Color(0xFFEBEBEB),
+          fillColor: context.appColors.surfaceFill,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -1223,9 +1218,11 @@ class _ProviderRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final statusBg = enabled
-        ? Colors.green.withValues(alpha: 0.12)
-        : Colors.orange.withValues(alpha: 0.15);
-    final statusFg = enabled ? Colors.green : Colors.orange;
+        ? context.appColors.successContainer
+        : context.appColors.warningContainer;
+    final statusFg = enabled
+        ? context.appColors.success
+        : context.appColors.warning;
 
     final row = _TactileRow(
       onTap: () {
@@ -1473,9 +1470,7 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final glassBase = isDark
         ? Colors.black.withValues(alpha: 0.06)
         : Colors.white.withValues(alpha: 0.06);
-    final overlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;

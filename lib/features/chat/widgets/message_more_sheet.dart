@@ -215,7 +215,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
     VoidCallback? onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final fg = danger ? Colors.red.shade600 : cs.onSurface;
+    final fg = danger ? cs.error : cs.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(

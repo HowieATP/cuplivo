@@ -3,7 +3,6 @@ part of 'assistant_settings_edit_page.dart';
 class _BasicSettingsTab extends StatefulWidget {
   const _BasicSettingsTab({required this.assistantId});
   final String assistantId;
-
   @override
   State<_BasicSettingsTab> createState() => _BasicSettingsTabState();
 }
@@ -16,7 +15,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   late final TextEditingController _handoffIdCtrl;
   late final TextEditingController _handoffDescCtrl;
   String? _handoffIdError;
-
   @override
   void initState() {
     super.initState();
@@ -65,7 +63,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
-
     Widget avatarWidget({double size = 56}) {
       final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.12);
       Widget inner;
@@ -145,9 +142,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         // Identity card (avatar + name) - iOS style
         Container(
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white10
-                : Colors.white.withValues(alpha: 0.96),
+            color: context.appColors.surfaceCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -174,7 +169,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           ),
         ),
         const SizedBox(height: 16),
-
         // iOS section card with all settings (without Use Assistant Avatar and Stream Output)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
@@ -284,13 +278,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           ),
         ),
         const SizedBox(height: 16),
-
         // Chat model card (moved down, styled like DefaultModelPage)
         Container(
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white10
-                : Colors.white.withValues(alpha: 0.96),
+            color: context.appColors.surfaceCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -362,12 +353,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   },
                   pressedScale: 0.98,
                   builder: (pressed) {
-                    final bg = isDark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5);
-                    final overlay = isDark
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.black.withValues(alpha: 0.05);
+                    final bg = context.appColors.surfaceFill;
+                    final overlay = cs.onSurface.withValues(
+                      alpha: isDark ? 0.06 : 0.05,
+                    );
                     final pressedBg = Color.alphaBlend(overlay, bg);
                     final l10n = AppLocalizations.of(context)!;
                     final settings = context.read<SettingsProvider>();
@@ -424,13 +413,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           ),
         ),
         const SizedBox(height: 16),
-
         // Chat background (separate iOS card)
         Container(
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white10
-                : Colors.white.withValues(alpha: 0.96),
+            color: context.appColors.surfaceCard,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -472,12 +458,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     onTap: () => _pickBackground(context, a),
                     pressedScale: 0.98,
                     builder: (pressed) {
-                      final bg = isDark
-                          ? Colors.white10
-                          : const Color(0xFFF2F3F5);
-                      final overlay = isDark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : Colors.black.withValues(alpha: 0.05);
+                      final bg = context.appColors.surfaceFill;
+                      final overlay = cs.onSurface.withValues(
+                        alpha: isDark ? 0.06 : 0.05,
+                      );
                       final pressedBg = Color.alphaBlend(overlay, bg);
                       final iconColor = cs.onSurface.withValues(alpha: 0.75);
                       final textColor = cs.onSurface.withValues(alpha: 0.9);
@@ -596,9 +580,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         hintText: 'research-bot',
                         errorText: _handoffIdError,
                         filled: true,
-                        fillColor: isDark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
@@ -665,9 +647,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditHandoffDescription,
                         filled: true,
-                        fillColor: isDark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
@@ -1266,9 +1246,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   decoration: InputDecoration(
                     hintText: l10n.assistantEditMaxTokensHint,
                     filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
@@ -1309,14 +1287,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
 class _BackgroundPreview extends StatefulWidget {
   const _BackgroundPreview({required this.path});
   final String path;
-
   @override
   State<_BackgroundPreview> createState() => _BackgroundPreviewState();
 }
 
 class _BackgroundPreviewState extends State<_BackgroundPreview> {
   Size? _size;
-
   @override
   void initState() {
     super.initState();
@@ -1401,7 +1377,6 @@ class _SliderTileNew extends StatelessWidget {
     this.customLabelStops,
     this.onLabelTap,
   });
-
   final double value;
   final double min;
   final double max;
@@ -1410,7 +1385,6 @@ class _SliderTileNew extends StatelessWidget {
   final ValueChanged<double> onChanged;
   final List<double>? customLabelStops;
   final VoidCallback? onLabelTap;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1422,7 +1396,6 @@ class _SliderTileNew extends StatelessWidget {
         ? (customLabelStops!.where((v) => v >= min && v <= max).toSet().toList()
             ..sort())
         : const <double>[];
-
     final active = cs.primary;
     final inactive = cs.onSurface.withValues(alpha: isDark ? 0.25 : 0.20);
     final double clamped = value.clamp(min, max);
@@ -1449,7 +1422,6 @@ class _SliderTileNew extends StatelessWidget {
       if (minor < 0) minor = 0;
       if (minor > 8) minor = 8;
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1591,6 +1563,7 @@ class _ValuePill extends StatelessWidget {
           : HitTestBehavior.deferToChild,
       child: DecoratedBox(
         decoration: BoxDecoration(
+          // color-gate: ignore
           color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
@@ -1792,9 +1765,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditEmojiDialogHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.transparent),
@@ -1903,9 +1874,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                 decoration: InputDecoration(
                   hintText: l10n.assistantEditImageUrlDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.transparent),
@@ -2027,9 +1996,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                 decoration: InputDecoration(
                   hintText: l10n.assistantEditQQAvatarDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.transparent),

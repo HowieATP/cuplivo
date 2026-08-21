@@ -14,6 +14,7 @@ import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
@@ -239,8 +240,7 @@ class _CompressContextOptionsDialogState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final panelColor = isDark ? const Color(0xFF1C1C1E) : cs.surface;
+    final panelColor = context.appColors.surfaceCard;
     final constrainedWidth = MediaQuery.of(
       context,
     ).size.width.clamp(0.0, 420.0).toDouble();
@@ -465,10 +465,9 @@ class _KeepCountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final enabled = onTap != null;
     return IosCardPress(
-      baseColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+      baseColor: context.appColors.surfaceFill,
       borderRadius: BorderRadius.circular(10),
       pressedScale: 0.98,
       onTap: onTap,
@@ -505,7 +504,7 @@ class _SegmentButton extends StatelessWidget {
     final selectedBg = isDark
         ? cs.primary.withValues(alpha: 0.22)
         : cs.primary.withValues(alpha: 0.12);
-    final baseBg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
+    final baseBg = context.appColors.surfaceFill;
 
     return IosCardPress(
       baseColor: selected ? selectedBg : baseBg,
@@ -548,10 +547,7 @@ class _DialogActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = primary
-        ? cs.primary
-        : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
+    final base = primary ? cs.primary : context.appColors.surfaceFill;
 
     return IosCardPress(
       baseColor: base,
@@ -2064,6 +2060,7 @@ class _HomePageState extends State<HomePage>
     bool deleteAllVersions = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2084,10 +2081,7 @@ class _HomePageState extends State<HomePage>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.homePageDelete,
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text(l10n.homePageDelete, style: TextStyle(color: cs.error)),
           ),
         ],
       ),
@@ -2110,6 +2104,7 @@ class _HomePageState extends State<HomePage>
     required bool deleteAllVersions,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     if (_controller.selectedItems.isEmpty) {
       showAppSnackBar(
         context,
@@ -2143,10 +2138,7 @@ class _HomePageState extends State<HomePage>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.homePageDelete,
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text(l10n.homePageDelete, style: TextStyle(color: cs.error)),
           ),
         ],
       ),

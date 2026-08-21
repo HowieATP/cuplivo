@@ -13,6 +13,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
@@ -815,9 +816,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white12
-                            : const Color(0xFFF2F3F5),
+                        color: context.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -1283,9 +1282,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1641,9 +1638,7 @@ Widget _sheetOption(
                 base)
           : base;
       final bgTarget = pressed
-          ? (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.05))
+          ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
           : Colors.transparent;
       return TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: target),
@@ -2046,7 +2041,6 @@ class _AutoCollapseCodeBlockLinesRowState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
 
     // Keep controller in sync when not editing
@@ -2097,7 +2091,7 @@ class _AutoCollapseCodeBlockLinesRowState
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
-                  fillColor: isDark ? Colors.white10 : Colors.white,
+                  fillColor: context.appColors.surfaceFill,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 8,

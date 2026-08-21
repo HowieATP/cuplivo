@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
@@ -431,7 +432,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ).usePureBackground;
         final bgColor = usePure
             ? (isDark ? Colors.black : Colors.white)
-            : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
+            : ctx.appColors.surfaceCard;
 
         return Stack(
           children: [
@@ -469,7 +470,6 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary; // hover/focus border
@@ -493,7 +493,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
             constraints: const BoxConstraints(minWidth: 150, minHeight: 40),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF141414) : Colors.white,
+              color: context.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: _open
@@ -721,9 +721,7 @@ class _LangOptionTileState extends State<_LangOptionTile> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.12)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.04)
               : Colors.transparent);
 
     return MouseRegion(
@@ -920,9 +918,7 @@ class _ModelPickerButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = enabled
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -990,9 +986,7 @@ class _PaneActionButtonState extends State<_PaneActionButton> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.06))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06)
         : Colors.transparent;
     final fg = cs.onSurface.withValues(alpha: 0.9);
     return MouseRegion(

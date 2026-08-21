@@ -15,6 +15,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/brand_assets.dart';
 import 'voice_service_widgets.dart';
 
@@ -261,7 +262,6 @@ class _AsrServiceCardState extends State<_AsrServiceCard> {
 
   Widget _buildMobile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final displayName = _serviceDisplayName(l10n, widget.service);
     return VoiceServiceTactileRow(
@@ -270,7 +270,7 @@ class _AsrServiceCardState extends State<_AsrServiceCard> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         color: pressed
-            ? (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)
+            ? cs.onSurface.withValues(alpha: 0.05)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(
@@ -330,9 +330,7 @@ class _AsrServiceCardState extends State<_AsrServiceCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final displayName = _serviceDisplayName(l10n, widget.service);
-    final background = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final background = context.appColors.surfaceCard;
     final border = _hovered || widget.selected
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -1328,7 +1326,7 @@ class _SystemConfiguration extends StatelessWidget {
         : l10n.asrServicesSystemSubtitle;
     final controlColor = desktop
         ? Colors.transparent
-        : (isDark ? Colors.white12 : const Color(0xFFF2F3F5));
+        : context.appColors.surfaceFill;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1445,11 +1443,10 @@ class _LocalModelPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final listColor = desktop
         ? Colors.transparent
-        : (isDark ? Colors.white12 : const Color(0xFFF2F3F5));
+        : context.appColors.surfaceFill;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1835,8 +1832,7 @@ class _EditorFieldState extends State<_EditorField> {
       );
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fieldBg = isDark ? Colors.white12 : const Color(0xFFF2F3F5);
+    final fieldBg = context.appColors.surfaceFill;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(

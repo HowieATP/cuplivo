@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/custom_theme.dart';
 import '../widgets/custom_theme_widgets.dart';
 
@@ -276,7 +277,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final settings = context.watch<SettingsProvider>();
       final Color bg = settings.usePureBackground
           ? (isDark ? Colors.black : const Color(0xFFFFFFFF))
-          : (isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96));
+          : context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,

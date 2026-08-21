@@ -5,6 +5,7 @@ import '../icons/lucide_adapter.dart';
 import '../shared/widgets/snackbar.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/app_semantic_colors.dart';
 
 Future<void> showSelectCopyDesktopDialog(
   BuildContext context, {
@@ -60,7 +61,6 @@ class _SelectCopyDesktopDialogState extends State<_SelectCopyDesktopDialog> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
       elevation: 12,
@@ -120,9 +120,7 @@ class _SelectCopyDesktopDialogState extends State<_SelectCopyDesktopDialog> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        color: context.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: cs.outlineVariant.withValues(alpha: 0.18),

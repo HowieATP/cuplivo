@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import '../../../core/prompts/ocr_presets.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -97,9 +98,7 @@ Future<void> showOcrPromptSheet(BuildContext context) async {
                 decoration: InputDecoration(
                   hintText: l10n.defaultModelPageOcrPromptHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(

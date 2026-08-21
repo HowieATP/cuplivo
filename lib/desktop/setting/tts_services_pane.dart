@@ -15,6 +15,7 @@ import '../../features/settings/widgets/voice_service_widgets.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 /// Desktop: TTS (语音服务) right-side pane
 /// Adapts mobile TTS page to desktop with hoverable list card style
@@ -168,7 +169,7 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = _appSurfaceCard(cs);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover || widget.selected
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -469,7 +470,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
     final l10n = AppLocalizations.of(context)!;
     final tts = context.watch<TtsProvider>();
 
-    final baseBg = _appSurfaceCard(cs);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -2062,17 +2063,4 @@ class _InputRow extends StatelessWidget {
       ),
     );
   }
-}
-
-Color _appSurfaceCard(ColorScheme cs) {
-  final isDark = cs.brightness == Brightness.dark;
-  return isDark
-      ? Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-          cs.surface,
-        )
-      : Color.alphaBlend(
-          const Color(0xFFFFFFFF).withValues(alpha: 0.96),
-          cs.surface,
-        );
 }

@@ -165,7 +165,7 @@ class _PromptTabState extends State<_PromptTab> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'system-prompt-editor',
-      barrierColor: Colors.black.withValues(alpha: 0.12),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
       pageBuilder: (ctx, _, __) {
         return _SystemPromptDesktopDialog(initial: initial);
       },
@@ -303,10 +303,9 @@ class _PromptTabState extends State<_PromptTab> {
     }
 
     // System Prompt Card (no border, iOS style)
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sysCard = Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
@@ -417,7 +416,7 @@ class _PromptTabState extends State<_PromptTab> {
     // Time Injection Card
     final timeInjectionCard = Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
@@ -469,7 +468,7 @@ class _PromptTabState extends State<_PromptTab> {
     // Template Card with preview (no border, iOS style)
     final tmplCard = Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
@@ -608,7 +607,6 @@ class _PromptTabState extends State<_PromptTab> {
     // Preset conversation card
     Widget presetCard() {
       final a = ap.getById(widget.assistantId)!;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
       final items = a.presetMessages;
       final isDesktop =
           Theme.of(context).platform == TargetPlatform.macOS ||
@@ -716,9 +714,7 @@ class _PromptTabState extends State<_PromptTab> {
         );
       }
 
-      final baseBg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final baseBg = context.appColors.surfaceCard;
 
       return Container(
         decoration: BoxDecoration(
@@ -956,9 +952,7 @@ class _PresetMessageCardState extends State<_PresetMessageCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -1083,9 +1077,9 @@ class _HoverTextButtonState extends State<_HoverTextButton> {
         ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
     final Color bg = (_hover || _press)
-        ? (isDark
-              ? Colors.white.withValues(alpha: _press ? 0.12 : 0.08)
-              : Colors.black.withValues(alpha: _press ? 0.08 : 0.06))
+        ? cs.onSurface.withValues(
+            alpha: isDark ? (_press ? 0.12 : 0.08) : (_press ? 0.08 : 0.06),
+          )
         : Colors.transparent;
 
     return MouseRegion(
@@ -1144,7 +1138,6 @@ class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return SizedBox(
       height: MediaQuery.of(context).size.height * 0.96,
@@ -1176,7 +1169,7 @@ class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+                  color: context.appColors.surfaceFill,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1288,9 +1281,7 @@ class _SystemPromptDesktopDialogState
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white10
-                              : const Color(0xFFF7F7F9),
+                          color: context.appColors.surfaceFill,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1558,9 +1549,7 @@ Future<void> _showEditPresetDialog(
                       ? l10n.assistantEditPresetInputHintAssistant
                       : l10n.assistantEditPresetInputHintUser,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF7F7F9),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(

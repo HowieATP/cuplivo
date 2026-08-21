@@ -13028,7 +13028,7 @@ abstract class AppLocalizations {
   /// No description provided for @worldBookEntryKeywordsHint.
   ///
   /// In en, this message translates to:
-  /// **'Type a keyword and tap + to add.'**
+  /// **'Type a keyword and press Enter or tap + to add.'**
   String get worldBookEntryKeywordsHint;
 
   /// No description provided for @worldBookEntryKeywordInputHint.

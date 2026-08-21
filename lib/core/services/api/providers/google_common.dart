@@ -521,7 +521,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           'name': name,
           if (desc.isNotEmpty) 'description': desc,
         };
-        if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
+        if (params != null) {
+          // Gemini validation + drop additionalProperties (rejected with
+          // HTTP 400, issue #425). MCP tools are already sanitized by
+          // ToolHandlerService; this covers built-in tools too.
+          d['parameters'] = ChatApiService._stripAdditionalProperties(
+            _cleanSchemaForGemini(params),
+          );
+        }
         decls.add(d);
       }
       if (decls.isNotEmpty) {
@@ -992,7 +999,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (params != null) {
         // Google Gemini requires strict JSON Schema compliance
         // Fix array properties that are missing 'items' field
-        final cleanedParams = _cleanSchemaForGemini(params);
+        final cleanedParams = ChatApiService._stripAdditionalProperties(
+          _cleanSchemaForGemini(params),
+        );
         d['parameters'] = cleanedParams;
       }
       decls.add(d);

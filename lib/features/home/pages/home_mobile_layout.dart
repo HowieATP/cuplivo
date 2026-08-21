@@ -509,6 +509,7 @@ class _ScrollButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ClipOval(
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
@@ -535,11 +536,7 @@ class _ScrollButton extends StatelessWidget {
               onTap: onTap,
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+                child: Icon(icon, size: 16, color: cs.onSurface),
               ),
             ),
           ),
@@ -638,9 +635,7 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final glassBase = isDark
         ? Colors.black.withValues(alpha: 0.06)
         : Colors.white.withValues(alpha: 0.06);
-    final overlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;

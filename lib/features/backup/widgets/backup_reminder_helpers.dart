@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 String backupReminderFrequencyLabel(AppLocalizations l10n, int days) {
   return switch (days) {
@@ -460,7 +461,7 @@ class _BackupReminderTimeWheelPanelState
               haptics: false,
               borderRadius: BorderRadius.circular(13),
               baseColor: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
+                  ? cs.onSurface.withValues(alpha: 0.08)
                   : const Color(0xFFE7E9EC),
               padding: const EdgeInsets.symmetric(vertical: 11),
               child: Center(
@@ -481,9 +482,7 @@ class _BackupReminderTimeWheelPanelState
               onTap: _save,
               haptics: false,
               borderRadius: BorderRadius.circular(13),
-              baseColor: isDark
-                  ? Colors.white.withValues(alpha: 0.16)
-                  : const Color(0xFFDADDE2),
+              baseColor: context.appColors.surfaceFill,
               padding: const EdgeInsets.symmetric(vertical: 11),
               child: Center(
                 child: Text(
@@ -568,9 +567,7 @@ class _BackupReminderCustomDaysDialogState
               decoration: InputDecoration(
                 labelText: l10n.backupReminderCustomDaysLabel,
                 filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white10
-                    : const Color(0xFFF2F3F5),
+                fillColor: context.appColors.surfaceFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(

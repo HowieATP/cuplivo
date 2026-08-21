@@ -267,6 +267,7 @@ class _ToolCollisionDialogBodyState extends State<_ToolCollisionDialogBody> {
   ) {
     final r = _resolutions[idx];
     final isBuiltin = collision.source == CollisionSource.builtin;
+    final cs = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,7 +355,7 @@ class _ToolCollisionDialogBodyState extends State<_ToolCollisionDialogBody> {
                         : Icons.link,
                     size: 20,
                     color: r.serversToUnbind.contains(server.id)
-                        ? Colors.red
+                        ? cs.error
                         : null,
                   ),
                 ),
@@ -368,7 +369,7 @@ class _ToolCollisionDialogBodyState extends State<_ToolCollisionDialogBody> {
                 l10n.mcpToolCollisionUnbindHint,
                 style: Theme.of(
                   context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.red),
+                ).textTheme.bodySmall?.copyWith(color: cs.error),
               ),
             ),
         ],

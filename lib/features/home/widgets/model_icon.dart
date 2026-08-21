@@ -17,22 +17,18 @@ class CurrentModelIcon extends StatelessWidget {
     this.withBackground = true,
     this.backgroundColor,
   });
-
   final String? providerKey;
   final String? modelId;
   final double size; // outer diameter
   final bool withBackground; // whether to draw circular background
   final Color? backgroundColor; // override background color if provided
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (providerKey == null || modelId == null) return const SizedBox.shrink();
-
     String? asset = BrandAssets.assetForName(modelId!);
     asset ??= BrandAssets.assetForName(providerKey!);
-
     Widget inner;
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -65,13 +61,13 @@ class CurrentModelIcon extends StatelessWidget {
         ),
       );
     }
-
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: withBackground
             ? (backgroundColor ??
+                  // color-gate: ignore
                   (isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1)))
             : Colors.transparent,
         shape: BoxShape.circle,

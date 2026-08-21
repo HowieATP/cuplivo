@@ -33,6 +33,7 @@ import 'tabbed_preview_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import 'package:Cuplivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -458,9 +459,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         // Unmask dollar signs that were protected during preprocessing
         String unmasked = inline.replaceAll(_codeDollarMask, r'$');
         String softened = _softBreakInline(unmasked);
-        final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
         final csCtx = Theme.of(ctx).colorScheme;
-        final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
+        final bg = ctx.appColors.surfaceFill;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(

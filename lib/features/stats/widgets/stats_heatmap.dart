@@ -410,6 +410,7 @@ class _HeatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final alpha = switch (level) {
       0 => 0.10,
       1 => 0.25,
@@ -417,11 +418,10 @@ class _HeatCell extends StatelessWidget {
       3 => 0.68,
       _ => 0.92,
     };
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = level == 0
         ? isDark
               ? Colors.white.withValues(alpha: 0.14)
-              : const Color(0xFFDDE2E8)
+              : const Color(0xFFDDE2E8) // color-gate: ignore
         : cs.primary.withValues(alpha: alpha);
     return Container(
       width: size,

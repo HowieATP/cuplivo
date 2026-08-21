@@ -11,6 +11,7 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
 import 'search_service_editor_page.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class SearchServicesPage extends StatefulWidget {
   const SearchServicesPage({super.key});
@@ -479,12 +480,12 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
       statusFg = cs.primary;
     } else if (conn == true) {
       statusText = l10n.searchServicesPageConnectedStatus;
-      statusBg = Colors.green.withValues(alpha: 0.12);
-      statusFg = Colors.green;
+      statusBg = context.appColors.successContainer;
+      statusFg = context.appColors.success;
     } else if (conn == false) {
       statusText = l10n.searchServicesPageFailedStatus;
-      statusBg = Colors.orange.withValues(alpha: 0.12);
-      statusFg = Colors.orange;
+      statusBg = context.appColors.warningContainer;
+      statusFg = context.appColors.warning;
     } else {
       statusText = l10n.searchServicesPageNotTestedStatus;
       statusBg = cs.onSurface.withValues(alpha: 0.06);
@@ -648,6 +649,7 @@ class _BrandBadge extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Use BrandAssets to get the icon path
     final asset = BrandAssets.assetForName(name);
+    // color-gate: ignore
     final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -819,9 +821,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -870,9 +870,7 @@ Widget _sheetOption(
     builder: (pressed) {
       final base = cs.onSurface;
       final bgTarget = (bgOnPress && pressed)
-          ? (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.05))
+          ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
           : Colors.transparent;
       return _AnimatedPressColor(
         pressed: pressed,

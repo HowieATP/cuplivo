@@ -51,6 +51,7 @@ import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -466,11 +467,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color:
-                                      Theme.of(ctx).brightness ==
-                                          Brightness.dark
-                                      ? Colors.white10
-                                      : const Color(0xFFF7F7F9),
+                                  color: ctx.appColors.surfaceFill,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: cs.outlineVariant.withValues(
@@ -496,11 +493,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color:
-                                      Theme.of(ctx).brightness ==
-                                          Brightness.dark
-                                      ? Colors.white10
-                                      : const Color(0xFFF7F7F9),
+                                  color: ctx.appColors.surfaceFill,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: cs.outlineVariant.withValues(
@@ -613,9 +606,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx).brightness == Brightness.dark
-                          ? Colors.white10
-                          : const Color(0xFFF7F7F9),
+                      color: ctx.appColors.surfaceFill,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -639,9 +630,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx).brightness == Brightness.dark
-                          ? Colors.white10
-                          : const Color(0xFFF7F7F9),
+                      color: ctx.appColors.surfaceFill,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1127,7 +1116,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'context-menu',
-      barrierColor: Colors.black.withValues(alpha: 0.08),
+      barrierColor: cs.scrim.withValues(alpha: 0.08),
       pageBuilder: (ctx, _, __) {
         return Stack(
           children: [
@@ -1157,6 +1146,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: isDark
+                              // color-gate: ignore
                               ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
                               : Colors.white.withValues(alpha: 0.66),
                         ),
@@ -1725,9 +1715,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   errorBuilder: (_, __, ___) => Container(
                     width: 112,
                     height: 112,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : Colors.black.withValues(alpha: 0.06),
+                    color: cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
                     child: Icon(
                       Icons.broken_image,
                       color: cs.onSurface.withValues(alpha: 0.45),
@@ -1746,7 +1734,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         parsed.docs.map((d) {
           return IosCardPress(
             baseColor: isDark
-                ? Colors.white.withValues(alpha: 0.08)
+                ? cs.onSurface.withValues(alpha: 0.08)
                 : cs.surface.withValues(alpha: 0.92),
             pressedScale: 0.99,
             borderRadius: BorderRadius.circular(10),
@@ -3236,6 +3224,7 @@ Widget _buildSharedChatSurface(
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: isDark
+                  // color-gate: ignore
                   ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
                   : Colors.white.withValues(alpha: 0.66),
               borderRadius: borderRadius,
@@ -3251,7 +3240,7 @@ Widget _buildSharedChatSurface(
     case ChatMessageBackgroundStyle.solid:
       return DecoratedBox(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+          color: context.appColors.surfaceCard,
           borderRadius: borderRadius,
           border: Border.all(
             color: cs.outlineVariant.withValues(alpha: 0.16),
@@ -3341,10 +3330,8 @@ class _MenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = danger ? Colors.red.shade600 : cs.onSurface;
-    final ic = danger
-        ? Colors.red.shade600
-        : cs.onSurface.withValues(alpha: 0.9);
+    final fg = danger ? cs.error : cs.onSurface;
+    final ic = danger ? cs.error : cs.onSurface.withValues(alpha: 0.9);
     // iOS-style press effect: no ripple. Use transparent base and a subtle
     // pressed blend inside the blurred/glass menu container.
     return IosCardPress(
@@ -4881,11 +4868,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(ctx).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white10
-                                        : const Color(0xFFF7F7F9),
+                                    color: ctx.appColors.surfaceFill,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color: cs.outlineVariant.withValues(
@@ -4911,11 +4894,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(ctx).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white10
-                                        : const Color(0xFFF7F7F9),
+                                    color: ctx.appColors.surfaceFill,
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color: cs.outlineVariant.withValues(
@@ -5032,9 +5011,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        color: ctx.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -5058,9 +5035,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        color: ctx.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -5963,9 +5938,7 @@ class _SourcesSummaryCard extends StatelessWidget {
     return IosCardPress(
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.16)
-            : Colors.black.withValues(alpha: 0.10),
+        color: cs.onSurface.withValues(alpha: isDark ? 0.16 : 0.10),
         width: 0.8,
       ),
       baseColor: Colors.transparent,
@@ -6060,9 +6033,7 @@ class _SourceFavicon extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : Colors.black.withValues(alpha: 0.06);
+    final borderColor = cs.onSurface.withValues(alpha: isDark ? 0.14 : 0.06);
 
     return Container(
       width: _SourceFaviconStack._iconSize,

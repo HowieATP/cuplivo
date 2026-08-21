@@ -39,6 +39,7 @@ import '../../provider/widgets/provider_balance_badge.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class ProviderDetailPage extends StatefulWidget {
   const ProviderDetailPage({
@@ -48,7 +49,6 @@ class ProviderDetailPage extends StatefulWidget {
   });
   final String keyName;
   final String displayName;
-
   @override
   State<ProviderDetailPage> createState() => _ProviderDetailPageState();
 }
@@ -76,7 +76,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
-
   // 模型选择模式相关
   bool _isSelectionMode = false;
   final Set<String> _selectedModels = {};
@@ -89,7 +88,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   bool _aihubmixAppCodeEnabled = false;
   bool _claudePromptCachingEnabled = false;
   String _claudePromptCachingTtl = ProviderConfig.claudePromptCachingTtl5m;
-
   @override
   void initState() {
     super.initState();
@@ -274,7 +272,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           onPressed: () => Navigator.of(ctx).pop(true),
                           child: Text(
                             l10n.providerDetailPageDeleteButton,
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(color: cs.error),
                           ),
                         ),
                       ],
@@ -291,7 +289,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         }
                       }
                     } catch (_) {}
-
                     // Remove provider config and related selections/pins
                     await settings.removeProviderConfig(widget.keyName);
                     if (!context.mounted) return;
@@ -473,9 +470,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 decoration: InputDecoration(
                   hintText: l10n.sideDrawerImageUrlDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx2.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.transparent),
@@ -555,9 +550,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   decoration: InputDecoration(
                     hintText: l10n.providerAvatarLobehubDialogHint,
                     filled: true,
-                    fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    fillColor: ctx2.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(color: Colors.transparent),
@@ -634,14 +627,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final icons = BrandAssets.selectableIcons;
-
     // 若当前头像为 LobeHub 自定义图标，预热缓存，使弹窗与详情页头像无需等待下载。
     final current = settings.getProviderConfig(widget.keyName);
     if (current.avatarType == 'lobehub' &&
         (current.avatarValue ?? '').isNotEmpty) {
       _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
     }
-
     await showDialog<void>(
       context: context,
       builder: (ctx) {
@@ -672,9 +663,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         prefixIcon: const Icon(Lucide.Search, size: 18),
                         isDense: true,
                         filled: true,
-                        fillColor: isDark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
@@ -750,6 +739,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                           child: Container(
                                             decoration: BoxDecoration(
                                               color: isDark
+                                                  // color-gate: ignore
                                                   ? Colors.white10
                                                   : cs.primary.withValues(
                                                       alpha: 0.1,
@@ -829,7 +819,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
@@ -1555,7 +1544,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                 modelOverrides: newOverrides,
                               ),
                             );
-
                             // Clear global and assistant-level model selections that reference the deleted model
                             await settings.clearSelectionsForModel(
                               widget.keyName,
@@ -1571,7 +1559,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                 }
                               }
                             } catch (_) {}
-
                             if (!context.mounted) return;
                             showAppSnackBar(
                               context,
@@ -1670,7 +1657,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   // Legacy network tab removed (replaced by ProviderNetworkPage)
-
   Widget _inputRow(
     BuildContext context, {
     required String label,
@@ -1681,7 +1667,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     Widget? suffix,
     ValueChanged<String>? onChanged,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1705,7 +1690,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : Colors.white,
+            fillColor: context.appColors.surfaceFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
@@ -1813,7 +1798,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   // --- iOS style helpers (consistent with MultiKeyManagerPage) ---
-
   Widget _iosSectionCard({required List<Widget> children}) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -2326,7 +2310,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       // preserve models and modelOverrides and proxy fields implicitly via copyWith
     );
     await settings.setProviderConfig(widget.keyName, updated);
-
     // If provider is now disabled but was previously enabled, clear model selections
     if (!_enabled && old.enabled) {
       await settings.clearSelectionsForProvider(widget.keyName);
@@ -2341,7 +2324,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         }
       } catch (_) {}
     }
-
     if (!mounted) return;
     // Silent auto-save (no snackbar) for immediate-save UX
   }
@@ -2354,7 +2336,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     List<Widget>? actions,
     ValueChanged<String>? onChanged,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2386,7 +2367,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             hintText: hint,
             filled: true,
             alignLabelWithHint: true,
-            fillColor: isDark ? Colors.white10 : Colors.white,
+            fillColor: context.appColors.surfaceFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
@@ -2466,13 +2447,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required EdgeInsetsGeometry padding,
     required double maxWidth,
   }) {
-    final toolbarColor = Theme.of(context).brightness == Brightness.dark
-        ? Color.alphaBlend(
-            Colors.white.withValues(alpha: 0.12),
-            colorScheme.surface,
-          )
-        : const Color(0xFFF2F3F5);
-
+    final toolbarColor = context.appColors.surfaceFill;
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
@@ -2515,7 +2490,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           horizontal: compact ? 12 : 18,
           vertical: 10,
         );
-
         return _buildToolbarShell(
           colorScheme: cs,
           horizontalMargin: horizontalMargin,
@@ -2699,7 +2673,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         final textScaler = MediaQuery.textScalerOf(context);
         final textDirection = Directionality.of(context);
         final locale = Localizations.maybeLocaleOf(context);
-
         double labelWidth(String label) {
           final painter = TextPainter(
             text: TextSpan(text: label, style: buttonTextStyle),
@@ -2793,7 +2766,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             toolbarTextBudget) {
           showDetectLabel = false;
         }
-
         return _buildToolbarShell(
           colorScheme: cs,
           horizontalMargin: horizontalMargin,
@@ -3236,7 +3208,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
     if (ok != true) return;
     if (!mounted) return;
-
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
     final deletedCount = await settings.deleteModels(
@@ -3271,9 +3242,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   Future<void> _startDetection() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
-
     final modelsToTest = Set<String>.from(_selectedModels);
-
     setState(() {
       _isDetecting = true;
       _detectionResults.removeWhere((id, _) => modelsToTest.contains(id));
@@ -3282,12 +3251,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _pendingModels.addAll(modelsToTest);
       _currentDetectingModel = null;
     });
-
     final cfg = context.read<SettingsProvider>().getProviderConfig(
       widget.keyName,
       defaultName: widget.displayName,
     );
-
     // 顺序检测,防止并发导致API被封锁
     for (final modelId in modelsToTest) {
       if (mounted) {
@@ -3296,7 +3263,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           _pendingModels.remove(modelId);
         });
       }
-
       try {
         await ProviderManager.testConnection(
           cfg,
@@ -3319,7 +3285,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       }
       await Future.delayed(const Duration(milliseconds: 500));
     }
-
     if (mounted) {
       setState(() {
         _isDetecting = false;
@@ -3388,7 +3353,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   // _saveNetwork moved to ProviderNetworkPage
-
   Future<void> _showModelPicker(BuildContext context) async {
     final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
@@ -3407,7 +3371,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     String error = '';
     // Collapsed state per group in the selector dialog
     final Map<String, bool> collapsed = <String, bool>{};
-
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -3460,7 +3423,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               // kick off loading once
               Future.microtask(loadModels);
             }
-
             final selected = settings
                 .getProviderConfig(
                   widget.keyName,
@@ -3477,7 +3439,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         m.displayName.toLowerCase().contains(query)))
                   m,
             ];
-
             String groupFor(ModelInfo m) {
               return ModelGrouping.groupFor(
                 m,
@@ -3493,7 +3454,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             }
             final groupKeys = grouped.keys.toList()
               ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
             return SafeArea(
               top: false,
               child: AnimatedPadding(
@@ -3530,10 +3490,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             decoration: InputDecoration(
                               hintText: l10n.providerDetailPageFilterHint,
                               filled: true,
-                              fillColor:
-                                  Theme.of(ctx).brightness == Brightness.dark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: ctx.appColors.surfaceFill,
                               prefixIcon: Icon(
                                 Lucide.Search,
                                 size: 20,
@@ -3722,13 +3679,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                           builder: (_) {
                                             return Container(
                                               decoration: BoxDecoration(
-                                                color:
-                                                    Theme.of(
-                                                          context,
-                                                        ).brightness ==
-                                                        Brightness.dark
-                                                    ? Colors.white10
-                                                    : const Color(0xFFF2F3F5),
+                                                color: context
+                                                    .appColors
+                                                    .surfaceFill,
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
@@ -4098,7 +4051,6 @@ class _ModelCard extends StatelessWidget {
   final String? detectionErrorMessage;
   final bool isDetecting;
   final bool isPending;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -4142,7 +4094,7 @@ class _ModelCard extends StatelessWidget {
               child: Icon(
                 detectionResult! ? Lucide.CheckCircle : Lucide.XCircle,
                 size: 16,
-                color: detectionResult! ? Colors.green : cs.error,
+                color: detectionResult! ? context.appColors.success : cs.error,
               ),
             ),
           )
@@ -4249,7 +4201,6 @@ class _ResolvedModelOverride {
     required this.ov,
     required this.baseId,
   });
-
   final ModelInfo base;
   final Map<String, dynamic>? ov;
   final String baseId;
@@ -4262,7 +4213,6 @@ class _ConnectionTestDialog extends StatefulWidget {
   });
   final String providerKey;
   final String providerDisplayName;
-
   @override
   State<_ConnectionTestDialog> createState() => _ConnectionTestDialogState();
 }
@@ -4275,7 +4225,6 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
   String _errorMessage = '';
   bool _useStream = false;
   bool _hasModels = true;
-
   @override
   void initState() {
     super.initState();
@@ -4501,7 +4450,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     required bool success,
     required String message,
   }) {
-    final color = success ? Colors.green : cs.error;
+    final color = success ? context.appColors.success : cs.error;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -4637,14 +4586,11 @@ ModelInfo _applyModelOverride(
 }
 
 // Using flutter_slidable for reliable swipe actions with confirm + undo.
-
 // Legacy page-based implementations removed in favor of swipeable PageView tabs.
-
 class _BrandAvatar extends StatelessWidget {
   const _BrandAvatar({required this.name, this.size = 20});
   final String name;
   final double size;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -4659,6 +4605,7 @@ class _BrandAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: isDark
+          // color-gate: ignore
           ? Colors.white10
           : cs.primary.withValues(alpha: 0.1),
       child: asset == null
@@ -4717,21 +4664,18 @@ class _TactileIconButton extends StatefulWidget {
     this.size = 22,
     this.haptics = true,
   });
-
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   final String? semanticLabel;
   final double size;
   final bool haptics;
-
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
 
 class _TactileIconButtonState extends State<_TactileIconButton> {
   bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
@@ -4742,7 +4686,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
       color: _pressed ? pressColor : base,
       semanticLabel: widget.semanticLabel,
     );
-
     return Semantics(
       button: true,
       label: widget.semanticLabel,
@@ -4817,7 +4760,6 @@ class _BottomTabs extends StatelessWidget {
   final IconData rightIcon;
   final String rightLabel;
   final ValueChanged<int> onSelect;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -4867,21 +4809,18 @@ class _BottomTabItem extends StatefulWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-
   @override
   State<_BottomTabItem> createState() => _BottomTabItemState();
 }
 
 class _BottomTabItemState extends State<_BottomTabItem> {
   bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final baseColor = cs.onSurface.withValues(alpha: 0.7);
     final selColor = cs.primary;
     final target = widget.selected ? selColor : baseColor;
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -4940,21 +4879,16 @@ class _PromptCachingTtlSegmentedControl extends StatelessWidget {
     required this.semanticLabel,
     required this.onChanged,
   });
-
   final String value;
   final String fiveMinuteLabel;
   final String oneHourLabel;
   final String semanticLabel;
   final ValueChanged<String> onChanged;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final background = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.05);
-
+    final background = cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05);
     return Semantics(
       label: semanticLabel,
       child: Container(
@@ -4992,12 +4926,10 @@ class _PromptCachingTtlSegment extends StatelessWidget {
     required this.selectedColor,
     required this.onTap,
   });
-
   final String label;
   final bool selected;
   final Color selectedColor;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

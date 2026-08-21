@@ -6,6 +6,7 @@ import '../../../core/providers/group_chat_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../pages/group_chat_settings_page.dart';
 import 'group_avatar.dart';
 
@@ -34,9 +35,7 @@ class GroupChatSettingsCard extends StatelessWidget {
     final preview = context.watch<GroupChatProvider>().latestMessagePreview(
       group.id,
     );
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
 
     return IosCardPress(
       onTap: () {

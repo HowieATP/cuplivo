@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -94,7 +95,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     }
     final usePure = sp?.usePureBackground ?? false;
     if (usePure) return isDark ? Colors.black : Colors.white;
-    return isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    return context.appColors.surfaceCard;
   }
 
   void _openMenu() {
@@ -143,16 +144,13 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final label = _labelForValue(widget.value);
 
     final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
-    final fillColor =
-        widget.triggerFillColor ??
-        (isDark ? const Color(0xFF141414) : Colors.white);
+    final fillColor = widget.triggerFillColor ?? context.appColors.surfaceCard;
 
     return CompositedTransformTarget(
       link: _link,
@@ -362,9 +360,7 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.12)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),

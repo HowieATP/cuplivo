@@ -1,13 +1,11 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'package:Cuplivo/core/providers/grok_device_code_controller.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
-
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import 'grok_device_code_flow.dart';
 import 'ios_tile_button.dart';
 import 'snackbar.dart';
@@ -15,15 +13,12 @@ import 'snackbar.dart';
 /// Inline Grok account status card for provider settings pages.
 class GrokAccountEntry extends StatelessWidget {
   const GrokAccountEntry({super.key, required this.cfg});
-
   final ProviderConfig cfg;
-
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<GrokDeviceCodeController>();
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-
     final Widget body = switch (controller.status) {
       GrokAuthStatus.signedIn => _buildSignedIn(context, controller, l10n, cs),
       GrokAuthStatus.expired => _buildOutOfDate(
@@ -42,12 +37,12 @@ class GrokAccountEntry extends StatelessWidget {
       GrokAuthStatus.polling => _buildWaiting(controller, l10n, cs),
       GrokAuthStatus.signedOut => _buildSignedOut(context, l10n, cs),
     };
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
@@ -123,7 +118,11 @@ class GrokAccountEntry extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Lucide.CheckCircle, size: 18, color: Color(0xFF34C759)),
+            Icon(
+              Lucide.CheckCircle,
+              size: 18,
+              color: context.appColors.success,
+            ),
             const SizedBox(width: 8),
             Text(
               l10n.grokLoginStatusSignedIn,

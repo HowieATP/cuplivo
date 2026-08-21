@@ -16,6 +16,7 @@ import '../../../shared/widgets/ios_expandable_section.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../settings/pages/mount_files_page.dart';
 import '../controllers/dependency_install_controller.dart';
 import 'sandbox_files_page.dart';
@@ -800,11 +801,10 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
   };
 
   Widget _sectionCard({required List<Widget> children}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.1)),
       ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../l10n/app_localizations.dart';
@@ -10,17 +9,19 @@ import '../utils/brand_assets.dart';
 import '../utils/model_grouping.dart';
 import '../shared/widgets/model_tag_wrap.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/app_semantic_colors.dart';
 
 Future<void> showModelFetchDialog(
   BuildContext context, {
   required String providerKey,
   required String providerDisplayName,
 }) async {
+  final cs = Theme.of(context).colorScheme;
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'model-fetch-dialog',
-    barrierColor: Colors.black.withValues(alpha: 0.25),
+    barrierColor: cs.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) {
       return _ModelFetchDialogBody(
         providerKey: providerKey,
@@ -47,7 +48,6 @@ class _ModelFetchDialogBody extends StatefulWidget {
   });
   final String providerKey;
   final String providerDisplayName;
-
   @override
   State<_ModelFetchDialogBody> createState() => _ModelFetchDialogBodyState();
 }
@@ -58,7 +58,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   String _error = '';
   List<ModelInfo> _items = const [];
   final Map<String, bool> _collapsed = <String, bool>{};
-
   @override
   void initState() {
     super.initState();
@@ -135,7 +134,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final settingsWatch = context.watch<SettingsProvider>();
-
     // Compute header filtered list and selection state for toggle icon
     final headerQuery = _searchCtrl.text.trim().toLowerCase();
     final headerFiltered = <ModelInfo>[
@@ -155,7 +153,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     final bool allHeaderFilteredSelected =
         headerFiltered.isNotEmpty &&
         headerFiltered.every((m) => headerSelectedSet.contains(m.id));
-
     final dialog = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -170,7 +167,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
+                  ? cs.onSurface.withValues(alpha: 0.08)
                   : cs.outlineVariant.withValues(alpha: 0.25),
               width: 1,
             ),
@@ -228,9 +225,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                               hintText: l10n.providerDetailPageFilterHint,
                               isDense: true,
                               filled: true,
-                              fillColor: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: context.appColors.surfaceFill,
                               prefixIcon: Icon(
                                 lucide.Lucide.Search,
                                 size: 18,
@@ -442,7 +437,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         ),
       ),
     );
-
     return Material(type: MaterialType.transparency, child: dialog);
   }
 
@@ -456,7 +450,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         )
         .models
         .toSet();
-
     final q = _searchCtrl.text.trim().toLowerCase();
     final filtered = <ModelInfo>[
       for (final m in _items)
@@ -465,7 +458,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
             m.displayName.toLowerCase().contains(q))
           m,
     ];
-
     final Map<String, List<ModelInfo>> grouped = {};
     for (final m in filtered) {
       final g = _groupFor(context, m);
@@ -473,11 +465,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     }
     final groupKeys = grouped.keys.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
     if (groupKeys.isEmpty) {
       return const Center(child: Text(''));
     }
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       children: [
@@ -494,9 +484,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 );
                 return Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
+                    color: context.appColors.surfaceFill,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Padding(
@@ -624,7 +612,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         .models
         .toSet();
     final added = selected.contains(m.id);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: _TactileRow(
@@ -709,17 +696,14 @@ class _TactileRowState extends State<_TactileRow> {
   bool _hovered = false;
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = () {
       if (_pressed) {
-        return isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.black.withValues(alpha: 0.06);
+        return cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06);
       }
       if (_hovered) {
-        return isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.black.withValues(alpha: 0.03);
+        return cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.03);
       }
       return Colors.transparent;
     }();
@@ -803,6 +787,7 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),

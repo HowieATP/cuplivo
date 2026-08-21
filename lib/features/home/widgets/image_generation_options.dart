@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 /// Holds the state of image generation options (quality / size / aspect
 /// ratio / format / compression / count). Values are emitted into the API
@@ -841,11 +842,7 @@ class _OptionChip extends StatelessWidget {
       onTap: onTap,
       haptics: false,
       borderRadius: BorderRadius.circular(999),
-      baseColor: selected
-          ? selectedBg
-          : isDark
-          ? Colors.white10
-          : cs.surface,
+      baseColor: selected ? selectedBg : context.appColors.surfaceFill,
       pressedBlendStrength: 0.18,
       border: Border.all(
         color: selected

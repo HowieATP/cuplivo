@@ -12,6 +12,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/brand_assets.dart';
 import 'search_api_keys_page.dart';
 
@@ -1807,7 +1808,7 @@ class _ProviderTypeChipState extends State<_ProviderTypeChip> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = widget.selected
         ? cs.primary.withValues(alpha: isDark ? 0.2 : 0.12)
-        : (isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96));
+        : context.appColors.surfaceCard;
     final overlay = _pressed
         ? cs.onSurface.withValues(alpha: 0.08)
         : (_hovered
@@ -2230,7 +2231,7 @@ Widget _sectionCard(BuildContext context, {required Widget child}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
   final isDark = theme.brightness == Brightness.dark;
-  final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+  final bg = context.appColors.surfaceCard;
   return Container(
     decoration: BoxDecoration(
       color: bg,

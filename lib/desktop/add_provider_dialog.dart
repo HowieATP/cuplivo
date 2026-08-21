@@ -9,14 +9,16 @@ import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../core/providers/settings_provider.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/app_semantic_colors.dart';
 
 Future<String?> showDesktopAddProviderDialog(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
   String? result;
   await showGeneralDialog<String?>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'add-provider-dialog',
-    barrierColor: Colors.black.withValues(alpha: 0.25),
+    barrierColor: cs.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) => const _AddProviderDialogBody(),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -102,13 +104,12 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   }
 
   InputDecoration _deskInputDecoration(BuildContext context, {String? hint}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       isDense: true,
       hintText: hint,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+      fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
@@ -152,9 +153,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.white10
-            : const Color(0xFFF7F7F9),
+        color: context.appColors.surfaceFill,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

@@ -23,6 +23,7 @@ import '../chat/chat_service.dart';
 import '../deleted_records_store.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment;
+import '../sync/lan_sync_models.dart' show FileManifestEntry;
 import 'kelivo_image_settings_mapper.dart';
 import 'kelivo_v2_exception.dart';
 import 'double_pref_keys.dart';
@@ -291,6 +292,7 @@ class DataSync {
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       final packSince = incremental?.since;
+      final packIncludeFilePaths = incremental?.includeFilePaths;
       await Isolate.run(() {
         _packZipSync(
           outPath: outPath,
@@ -299,6 +301,7 @@ class DataSync {
           deletedJsonPath: deletedJsonPath,
           includeFiles: effectiveIncludeFiles,
           since: packSince,
+          includeFilePaths: packIncludeFilePaths,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -427,8 +430,15 @@ class DataSync {
     required String skillsDirPath,
     required String workspacesDirPath,
     DateTime? since,
+    Set<String>? includeFilePaths,
   }) {
     final writer = _StreamingZipWriter(outPath);
+    // LAN-sync delta flow only: collect the exact (size, ms mtime) of every
+    // packed file so the receiving side restores matching mtimes (kills
+    // cross-run re-send churn). Null → legacy mtime-filter path, no manifest.
+    final manifest = includeFilePaths != null
+        ? <String, ({int size, int mtimeMs})>{}
+        : null;
     try {
       // settings.json
       if (settingsPath != null) {
@@ -446,14 +456,49 @@ class DataSync {
       }
 
       // skills/ — always included, independent of includeFiles
-      _addDirectoryToZip(writer, skillsDirPath, 'skills', since: since);
+      _addDirectoryToZip(
+        writer,
+        skillsDirPath,
+        'skills',
+        since: since,
+        includeFilePaths: includeFilePaths,
+        manifestOut: manifest,
+      );
 
       // files under upload/, images/, avatars/
       if (includeFiles) {
-        _addDirectoryToZip(writer, uploadDirPath, 'upload', since: since);
-        _addDirectoryToZip(writer, avatarsDirPath, 'avatars', since: since);
-        _addDirectoryToZip(writer, imagesDirPath, 'images', since: since);
-        _addDirectoryToZip(writer, fontsDirPath, 'fonts', since: since);
+        _addDirectoryToZip(
+          writer,
+          uploadDirPath,
+          'upload',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          avatarsDirPath,
+          'avatars',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          imagesDirPath,
+          'images',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          fontsDirPath,
+          'fonts',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
         // workspaces/ — user content; dot-prefixed entries (e.g.
         // .fetch_cache/) are excluded from backup/sync (one dotfile rule,
         // same as the server's glob/grep convention).
@@ -463,7 +508,20 @@ class DataSync {
           'workspaces',
           since: since,
           skipDotEntries: true,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
         );
+      }
+
+      // sync_manifest.json — exact ms mtimes of the packed files, consumed by
+      // the restore side. Deliberately NOT named manifest.json: that name is
+      // the Kelivo-v2 backup detector and would mis-reject this zip.
+      if (manifest != null) {
+        final manifestJson = jsonEncode({
+          for (final entry in manifest.entries)
+            entry.key: {'size': entry.value.size, 'mtime': entry.value.mtimeMs},
+        });
+        writer.addBytes(utf8.encode(manifestJson), 'sync_manifest.json');
       }
 
       writer.closeSync();
@@ -483,12 +541,20 @@ class DataSync {
   }
 
   /// Add all files from [srcDirPath] into the zip under [zipPrefix].
+  ///
+  /// When [includeFilePaths] is set (LAN-sync delta flow), a file is packed
+  /// iff its zip-entry name (`<zipPrefix>/<relPosix>`) is in the set — this
+  /// replaces the mtime `>= since` filter. Otherwise [since] behaves as before.
+  /// [manifestOut], when non-null, is filled with the packed files' exact
+  /// (size, ms mtime) keyed by zip-entry name.
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix, {
     DateTime? since,
     bool skipDotEntries = false,
+    Set<String>? includeFilePaths,
+    Map<String, ({int size, int mtimeMs})>? manifestOut,
   }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
@@ -502,14 +568,28 @@ class DataSync {
             relPosix.split('/').any((s) => s.startsWith('.'))) {
           continue;
         }
-        if (since != null) {
+        final entryName = '$zipPrefix/$relPosix';
+        if (includeFilePaths != null) {
+          if (!includeFilePaths.contains(entryName)) continue;
+        } else if (since != null) {
           try {
             if (ent.lastModifiedSync().isBefore(since)) continue;
           } catch (_) {
             // Cannot read modification time — include conservatively
           }
         }
-        _addFileToZip(writer, ent.path, '$zipPrefix/$relPosix');
+        if (manifestOut != null) {
+          try {
+            final stat = ent.statSync();
+            manifestOut[entryName] = (
+              size: stat.size,
+              mtimeMs: stat.modified.millisecondsSinceEpoch,
+            );
+          } catch (_) {
+            // Cannot stat — the pack call below surfaces a real error later.
+          }
+        }
+        _addFileToZip(writer, ent.path, entryName);
       }
     }
   }
@@ -540,6 +620,42 @@ class DataSync {
       }
     }
     return out;
+  }
+
+  /// Sets [target]'s mtime, preferring the LAN-sync manifest's ms precision
+  /// when present; otherwise falls back to [source]'s own mtime (the ZIP's
+  /// second-granularity UT field). Best-effort — never throws.
+  static Future<void> _setTargetMtime(
+    File target,
+    File source,
+    String extractDirPath,
+    Map<String, ({int size, int mtimeMs})>? manifest,
+  ) async {
+    final mtime = await _backupFileMtime(source, extractDirPath, manifest);
+    try {
+      await target.setLastModified(mtime);
+    } catch (_) {}
+  }
+
+  /// The effective mtime of an extracted backup file. When the LAN-sync
+  /// `sync_manifest.json` carries an entry for the file, its exact ms mtime is
+  /// used — this makes the merge's newer-wins comparison agree precisely with
+  /// the delta (`computeFileDelta` compares ms mtimes), so a same-second tie
+  /// can never keep the receiver's older copy and re-send forever. Otherwise
+  /// falls back to the ZIP's own (second-granularity) mtime.
+  static Future<DateTime> _backupFileMtime(
+    File source,
+    String extractDirPath,
+    Map<String, ({int size, int mtimeMs})>? manifest,
+  ) async {
+    final key = p
+        .relative(source.path, from: extractDirPath)
+        .replaceAll('\\', '/');
+    final entry = manifest?[key];
+    if (entry != null) {
+      return DateTime.fromMillisecondsSinceEpoch(entry.mtimeMs);
+    }
+    return source.lastModified();
   }
 
   /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
@@ -1200,6 +1316,54 @@ class DataSync {
     return (fileCount: fileCount, totalBytes: totalBytes);
   }
 
+  /// Builds this device's file manifest for LAN sync: zip-entry path →
+  /// (size, ms mtime). Keys exactly mirror the ZIP packer's entry names
+  /// (`<root>/<relPosix>`), so a delta computed against a peer's manifest
+  /// plugs straight into `_packZipSync(includeFilePaths:)`. Mirrors the
+  /// `_packZipSync` rules: `workspaces/` skips dot-prefixed entries, `skills/`
+  /// is always covered.
+  ///
+  /// Strict by design: an unreadable tree/file throws (with context) instead
+  /// of producing a partial manifest — a partial manifest would silently drop
+  /// the missing files from the delta and the peer would never receive them.
+  /// The pack path fails loudly on the same files, so this is consistent.
+  Future<Map<String, FileManifestEntry>> buildFileManifest() async {
+    final result = <String, FileManifestEntry>{};
+
+    Future<void> walk(
+      String dirPath,
+      String zipPrefix, {
+      required bool skipDot,
+    }) async {
+      // A tree that has never been created is legitimately empty — skip it.
+      // Any other failure while listing/stat-ing throws (strict manifest).
+      if (!await Directory(dirPath).exists()) return;
+      await for (final ent in Directory(
+        dirPath,
+      ).list(recursive: true, followLinks: false)) {
+        if (ent is! File) continue;
+        final rel = p.relative(ent.path, from: dirPath).replaceAll('\\', '/');
+        if (skipDot && rel.split('/').any((s) => s.startsWith('.'))) {
+          continue;
+        }
+        final stat = await ent.stat();
+        result['$zipPrefix/$rel'] = FileManifestEntry(
+          size: stat.size,
+          mtimeMs: stat.modified.millisecondsSinceEpoch,
+        );
+      }
+    }
+
+    await walk((await _getUploadDir()).path, 'upload', skipDot: false);
+    await walk((await _getAvatarsDir()).path, 'avatars', skipDot: false);
+    await walk((await _getImagesDir()).path, 'images', skipDot: false);
+    await walk((await _getFontsDir()).path, 'fonts', skipDot: false);
+    await walk((await _getWorkspacesDir()).path, 'workspaces', skipDot: true);
+    await walk((await _getSkillsDir()).path, 'skills', skipDot: false);
+
+    return result;
+  }
+
   Future<String> _exportSettingsJson() async {
     final prefs = await SharedPreferencesAsync.instance;
     final map = await prefs.snapshot();
@@ -1265,7 +1429,18 @@ class DataSync {
       await chatService.init();
     }
     var conversations = chatService.getAllCompleteConversations();
-    if (incremental != null) {
+    final perConvSince = incremental?.conversationSince;
+    if (incremental != null && perConvSince != null) {
+      // LAN-sync per-conversation mode: export exactly the conversations that
+      // have a delta on this device (presence in the map); conversations
+      // absent from the map are identical on both peers and skipped entirely.
+      // Each exported conversation is then scoped to its own fork-point
+      // timestamp in the messages loop below (null → one-sided conversation,
+      // exported in full). This removes the global-since over/under-inclusion.
+      conversations = conversations
+          .where((c) => perConvSince.containsKey(c.id))
+          .toList();
+    } else if (incremental != null) {
       final sinceCheck = incremental.sinceCheck;
       final since = incremental.since;
       // Message-level filtering with updatedAt pre-check optimization.
@@ -1308,10 +1483,22 @@ class DataSync {
         var msgs = chatService.getMessages(c.id);
         // Group transcripts are all-or-nothing: a partial message list would
         // corrupt member assistants' private context after restore.
-        if (incremental != null &&
-            !c.isGroup &&
-            c.createdAt.isBefore(incremental.since)) {
-          msgs = _incrementalQualifiedMessages(msgs, incremental.sinceCheck);
+        if (incremental != null && !c.isGroup) {
+          final perConv = incremental.conversationSince;
+          if (perConv != null) {
+            // Per-conversation window (LAN sync): null since = one-sided
+            // conversation whose whole transcript is the increment — export
+            // every message.
+            final convSince = perConv[c.id];
+            if (convSince != null) {
+              msgs = _incrementalQualifiedMessages(
+                msgs,
+                (t) => convSince.isBefore(t) || convSince.isAtSameMomentAs(t),
+              );
+            }
+          } else if (c.createdAt.isBefore(incremental.since)) {
+            msgs = _incrementalQualifiedMessages(msgs, incremental.sinceCheck);
+          }
         }
         for (final m in msgs) {
           if (!firstMsg) sink.write(',');
@@ -2030,6 +2217,31 @@ class DataSync {
         }
       }
 
+      // LAN-sync file manifest: exact ms mtimes of the packed files, so a
+      // restored file's mtime matches the sender's and the next sync's delta
+      // comparison sees no drift. Absent in normal backups / old-peer zips —
+      // fall back to the zip's own (second-granularity) mtimes.
+      Map<String, ({int size, int mtimeMs})>? syncManifest;
+      final syncManifestFile = File(
+        p.join(extractDir.path, 'sync_manifest.json'),
+      );
+      if (await syncManifestFile.exists()) {
+        try {
+          final raw =
+              jsonDecode(await syncManifestFile.readAsString())
+                  as Map<String, dynamic>;
+          syncManifest = raw.map((key, value) {
+            final m = (value as Map).cast<String, dynamic>();
+            return MapEntry(key, (
+              size: m['size'] as int,
+              mtimeMs: m['mtime'] as int,
+            ));
+          });
+        } catch (e) {
+          debugPrint('restoreData: failed to parse sync_manifest.json: $e');
+        }
+      }
+
       // Restore files. File copying is best-effort: a single locked or unusual
       // file must not abort the whole restore — conversations and assistants
       // are already committed at this point.
@@ -2100,7 +2312,12 @@ class DataSync {
                 await target.parent.create(recursive: true);
                 await e.file.copy(target.path);
                 try {
-                  await target.setLastModified(await e.file.lastModified());
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
                 } catch (_) {}
                 bumpCopied(e.file);
               }
@@ -2128,7 +2345,12 @@ class DataSync {
                 await target.parent.create(recursive: true);
                 await e.file.copy(target.path);
                 try {
-                  await target.setLastModified(await e.file.lastModified());
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
                 } catch (_) {}
                 bumpCopied(e.file);
               }
@@ -2156,7 +2378,12 @@ class DataSync {
                 await target.parent.create(recursive: true);
                 await e.file.copy(target.path);
                 try {
-                  await target.setLastModified(await e.file.lastModified());
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
                 } catch (_) {}
                 bumpCopied(e.file);
               }
@@ -2184,7 +2411,12 @@ class DataSync {
                 await target.parent.create(recursive: true);
                 await e.file.copy(target.path);
                 try {
-                  await target.setLastModified(await e.file.lastModified());
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
                 } catch (_) {}
                 bumpCopied(e.file);
               }
@@ -2215,13 +2447,22 @@ class DataSync {
                 await target.parent.create(recursive: true);
                 await e.file.copy(target.path);
                 try {
-                  await target.setLastModified(await e.file.lastModified());
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
                 } catch (_) {}
                 bumpCopied(e.file);
               }
             }
           } else {
-            // Merge mode: Only copy non-existing files
+            // Merge mode: per-file newer-wins across every tree (see the
+            // per-tree blocks below) — a backup entry replaces the local copy
+            // only when strictly newer; ties/older keep local. This converges
+            // bidirectional sync; copy-if-absent (the old behavior) would keep
+            // a peer's stale copy forever.
             // Merge upload directory
             final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
             if (await uploadSrc.exists()) {
@@ -2238,11 +2479,35 @@ class DataSync {
               }
               for (final e in entries) {
                 final target = File(p.join(dst.path, e.rel));
-                if (!await target.exists()) {
+                // Merge semantics: newer-wins per file (same rule as
+                // workspaces/skills) — a backup entry replaces the local copy
+                // only when strictly newer. Copy-if-absent (the old behavior)
+                // would never propagate an updated upload file across LAN sync.
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
                   await target.parent.create(recursive: true);
                   await e.file.copy(target.path);
                   try {
-                    await target.setLastModified(await e.file.lastModified());
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
                 bumpCopied(e.file);
@@ -2265,11 +2530,31 @@ class DataSync {
               }
               for (final e in entries) {
                 final target = File(p.join(dst.path, e.rel));
-                if (!await target.exists()) {
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
                   await target.parent.create(recursive: true);
                   await e.file.copy(target.path);
                   try {
-                    await target.setLastModified(await e.file.lastModified());
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
                 bumpCopied(e.file);
@@ -2292,11 +2577,31 @@ class DataSync {
               }
               for (final e in entries) {
                 final target = File(p.join(dst.path, e.rel));
-                if (!await target.exists()) {
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
                   await target.parent.create(recursive: true);
                   await e.file.copy(target.path);
                   try {
-                    await target.setLastModified(await e.file.lastModified());
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
                 bumpCopied(e.file);
@@ -2319,11 +2624,31 @@ class DataSync {
               }
               for (final e in entries) {
                 final target = File(p.join(dst.path, e.rel));
-                if (!await target.exists()) {
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
                   await target.parent.create(recursive: true);
                   await e.file.copy(target.path);
                   try {
-                    await target.setLastModified(await e.file.lastModified());
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
                 bumpCopied(e.file);
@@ -2355,7 +2680,11 @@ class DataSync {
                 var keepLocal = false;
                 if (await target.exists()) {
                   try {
-                    final backupMod = await e.file.lastModified();
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                     final localMod = await target.lastModified();
                     keepLocal = !backupMod.isAfter(localMod);
                   } catch (_) {
@@ -2367,7 +2696,12 @@ class DataSync {
                   await target.parent.create(recursive: true);
                   await e.file.copy(target.path);
                   try {
-                    await target.setLastModified(await e.file.lastModified());
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
                 bumpCopied(e.file);
@@ -2429,7 +2763,11 @@ class DataSync {
               // Newer-wins per file: replace a local copy only when the
               // backup entry is strictly newer; ties/older keep local.
               try {
-                final backupMod = await e.file.lastModified();
+                final backupMod = await _backupFileMtime(
+                  e.file,
+                  extractDir.path,
+                  syncManifest,
+                );
                 final localMod = await target.lastModified();
                 keepLocal = !backupMod.isAfter(localMod);
               } catch (_) {
@@ -2441,7 +2779,12 @@ class DataSync {
               await target.parent.create(recursive: true);
               await e.file.copy(target.path);
               try {
-                await target.setLastModified(await e.file.lastModified());
+                await _setTargetMtime(
+                  target,
+                  e.file,
+                  extractDir.path,
+                  syncManifest,
+                );
               } catch (_) {}
             }
             skillCopiedFiles++;
@@ -2744,6 +3087,51 @@ class _StreamingZipWriter {
     );
   }
 
+  /// Adds an in-memory byte payload (e.g. the LAN-sync `sync_manifest.json`)
+  /// as a ZIP entry. [mtimeMs] defaults to now when null.
+  void addBytes(Uint8List bytes, String entryName, {int? mtimeMs}) {
+    if (_closed) {
+      throw StateError('Cannot add files after the ZIP writer is closed.');
+    }
+    if (entryName.isEmpty) return;
+
+    final modified = mtimeMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(mtimeMs)
+        : DateTime.now();
+    final modTime = _zipTime(modified);
+    final modDate = _zipDate(modified);
+    final utExtra = _utExtraField(modified);
+    final nameBytes = utf8.encode(entryName);
+    final localHeaderOffset = _output.length;
+
+    _writeLocalHeader(
+      nameBytes: nameBytes,
+      modTime: modTime,
+      modDate: modDate,
+      utExtra: utExtra,
+    );
+
+    final written = _writeDeflatedBytes(bytes);
+    _checkZip32(written.compressedSize, 'compressed size');
+    _checkZip32(written.uncompressedSize, 'uncompressed size');
+
+    _writeDataDescriptor(written);
+
+    _entries.add(
+      _StreamingZipEntry(
+        nameBytes: nameBytes,
+        modTime: modTime,
+        modDate: modDate,
+        utExtra: utExtra,
+        crc32: written.crc32,
+        compressedSize: written.compressedSize,
+        uncompressedSize: written.uncompressedSize,
+        localHeaderOffset: localHeaderOffset,
+        mode: 0,
+      ),
+    );
+  }
+
   void closeSync() {
     if (_closed) return;
     _checkEntryCount();
@@ -2821,6 +3209,29 @@ class _StreamingZipWriter {
       crc32: crc32,
       compressedSize: compressedSink.bytesWritten,
       uncompressedSize: uncompressedSize,
+    );
+  }
+
+  _StreamingZipWrittenFile _writeDeflatedBytes(Uint8List bytes) {
+    final compressedSink = _CountingOutputSink(_output);
+    final inputSink = ZLibCodec(
+      level: ZLibOption.defaultLevel,
+      raw: true,
+    ).encoder.startChunkedConversion(compressedSink);
+
+    var crc32 = 0;
+    for (var i = 0; i < bytes.length; i += _chunkSize) {
+      final end = i + _chunkSize < bytes.length ? i + _chunkSize : bytes.length;
+      final chunk = Uint8List.sublistView(bytes, i, end);
+      crc32 = getCrc32(chunk, crc32);
+      inputSink.add(chunk);
+    }
+    inputSink.close();
+
+    return _StreamingZipWrittenFile(
+      crc32: crc32,
+      compressedSize: compressedSink.bytesWritten,
+      uncompressedSize: bytes.length,
     );
   }
 

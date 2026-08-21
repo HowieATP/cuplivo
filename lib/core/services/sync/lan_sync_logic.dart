@@ -130,6 +130,42 @@ DateTime? computeEarliestSince(
   return earliest;
 }
 
+/// Computes the set of zip-entry paths the [local] side must send to [peer]
+/// so the peer ends up with the newest content for every path both share.
+///
+/// Rule (identical on both peers, deterministic per path — at most one side
+/// packs a given path per run):
+/// - path absent on [peer] → send;
+/// - otherwise send iff `local.mtimeMs > peer.mtimeMs`.
+///
+/// Equal mtime is treated as "already synced" (mtime is ms-precision and a
+/// restore sets the file's mtime to the sender's exact value, so an equal
+/// mtime is a strong same-content signal). There is deliberately no size
+/// tie-break: the receiving side's merge is strictly-newer per file, so a
+/// size tie-break would send files the receiver never applies.
+Set<String> computeFileDelta(
+  Map<String, FileManifestEntry> local,
+  Map<String, FileManifestEntry> peer,
+) {
+  final toSend = <String>{};
+  for (final entry in local.entries) {
+    final peerEntry = peer[entry.key];
+    if (peerEntry == null || entry.value.mtimeMs > peerEntry.mtimeMs) {
+      toSend.add(entry.key);
+    }
+  }
+  return toSend;
+}
+
+/// Returns total bytes of the [delta] paths according to [manifest].
+int sumDeltaBytes(Map<String, FileManifestEntry> manifest, Set<String> delta) {
+  var total = 0;
+  for (final key in delta) {
+    total += manifest[key]?.size ?? 0;
+  }
+  return total;
+}
+
 // ---------------------------------------------------------------------------
 // Multipart parsing (pure, no I/O dependencies)
 // ---------------------------------------------------------------------------

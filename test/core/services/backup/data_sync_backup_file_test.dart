@@ -436,6 +436,128 @@ void main() {
     );
 
     test(
+      'LAN-sync manifest restores ms-precision mtimes (sync_manifest.json wins)',
+      () async {
+        // The LAN-sync delta flow packs via includeFilePaths and rides a
+        // sync_manifest.json with ms mtimes. After a restore the file's mtime
+        // must equal the sender's exact stored value — otherwise the next
+        // sync's delta comparison sees drift and re-sends it forever. On a
+        // sub-second filesystem the manifest value (with the .789ms) also
+        // proves the manifest path wins over the ZIP's second-granularity UT
+        // field; on a whole-second filesystem (some CI runners) both values
+        // collapse to the same whole second and the round-trip equality is
+        // the meaningful assertion.
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final sourceFile = File('${uploadDir.path}/a.bin');
+        await sourceFile.writeAsBytes(List<int>.filled(16, 7));
+        await sourceFile.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 789));
+        final srcMtimeMs = sourceFile
+            .statSync()
+            .modified
+            .millisecondsSinceEpoch;
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+            includeFilePaths: {'upload/a.bin'},
+          ),
+        );
+
+        // Peer lacks the file entirely → merge copies it (absent → copied).
+        await sourceFile.delete();
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        expect(await sourceFile.exists(), isTrue);
+        final restoredMs = sourceFile
+            .statSync()
+            .modified
+            .millisecondsSinceEpoch;
+        expect(restoredMs, srcMtimeMs);
+        await DataSync.cleanupTemporaryBackupFile(zipFile);
+      },
+    );
+
+    test(
+      'LAN-sync delta: upload merge is newer-wins at ms precision',
+      () async {
+        // A delta sync sends an upload file only when the sender's ms mtime is
+        // strictly newer. The receiver's merge must therefore replace the local
+        // copy using the SAME ms-precision manifest mtime — otherwise a
+        // same-second newer sender (.800) loses to a same-second older local
+        // (.200) because the ZIP's UT field rounds down to whole seconds, and
+        // the file would re-send forever without ever being applied. Some CI
+        // filesystems store only whole-second mtimes, which collapses this
+        // scenario into a tie — the conservative keep-local is then correct.
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final target = File('${uploadDir.path}/a.bin');
+        final packed = List<int>.filled(16, 7);
+        await target.writeAsBytes(packed);
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 800));
+        final srcMs = target.statSync().modified.millisecondsSinceEpoch;
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+            includeFilePaths: {'upload/a.bin'},
+          ),
+        );
+
+        // Local copy becomes the OLDER one within the same second — the exact
+        // scenario where the delta (ms) and a second-precision merge disagree.
+        await target.writeAsString('local version');
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 200));
+        final localMs = target.statSync().modified.millisecondsSinceEpoch;
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        if (srcMs > localMs) {
+          // Sub-second filesystem: the strictly-newer backup wins and its
+          // ms mtime is applied.
+          expect(await target.readAsBytes(), packed);
+          expect(target.statSync().modified.millisecondsSinceEpoch, srcMs);
+        } else {
+          // Whole-second filesystem: the same-second tie collapsed to equal
+          // mtimes — conservative keep-local is correct.
+          expect(await target.readAsString(), 'local version');
+        }
+
+        // Local becomes genuinely newer (clearly later whole second) → kept
+        // (never regressed).
+        await target.writeAsString('local version 2');
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 58));
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+        expect(await target.readAsString(), 'local version 2');
+
+        await DataSync.cleanupTemporaryBackupFile(zipFile);
+      },
+    );
+
+    test(
       'restore progress fraction never regresses across directories',
       () async {
         // Three trees so the cumulative totalFiles jumps at directory

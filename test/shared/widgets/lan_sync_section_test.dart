@@ -27,6 +27,16 @@ class _FakeChatService extends ChatService {
   Future<List<Assistant>> getAllAssistants() async => const [];
 }
 
+/// DataSync fake whose file-manifest builder needs no real filesystem — the
+/// client index builder calls `buildFileManifest`, and real file I/O cannot
+/// complete inside `testWidgets`'s fake-async zone.
+class _FakeDataSync extends DataSync {
+  _FakeDataSync(ChatService chatService) : super(chatService: chatService);
+
+  @override
+  Future<Map<String, FileManifestEntry>> buildFileManifest() async => const {};
+}
+
 /// Returns a plan with zero changes and a null `since`, so the exchange
 /// round never builds a zip or touches DataSync.
 String _emptyPlanJson() {
@@ -60,7 +70,12 @@ void main() {
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: LanSyncSection(lanSyncHttpClient: httpClient)),
+        home: Scaffold(
+          body: LanSyncSection(
+            lanSyncHttpClient: httpClient,
+            dataSync: _FakeDataSync(chatService),
+          ),
+        ),
       ),
     );
   }

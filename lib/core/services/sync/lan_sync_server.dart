@@ -85,6 +85,31 @@ class LanSyncServer extends ChangeNotifier {
   File? _receivedZip;
   File? get receivedZip => _receivedZip;
 
+  // -------------------------------------------------------------------------
+  // Retained plan state for the round-2 zip build (single-use lifecycle).
+  // Populated by `_computePlan` in round 1, consumed by `_handleExchange`.
+  // This assumes ONE initiator per server instance: a second device running
+  // `/sync/plan` between the first device's round 1 and round 2 would
+  // overwrite these fields, and the first device's exchange would then build
+  // the second device's delta. The server dialog is modal (one sync session
+  // per launch) so this is unreachable in practice.
+  // -------------------------------------------------------------------------
+
+  /// The global `since` (earliest fork-point timestamp). Null when all
+  /// conversations are identical — in which case a file delta may still drive
+  /// the exchange.
+  DateTime? _exchangeSince;
+
+  /// Per-conversation fork-point timestamps for the chat export. Presence of a
+  /// key = the conversation has a delta; null value = one-sided (whole
+  /// conversation). Null when the initiator is an old peer (no manifest) —
+  /// the zip then falls back to the single global `since`.
+  Map<String, DateTime?>? _exchangeConversationSince;
+
+  /// The server's outbound file delta (zip-entry paths to pack). Null when the
+  /// initiator is an old peer → `since`-based file packing.
+  Set<String>? _serverOutboundDelta;
+
   LanSyncServer({required this._chatService, required this._dataSync});
 
   /// Starts the HTTP server. Throws on failure.
@@ -261,16 +286,25 @@ class LanSyncServer extends ChangeNotifier {
     }
 
     // Build the server's incremental zip.
+    // Modern peer (manifest present): exact per-file delta + per-conversation
+    // chat window from the retained plan. Old peer: legacy single-`since`
+    // mtime/chat filter. No zip at all when there is nothing to send.
     final cfg = const WebDavConfig(includeChats: true, includeFiles: true);
     File? myZip;
-    if (since != null) {
+    final outboundDelta = _serverOutboundDelta;
+    final hasSomethingToSend =
+        _exchangeSince != null ||
+        (outboundDelta != null && outboundDelta.isNotEmpty);
+    if (hasSomethingToSend) {
       final incremental = IncrementalBackupConfig(
-        since: since,
+        since: _exchangeSince ?? since ?? DateTime(2000),
         // Settings (including assistants and providers) ride settings.json;
         // merge restore unions them on the receiving side (issue #476).
         includeSettings: true,
         includeFiles: true,
         updateBackupTime: false,
+        conversationSince: _exchangeConversationSince,
+        includeFilePaths: outboundDelta,
       );
       myZip = await _dataSync.exportToFile(cfg, incremental: incremental);
     }
@@ -308,6 +342,10 @@ class LanSyncServer extends ChangeNotifier {
   }
 
   /// Computes the sync plan by comparing the initiator's index with our data.
+  ///
+  /// Also retains the round-2 zip inputs on this single-use instance:
+  /// [_exchangeSince], [_exchangeConversationSince] (per-conversation chat
+  /// windows) and [_serverOutboundDelta] (exact file delta for modern peers).
   Future<SyncPlan> _computePlan({
     required SyncIndex initiatorIndex,
     required List<Conversation> myConversations,
@@ -373,12 +411,71 @@ class LanSyncServer extends ChangeNotifier {
       }
     }
 
-    // Compute earliest `since` timestamp using the pure logic function.
-    // The timestamp lookup accesses our local DB for fork-point messages.
-    final since = computeEarliestSince(plans, (convId, forkPointId) {
-      final msg = _chatService.repo.getMessageSync(forkPointId);
-      return msg?.timestamp;
-    });
+    // Resolve each conversation's fork-point timestamp once (cached), then
+    // derive the global `since` and the per-conversation chat windows. The
+    // timestamp lookup accesses our local DB for fork-point messages.
+    final forkTsCache = <String, DateTime?>{};
+    DateTime? resolveFork(String convId, String forkId) =>
+        forkTsCache.putIfAbsent(
+          convId,
+          () => _chatService.repo.getMessageSync(forkId)?.timestamp,
+        );
+    final since = computeEarliestSince(plans, resolveFork);
+
+    // Attach each conversation's own since for the per-conversation chat
+    // export (null = one-sided conversation, exported in full; identical
+    // conversations are skipped by the transport).
+    final conversationSince = <String, DateTime?>{};
+    final plansWithSince = <SyncConvPlan>[];
+    for (final plan in plans) {
+      final forkId = plan.forkPointMessageId;
+      final convSince = plan.state == SyncConvState.identical || forkId == null
+          ? null
+          : forkTsCache[plan.conversationId];
+      if (plan.state != SyncConvState.identical) {
+        conversationSince[plan.conversationId] = convSince;
+      }
+      plansWithSince.add(
+        SyncConvPlan(
+          conversationId: plan.conversationId,
+          conversationTitle: plan.conversationTitle,
+          state: plan.state,
+          forkPointMessageId: plan.forkPointMessageId,
+          initiatorIncrementCount: plan.initiatorIncrementCount,
+          serverIncrementCount: plan.serverIncrementCount,
+          since: convSince,
+        ),
+      );
+    }
+
+    // What the server would pack in round 2. Modern peer (manifest present):
+    // exact per-file delta against the initiator's manifest (one stat walk).
+    // Old peer: legacy `since`-based stat preview. Mirrors `_packZipSync`
+    // rules so the preview never drifts from the actual zip payload.
+    final peerManifest = initiatorIndex.fileManifest;
+    Map<String, FileManifestEntry>? localManifest;
+    Set<String>? outboundDelta;
+    int? serverFileCount;
+    int? serverFileSizeBytes;
+    if (peerManifest != null) {
+      localManifest = await _dataSync.buildFileManifest();
+      outboundDelta = computeFileDelta(localManifest, peerManifest);
+      serverFileCount = outboundDelta.length;
+      serverFileSizeBytes = sumDeltaBytes(localManifest, outboundDelta);
+    } else if (since != null) {
+      final fileStats = await _dataSync.countFilesForSince(since);
+      serverFileCount = fileStats.fileCount;
+      serverFileSizeBytes = fileStats.totalBytes;
+    }
+
+    // Retain the round-2 zip inputs. Old-peer fallback: no per-conversation
+    // window and no file delta → the exchange rebuilds the legacy single-since
+    // zip.
+    _exchangeSince = since;
+    _exchangeConversationSince = peerManifest != null
+        ? conversationSince
+        : null;
+    _serverOutboundDelta = peerManifest != null ? outboundDelta : null;
 
     // Assistant set differences.
     final theirSet = initiatorIndex.assistantIds.toSet();
@@ -386,19 +483,14 @@ class LanSyncServer extends ChangeNotifier {
     final missingOnServer = theirSet.difference(mySet).toList();
     final missingOnInitiator = mySet.difference(theirSet).toList();
 
-    // What the server would pack in round 2 (mirrors _packZipSync rules),
-    // so the initiator's plan preview can show the inbound file payload.
-    final fileStats = since != null
-        ? await _dataSync.countFilesForSince(since)
-        : null;
-
     return SyncPlan(
-      conversations: plans,
+      conversations: plansWithSince,
       missingAssistantIds: missingOnServer,
       remoteMissingAssistantIds: missingOnInitiator,
       since: since,
-      serverFileCount: fileStats?.fileCount,
-      serverFileSizeBytes: fileStats?.totalBytes,
+      serverFileCount: serverFileCount,
+      serverFileSizeBytes: serverFileSizeBytes,
+      serverFileManifest: peerManifest != null ? localManifest : null,
     );
   }
 

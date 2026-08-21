@@ -27,19 +27,51 @@ enum LanSyncPhase {
   done,
 }
 
+/// A single file's identity in a sync file manifest: its byte size and
+/// filesystem modification time in milliseconds since epoch (ms precision so
+/// a peer that restored the file reports the exact mtime the sender stored —
+/// second-granularity would trigger cross-run re-send churn).
+class FileManifestEntry {
+  final int size;
+  final int mtimeMs;
+
+  const FileManifestEntry({required this.size, required this.mtimeMs});
+
+  Map<String, dynamic> toJson() => {'size': size, 'mtime': mtimeMs};
+
+  static FileManifestEntry fromJson(Map<String, dynamic> json) {
+    return FileManifestEntry(
+      size: json['size'] as int,
+      mtimeMs: json['mtime'] as int,
+    );
+  }
+}
+
 /// Index sent from the initiator (device A) to the server (device B) in round 1.
 ///
-/// Contains per-conversation message IDs (ordered by messageOrder) and the
-/// initiator's assistant IDs, so the server can compute a sync plan.
+/// Contains per-conversation message IDs (ordered by messageOrder), the
+/// initiator's assistant IDs, and — for modern peers — the initiator's full
+/// file manifest (zip-entry path → size/mtime), so the server can compute an
+/// exact per-file delta instead of gating the zip by a global `since`.
 class SyncIndex {
   final Map<String, List<String>> conversations;
   final List<String> assistantIds;
 
-  const SyncIndex({required this.conversations, required this.assistantIds});
+  /// The initiator's file tree keyed by zip-entry path (e.g. `workspaces/x`).
+  /// Null when sent by an old peer — the receiver then falls back to the
+  /// `since`-based packing path.
+  final Map<String, FileManifestEntry>? fileManifest;
+
+  const SyncIndex({
+    required this.conversations,
+    required this.assistantIds,
+    this.fileManifest,
+  });
 
   Map<String, dynamic> toJson() => {
     'conversations': conversations,
     'assistantIds': assistantIds,
+    'fileManifest': fileManifest?.map((k, v) => MapEntry(k, v.toJson())),
   };
 
   String toJsonString() => jsonEncode(toJson());
@@ -49,9 +81,16 @@ class SyncIndex {
     final conversations = convsRaw.map(
       (k, v) => MapEntry(k, (v as List).cast<String>()),
     );
+    final manifestRaw = json['fileManifest'] as Map<String, dynamic>?;
     return SyncIndex(
       conversations: conversations,
       assistantIds: (json['assistantIds'] as List).cast<String>(),
+      fileManifest: manifestRaw?.map(
+        (k, v) => MapEntry(
+          k,
+          FileManifestEntry.fromJson((v as Map).cast<String, dynamic>()),
+        ),
+      ),
     );
   }
 
@@ -92,6 +131,13 @@ class SyncConvPlan {
   /// Number of messages the server (B) has after the fork point.
   final int serverIncrementCount;
 
+  /// The fork-point message's timestamp (resolved server-side). Used by both
+  /// peers as this conversation's per-conversation `since` for the chat export
+  /// in round 2. Null for identical conversations and for one-sided
+  /// conversations with no fork point (the whole conversation is an increment
+  /// and is exported in full).
+  final DateTime? since;
+
   const SyncConvPlan({
     required this.conversationId,
     this.conversationTitle,
@@ -99,6 +145,7 @@ class SyncConvPlan {
     this.forkPointMessageId,
     required this.initiatorIncrementCount,
     required this.serverIncrementCount,
+    this.since,
   });
 
   Map<String, dynamic> toJson() => {
@@ -108,7 +155,21 @@ class SyncConvPlan {
     'forkPointMessageId': forkPointMessageId,
     'initiatorIncrementCount': initiatorIncrementCount,
     'serverIncrementCount': serverIncrementCount,
+    'since': since?.toIso8601String(),
   };
+
+  static SyncConvPlan fromJson(Map<String, dynamic> json) {
+    final sinceStr = json['since'] as String?;
+    return SyncConvPlan(
+      conversationId: json['conversationId'] as String,
+      conversationTitle: json['conversationTitle'] as String?,
+      state: SyncConvState.values.byName(json['state'] as String),
+      forkPointMessageId: json['forkPointMessageId'] as String?,
+      initiatorIncrementCount: json['initiatorIncrementCount'] as int,
+      serverIncrementCount: json['serverIncrementCount'] as int,
+      since: sinceStr != null ? DateTime.parse(sinceStr) : null,
+    );
+  }
 }
 
 /// The sync plan returned from the server (B) to the initiator (A) in round 1.
@@ -133,6 +194,10 @@ class SyncPlan {
   final int? serverFileCount;
   final int? serverFileSizeBytes;
 
+  /// The server's (B) file manifest, so the initiator (A) can compute its own
+  /// outbound per-file delta. Null when the peer is old (`since`-based flow).
+  final Map<String, FileManifestEntry>? serverFileManifest;
+
   /// Convenience: total conversations with initiator-only increments.
   int get initiatorOnlyCount =>
       conversations.where((c) => c.state == SyncConvState.initiatorOnly).length;
@@ -152,6 +217,7 @@ class SyncPlan {
     required this.since,
     this.serverFileCount,
     this.serverFileSizeBytes,
+    this.serverFileManifest,
   });
 
   Map<String, dynamic> toJson() => {
@@ -161,23 +227,20 @@ class SyncPlan {
     'since': since?.toIso8601String(),
     if (serverFileCount != null) 'serverFileCount': serverFileCount,
     if (serverFileSizeBytes != null) 'serverFileSizeBytes': serverFileSizeBytes,
+    if (serverFileManifest != null)
+      'serverFileManifest': serverFileManifest!.map(
+        (k, v) => MapEntry(k, v.toJson()),
+      ),
   };
 
   String toJsonString() => jsonEncode(toJson());
 
   static SyncPlan fromJson(Map<String, dynamic> json) {
-    final convs = (json['conversations'] as List).map((c) {
-      final m = c as Map<String, dynamic>;
-      return SyncConvPlan(
-        conversationId: m['conversationId'] as String,
-        conversationTitle: m['conversationTitle'] as String?,
-        state: SyncConvState.values.byName(m['state'] as String),
-        forkPointMessageId: m['forkPointMessageId'] as String?,
-        initiatorIncrementCount: m['initiatorIncrementCount'] as int,
-        serverIncrementCount: m['serverIncrementCount'] as int,
-      );
-    }).toList();
+    final convs = (json['conversations'] as List)
+        .map((c) => SyncConvPlan.fromJson((c as Map).cast<String, dynamic>()))
+        .toList();
     final sinceStr = json['since'] as String?;
+    final manifestRaw = json['serverFileManifest'] as Map<String, dynamic>?;
     return SyncPlan(
       conversations: convs,
       missingAssistantIds: (json['missingAssistantIds'] as List).cast<String>(),
@@ -186,6 +249,12 @@ class SyncPlan {
       since: sinceStr != null ? DateTime.parse(sinceStr) : null,
       serverFileCount: json['serverFileCount'] as int?,
       serverFileSizeBytes: json['serverFileSizeBytes'] as int?,
+      serverFileManifest: manifestRaw?.map(
+        (k, v) => MapEntry(
+          k,
+          FileManifestEntry.fromJson((v as Map).cast<String, dynamic>()),
+        ),
+      ),
     );
   }
 

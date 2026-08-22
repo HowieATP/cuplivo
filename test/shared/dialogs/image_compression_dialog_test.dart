@@ -10,39 +10,43 @@ void main() {
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => TextButton(
-            onPressed: () => ImageCompressionDialog.show(
-              context,
-              imagePath: 'missing-image.png',
-              totalImageCount: 1,
-              originalWidth: 2048,
-              originalHeight: 1024,
-              hasRealAlpha: true,
-              onCompress: (_) async {},
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => ImageCompressionDialog.show(
+                context,
+                imagePath: 'missing-image.png',
+                totalImageCount: 1,
+                originalWidth: 2048,
+                originalHeight: 1024,
+                hasRealAlpha: true,
+                onCompress: (_) async {},
+              ),
+              child: const Text('open'),
             ),
-            child: const Text('open'),
           ),
         ),
-      ),
-    );
+      );
 
-    await tester.tap(find.text('open'));
-    await tester.pump();
+      await tester.tap(find.text('open'));
+      await tester.pump();
 
-    expect(find.byType(Slider), findsNothing);
-    expect(find.byType(SfSlider), findsNWidgets(2));
+      expect(find.byType(Slider), findsNothing);
+      expect(find.byType(SfSlider), findsNWidgets(2));
 
-    final sliders = tester.widgetList<SfSlider>(find.byType(SfSlider)).toList();
-    expect(sliders.first.onChanged, isNull);
-    expect(sliders.first.stepSize, 1);
-    expect(sliders.last.onChanged, isNotNull);
-    expect(sliders.last.stepSize, 64);
+      final sliders = tester
+          .widgetList<SfSlider>(find.byType(SfSlider))
+          .toList();
+      expect(sliders.first.onChanged, isNull);
+      expect(sliders.first.stepSize, 1);
+      expect(sliders.last.onChanged, isNotNull);
+      expect(sliders.last.stepSize, 64);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:path/path.dart' as p;
 
@@ -17,30 +17,52 @@ import '../../../../utils/utf16_safe_cut.dart';
 /// External mounts are desktop-only and never sync. The built-in `@workspaces`
 /// mount is always present (rw) and is the only mount on mobile. See
 /// `docs/adr/0022-filesystem-mount-relative-wire-format.md`.
+///
+/// An Android SAF mount (see `docs/adr/0037-...`) carries a `content://` tree
+/// URI in [uri]; its [path] is the host mirror directory that the sync service
+/// keeps in two-way mirror sync with the SAF source. The engine only ever
+/// touches [path] — the mirror is a real host path — so the filesystem
+/// engine needs no content-URI IO. `uri != null` marks an external mount:
+/// it never syncs, its deletions never ride the marker protocol, and
+/// `kelivo_fetch` rejects it as a download target (its `.fetch_cache` would
+/// otherwise leak into the user's real folder).
 class FilesystemMount {
   final String alias;
   final String path;
   final bool readOnly;
 
+  /// Android SAF tree URI (`content://...`). Null on all other mounts.
+  final String? uri;
+
   const FilesystemMount({
     required this.alias,
     required this.path,
     this.readOnly = true,
+    this.uri,
   });
 
   String get wireName => '@$alias';
 
-  FilesystemMount copyWith({String? alias, String? path, bool? readOnly}) =>
-      FilesystemMount(
-        alias: alias ?? this.alias,
-        path: path ?? this.path,
-        readOnly: readOnly ?? this.readOnly,
-      );
+  bool get isSafMount => uri != null;
+
+  FilesystemMount copyWith({
+    String? alias,
+    String? path,
+    bool? readOnly,
+    String? uri,
+    bool clearUri = false,
+  }) => FilesystemMount(
+    alias: alias ?? this.alias,
+    path: path ?? this.path,
+    readOnly: readOnly ?? this.readOnly,
+    uri: clearUri ? null : (uri ?? this.uri),
+  );
 
   Map<String, dynamic> toJson() => {
     'alias': alias,
     'path': path,
     'readOnly': readOnly,
+    if (uri != null) 'uri': uri,
   };
 
   factory FilesystemMount.fromJson(Map<String, dynamic> json) =>
@@ -48,6 +70,7 @@ class FilesystemMount {
         alias: (json['alias'] as String? ?? '').trim(),
         path: (json['path'] as String? ?? '').trim(),
         readOnly: json['readOnly'] as bool? ?? true,
+        uri: (json['uri'] as String?)?.trim(),
       );
 }
 
@@ -189,6 +212,7 @@ class KelivoFilesystemMcpServerEngine {
   KelivoFilesystemMcpServerEngine({
     required this.mountsProvider,
     this.onWorkspaceFileDeleted,
+    this.onMountMutated,
     this.pathPresenter,
   });
 
@@ -204,6 +228,12 @@ class KelivoFilesystemMcpServerEngine {
 
   final List<FilesystemMount> Function() mountsProvider;
   final Future<void> Function(String wirePath)? onWorkspaceFileDeleted;
+
+  /// Fired (advisory, never throws) after a tool mutates [FilesystemMount]
+  /// content — write/patch/mkdir/delete/move/zip/unzip/download. Receives the
+  /// affected mount alias. Consumers (e.g. the SAF mirror sync service) use
+  /// it to schedule a deferred push of mirror changes back to their source.
+  final void Function(String alias)? onMountMutated;
 
   /// Optional model-facing path presentation (see
   /// `workspace_path_presentation.dart`). When set, every path ECHO site
@@ -493,6 +523,7 @@ class KelivoFilesystemMcpServerEngine {
     final file = File(resolved.hostPath);
     await file.parent.create(recursive: true);
     await file.writeAsString(content, flush: true);
+    _notifyMutated(resolved);
     return _toolOk(
       'Wrote ${utf8.encode(content).length} bytes to ${_display(resolved.wirePath)}',
     );
@@ -520,6 +551,7 @@ class KelivoFilesystemMcpServerEngine {
         newString +
         original.substring(idx + oldString.length);
     await file.writeAsString(patched, flush: true);
+    _notifyMutated(resolved);
     return _toolOk(
       'Patched ${_display(resolved.wirePath)} (replaced 1 occurrence)',
     );
@@ -551,6 +583,7 @@ class KelivoFilesystemMcpServerEngine {
       return _toolErr('Not found: ${_display(resolved.wirePath)}');
     }
     await _recordDeletionIfWorkspaces(resolved);
+    _notifyMutated(resolved);
     return _toolOk('Deleted ${_display(resolved.wirePath)}');
   }
 
@@ -921,6 +954,7 @@ class KelivoFilesystemMcpServerEngine {
       }
     }
     await dir.create(recursive: recursive);
+    _notifyMutated(resolved);
     return _toolOk('Created directory ${_display(resolved.wirePath)}');
   }
 
@@ -1007,6 +1041,8 @@ class KelivoFilesystemMcpServerEngine {
       }
       await _recordDeletionIfWorkspaces(source);
     }
+    _notifyMutated(source);
+    _notifyMutated(dest);
     return _toolOk(
       'Moved ${_display(source.wirePath)} -> ${_display(dest.wirePath)}',
     );
@@ -1075,6 +1111,7 @@ class KelivoFilesystemMcpServerEngine {
       } catch (_) {}
       return _toolErr('Zip failed: $e');
     }
+    _notifyMutated(dest);
     return _toolOk(
       'Zipped $fileCount files ($totalBytes bytes) to '
       '${_display(dest.wirePath)}',
@@ -1191,6 +1228,7 @@ class KelivoFilesystemMcpServerEngine {
     } catch (e) {
       return _toolErr('Extraction failed: $e');
     }
+    _notifyMutated(dest);
     return _toolOk(
       'Extracted ${planned.length} files ($totalBytes bytes) to '
       '${_display(dest.wirePath)}',
@@ -1210,6 +1248,17 @@ class KelivoFilesystemMcpServerEngine {
       );
     }
     _requireWritable(resolved);
+    // SAF mounts reject fetch targets: the download and its .fetch_cache
+    // continuation cache live inside the mount and would be mirrored back
+    // into the user's real folder (ADR-0037). Download to a workspace mount
+    // instead, then copy with the filesystem tools.
+    if (resolved.mount.isSafMount) {
+      return _toolErr(
+        'Downloading into an external SAF mount is not supported '
+        '(${_display(resolved.wirePath)}). Download to the workspace '
+        'mount first.',
+      );
+    }
     final urlRaw = (args['url'] ?? '').toString().trim();
     final url = Uri.tryParse(urlRaw);
     if (url == null ||
@@ -1245,6 +1294,7 @@ class KelivoFilesystemMcpServerEngine {
           await target.setLastModified(DateTime.now());
         } catch (_) {}
       }
+      _notifyMutated(resolved);
       return _toolOk(
         'Downloaded ${result.downloadedBytes} bytes to '
         '${_display(resolved.wirePath)}',
@@ -1265,6 +1315,18 @@ class KelivoFilesystemMcpServerEngine {
   void _requireWritable(ResolvedWirePath resolved) {
     if (resolved.mount.readOnly) {
       throw WirePathException('Mount @${resolved.mount.alias} is read-only');
+    }
+  }
+
+  /// Advisory mutation notification — mirror sync is best-effort, so a
+  /// failing consumer must never fail the tool call itself.
+  void _notifyMutated(ResolvedWirePath resolved) {
+    final cb = onMountMutated;
+    if (cb == null) return;
+    try {
+      cb(resolved.mount.alias);
+    } catch (e) {
+      debugPrint('workspace_fs: onMountMutated failed: $e');
     }
   }
 

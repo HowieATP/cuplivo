@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../../core/providers/workspace_provider.dart';
+import '../../../core/services/saf/saf_mount_sync_service.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
 import '../../../core/services/workspace/terminal_extra_keys.dart';
 import '../../../core/services/workspace/workspace_terminal_gate.dart';
@@ -157,7 +158,12 @@ class _WorkspaceTerminalPageState extends State<WorkspaceTerminalPage>
       await _outputSub?.cancel();
       _keys.resetSessionModifiers();
       await sessionController.stop();
-      final spec = await _sandbox.ptyLaunchSpec(hostPath);
+      if (!mounted) return;
+      final safMounts = context.read<SafMountSyncService>();
+      final spec = await _sandbox.ptyLaunchSpec(
+        hostPath,
+        binds: safMounts.guestBindsFor(widget.workspaceId),
+      );
       if (!mounted || sessionController.closed) return;
       final terminal = Terminal(
         maxLines: 5000,

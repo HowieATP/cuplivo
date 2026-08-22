@@ -22,11 +22,18 @@ class ModelPathException implements Exception {
 ///
 /// - `/` is passed through unchanged (engine special case: list mounts).
 /// - `/workspace` → `@alias`; `/workspace/rel/path` → `@alias/rel/path`.
+/// - External SAF mounts (Android) are addressed as
+///   `/workspace/.mounts/<alias>` → `@<alias>` (see ADR-0037). The alias must
+///   be a known SAF mount alias; anything else under `.mounts/` is rejected.
 /// - Trailing slashes are preserved so the engine's existing validation
 ///   applies unchanged (read tolerates one, the other tools reject it).
 /// - Segment-level validation (traversal, malformed segments) still happens
 ///   inside the engine against the translated canonical path.
-String parseModelPath(String raw, String alias) {
+String parseModelPath(
+  String raw,
+  String alias, {
+  Set<String> safAliases = const <String>{},
+}) {
   if (raw.trim() != raw) {
     throw ModelPathException(
       'Invalid path: leading/trailing whitespace is not allowed: $raw',
@@ -47,18 +54,58 @@ String parseModelPath(String raw, String alias) {
     );
   }
   if (raw == '/workspace') return '@$alias';
-  return '@$alias/${raw.substring('/workspace/'.length)}';
+  final rest = raw.substring('/workspace/'.length);
+  // External SAF mounts live under the reserved .mounts/ guest directory.
+  // The path is ONLY interpreted as a mount reference; a literal workspace
+  // folder named ".mounts" is shadowed by design (ADR-0037) — same
+  // convention as .sandbox/.fetch_cache dotdirs.
+  if (rest == '.mounts') {
+    throw ModelPathException(
+      'Invalid path: name a mount: /workspace/.mounts/<alias>',
+    );
+  }
+  if (rest.startsWith('.mounts/')) {
+    final seg = rest.substring('.mounts/'.length);
+    final slash = seg.indexOf('/');
+    final mountAlias = slash < 0 ? seg : seg.substring(0, slash);
+    if (mountAlias.isEmpty) {
+      throw ModelPathException(
+        'Invalid path: name a mount: /workspace/.mounts/<alias>',
+      );
+    }
+    if (!safAliases.contains(mountAlias)) {
+      throw ModelPathException(
+        'Invalid path: unknown mount alias: /workspace/.mounts/$mountAlias',
+      );
+    }
+    if (slash < 0) return '@$mountAlias';
+    final rel = seg.substring(slash + 1);
+    return '@$mountAlias/$rel';
+  }
+  return '@$alias/$rest';
 }
 
 /// Canonical wire path → model-facing `/workspace/...` form.
 ///
-/// Only the bound workspace alias is presented as `/workspace`; anything
-/// else (other mounts, already-presented paths) is returned unchanged.
-String presentWirePath(String wirePath, String alias) {
+/// Only the bound workspace alias is presented as `/workspace`; SAF mounts
+/// present as `/workspace/.mounts/<alias>`; anything else (other mounts,
+/// already-presented paths) is returned unchanged.
+String presentWirePath(
+  String wirePath,
+  String alias, {
+  Set<String> safAliases = const <String>{},
+}) {
   final prefix = '@$alias';
   if (wirePath == prefix) return '/workspace';
   if (wirePath.startsWith('$prefix/')) {
     return '/workspace/${wirePath.substring(prefix.length + 1)}';
+  }
+  for (final saf in safAliases) {
+    final safPrefix = '@$saf';
+    if (wirePath == safPrefix) return '/workspace/.mounts/$saf';
+    if (wirePath.startsWith('$safPrefix/')) {
+      return '/workspace/.mounts/$saf/${wirePath.substring(safPrefix.length + 1)}';
+    }
   }
   return wirePath;
 }
@@ -71,6 +118,7 @@ String presentDefText(String text) {
       .replaceAll('@default/', '/workspace/')
       .replaceAll('@default', '/workspace')
       .replaceAll('@alias/rel/path', '/workspace/rel/path')
+      .replaceAll('@alias', '/workspace')
       .replaceAll('Mount-relative', 'Workspace-relative')
       .replaceAll('mount-relative', 'workspace-relative');
 }

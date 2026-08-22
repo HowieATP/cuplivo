@@ -17,6 +17,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/generation_engine.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
+import '../../../core/services/saf/saf_mount_sync_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
@@ -384,12 +385,19 @@ class ToolHandlerService {
     // Workspace filesystem + shell tools
     try {
       final wp = contextProvider.read<WorkspaceProvider>();
+      SafMountSyncService? safMounts;
+      try {
+        safMounts = contextProvider.read<SafMountSyncService>();
+      } on ProviderNotFoundException catch (e) {
+        debugPrint('workspace saf mounts unavailable: $e');
+      }
       toolDefs.addAll(
         WorkspaceToolsService.buildToolDefinitions(
           assistant: assistant,
           workspaces: wp,
           supportsTools: supportsTools,
           sandbox: LinuxSandboxService.instance,
+          safMounts: safMounts,
         ),
       );
     } on ProviderNotFoundException catch (e) {
@@ -793,6 +801,13 @@ class ToolHandlerService {
             }
           }
           try {
+            SafMountSyncService? safMounts;
+            try {
+              // ignore: use_build_context_synchronously (root context, valid for app lifetime)
+              safMounts = contextProvider.read<SafMountSyncService>();
+            } on ProviderNotFoundException catch (e) {
+              debugPrint('workspace saf mounts unavailable: $e');
+            }
             final wsResult = await WorkspaceToolsService.tryHandleToolCall(
               name: name,
               args: args,
@@ -800,6 +815,7 @@ class ToolHandlerService {
               workspaces: wp,
               chatService: chatService,
               sandbox: LinuxSandboxService.instance,
+              safMounts: safMounts,
               onDownloadProgress: (downloadJob == null || downloadStore == null)
                   ? null
                   : (received, total) => downloadStore!.updateProgress(

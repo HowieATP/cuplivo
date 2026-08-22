@@ -413,6 +413,85 @@ class AppLocalizationsEn extends AppLocalizations {
       '\"workspaces\" is a reserved alias';
 
   @override
+  String get workspaceSafMountsEntry => 'Mounted directories';
+
+  @override
+  String safMountCount(Object count) {
+    return '$count mounted';
+  }
+
+  @override
+  String get safMountSectionTitle => 'Mounted directories';
+
+  @override
+  String get safMountAdd => 'Add SAF mount';
+
+  @override
+  String get safMountAddTitle => 'Add external directory';
+
+  @override
+  String get safMountAliasLabel => 'Alias';
+
+  @override
+  String get safMountAliasHint => 'Lowercase start, e.g. notes';
+
+  @override
+  String get safMountErrorAliasInvalid =>
+      'Alias must start with a lowercase letter or digit and use only a-z 0-9 _ -';
+
+  @override
+  String get safMountErrorAliasReserved =>
+      'This alias conflicts with the current workspace';
+
+  @override
+  String get safMountErrorAliasDuplicate => 'This alias is already in use';
+
+  @override
+  String get safMountErrorUriDuplicate =>
+      'This directory is already mounted in another workspace';
+
+  @override
+  String get safMountErrorAddFailed => 'Failed to add the mount';
+
+  @override
+  String get safMountErrorPickFailed => 'Failed to open the directory picker';
+
+  @override
+  String get safMountRemoveTitle => 'Remove mount';
+
+  @override
+  String safMountRemoveMessage(Object name) {
+    return 'Remove \"$name\"? The app-local mirror will be deleted; files in the original directory are untouched.';
+  }
+
+  @override
+  String get safMountEmpty =>
+      'No mounted directories. Add one to let this workspace access an external folder.';
+
+  @override
+  String get safMountSectionNote =>
+      'Access uses this workspace\'s enabled file and shell tools. Changes and deletions are mirrored both ways with the external directory.';
+
+  @override
+  String get safMountSyncNow => 'Sync now';
+
+  @override
+  String get safMountRemove => 'Remove mount';
+
+  @override
+  String get safMountStatusIdle => 'Synced';
+
+  @override
+  String get safMountStatusSyncing => 'Syncing…';
+
+  @override
+  String get safMountStatusUnavailable =>
+      'Unavailable — re-authorize or remount in the system picker';
+
+  @override
+  String get safMountStatusError => 'Sync failed — will retry';
+
+  @override
   String get storageMountsErrorAliasDuplicate => 'This alias already exists';
 
   @override

@@ -807,6 +807,144 @@ abstract class AppLocalizations {
   /// **'\"workspaces\" is a reserved alias'**
   String get storageMountsErrorAliasReserved;
 
+  /// No description provided for @workspaceSafMountsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted directories'**
+  String get workspaceSafMountsEntry;
+
+  /// No description provided for @safMountCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} mounted'**
+  String safMountCount(Object count);
+
+  /// No description provided for @safMountSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted directories'**
+  String get safMountSectionTitle;
+
+  /// No description provided for @safMountAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add SAF mount'**
+  String get safMountAdd;
+
+  /// No description provided for @safMountAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add external directory'**
+  String get safMountAddTitle;
+
+  /// No description provided for @safMountAliasLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias'**
+  String get safMountAliasLabel;
+
+  /// No description provided for @safMountAliasHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Lowercase start, e.g. notes'**
+  String get safMountAliasHint;
+
+  /// No description provided for @safMountErrorAliasInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias must start with a lowercase letter or digit and use only a-z 0-9 _ -'**
+  String get safMountErrorAliasInvalid;
+
+  /// No description provided for @safMountErrorAliasReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'This alias conflicts with the current workspace'**
+  String get safMountErrorAliasReserved;
+
+  /// No description provided for @safMountErrorAliasDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This alias is already in use'**
+  String get safMountErrorAliasDuplicate;
+
+  /// No description provided for @safMountErrorUriDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This directory is already mounted in another workspace'**
+  String get safMountErrorUriDuplicate;
+
+  /// No description provided for @safMountErrorAddFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add the mount'**
+  String get safMountErrorAddFailed;
+
+  /// No description provided for @safMountErrorPickFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open the directory picker'**
+  String get safMountErrorPickFailed;
+
+  /// No description provided for @safMountRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove mount'**
+  String get safMountRemoveTitle;
+
+  /// No description provided for @safMountRemoveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\"? The app-local mirror will be deleted; files in the original directory are untouched.'**
+  String safMountRemoveMessage(Object name);
+
+  /// No description provided for @safMountEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No mounted directories. Add one to let this workspace access an external folder.'**
+  String get safMountEmpty;
+
+  /// No description provided for @safMountSectionNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Access uses this workspace\'s enabled file and shell tools. Changes and deletions are mirrored both ways with the external directory.'**
+  String get safMountSectionNote;
+
+  /// No description provided for @safMountSyncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get safMountSyncNow;
+
+  /// No description provided for @safMountRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove mount'**
+  String get safMountRemove;
+
+  /// No description provided for @safMountStatusIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get safMountStatusIdle;
+
+  /// No description provided for @safMountStatusSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get safMountStatusSyncing;
+
+  /// No description provided for @safMountStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable — re-authorize or remount in the system picker'**
+  String get safMountStatusUnavailable;
+
+  /// No description provided for @safMountStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed — will retry'**
+  String get safMountStatusError;
+
   /// No description provided for @storageMountsErrorAliasDuplicate.
   ///
   /// In en, this message translates to:

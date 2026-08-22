@@ -1888,6 +1888,15 @@ class ChatService extends ChangeNotifier {
         await wsDir.delete(recursive: true);
       }
     } catch (_) {}
+    // Remove Android SAF mount mirrors + sync snapshots — the mount config
+    // itself rides settings.json (wiped with settings); orphaned mirrors
+    // would otherwise linger in app-private storage (ADR-0037).
+    try {
+      final safDir = await AppDirectories.getSafMountsDirectory();
+      if (await safDir.exists()) {
+        await safDir.delete(recursive: true);
+      }
+    } catch (_) {}
     // iOS Linux sandbox: the shared iSH rootfs lives OUTSIDE @workspaces
     // (Application Support, ADR-0035), so wipe it separately. Refuse while
     // the kernel is booted — deleting a live fakefs mount would corrupt the

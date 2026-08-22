@@ -219,6 +219,15 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
           result.error("bad_args", "workspacePath and command required", null)
           return
         }
+        val guestCwd = normalizeGuestCwd(cwd)
+        if (guestCwd == null) {
+          result.error(
+            "invalid_cwd",
+            "cwd must be a relative path or under /workspace",
+            null,
+          )
+          return
+        }
         val execution = AndroidExecution(requestId, attachmentGeneration.get())
         if (executions.putIfAbsent(requestId, execution) != null) {
           result.error("duplicate_request", "requestId already active", null)
@@ -251,7 +260,7 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
               val map = GuestCommandRunner(appContext).execute(
                 workspacePath = workspace,
                 command = command,
-                cwd = cwd,
+                guestCwd = guestCwd,
                 timeoutMs = timeoutMs,
                 execution = execution,
               )
@@ -611,7 +620,7 @@ private class GuestCommandRunner(private val appContext: Context) {
   fun execute(
     workspacePath: String,
     command: String,
-    cwd: String?,
+    guestCwd: String,
     timeoutMs: Long,
     execution: AndroidExecution,
   ): Map<String, Any?> {
@@ -622,11 +631,6 @@ private class GuestCommandRunner(private val appContext: Context) {
     val linux = File(workspacePath, ".sandbox/linux")
     val tmp = File(workspacePath, ".sandbox/tmp")
     tmp.mkdirs()
-    val guestCwd = when {
-      cwd.isNullOrBlank() -> "/workspace"
-      cwd.startsWith("/workspace") -> cwd
-      else -> "/workspace/${cwd.trimStart('/')}"
-    }
 
     val builder = ProcessBuilder(
       buildGuestCommand(
@@ -1085,6 +1089,46 @@ private object OutputDrainer {
       }
       return bytes
     }
+  }
+}
+
+/** Normalizes a guest cwd under /workspace, or null when the value escapes
+ *  the workspace root (…/..), is not a real /workspace subpath (/workspaceX),
+ *  or contains a NUL byte. Blank input maps to "/workspace". Mirrors the Dart
+ *  helper (lib/core/services/workspace/guest_cwd.dart) and the iOS bridge
+ *  (issue #400). */
+private fun normalizeGuestCwd(raw: String?): String? {
+  val trimmed = raw?.trim().orEmpty()
+  if (trimmed.isEmpty()) return "/workspace"
+  if (trimmed.contains('\u0000')) return null
+
+  val relative: String
+  when {
+    trimmed == "/workspace" -> return "/workspace"
+    trimmed.startsWith("/workspace/") -> {
+      relative = trimmed.removePrefix("/workspace/")
+    }
+    // Absolute paths outside /workspace are invalid, including lookalikes
+    // such as "/workspaceX".
+    trimmed.startsWith("/") -> return null
+    else -> relative = trimmed
+  }
+
+  val segments = ArrayDeque<String>()
+  for (part in relative.split('/')) {
+    when {
+      part.isEmpty() || part == "." -> Unit
+      part == ".." -> {
+        if (segments.isEmpty()) return null // escapes /workspace
+        segments.removeLast()
+      }
+      else -> segments.addLast(part)
+    }
+  }
+  return if (segments.isEmpty()) {
+    "/workspace"
+  } else {
+    "/workspace/" + segments.joinToString("/")
   }
 }
 

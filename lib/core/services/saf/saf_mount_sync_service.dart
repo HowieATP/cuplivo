@@ -93,18 +93,17 @@ class SafChannel {
         .toList();
   }
 
-  Future<Uint8List> readFile(String uri) async {
-    final bytes = await _channel.invokeMethod<Uint8List>('readFile', {
+  Future<void> copyToPath(String uri, String targetPath) async {
+    await _channel.invokeMethod<void>('copyToPath', {
       'uri': uri,
+      'targetPath': targetPath,
     });
-    if (bytes == null) throw StateError('readFile returned null for $uri');
-    return bytes;
   }
 
-  Future<void> writeFile(String uri, Uint8List bytes) async {
-    await _channel.invokeMethod<void>('writeFile', {
+  Future<void> copyFromPath(String uri, String sourcePath) async {
+    await _channel.invokeMethod<void>('copyFromPath', {
       'uri': uri,
-      'bytes': bytes,
+      'sourcePath': sourcePath,
     });
   }
 
@@ -163,6 +162,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   static const String errorAliasReserved = 'alias_reserved';
   static const String errorAliasDuplicate = 'alias_duplicate';
   static const String errorUriDuplicate = 'uri_duplicate';
+  static const String errorUnsupported = 'unsupported';
 
   static const Duration mutationDebounce = Duration(milliseconds: 500);
   static const Duration foregroundPollInterval = Duration(seconds: 60);
@@ -255,20 +255,24 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _doInit() async {
     await workspaces.init();
-    try {
-      WidgetsBinding.instance.addObserver(this);
-    } catch (_) {
-      // Headless tests without a binding: lifecycle triggers stay inert.
+    if (androidProbe()) {
+      try {
+        WidgetsBinding.instance.addObserver(this);
+      } catch (_) {
+        // Headless tests without a binding: lifecycle triggers stay inert.
+      }
     }
     final mirrors = await AppDirectories.getSafMountsDirectory();
     final stateDir = await AppDirectories.getSafMountStateDirectory();
     _mirrorsRoot = mirrors.path;
     _stateRoot = stateDir.path;
     await _clearLegacyGlobalMountsIfNeeded();
-    try {
-      await stateDir.create(recursive: true);
-    } catch (e) {
-      debugPrint('SafMountSyncService: state dir create failed: $e');
+    if (androidProbe()) {
+      try {
+        await stateDir.create(recursive: true);
+      } catch (e) {
+        debugPrint('SafMountSyncService: state dir create failed: $e');
+      }
     }
     _knownMountIds = androidProbe()
         ? _allEntries.map((e) => e.id).toSet()
@@ -336,7 +340,11 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// minutes; a timeout would drop the result while the native side still
   /// holds the pending reply (the grant is persisted but the UI never hears
   /// about it).
-  Future<Map<String, dynamic>?> pickTree() => channel.pickTree();
+  Future<Map<String, dynamic>?> pickTree() async {
+    await init();
+    if (!androidProbe()) return null;
+    return channel.pickTree();
+  }
 
   /// Returns null on success or an error code for the UI to localize.
   Future<String?> addMount({
@@ -346,6 +354,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     required String displayName,
   }) async {
     await init();
+    if (!androidProbe()) return errorUnsupported;
     final workspace = workspaces.getById(workspaceId);
     if (workspace == null) return errorAliasReserved;
     final trimmed = alias.trim();
@@ -427,6 +436,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> syncAll() async {
     await init();
+    if (!androidProbe()) return;
     final mountIds = _allEntries.map((e) => e.id).toList();
     for (final mountId in mountIds) {
       await syncNow(mountId);
@@ -435,6 +445,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> syncNow(String mountId) async {
     await init();
+    if (!androidProbe()) return;
     final entry = entryById(mountId);
     if (entry == null || !_running.add(mountId)) return;
     try {
@@ -549,8 +560,9 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final createdSafDirs = <String, String>{};
 
     // Pass 1: entries present on the SAF side.
-    for (final rel in safTree.keys) {
-      final saf = safTree[rel]!;
+    for (final rel in safTree.keys.toList()) {
+      final saf = safTree[rel];
+      if (saf == null) continue;
       final mir = mirrorTree[rel];
       if (saf.isDirectory) {
         final target = Directory(p.join(mirrorRoot.path, rel));
@@ -683,7 +695,12 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       // pass 3 would treat its absence as deletions in the user's real dir.
       return deleteFailed;
     }
-    for (final rel in snapshot.keys) {
+    final deletionCandidates = snapshot.keys.toList()
+      ..sort((a, b) {
+        final depthOrder = b.split('/').length.compareTo(a.split('/').length);
+        return depthOrder != 0 ? depthOrder : b.compareTo(a);
+      });
+    for (final rel in deletionCandidates) {
       final safHas = safTree.containsKey(rel);
       final mirHas = mirrorTree.containsKey(rel);
       if (safHas && !mirHas) {
@@ -741,14 +758,13 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       await _removeRecursive(target.path);
     }
     await target.parent.create(recursive: true);
-    final bytes = await channel.withTimeout(() => channel.readFile(saf.uri));
     // Temp file lives OUTSIDE the mirror walk root (.state/): an interrupted
     // round (process death) must never leave a .saf_tmp entry inside the
     // mirror, which the next round would misread as brand-new mirror content
     // and push into the user's real directory. Same-volume rename stays
     // atomic; per-alias single-flight guarantees a fixed temp name is safe.
     final tmp = File(p.join(_stateRoot, '${entry.id}_copy_tmp'));
-    await tmp.writeAsBytes(bytes, flush: true);
+    await channel.withTimeout(() => channel.copyToPath(saf.uri, tmp.path));
     await tmp.rename(target.path);
     final mtime = saf.lastModifiedMs;
     if (mtime != null) {
@@ -818,11 +834,13 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
         // Type conflict: SAF has a file where the mirror has a directory —
         // delete the SAF file so the directory can be created (newer side
         // wins).
-        try {
-          await channel.withTimeout(() => channel.delete(safEntry.uri));
-        } catch (e) {
-          debugPrint('SafMountSyncService: conflict SAF delete failed: $e');
+        final deleted = await channel.withTimeout(
+          () => channel.delete(safEntry.uri),
+        );
+        if (!deleted) {
+          throw StateError('Provider refused to delete conflicting SAF file');
         }
+        _replaceSafSubtree(safTree, rel);
       }
       if (safEntry == null || !safEntry.isDirectory) {
         final parentUri = await _ensureParentSafDir(
@@ -835,18 +853,32 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
           () => channel.mkdir(parentUri, p.basename(rel)),
         );
         createdSafDirs[rel] = created;
+        _replaceSafSubtree(
+          safTree,
+          rel,
+          SafEntry(name: p.basename(rel), isDirectory: true, uri: created),
+        );
       }
       return;
     }
-    final bytes = await file.readAsBytes();
     if (safEntry != null) {
       if (!safEntry.isDirectory) {
-        await channel.withTimeout(() => channel.writeFile(safEntry.uri, bytes));
+        await channel.withTimeout(
+          () => channel.copyFromPath(safEntry.uri, file.path),
+        );
         return;
       }
       // Type conflict: SAF has a directory where the mirror has a file —
       // delete it, then fall through to create the file.
-      await channel.withTimeout(() => channel.delete(safEntry.uri));
+      final deleted = await channel.withTimeout(
+        () => channel.delete(safEntry.uri),
+      );
+      if (!deleted) {
+        throw StateError(
+          'Provider refused to delete conflicting SAF directory',
+        );
+      }
+      _replaceSafSubtree(safTree, rel);
     }
     // New file (or post-conflict): create in the SAF parent directory, then
     // write.
@@ -859,7 +891,21 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final created = await channel.withTimeout(
       () => channel.createFile(parentUri, p.basename(rel)),
     );
-    await channel.withTimeout(() => channel.writeFile(created, bytes));
+    await channel.withTimeout(() => channel.copyFromPath(created, file.path));
+    _replaceSafSubtree(
+      safTree,
+      rel,
+      SafEntry(name: p.basename(rel), isDirectory: false, uri: created),
+    );
+  }
+
+  static void _replaceSafSubtree(
+    Map<String, SafEntry> safTree,
+    String rel, [
+    SafEntry? replacement,
+  ]) {
+    safTree.removeWhere((path, _) => path == rel || path.startsWith('$rel/'));
+    if (replacement != null) safTree[rel] = replacement;
   }
 
   /// Resolves the SAF URI of the parent directory of [rel], creating any
@@ -986,10 +1032,21 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final entries = <SafEntry>[];
     for (final m in raw) {
       final name = (m['name'] ?? '').toString();
-      if (name.isEmpty) continue;
-      if (name == '.' || name == '..') continue;
+      if (!_isSafeSafDocumentName(name)) {
+        debugPrint(
+          'SafMountSyncService: provider returned unsafe document name; '
+          'aborting round',
+        );
+        throw StateError('SAF provider returned an unsafe document name');
+      }
       final childUri = (m['uri'] ?? '').toString();
-      if (childUri.isEmpty) continue;
+      if (Uri.tryParse(childUri)?.scheme != 'content') {
+        debugPrint(
+          'SafMountSyncService: provider returned an invalid document URI; '
+          'aborting round',
+        );
+        throw StateError('SAF provider returned an invalid document URI');
+      }
       final entry = SafEntry(
         name: name,
         isDirectory: m['isDirectory'] == true,
@@ -1002,11 +1059,26 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     entries.sort((a, b) => a.name.compareTo(b.name));
     for (final e in entries) {
       final rel = relPrefix == '.' ? e.name : '$relPrefix/${e.name}';
+      if (out.containsKey(rel)) {
+        debugPrint(
+          'SafMountSyncService: provider returned a duplicate document name; '
+          'aborting round',
+        );
+        throw StateError('SAF provider returned a duplicate document name');
+      }
       out[rel] = e;
       if (e.isDirectory) {
         await _walkSaf(e.uri, rel, out);
       }
     }
+  }
+
+  static bool _isSafeSafDocumentName(String name) {
+    return isSafeWireSegment(name) &&
+        !name.contains('/') &&
+        !name.contains('\\') &&
+        !name.contains(':') &&
+        !name.contains('\u0000');
   }
 
   Future<Map<String, _MirrorEntry>> _listMirrorTree(Directory root) async {
@@ -1035,6 +1107,13 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     children.sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
     for (final child in children) {
       final name = p.basename(child.path);
+      if (!_isSafeSafDocumentName(name)) {
+        debugPrint(
+          'SafMountSyncService: mirror contains an unsafe document name at '
+          '${child.path}; aborting round',
+        );
+        throw StateError('Mirror contains an unsafe document name');
+      }
       final rel = relPrefix == '.' ? name : '$relPrefix/$name';
       if (name.endsWith('.saf_tmp')) {
         // Stale copy temp from a pre-ADR-0037-build interruption (older
@@ -1132,6 +1211,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       await tmp.rename(f.path);
     } catch (e) {
       debugPrint('SafMountSyncService: snapshot write failed for $mountId: $e');
+      rethrow;
     }
   }
 
@@ -1141,6 +1221,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!androidProbe()) return;
     if (state == AppLifecycleState.resumed) {
       _setForeground(true);
       Timer(resumeDebounce, () => unawaited(syncAll()));

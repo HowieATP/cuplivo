@@ -39,9 +39,11 @@ class _FakeSafChannel extends SafChannel {
     uri: rootUri,
   );
   bool granted = true;
+  int checkAccessCalls = 0;
+  int pickTreeCalls = 0;
   int _nextId = 0;
 
-  /// Provider-side "now" for writeFile stamps. Year 2033 so provider mtimes
+  /// Provider-side "now" for streamed write stamps. Year 2033 so mtimes
   /// are always NEWER than any real wall-clock mirror mtime (~1.7e12 ms) —
   /// LWW comparisons in the tests stay deterministic.
   int nowMs = 2_000_000_000_000;
@@ -116,7 +118,10 @@ class _FakeSafChannel extends SafChannel {
   }
 
   @override
-  Future<Map<String, dynamic>?> pickTree() async => null;
+  Future<Map<String, dynamic>?> pickTree() async {
+    pickTreeCalls++;
+    return null;
+  }
 
   @override
   Future<List<Map<String, dynamic>>> list(String uri) async {
@@ -157,17 +162,17 @@ class _FakeSafChannel extends SafChannel {
   }
 
   @override
-  Future<Uint8List> readFile(String uri) async {
+  Future<void> copyToPath(String uri, String targetPath) async {
     if (!granted) throw PlatformException(code: 'access_denied');
     final node = _nodeByUri(uri);
-    return node.bytes;
+    await File(targetPath).writeAsBytes(node.bytes, flush: true);
   }
 
   @override
-  Future<void> writeFile(String uri, Uint8List bytes) async {
+  Future<void> copyFromPath(String uri, String sourcePath) async {
     if (!granted) throw PlatformException(code: 'access_denied');
     final node = _nodeByUri(uri);
-    node.bytes = bytes;
+    node.bytes = await File(sourcePath).readAsBytes();
     node.mtimeMs = nowMs;
   }
 
@@ -220,7 +225,10 @@ class _FakeSafChannel extends SafChannel {
   }
 
   @override
-  Future<bool> checkAccess(String uri) async => granted;
+  Future<bool> checkAccess(String uri) async {
+    checkAccessCalls++;
+    return granted;
+  }
 }
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -549,6 +557,33 @@ void main() {
     });
 
     test(
+      'mirror-side nested directory deletion converges while empty',
+      () async {
+        channel.seedFile('folder/nested/file.txt', 'data');
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+
+        await Directory(
+          mirrorFile('notes', 'folder').path,
+        ).delete(recursive: true);
+        await service.syncNow('notes');
+        await pump();
+        expect(channel.root.children, isEmpty);
+        expect(service.stateOf('notes').status, SafMountStatus.idle);
+
+        // The completed round must have forgotten every descendant; otherwise
+        // the empty-tree guard would strand the mount as unavailable here.
+        await service.syncNow('notes');
+        await pump();
+        expect(service.stateOf('notes').status, SafMountStatus.idle);
+      },
+    );
+
+    test(
       'delete-then-recreate after a deletion round is pushed, not destroyed',
       () async {
         channel.seedFile('a.md', 'v1', mtimeMs: 1_000_000_000);
@@ -649,6 +684,34 @@ void main() {
   });
 
   group('access failures', () {
+    test(
+      'unsafe provider names abort before writing outside the mirror',
+      () async {
+        channel.root.children.add(
+          _FakeSafNode(
+            name: '../escaped.txt',
+            isDirectory: false,
+            uri: 'content://tree/unsafe-name',
+          ),
+        );
+
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'x',
+        );
+        await pump();
+
+        expect(service.stateOf('notes').status, SafMountStatus.error);
+        expect(
+          await File(
+            p.join(tempDir.path, 'saf_mounts', 'escaped.txt'),
+          ).exists(),
+          isFalse,
+        );
+      },
+    );
+
     test(
       'revoked grant marks the mount unavailable and keeps the mirror',
       () async {
@@ -803,6 +866,24 @@ void main() {
       expect(service.stateOf('notes').status, SafMountStatus.idle);
       expect(() => channel.findByRel('gone.txt'), throwsStateError);
     });
+
+    test('snapshot persistence failure keeps the round in error', () async {
+      channel.seedFile('a.txt', 'v1', mtimeMs: 1_000_000_000);
+      await service.addMount(
+        alias: 'notes',
+        uri: 'content://tree',
+        displayName: 'x',
+      );
+      await pump();
+      final entry = service.entryByAlias('notes')!;
+      await Directory('${service.raw.statePathFor(entry.id)}.tmp').create();
+
+      await mirrorFile('notes', 'a.txt').writeAsString('v2');
+      await service.syncNow('notes');
+      await pump();
+
+      expect(service.stateOf('notes').status, SafMountStatus.error);
+    });
   });
 
   group('file↔directory type conflicts', () {
@@ -829,6 +910,7 @@ void main() {
         expect(saf.isDirectory, isFalse);
         expect(utf8.decode(saf.bytes), 'now a file');
         expect(await mirrorFile('notes', 'x').readAsString(), 'now a file');
+        expect(service.stateOf('notes').status, SafMountStatus.idle);
       },
     );
 
@@ -983,6 +1065,44 @@ void main() {
   });
 
   group('workspace scoping', () {
+    test('non-Android restore preserves metadata without syncing', () async {
+      service.raw.dispose();
+      const entry = WorkspaceSafMount(
+        id: 'restored_mount',
+        alias: 'notes',
+        uri: 'content://tree/restored',
+        displayName: 'Restored',
+      );
+      await workspaces.addSafMount(Workspace.defaultId, entry);
+      SafMountSyncService.androidProbe = () => false;
+      service = _TestSafMountService(
+        SafMountSyncService(workspaces: workspaces, channel: channel),
+      );
+
+      await service.init();
+      expect(await service.raw.pickTree(), isNull);
+      expect(
+        await service.raw.addMount(
+          workspaceId: Workspace.defaultId,
+          alias: 'other',
+          uri: 'content://tree/other',
+          displayName: 'Other',
+        ),
+        SafMountSyncService.errorUnsupported,
+      );
+      await service.raw.syncAll();
+      await service.raw.syncNow(entry.id);
+      await service.raw.reloadAfterRestore();
+
+      expect(channel.checkAccessCalls, 0);
+      expect(channel.pickTreeCalls, 0);
+      expect(
+        await Directory(service.raw.mirrorPathFor(entry.id)).exists(),
+        isFalse,
+      );
+      expect(workspaces.getById(Workspace.defaultId)!.safMounts, [entry]);
+    });
+
     test(
       'isolates mounts and aliases while rejecting a duplicate URI',
       () async {

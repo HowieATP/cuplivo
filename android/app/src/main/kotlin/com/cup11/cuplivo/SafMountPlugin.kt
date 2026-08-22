@@ -18,6 +18,8 @@ import io.flutter.plugin.common.StandardMethodCodec
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import java.io.File
+import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 
@@ -90,15 +92,31 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         return@ActivityResultListener true
       }
       val uri = data.data!!
-      val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+      val requiredFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+      val grantedFlags = data.flags and requiredFlags
+      if (grantedFlags != requiredFlags) {
+        mainHandler.post {
+          pending.error(
+            "access_denied",
+            "The selected directory did not grant persistent read/write access",
+            null,
+          )
+        }
+        return@ActivityResultListener true
+      }
       try {
-        appContext.contentResolver.takePersistableUriPermission(uri, flags)
+        appContext.contentResolver.takePersistableUriPermission(uri, grantedFlags)
       } catch (e: Exception) {
-        // Some providers refuse persistable grants; the mount still works
-        // for this session but will not survive a restart.
         android.util.Log.w(TAG, "takePersistableUriPermission failed: ${e.message}")
+        mainHandler.post {
+          pending.error(
+            "access_denied",
+            "The selected directory cannot grant persistent read/write access",
+            null,
+          )
+        }
+        return@ActivityResultListener true
       }
       val doc = DocumentFile.fromTreeUri(appContext, uri)
       val displayName = doc?.name?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment.orEmpty()
@@ -115,22 +133,19 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         val uri = parseUri(call, "uri", result) ?: return
         runBackground(result) { list(uri) }
       }
-      "readFile" -> {
+      "copyToPath" -> {
         val uri = parseUri(call, "uri", result) ?: return
-        runBackground(result) { readFile(uri) }
+        val target = parseInternalFile(call, "targetPath", result) ?: return
+        runBackground(result) { copyToPath(uri, target) }
       }
-      "writeFile" -> {
+      "copyFromPath" -> {
         val uri = parseUri(call, "uri", result) ?: return
-        val bytes = call.argument<ByteArray>("bytes")
-        if (bytes == null) {
-          result.error("bad_args", "bytes required", null)
-          return
-        }
-        runBackground(result) { writeFile(uri, bytes) }
+        val source = parseInternalFile(call, "sourcePath", result) ?: return
+        runBackground(result) { copyFromPath(uri, source) }
       }
       "createFile" -> {
         val parent = parseUri(call, "parentUri", result) ?: return
-        val name = call.argument<String>("name")?.trim().orEmpty()
+        val name = call.argument<String>("name").orEmpty()
         if (name.isEmpty()) {
           result.error("bad_args", "name required", null)
           return
@@ -139,7 +154,7 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
       }
       "mkdir" -> {
         val parent = parseUri(call, "parentUri", result) ?: return
-        val name = call.argument<String>("name")?.trim().orEmpty()
+        val name = call.argument<String>("name").orEmpty()
         if (name.isEmpty()) {
           result.error("bad_args", "name required", null)
           return
@@ -218,6 +233,32 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     return uri
   }
 
+  private fun parseInternalFile(
+    call: MethodCall,
+    key: String,
+    result: MethodChannel.Result,
+  ): File? {
+    val raw = call.argument<String>(key).orEmpty()
+    if (raw.isBlank()) {
+      result.error("bad_args", "$key required", null)
+      return null
+    }
+    return try {
+      val root = appContext.filesDir.canonicalFile
+      val file = File(raw).canonicalFile
+      val rootPrefix = root.path + File.separator
+      if (!file.path.startsWith(rootPrefix)) {
+        result.error("bad_args", "$key must stay inside app storage", null)
+        null
+      } else {
+        file
+      }
+    } catch (e: Exception) {
+      result.error("bad_args", "$key could not be resolved: ${e.message}", null)
+      null
+    }
+  }
+
   private fun list(uri: Uri): List<Map<String, Any?>> {
     val doc = DocumentFile.fromTreeUri(appContext, uri)
       ?: throw FileNotFoundException("Cannot resolve tree: $uri")
@@ -232,19 +273,25 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
   }
 
-  private fun readFile(uri: Uri): ByteArray {
+  private fun copyToPath(uri: Uri, target: File) {
     val input = appContext.contentResolver.openInputStream(uri)
       ?: throw FileNotFoundException("Cannot open: $uri")
-    return input.use { it.readBytes() }
+    target.parentFile?.mkdirs()
+    input.use { source ->
+      FileOutputStream(target).use { destination -> source.copyTo(destination) }
+    }
   }
 
-  private fun writeFile(uri: Uri, bytes: ByteArray) {
+  private fun copyFromPath(uri: Uri, source: File) {
+    if (!source.isFile) throw FileNotFoundException("Cannot open: $source")
     // "rwt": read, write, truncate — overwrite in place without recreating
     // the document (keeps its identity and mtime behavior provider-side).
     val pfd = appContext.contentResolver.openFileDescriptor(uri, "rwt")
       ?: throw FileNotFoundException("Cannot open for write: $uri")
     pfd.use { descriptor ->
-      FileOutputStream(descriptor.fileDescriptor).use { it.write(bytes) }
+      FileInputStream(source).use { input ->
+        FileOutputStream(descriptor.fileDescriptor).use { output -> input.copyTo(output) }
+      }
     }
   }
 

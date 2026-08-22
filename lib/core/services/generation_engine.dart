@@ -16,6 +16,7 @@ import 'api/chat_api_service.dart';
 import 'chat/chat_service.dart';
 import 'workspace/linux_sandbox_service.dart';
 import 'streaming_content_notifier.dart';
+import 'wake_lock_manager.dart';
 
 /// Live status of one generation slot.
 enum SlotStatus { running, done, error, cancelled }
@@ -341,11 +342,14 @@ class GenerationEngine extends ChangeNotifier {
     required this._chatService,
     this._downloadProgressStore,
     EngineChatStreamProvider? streamProvider,
-  }) : _streamProvider = streamProvider ?? _defaultStreamProvider;
+    WakeLockManager? wakeLockManager,
+  }) : _streamProvider = streamProvider ?? _defaultStreamProvider,
+       _wakeLockManager = wakeLockManager ?? WakeLockManager();
 
   final ChatService _chatService;
   final DownloadProgressStore? _downloadProgressStore;
   final EngineChatStreamProvider _streamProvider;
+  final WakeLockManager _wakeLockManager;
 
   /// Active round per conversation (round identity = conversation in current
   /// practice: subagent 1-slot child rounds, sequential page rounds).
@@ -655,6 +659,7 @@ class GenerationEngine extends ChangeNotifier {
     for (final mid in _slots.keys.toList()) {
       ChatApiService.cancelRequest(mid);
     }
+    _wakeLockManager.reset();
     unawaited(LinuxSandboxService.instance.cancelAll());
     super.dispose();
   }
@@ -696,6 +701,11 @@ class GenerationEngine extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Screen-on wake lock (mobile only, refcounted): every slot that
+      // starts acquires once and releases exactly once in the finally below,
+      // so Multi-AI rounds hold the lock until the last slot settles. See
+      // docs/adr/0040-screen-on-wake-lock-during-generation.md.
+      _wakeLockManager.acquire();
       await for (final chunk in _streamProvider(
         config: req.config,
         modelId: req.modelId,
@@ -759,6 +769,7 @@ class GenerationEngine extends ChangeNotifier {
       debugPrint('[GenerationEngine] error in ${slot.assistantMessageId}: $e');
       await _failSlot(runtime, round, e);
     } finally {
+      _wakeLockManager.release();
       await _cleanupSlot(slot, round);
     }
   }

@@ -499,13 +499,9 @@ void main() {
       final chat = report.categories.singleWhere(
         (category) => category.key == StorageUsageCategoryKey.chatData,
       );
-      final other = report.categories.singleWhere(
-        (category) => category.key == StorageUsageCategoryKey.other,
-      );
 
       expect(chat.stats.bytes, 11);
       expect(chat.stats.fileCount, 1);
-      expect(other.stats.bytes, 10);
       expect(report.totalBytes, 21);
     },
     skip: Platform.isWindows

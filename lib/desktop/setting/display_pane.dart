@@ -90,8 +90,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowReasoningMarkdown(),
                   _RowDivider(),
-                  _ToggleRowStreamingThinkingPreviewTruncate(),
-                  _RowDivider(),
                   _ToggleRowAssistantMarkdown(),
                   _RowDivider(),
                   _AutoCollapseCodeBlocksSection(),
@@ -2282,22 +2280,6 @@ class _ToggleRowReasoningMarkdown extends StatelessWidget {
       value: sp.enableReasoningMarkdown,
       onChanged: (v) =>
           context.read<SettingsProvider>().setEnableReasoningMarkdown(v),
-    );
-  }
-}
-
-class _ToggleRowStreamingThinkingPreviewTruncate extends StatelessWidget {
-  const _ToggleRowStreamingThinkingPreviewTruncate();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageStreamingThinkingPreviewTruncateTitle,
-      value: sp.streamingThinkingPreviewTruncate,
-      onChanged: (v) => context
-          .read<SettingsProvider>()
-          .setStreamingThinkingPreviewTruncate(v),
     );
   }
 }

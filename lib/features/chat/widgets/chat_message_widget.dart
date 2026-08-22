@@ -55,21 +55,6 @@ import '../../../theme/app_semantic_colors.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
-/// Upper bound for the streaming thinking preview text (issue #232). While
-/// thinking streams, the collapsed preview re-parses the whole accumulated
-/// markdown on every 150ms UI tick; truncating to the tail (the preview
-/// auto-scrolls to the bottom) makes the per-tick cost O(1) in thinking
-/// length. Full text still renders when the user expands the card.
-const int _streamingThinkingPreviewMaxChars = 2000;
-
-/// Bounds [text] to the tail for the streaming thinking preview unless the
-/// user opted out via [SettingsProvider.streamingThinkingPreviewTruncate].
-String _boundedStreamingPreview(SettingsProvider settings, String text) {
-  if (!settings.streamingThinkingPreviewTruncate) return text;
-  if (text.length <= _streamingThinkingPreviewMaxChars) return text;
-  return '…\n${text.substring(text.length - _streamingThinkingPreviewMaxChars)}';
-}
-
 Uri? _tryNormalizeExternalUri(String raw) {
   var u = raw.trim();
   if (u.isEmpty) return null;
@@ -3963,9 +3948,7 @@ class _ChainOfThoughtReasoningStepState
     final settings = context.watch<SettingsProvider>();
     final state = _stepState;
     final rawText = _sanitize(widget.step.text);
-    final display = state == _ReasoningStepState.preview
-        ? _boundedStreamingPreview(settings, rawText)
-        : rawText;
+    final display = rawText;
     final label = Row(
       children: [
         _Shimmer(
@@ -6246,9 +6229,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
 
     final bool isLoading = loading;
     final rawText = _sanitize(widget.text);
-    final display = (isLoading && !widget.expanded)
-        ? _boundedStreamingPreview(settings, rawText)
-        : rawText;
+    final display = rawText;
 
     // 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
     Widget reasoningContent(String text) {

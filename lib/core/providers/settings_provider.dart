@@ -217,8 +217,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
       'display_enable_reasoning_markdown_v1';
-  static const String _displayStreamingThinkingPreviewTruncateKey =
-      'display_streaming_thinking_preview_truncate_v1';
   static const String _displayEnableAssistantMarkdownKey =
       'display_enable_assistant_markdown_v1';
   static const String _displayShowChatListDateKey =
@@ -1286,8 +1284,6 @@ class SettingsProvider extends ChangeNotifier {
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
-    _streamingThinkingPreviewTruncate =
-        prefs.getBool(_displayStreamingThinkingPreviewTruncateKey) ?? true;
     _enableAssistantMarkdown =
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
@@ -4594,19 +4590,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
   }
 
-  // Display: bound the streaming thinking preview to its tail (issue #232).
-  // Off = original behavior (full text re-parsed on every streaming update).
-  bool _streamingThinkingPreviewTruncate = true;
-  bool get streamingThinkingPreviewTruncate =>
-      _streamingThinkingPreviewTruncate;
-  Future<void> setStreamingThinkingPreviewTruncate(bool v) async {
-    if (_streamingThinkingPreviewTruncate == v) return;
-    _streamingThinkingPreviewTruncate = v;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_displayStreamingThinkingPreviewTruncateKey, v);
-  }
-
   // Display: render assistant messages with Markdown
   bool _enableAssistantMarkdown = true;
   bool get enableAssistantMarkdown => _enableAssistantMarkdown;
@@ -5196,7 +5179,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._enableMathRendering = _enableMathRendering;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
-    copy._streamingThinkingPreviewTruncate = _streamingThinkingPreviewTruncate;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;

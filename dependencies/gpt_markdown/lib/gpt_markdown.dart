@@ -44,7 +44,8 @@ class GptMarkdown extends StatelessWidget {
     this.components,
     this.inlineComponents,
     this.useDollarSignsForLatex = false,
-    this.streaming = false,
+    this.preprocessBlocks,
+    this.generation,
   });
 
   /// The direction of the text.
@@ -102,11 +103,6 @@ class GptMarkdown extends StatelessWidget {
   /// Whether to use dollar signs for LaTeX.
   final bool useDollarSignsForLatex;
 
-  /// Whether the content is being streamed. Participates in config equality
-  /// so a streaming flag flip with unchanged text regenerates the parse tree
-  /// (code-block rendering behavior depends on it).
-  final bool streaming;
-
   /// The table builder.
   final TableBuilder? tableBuilder;
 
@@ -154,6 +150,12 @@ class GptMarkdown extends StatelessWidget {
   /// ```
   final List<MarkdownComponent>? inlineComponents;
 
+  /// See [GptMarkdownConfig.preprocessBlocks].
+  final String Function(String text)? preprocessBlocks;
+
+  /// See [GptMarkdownConfig.generation].
+  final Object? generation;
+
   /// A method to remove extra lines inside block LaTeX.
   // String _removeExtraLinesInsideBlockLatex(String text) {
   //   return text.replaceAllMapped(
@@ -167,7 +169,10 @@ class GptMarkdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String tex = data.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
+    String tex =
+        data.contains('\r')
+            ? data.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim()
+            : data.trim();
     if (useDollarSignsForLatex) {
       tex = tex.replaceAllMapped(
         RegExp(r"(?<!\\)\$\$(.*?)(?<!\\)\$\$", dotAll: true),
@@ -213,7 +218,8 @@ class GptMarkdown extends StatelessWidget {
           components: components,
           inlineComponents: inlineComponents,
           tableBuilder: tableBuilder,
-          streaming: streaming,
+          preprocessBlocks: preprocessBlocks,
+          generation: generation,
         ),
       ),
     );

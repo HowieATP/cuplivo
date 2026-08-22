@@ -128,6 +128,7 @@ class ChatInputBar extends StatefulWidget {
     this.onMultiSelectModel,
     this.mode = ChatInputMode.normal,
     this.imageGenController,
+    this.livePanel,
   });
 
   /// When [ChatInputMode.groupChat], hide model/search/reasoning/MCP/multi-AI.
@@ -189,6 +190,12 @@ class ChatInputBar extends StatefulWidget {
   /// its own; the home page passes a shared instance so the LivePanel's
   /// inline options card edits the same controller the bar snapshots on send.
   final ImageGenerationOptionsController? imageGenController;
+
+  /// Transient status surface rendered inside the frosted card, above the
+  /// attachment previews (the LivePanel's pills/cards). Keeping it inside
+  /// the card means the rounded border wraps both, and the bar's measured
+  /// height (driving the message list bottom padding) covers the panel.
+  final Widget? livePanel;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -2867,6 +2874,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                       child: Column(
                         children: [
+                          if (widget.livePanel != null) widget.livePanel!,
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button

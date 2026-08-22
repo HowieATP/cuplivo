@@ -144,6 +144,9 @@ void main() {
       // Expand, then the row is tappable and opens the child.
       await tester.tap(find.textContaining('Research Bot'));
       await tester.pump();
+      // The expanded body eases in over 220ms (AnimatedSize); wait for it to
+      // finish so the row is fully hittable before tapping.
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.textContaining('3 tool calls'), findsOneWidget);
       expect(find.text('kelivo_read'), findsOneWidget);
       expect(find.byIcon(Icons.arrow_forward_ios), findsOneWidget);

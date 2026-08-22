@@ -46,6 +46,7 @@ void main() {
     double inputBackgroundOpacityLight = 0.8236,
     double inputBackgroundOpacityDark = 0.7396,
     ChatInputMode mode = ChatInputMode.normal,
+    Widget? livePanel,
   }) {
     return MultiProvider(
       providers: [
@@ -84,6 +85,7 @@ void main() {
             inputBackgroundOpacityLight: inputBackgroundOpacityLight,
             inputBackgroundOpacityDark: inputBackgroundOpacityDark,
             mode: mode,
+            livePanel: livePanel,
           ),
         ),
       ),
@@ -786,6 +788,43 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('livePanel 渲染在输入卡内部', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        livePanel: const ColoredBox(
+          key: Key('test-live-panel'),
+          color: Colors.transparent,
+          child: SizedBox(height: 24),
+        ),
+      ),
+    );
+
+    // The panel entry lives inside the input bar's rounded card.
+    expect(find.byKey(const Key('test-live-panel')), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.byKey(const Key('test-live-panel')),
+        matching: find.byType(ChatInputBar),
+      ),
+      findsOneWidget,
+    );
+    // The card grows with the panel: the entry renders above the text field.
+    final panelY = tester
+        .getTopLeft(find.byKey(const Key('test-live-panel')))
+        .dy;
+    final fieldY = tester.getTopLeft(find.byType(TextField)).dy;
+    expect(panelY, lessThan(fieldY));
 
     controller.dispose();
     focusNode.dispose();

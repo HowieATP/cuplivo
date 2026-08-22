@@ -12,18 +12,26 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/image_mode_info_popover.dart';
+import '../../../theme/design_tokens.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/tool_approval_service.dart';
 import 'image_generation_options.dart';
 
-/// LivePanel (实时面板): unified transient-status surface pinned above the
-/// conversation input bar. Hosts heterogeneous live entries — subagent jobs,
-/// workspace downloads, and the image-mode / image-warning pills — sharing one
-/// pill↔card design language (issue #307, ADR-0036).
+/// LivePanel (实时面板): unified transient-status surface rendered inside the
+/// conversation input bar's card. Hosts heterogeneous live entries — subagent
+/// jobs, workspace downloads, and the image-mode / image-warning pills —
+/// sharing one pill↔card design language (issue #307, ADR-0036). Entries are
+/// transparent rows inside the card separated by hairline rules; the card's
+/// single rounded border bounds the section and a trailing rule doubles as
+/// the chat input's upper border. The panel's height feeds the message list's
+/// bottom padding so the last message is never shaded.
 ///
 /// Entry order: info pill, warning pill, download entries, subagent entries.
 /// Every entry is conversation-scoped (keyed off `currentConversationId`);
 /// the panel disappears when no entry exists.
+///
+/// UI inspiration: [Paseo](https://github.com/getpaseo/paseo) — transient
+/// agent status hosted inside a unified composer panel.
 class LivePanel extends StatefulWidget {
   const LivePanel({super.key, this.onOpenChild, this.imageGenController});
 
@@ -41,7 +49,12 @@ class LivePanel extends StatefulWidget {
 }
 
 class _LivePanelState extends State<LivePanel> {
+  static const Duration _expandDuration = Duration(milliseconds: 220);
+  static const Curve _expandCurve = Curves.easeOutCubic;
+
   Timer? _ticker;
+  final ScrollController _scrollController = ScrollController();
+  Set<String> _lastEntryIds = <String>{};
   final _expandedJobIds = <String>{};
   final _expandedDownloadIds = <String>{};
   bool _expandedImageMode = false;
@@ -63,6 +76,7 @@ class _LivePanelState extends State<LivePanel> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -142,6 +156,31 @@ class _LivePanelState extends State<LivePanel> {
   Widget build(BuildContext context) {
     final jobs = _activeJobs();
     final downloads = _activeDownloads();
+    // Reveal entries appended below the fold: only when an entry that was
+    // not present before arrives AND the view already sits at (or near) the
+    // bottom, so a user reading the panel top is not dragged away. Identity
+    // tracking (not a count) so that a removal + an addition in the same
+    // rebuild still reveals the new entry. Removal of entries scrolls nothing.
+    final entryIds = <String>{
+      for (final job in jobs) 'job:${job.conversationId}',
+      for (final download in downloads) 'dl:${download.id}',
+    };
+    final hasNewEntry = entryIds.any((id) => !_lastEntryIds.contains(id));
+    if (hasNewEntry && _scrollController.hasClients) {
+      final position = _scrollController.position;
+      final atBottom = position.pixels >= position.maxScrollExtent - 24;
+      if (atBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scrollController.hasClients) return;
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          );
+        });
+      }
+    }
+    _lastEntryIds = entryIds;
     final inputStatus = context.watch<InputStatusProvider>();
     final hasPills =
         inputStatus.imageModeActive ||
@@ -153,8 +192,6 @@ class _LivePanelState extends State<LivePanel> {
 
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? cs.surfaceContainerHighest : cs.surface;
 
     // The expansion flag is only meaningful while the image-mode pill renders.
     // Sync it here so a model switch (pill disappears) collapses the options
@@ -165,58 +202,125 @@ class _LivePanelState extends State<LivePanel> {
       _expandedImageMode = showImageOptionsExpanded;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (inputStatus.imageModeActive) ...[
-            _buildImageModePill(inputStatus, base, cs, l10n),
-            if (showImageOptionsExpanded) ...[
-              const SizedBox(height: 6),
-              _buildImageOptionsCard(base),
-            ],
-            const SizedBox(height: 6),
-          ] else if (inputStatus.imageModeDismissed) ...[
-            _buildChatModePill(inputStatus, base, cs, l10n),
-            const SizedBox(height: 6),
-          ],
-          if (inputStatus.imageWarningActive) ...[
-            _buildPill(
-              icon: Lucide.ImageOff,
-              label: l10n.chatInputBarImageWarning,
-              closeTooltip: l10n.chatInputBarDisableImageWarningTooltip,
-              onClose: () => inputStatus.dismissImageWarning(),
-              base: base,
-              cs: cs,
+    // One entry = its row plus any expanded body; entries are transparent
+    // rows inside the card, separated by hairline rules. The card's own
+    // rounded border bounds the section, so the first row has no rule above
+    // it, and a trailing rule draws the chat input's upper border.
+    final entries = <Widget>[];
+    if (inputStatus.imageModeActive) {
+      entries.add(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildImageModePill(inputStatus, cs, l10n),
+            _expandable(
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [const SizedBox(height: 6), _buildImageOptionsCard()],
+              ),
+              showImageOptionsExpanded,
             ),
-            const SizedBox(height: 6),
           ],
-          for (final download in downloads) ...[
-            _buildDownloadCard(download, base, cs),
-            if (download != downloads.last) const SizedBox(height: 6),
+        ),
+      );
+    } else if (inputStatus.imageModeDismissed) {
+      entries.add(_buildChatModePill(inputStatus, cs, l10n));
+    }
+    if (inputStatus.imageWarningActive) {
+      entries.add(
+        _buildPill(
+          icon: Lucide.ImageOff,
+          label: l10n.chatInputBarImageWarning,
+          closeTooltip: l10n.chatInputBarDisableImageWarningTooltip,
+          onClose: () => inputStatus.dismissImageWarning(),
+          cs: cs,
+        ),
+      );
+    }
+    for (final download in downloads) {
+      entries.add(_buildDownloadCard(download, cs));
+    }
+    for (final job in jobs) {
+      entries.add(_buildJobCard(context, job, cs, l10n));
+    }
+
+    // Cap the panel so many entries or the expanded options card cannot push
+    // the input bar off the top of the screen; the entries scroll within it.
+    // The cap is keyboard-aware, mirroring the input bar's visibleHeight math.
+    final media = MediaQuery.of(context);
+    final maxEntriesHeight =
+        (media.size.height - media.viewInsets.bottom) * 0.45;
+    final children = <Widget>[];
+    for (var i = 0; i < entries.length; i++) {
+      if (i > 0) children.add(_entryRule(cs));
+      children.add(entries[i]);
+    }
+    if (entries.isNotEmpty) children.add(_entryRule(cs));
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxEntriesHeight),
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...children,
+            // Breathing room between the last rule and the input bar content
+            // below; absent when the panel is empty.
+            const SizedBox(height: AppSpacing.xxs),
           ],
-          if (downloads.isNotEmpty && jobs.isNotEmpty)
-            const SizedBox(height: 6),
-          for (final job in jobs) ...[
-            _buildJobCard(context, job, base, cs, l10n),
-            if (job != jobs.last) const SizedBox(height: 6),
-          ],
-        ],
+        ),
       ),
+    );
+  }
+
+  /// Full-width hairline separating live entries from each other and the
+  /// chat input section. The card's own border bounds the first entry, so
+  /// the first row intentionally has no rule above it.
+  static Widget _entryRule(ColorScheme cs) {
+    return SizedBox(
+      height: 1,
+      child: ColoredBox(
+        color: cs.outline.withValues(
+          alpha: cs.brightness == Brightness.dark ? 0.16 : 0.14,
+        ),
+      ),
+    );
+  }
+
+  /// Animated show/hide for an entry's expandable section: the height eases
+  /// between 0 and full instead of jumping. The collapsed box keeps the
+  /// entry's width (only height animates).
+  static Widget _expandable(Widget child, bool visible) {
+    return AnimatedSize(
+      duration: _expandDuration,
+      curve: _expandCurve,
+      alignment: Alignment.topCenter,
+      child: visible ? child : const SizedBox(width: double.infinity),
+    );
+  }
+
+  /// Rotating expand/collapse chevron: up when collapsed, flipped 180° (i.e.
+  /// appearing as down) when expanded.
+  static Widget _animatedChevron({
+    required bool expanded,
+    required Color color,
+  }) {
+    return AnimatedRotation(
+      turns: expanded ? 0.5 : 0.0,
+      duration: _expandDuration,
+      curve: _expandCurve,
+      child: Icon(Icons.keyboard_arrow_up, size: 18, color: color),
     );
   }
 
   Widget _buildImageModePill(
     InputStatusProvider inputStatus,
-    Color base,
     ColorScheme cs,
     AppLocalizations l10n,
   ) {
     return _buildPill(
       icon: Lucide.Brush,
       label: l10n.chatInputBarImageMode,
-      base: base,
       cs: cs,
       onTap: () => setState(() => _expandedImageMode = !_expandedImageMode),
       infoButton: IosIconButton(
@@ -239,11 +343,8 @@ class _LivePanelState extends State<LivePanel> {
               shape: BoxShape.circle,
             ),
           ),
-        Icon(
-          _expandedImageMode
-              ? Icons.keyboard_arrow_down
-              : Icons.keyboard_arrow_up,
-          size: 18,
+        _animatedChevron(
+          expanded: _expandedImageMode,
           color: cs.onSurfaceVariant,
         ),
         const SizedBox(width: 2),
@@ -263,14 +364,12 @@ class _LivePanelState extends State<LivePanel> {
 
   Widget _buildChatModePill(
     InputStatusProvider inputStatus,
-    Color base,
     ColorScheme cs,
     AppLocalizations l10n,
   ) {
     return _buildPill(
       icon: Lucide.MessageSquare,
       label: l10n.chatInputBarChatMode,
-      base: base,
       cs: cs,
       onTap: () {
         inputStatus.restoreImageMode();
@@ -289,22 +388,15 @@ class _LivePanelState extends State<LivePanel> {
     );
   }
 
-  Widget _buildImageOptionsCard(Color base) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.55;
-    return Container(
-      decoration: BoxDecoration(
-        color: base,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: SingleChildScrollView(
-          child: ImageGenerationOptionsBody(
-            controller: _imageGenController,
-            onChanged: () => setState(() {}),
-          ),
-        ),
+  Widget _buildImageOptionsCard() {
+    // Single scroll layer: the panel's outer scroll view owns all scrolling,
+    // so a nested scrollable here would trap the card's tail below the
+    // panel's window on clamping platforms. No ConstrainedBox/scroll.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: ImageGenerationOptionsBody(
+        controller: _imageGenController,
+        onChanged: () => setState(() {}),
       ),
     );
   }
@@ -312,7 +404,6 @@ class _LivePanelState extends State<LivePanel> {
   Widget _buildPill({
     required IconData icon,
     required String label,
-    required Color base,
     required ColorScheme cs,
     VoidCallback? onTap,
     Widget? infoButton,
@@ -322,8 +413,7 @@ class _LivePanelState extends State<LivePanel> {
   }) {
     return IosCardPress(
       borderRadius: BorderRadius.circular(12),
-      baseColor: base,
-      pressedScale: 0.99,
+      baseColor: Colors.transparent,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -361,15 +451,14 @@ class _LivePanelState extends State<LivePanel> {
     );
   }
 
-  Widget _buildDownloadCard(DownloadJob job, Color base, ColorScheme cs) {
+  Widget _buildDownloadCard(DownloadJob job, ColorScheme cs) {
     final showExpanded = _expandedDownloadIds.contains(job.id);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         IosCardPress(
           borderRadius: BorderRadius.circular(12),
-          baseColor: base,
-          pressedScale: 0.99,
+          baseColor: Colors.transparent,
           onTap: () => setState(() {
             if (!_expandedDownloadIds.add(job.id)) {
               _expandedDownloadIds.remove(job.id);
@@ -394,26 +483,21 @@ class _LivePanelState extends State<LivePanel> {
                     ),
                   ),
                 ),
-                Icon(
-                  showExpanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_up,
-                  size: 18,
+                _animatedChevron(
+                  expanded: showExpanded,
                   color: cs.onSurfaceVariant,
                 ),
               ],
             ),
           ),
         ),
-        if (showExpanded)
-          Container(
-            decoration: BoxDecoration(
-              color: base,
-              borderRadius: BorderRadius.circular(12),
-            ),
+        _expandable(
+          Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: _buildDownloadProgress(job, cs),
           ),
+          showExpanded,
+        ),
       ],
     );
   }
@@ -461,7 +545,6 @@ class _LivePanelState extends State<LivePanel> {
   Widget _buildJobCard(
     BuildContext context,
     GenerationSlot job,
-    Color base,
     ColorScheme cs,
     AppLocalizations l10n,
   ) {
@@ -477,8 +560,7 @@ class _LivePanelState extends State<LivePanel> {
       children: [
         IosCardPress(
           borderRadius: BorderRadius.circular(12),
-          baseColor: base,
-          pressedScale: 0.99,
+          baseColor: Colors.transparent,
           onTap: waitingInteraction
               ? null
               : () => setState(() {
@@ -511,11 +593,8 @@ class _LivePanelState extends State<LivePanel> {
                   ),
                 ),
                 if (!waitingInteraction)
-                  Icon(
-                    showExpanded
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_up,
-                    size: 18,
+                  _animatedChevron(
+                    expanded: showExpanded,
                     color: cs.onSurfaceVariant,
                   ),
                 const SizedBox(width: 4),
@@ -530,14 +609,13 @@ class _LivePanelState extends State<LivePanel> {
             ),
           ),
         ),
-        if (showExpanded)
-          Container(
-            decoration: BoxDecoration(
-              color: base,
-              borderRadius: BorderRadius.circular(12),
-            ),
+        _expandable(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: _buildExpandedBody(context, job, approval, askUser),
           ),
+          showExpanded,
+        ),
       ],
     );
   }

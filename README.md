@@ -13,16 +13,15 @@
 
 Cuplivo is a community fork of Kelivo with strong compatibility focus:
 
-- **Backup zip format fully compatible.** Configure WebDAV or S3 (or local export/import), restore backup files exported from Kelivo, and pick up where you left off — no reconfiguration needed.
+- **Backup zip format compatible.** Export locally in Kelivo, then restore the backup file in Cuplivo and pick up where you left off — no reconfiguration needed.
+  - *Note*: Kelivo v1.2.x underwent a large-scale refactoring that moved the primary data carrier inside the zip from JSON to SQLite, which is inconvenient to read from within a Flutter app. If you are migrating from v1.2.x, follow the in-app prompt to visit the website for compatibility conversion.
+  - The auxiliary website provided in-app, kelivo-helper.netlify.app, processes data entirely locally — your data is never uploaded to a server.
 - **Package name changed to avoid conflicts.** Many developers worry that their custom changes will conflict with future Kelivo updates; but installing Cuplivo **does not require uninstalling and will not overwrite** Kelivo — your data is doubly protected.
-- **Verified by real users.** Currently known to be used by the author and at least 5 other stable users with no issues reported.
 - **UI inherits Kelivo's style.** No major changes overall; existing users will feel right at home.
 
 ### 🧪 Stability
 
-This fork is positioned as a **"new feature proving ground"**: it may adopt features the community finds useful, most verified through lightweight self-testing, aiming to provide a more out-of-the-box experience for users seeking the latest capabilities. Basic availability and stability are maintained (no P0 bugs; no data corruption or crash-on-launch bugs encountered so far), but releases are more frequent with lighter review. New features may carry P1/P2-level bugs, though feedback will be addressed promptly.
-
-We are aware that the upstream Kelivo repository is undergoing a major data storage refactoring. In the near term, this fork plans only to maintain compatibility with the new-format `.zip` exports from upstream. Most defensive data-integrity changes made here may not be adopted upstream — **please keep your own backups.**
+This fork is positioned as a **"new feature proving ground"**: it may adopt features the community finds useful, most verified through lightweight self-testing, aiming to provide a more out-of-the-box experience for users seeking the latest capabilities. Basic availability and stability are maintained, but releases are more frequent with lighter review — there may be bugs, though feedback will be addressed promptly.
 
 ## ✨ New Features
 
@@ -30,83 +29,81 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ### Backup & Sync Enhancements
 
-1. **Incremental backup & LAN sync** — Uploads only conversations, messages and related attachments since a selected date; quickly sync two devices' state over LAN.
+1. **Incremental backup & LAN sync** — Uploads only conversations, messages and related attachments since a selected date; quickly sync two devices' state over LAN, avoiding the need to transfer huge zip files over the public internet on every sync.
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
-   - *Note*: Periodic full snapshots are still recommended.
+   - *Note*: Periodic full snapshots are still recommended to protect against large data loss.
 
-2. **Deletion recovery (trash bin)** — Deleted conversations go to a trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries deletion markers so content removed on one side is promptly purged on the other (#137).
+2. **Deletion recovery (trash bin)** — Deleted conversations go to a trash bin with configurable capacity (default 10 KB) to prevent accidental loss; sync carries deletion markers so content removed on one side is promptly purged on the other.
 
-3. **Import from RikkaHub** — Convert a RikkaHub backup into a Cuplivo-compatible backup through the migration website, then import it via "Import Backup File" (#165).
+3. **Import from RikkaHub** — Convert a RikkaHub backup into a Cuplivo-compatible backup through the migration website, then import it via "Import Backup File".
 
 ### Signature Chat Experience
 
-1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools (#301). Android can also open a Termux-like interactive terminal from workspace settings, independent of the model shell tool (#428).
+1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools. Android can also open a Termux-like interactive terminal from workspace settings, independent of the model shell tool.
 
 2. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
    - *Android-only*: background alarm + notification channel; alarm persists through force-stop
+   - *Tip*: Enable it in the "Ta's Letters" tab of the assistant settings
 
-3. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context (#150).
+3. **Multi-assistant group chat** — Director-orchestrated group conversations: a background director model decides which assistant speaks, and each member chats in a shared thread with private context.
 
-4. **Built-in filesystem MCP server** — Read, write, and regex-search local files through an in-memory MCP server; mount local directories without a command line, security-first. Browse mounted directories in an in-app file browser, with paginated grep results and context, code structure outlines (`kelivo_outline`), downloading internet resources into the workspace, and long-webpage workspace cache continuation (#173, #221, #222). On desktop, the built-in workspace directory location is user-configurable, with open-externally and share actions for workspace files, an enhanced file preview, and correct display of empty folders (#242, #250).
+4. **Built-in filesystem MCP server** — Read, write, and regex-search local files through an in-memory MCP server; mount local directories without a command line, security-first. Browse mounted directories in an in-app file browser, with paginated grep results and context, code structure outlines, downloading internet resources into the workspace, and long-webpage workspace cache continuation. On desktop, the built-in workspace directory location is user-configurable, with open-externally and share actions for workspace files.
 
 5. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
-   - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
 ### Agent Capabilities
 
-1. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via MCP tools: fire-and-forget for background work, or **wait mode** that blocks until the subagent finishes and returns its result to the main agent for further processing, with a live progress panel in the parent conversation and same-turn parallel calls (#140, #251).
+1. **Handoff (subagent delegation)** — Delegate subtasks to other assistants via MCP tools: fire-and-forget for background work, or **wait mode** that blocks until the subagent finishes and returns its result to the main agent for further processing, with a live progress panel in the parent conversation and same-turn parallel calls.
 
-2. **Skills** — Import skills from public GitHub repositories, plus auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups. v3 adds categories, a master toggle, chat-level skill entry (#161), and built-in tools that let the assistant import and create skills directly (#319).
+2. **Skills** — Import skills from public GitHub repositories, plus auxiliary file tools for skill execution. Skills are persisted on the filesystem and included in backups. v3 adds categories, a master toggle, chat-level skill entry, and built-in tools that let the assistant import and create skills directly.
 
 ### API & Provider Control
 
-1. **Image generation options panel** — Visual configuration for OpenAI Images API models: quickly control quality, size/aspect ratio, output format, count, and more (#248).
+1. **Image generation options panel** — Visual configuration for OpenAI Images API models: quickly control quality, size/aspect ratio, output format, count, and more.
 
-2. **OAuth account sign-in** — Device-code sign-in for Grok xAI (#164) and OpenAI Codex (#157); MCP OAuth v2 auto flow with authorization server discovery, dynamic client registration, and loopback callback (#156).
+2. **OAuth account sign-in** — Device-code sign-in for Grok xAI and OpenAI Codex, so you can use your subscriptions in Cuplivo.
 
-3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
+3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs.
 
-4. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
+4. **Smart OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control.
 
 5. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
 ### Practical Utilities
 
-1. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch (#246).
+1. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch.
 
-2. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
+2. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction.
 
-3. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG (#345).
+3. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG.
 
-4. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI (#390).
+4. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI.
 
-5. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat (#491).
+5. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat.
 
 ### UI & Rendering
 
-1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
+1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block.
 
-2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
+2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue.
 
 3. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-4. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
-
-5. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+4. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist.
 
 ### Additional Fixes
 
 - Large base64 images no longer cause regex stack overflow
-- Markdown math formulas now render correctly: multi-line formulas inside lists, plus `\tag` support (#227)
+- Markdown math formulas now render correctly: multi-line formulas inside lists, plus `\tag` support
 - Win+V clipboard history paste fix for Flutter engine bug on Windows
-- iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16 (#193)
-- Kaomoji rendering — A bundled fallback font covers rare characters so kaomoji are no longer rendered incorrectly (#249)
+- iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16
+- Kaomoji rendering — A bundled fallback font covers rare characters so kaomoji are no longer rendered incorrectly
 - Various other stability improvements
 
 ## ⚠️ Note
 
-Cuplivo is a community fork and has not been fully separated from the upstream project. The QQ group now belongs to Cuplivo (group `1101061750`); donation QR codes still point to the original author. Some references may retain the original name during the transition. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
+Cuplivo is a community fork and has not been fully separated from the upstream project; some references may retain the original name. Dedicated QQ group and Discord channel have been set up. The app icon has been replaced with Cuplivo's custom artwork (commissioned by @Pheobe-Southwood).
 
 ---
 
@@ -119,53 +116,38 @@ Cuplivo is a community fork and has not been fully separated from the upstream p
 
 ## 🚀 Download
 
-🔗 [Download the latest version](https://github.com/Chevey339/kelivo/releases/latest)
+🔗 [Download the latest version](https://github.com/cuplivo/cuplivo/releases/latest)
 
 > **iOS:** Cuplivo is not on the App Store. Please install it by self-signing (e.g. Sideloadly, AltStore, or other signing tools).
 
 ## 💖 Sponsors
 
-Thanks to [siliconflow.cn](https://siliconflow.cn) for providing free models in cooperation with us.
+Thanks to [siliconflow.cn](https://siliconflow.cn) for providing free models in cooperation with Kelivo.
 
 ## ✨ Features
 
 - 🎨 **Modern Design** - Material You design language with dynamic color theming support (Android 12+).
 - 🌙 **Dark Mode** - Perfectly adapted dark theme to protect your eyes.
 - 🌍 **Multi-language Support** - Supports both English and Chinese interfaces.
-- 🖥️ **Multi-platform Support** - Mobile (Android/iOS/Harmony) and Desktop (Windows/macOS/Linux).
-- 🔄 **Multi-provider Support** - Supports major AI providers like OpenAI, Google Gemini, Anthropic, etc.
+- 🖥️ **Multi-platform Support** - Mobile (Android/iOS) and Desktop (Windows/macOS/Linux).
+- 🔄 **Multi-provider Support** - Supports major AI providers like OpenAI, Google Gemini, Anthropic, DeepSeek, etc.
 - 🤖 **Custom Assistants** - Create and manage personalized AI assistants.
 - 🖼️ **Multimodal Input** - Supports various formats including images, text documents, PDFs, Word documents, etc.
-- 📝 **Markdown Rendering** - Full support for code highlighting, LaTeX formulas, tables, and more.
+- 📝 **Markdown Rendering** - Supports code highlighting, LaTeX formulas, tables, and more.
 - 🎙️ **Voice/TTS Providers** - Built-in system TTS plus OpenAI / Google Gemini / ElevenLabs voice servers.
 - 🛠️ **MCP Support** - Model Context Protocol tool integration.
-- 🧰 **Built-in MCP Tools** - Includes a built-in MCP Fetch tool.
 - 🔍 **Web Search** - Integrated with multiple search engines (Bing, DuckDuckGo, Exa, Tavily, Zhipu, LinkUp, Brave, Metaso, SearXNG, Ollama, Jina, Perplexity, Bocha, Serper, Grok).
-- 🧩 **Prompt Variables** - Supports dynamic variables like model name, time, etc.
 - 📤 **QR Code Sharing** - Export and import provider configurations via QR codes.
-- 💾 **Data Backup** - Supports chat history backup and restoration.
 - 🌐 **Custom Requests** - Supports custom HTTP request headers and bodies.
 - 🔡 **Custom Fonts** - Bring your own fonts (system fonts / Google Fonts).
-- ⚙️ **Android Background Generation** - Keep chat generation running in the background (optional setting).
 
 ## 📱 Platform Support
 
 - ✅ Android
 - ✅ iOS
-- ✅ Harmony ([kelivo-ohos](https://github.com/Chevey339/kelivo-ohos))
 - ✅ Windows
 - ✅ macOS
 - ✅ Linux
-
-## 🤝 Contribution Guide
-
-Pull Requests and Issues are welcome!
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## ❤️ Acknowledgements
 
@@ -173,19 +155,9 @@ Special thanks to the [RikkaHub](https://github.com/re-ovo/rikkahub) project for
 
 Special thanks to [OpenCode](https://opencode.ai) — the design of our file system tools is heavily inspired by OpenCode.
 
-## ⭐ Star History
-
-If you like this project, please give it a star ⭐
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.com/#Chevey339/kelivo&Date)
-
 ## 📄 License
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Contact Us
-
-- Issue: [GitHub Issues](https://github.com/Chevey339/kelivo/issues)
+Like Kelivo, this project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
 ---
 

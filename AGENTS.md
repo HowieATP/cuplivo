@@ -65,7 +65,7 @@
 
 - This repository (Cuplivo) is a **community fork** of upstream [Kelivo](https://github.com/Chevey339/kelivo).
 
-- README intentionally retains many upstream references (download links, Issues, sponsors, community groups, Star History). Do not "fix" or rewrite these links.
+- `README.md` and `README_ZH_CN.md` are fully Cuplivo-branded: download links point to `cuplivo/cuplivo`, and upstream Kelivo references (Star History, Contact Us, Contribution Guide, Harmony) have been removed. Keep both README files in sync and never re-introduce upstream links.
 
 - `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when bumping version, always update both files simultaneously; in other cases, there is no need to update them.
 

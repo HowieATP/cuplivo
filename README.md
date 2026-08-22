@@ -65,65 +65,42 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 2. **OAuth account sign-in** — Device-code sign-in for Grok xAI (#164) and OpenAI Codex (#157); MCP OAuth v2 auto flow with authorization server discovery, dynamic client registration, and loopback callback (#156).
 
-3. **Multi-key rotation for web search** — Configure multiple API keys for the search service; keys rotate automatically on rate limit to raise effective quotas (#139).
+3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
 
-4. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs (#159).
+4. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
 
-5. **Provider-level custom Headers/Body** — Attach custom headers and body fields per provider (#120).
-
-6. **Per-assistant OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control (#171).
-
-7. **Per-server heartbeat interval** — Configure heartbeat interval per MCP server to avoid 429 rate limits (#108).
-
-8. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
-
-9. **Thinking toggles** — Per-assistant thinking toggles for summary/suggestion/compress/translate/OCR models (#117).
+5. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
 ### Practical Utilities
 
-1. **Manual keep-recent compression + prompt presets** — Compress a conversation keeping the most recent N messages, with a live token-estimate preview (default keep-count scales with conversation size), improving role-play / novel-writing sessions and reducing style drift; quick-switch between built-in compress/OCR prompt presets (#143, #236).
+1. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch (#246).
 
-2. **Batch select/delete/move for conversations** — Select, delete, or move multiple conversations at once in the sidebar for efficient conversation management (#82).
+2. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
 
-3. **Storage space manager** — Sort stored files by time or size, find unreferenced images/files (orphans), and reverse-locate which chat record a stored file belongs to (#128).
+3. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG (#345).
 
-4. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch (#246).
+4. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI (#390).
 
-5. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction (#122).
-
-6. **Mini-map message-level search** — Search within a conversation's mini-map: filter to matching messages with match highlighting, sharing the same search logic between the desktop popover and the mobile sheet (#270).
-
-7. **Batch export conversations** — Export multiple conversations to Markdown in a single operation (#276, #305).
-
-8. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG (#345).
-
-9. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI (#390).
-
-10. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat (#491).
+5. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat (#491).
 
 ### UI & Rendering
 
-1. **Translucent block rendering** — Code, table, and `<details>` blocks use translucent backgrounds so they blend better with chat background images (#452).
+1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
 
-2. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block (#174, #203).
+2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
 
-3. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue (#160).
+3. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-4. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+4. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
 
-5. **Desktop markdown table toolbar** — Format and copy markdown tables with a dedicated desktop toolbar supporting multi-format copy (plain text, HTML, LaTeX) (#109).
-
-6. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
+5. **Preset messages** — Preset messages collapsed behind a toggle bar in the chat list; new conversations are blocked when only presets exist (#116).
 
 ### Additional Fixes
 
-- **Token statistics** — Assistant messages with multi-round tool calls now count their tokens as a sum; in-app statistics no longer undercount consumption (#247)
-- Optimized title generation logic (auto-retry on first failure)
 - Large base64 images no longer cause regex stack overflow
 - Markdown math formulas now render correctly: multi-line formulas inside lists, plus `\tag` support (#227)
 - Win+V clipboard history paste fix for Flutter engine bug on Windows
 - iOS: exported chat images now use 8-bit sRGB readback, fixing abnormal table background colors since v1.1.16 (#193)
-- iOS: storage space manager now counts and clears the real iOS tmp directory (#223)
 - Kaomoji rendering — A bundled fallback font covers rare characters so kaomoji are no longer rendered incorrectly (#249)
 - Various other stability improvements
 

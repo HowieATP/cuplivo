@@ -9,6 +9,13 @@
 #import "CuplivoISHKernel.h"
 #import "CuplivoISHCrashGuards.h"
 
+// SCDynamicStore (what `scutil --dns` uses) is macOS-only. For change
+// watching we use SCNetworkReachability — the well-known iOS substitute —
+// because Network.framework's NWPathMonitor cannot be declared on this
+// toolchain: `@import Network;` resolves but provides no declarations, and
+// Network/nw_path_monitor.h does not exist in the Xcode 26.x iOS SDK.
+@import SystemConfiguration;
+
 #include "ish/kernel/init.h"
 #include "ish/kernel/task.h"
 #include "ish/kernel/calls.h"
@@ -21,11 +28,20 @@
 #include "ish/fs/fd.h"
 
 #include <pthread.h>
+#include <stdio.h>
 #include <sys/syslimits.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
 
 NSNotificationName const CuplivoISHProcessExitedNotification = @"CuplivoISHProcessExited";
 
 static NSString *const kDnsSubdir = @"CuplivoSandbox/dns";
+
+// Fallback nameservers appended after the system resolver servers. System
+// DNS may be absent (airplane mode) or unusable from the guest (a loopback
+// resolver belongs to the host, see -isUsableDnsServer:). Public servers
+// only — the fallback is never user-configurable in v1 (issue #463).
 static const char *kPublicDns[] = {"1.1.1.1", "8.8.8.8", "223.5.5.5"};
 
 // Exit hook exposed by kernel/task.c.
@@ -84,6 +100,14 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
     NSString *_rootPath;
     NSString *_dataPath;
     NSString *_dnsHostPath;
+    SCNetworkReachabilityRef _dnsReachability;
+}
+
+- (void)dealloc {
+    if (_dnsReachability != NULL) {
+        SCNetworkReachabilitySetDispatchQueue(_dnsReachability, NULL);
+        CFRelease(_dnsReachability);
+    }
 }
 
 + (instancetype)shared {
@@ -207,9 +231,9 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
     if (![fm fileExistsAtPath:dnsDir]) {
         [fm createDirectoryAtPath:dnsDir withIntermediateDirectories:YES attributes:nil error:nil];
     }
-    if (![fm fileExistsAtPath:_dnsHostPath]) {
-        [self seedDnsFile];
-    }
+    // Always rewrite (not seed-if-missing): heals stale/partial files from
+    // older installs and picks up the current network before the mount.
+    [self refreshDnsConfig];
 
     int err = fakefs_bind_mount("/etc/resolv.conf", _dnsHostPath.fileSystemRepresentation, false);
     if (err < 0) {
@@ -217,28 +241,137 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
         struct task *prev = current;
         current = pid_get_task(1);
         if (current) {
-            NSString *seed = [NSString stringWithContentsOfFile:_dnsHostPath encoding:NSUTF8StringEncoding error:nil];
-            if (seed) {
-                struct fd *fd = generic_open("/etc/resolv.conf", O_WRONLY_ | O_CREAT_ | O_TRUNC_, 0666);
-                if (!IS_ERR(fd)) {
-                    fd->ops->write(fd, seed.UTF8String, [seed lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
-                    fd_close(fd);
-                }
+            NSString *seed = [self dnsContentString];
+            struct fd *fd = generic_open("/etc/resolv.conf", O_WRONLY_ | O_CREAT_ | O_TRUNC_, 0666);
+            if (!IS_ERR(fd)) {
+                fd->ops->write(fd, seed.UTF8String, [seed lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+                fd_close(fd);
             }
         }
         current = prev;
         return;
     }
     NSLog(@"CuplivoISHKernel: DNS bind mount OK: /etc/resolv.conf -> %@", _dnsHostPath);
+    [self startDnsWatcher];
 }
 
-- (void)seedDnsFile {
-    NSMutableString *content = [NSMutableString string];
-    for (size_t i = 0; i < sizeof(kPublicDns) / sizeof(kPublicDns[0]); i++) {
-        [content appendFormat:@"nameserver %s\n", kPublicDns[i]];
+// System resolver servers, filtered, followed by the fallback list.
+- (NSString *)dnsContentString {
+    NSMutableArray<NSString *> *servers = [NSMutableArray array];
+    void (^addServer)(NSString *) = ^(NSString *raw) {
+        NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (s.length == 0 || [servers containsObject:s]) return;
+        [servers addObject:s];
+    };
+
+    // On iOS, configd maintains the host /etc/resolv.conf, reflecting the
+    // resolver configuration for the current network (Wi-Fi, cellular, VPN
+    // on-demand...). SCDynamicStore (what `scutil --dns` uses) is macOS-only.
+    FILE *resolv = fopen("/etc/resolv.conf", "r");
+    if (resolv != NULL) {
+        char line[512];
+        while (fgets(line, sizeof(line), resolv) != NULL) {
+            char ns[256];
+            if (sscanf(line, "nameserver %255s", ns) == 1) {
+                NSString *server = [NSString stringWithUTF8String:ns];
+                if ([self isUsableDnsServer:server]) addServer(server);
+            }
+        }
+        fclose(resolv);
+    } else {
+        NSLog(@"CuplivoISHKernel: /etc/resolv.conf unreadable — fallback DNS only");
     }
-    [content writeToFile:_dnsHostPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    NSLog(@"CuplivoISHKernel: seeded host resolv.conf at %@", _dnsHostPath);
+
+    // Always append the fallback: musl rotates through nameservers, so a
+    // temporarily unreachable system server falls through to the public one.
+    for (size_t i = 0; i < sizeof(kPublicDns) / sizeof(kPublicDns[0]); i++) {
+        addServer([NSString stringWithUTF8String:kPublicDns[i]]);
+    }
+
+    NSMutableString *content = [NSMutableString string];
+    for (NSString *server in servers) {
+        [content appendFormat:@"nameserver %@\n", server];
+    }
+    return content;
+}
+
+// Valid IP address, not host-loopback. A VPN/ad-block app commonly points
+// the system resolver at 127.0.0.1 (its local DNS proxy); from inside the
+// guest's own emulated network stack that loopback means the guest itself,
+// so such servers must be dropped. LAN/private-range servers are kept — the
+// guest shares the host's L3 connectivity and can reach them.
+- (BOOL)isUsableDnsServer:(NSString *)server {
+    struct in_addr addr4;
+    if (inet_pton(AF_INET, server.UTF8String, &addr4) == 1) {
+        const uint8_t *bytes = (const uint8_t *)&addr4;
+        return bytes[0] != 127;
+    }
+    struct in6_addr addr6;
+    if (inet_pton(AF_INET6, server.UTF8String, &addr6) == 1) {
+        return memcmp(&addr6, &in6addr_loopback, sizeof(addr6)) != 0;
+    }
+    return NO;
+}
+
+- (void)refreshDnsConfig {
+    if (_dnsHostPath == nil) return;
+    NSString *content = [self dnsContentString];
+    NSError *error = nil;
+    if (![content writeToFile:_dnsHostPath atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+        NSLog(@"CuplivoISHKernel: DNS refresh write failed: %@", error);
+        return;
+    }
+    NSArray<NSString *> *lines = [content componentsSeparatedByString:@"\n"];
+    lines = [lines filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"length > 0"]];
+    NSLog(@"CuplivoISHKernel: refreshed host resolv.conf (%lu nameservers): %@",
+          (unsigned long)lines.count, [lines componentsJoinedByString:@" | "]);
+}
+
+static void CuplivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
+                                          SCNetworkReachabilityFlags flags,
+                                          void *info) {
+    (void)target;
+    (void)flags;
+    @autoreleasepool {
+        CuplivoISHKernel *kernel = (__bridge CuplivoISHKernel *)info;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [kernel refreshDnsConfig];
+        });
+    }
+}
+
+// Watch the network connectivity and rewrite the host file, so the guest's
+// bind-mounted /etc/resolv.conf follows Wi-Fi <-> cellular switches and VPN
+// connect/disconnect without an app relaunch. SCNetworkReachability fires on
+// exactly those state transitions; DNS-only changes on the same link are not
+// reported on iOS, so a relaunch still rewrites the config at boot. The API
+// is deprecated as of iOS 17.4 (replaced by Network.framework), but the
+// Network.framework module cannot be imported on the current Xcode 26.x SDK.
+- (void)startDnsWatcher {
+    if (_dnsReachability != NULL) return;
+    SCNetworkReachabilityRef reachability =
+        SCNetworkReachabilityCreateWithName(kCFAllocatorDefault, "1.1.1.1");
+    if (reachability == NULL) {
+        NSLog(@"CuplivoISHKernel: SCNetworkReachabilityCreateWithName failed — DNS watcher disabled");
+        return;
+    }
+    SCNetworkReachabilityContext context = {.version = 0,
+                                            .info = (__bridge void *)self,
+                                            .retain = NULL,
+                                            .release = NULL,
+                                            .copyDescription = NULL};
+    if (!SCNetworkReachabilitySetCallback(reachability, CuplivoDnsReachabilityChanged, &context)) {
+        NSLog(@"CuplivoISHKernel: SCNetworkReachabilitySetCallback failed");
+        CFRelease(reachability);
+        return;
+    }
+    if (!SCNetworkReachabilitySetDispatchQueue(reachability, dispatch_get_main_queue())) {
+        NSLog(@"CuplivoISHKernel: SCNetworkReachabilitySetDispatchQueue failed");
+        CFRelease(reachability);
+        return;
+    }
+    _dnsReachability = reachability;
+    NSLog(@"CuplivoISHKernel: DNS watcher active (SCNetworkReachability)");
 }
 
 - (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath {

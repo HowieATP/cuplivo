@@ -72,6 +72,7 @@ class ChatInputSection extends StatelessWidget {
     this.multiAIModelCount,
     this.onMultiSelectModel,
     this.imageGenController,
+    this.livePanel,
   });
 
   final GlobalKey inputBarKey;
@@ -122,6 +123,9 @@ class ChatInputSection extends StatelessWidget {
   /// to the bar so the LivePanel inline card and the bar snapshot one
   /// controller.
   final ImageGenerationOptionsController? imageGenController;
+
+  /// Transient status surface (LivePanel) rendered inside the bar's card.
+  final Widget? livePanel;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +243,7 @@ class ChatInputSection extends StatelessWidget {
       multiAIModelCount: multiAIModelCount,
       onMultiSelectModel: onMultiSelectModel,
       imageGenController: imageGenController,
+      livePanel: livePanel,
     );
   }
 

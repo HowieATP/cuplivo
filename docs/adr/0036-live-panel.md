@@ -13,6 +13,11 @@ workspace `download(url, path)` local tool (`WorkspaceDownloadService`) had no p
 surface, and the image-mode / image-warning pills were floating overlays inside
 `_ChatInputBarState`. Issue #307 unifies these into one design language.
 
+Design provenance: the unified composer panel — transient agent status hosted inside the
+input bar's single rounded card as transparent, divider-separated rows — is visually
+inspired by [Paseo](https://github.com/getpaseo/paseo). Inspiration only; no code is
+copied.
+
 ## Decisions
 
 - **LivePanel + live entries**: generalize `SubagentPanel` into a single surface; the

@@ -10,6 +10,7 @@ import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/generation_engine.dart';
 import 'package:Cuplivo/core/services/streaming_content_notifier.dart';
+import 'package:Cuplivo/core/services/wake_lock_manager.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
 class _FakeChatService extends ChatService {
@@ -110,6 +111,10 @@ void main() {
   late Map<String, StreamController<ChatStreamChunk>> streamControllers;
   late GenerationEngine service;
 
+  /// Recording of the engine's wake-lock calls (true = enable, false =
+  /// disable), written synchronously by the injected [WakeLockManager].
+  late List<bool> wakeLockCalls;
+
   /// Conversation id -> placeholder message id (the engine keys streams by
   /// the slot messageId — requestId — not the conversation id).
   final midFor = <String, String>{};
@@ -193,8 +198,13 @@ void main() {
   setUp(() {
     chatService = _FakeChatService();
     streamControllers = <String, StreamController<ChatStreamChunk>>{};
+    wakeLockCalls = <bool>[];
     service = GenerationEngine(
       chatService: chatService,
+      wakeLockManager: WakeLockManager(
+        isMobilePlatform: () => true,
+        applyLock: (enabled) async => wakeLockCalls.add(enabled),
+      ),
       streamProvider:
           ({
             required config,
@@ -1019,4 +1029,166 @@ void main() {
       });
     },
   );
+
+  group('GenerationEngine wake lock', () {
+    test('acquires on start and releases when the slot completes', () async {
+      await startChild(id: 'child-1', parent: 'parent-1');
+      final future = service.waitFor('child-1');
+      expect(wakeLockCalls, [true]);
+
+      pumpChunk('child-1', 'hello');
+      await closeStream('child-1');
+      await future;
+      await pumpEventQueue();
+
+      expect(wakeLockCalls, [true, false]);
+    });
+
+    test('Multi-AI: holds the lock until the LAST of N parallel slots '
+        'settles', () async {
+      final placeholderA = await chatService.addMessage(
+        conversationId: 'multi',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      final placeholderB = await chatService.addMessage(
+        conversationId: 'multi',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      service.startRound(
+        conversationId: 'multi',
+        slots: [
+          GenerationSlotRequest(
+            assistantMessageId: placeholderA.id,
+            apiMessages: const [],
+            config: config,
+            modelId: 'model-1',
+          ),
+          GenerationSlotRequest(
+            assistantMessageId: placeholderB.id,
+            apiMessages: const [],
+            config: config,
+            modelId: 'model-2',
+          ),
+        ],
+      );
+      await pumpEventQueue();
+      expect(wakeLockCalls, [true]);
+
+      // First slot settles; the second is still streaming.
+      pumpChunk(placeholderA.id, 'a');
+      await closeStream(placeholderA.id);
+      await pumpEventQueue();
+      expect(wakeLockCalls, [true]);
+
+      // Last slot settles: the lock drops.
+      pumpChunk(placeholderB.id, 'b');
+      await closeStream(placeholderB.id);
+      await pumpEventQueue();
+      expect(wakeLockCalls, [true, false]);
+    });
+
+    test('sequential rounds re-acquire per round (no stale hold)', () async {
+      await startChild(id: 'child-1', parent: 'parent-1');
+      await closeStream('child-1');
+      await service.waitFor('child-1');
+      await pumpEventQueue();
+      expect(wakeLockCalls, [true, false]);
+
+      await startChild(id: 'child-2', parent: 'parent-1');
+      await closeStream('child-2');
+      await service.waitFor('child-2');
+      await pumpEventQueue();
+      expect(wakeLockCalls, [true, false, true, false]);
+    });
+
+    test('releases when the slot stream errors', () async {
+      await startChild(id: 'child-1', parent: 'parent-1');
+      final future = service.waitFor('child-1');
+      expect(wakeLockCalls, [true]);
+
+      pumpChunk('child-1', 'before boom');
+      streamControllers[midFor['child-1']]!.addError(StateError('boom'));
+      await closeStream('child-1');
+      await future;
+      await pumpEventQueue();
+
+      expect(wakeLockCalls, [true, false]);
+    });
+
+    test('releases when the user cancels a running slot', () async {
+      await startChild(id: 'child-1', parent: 'parent-1');
+      final future = service.waitFor('child-1');
+      expect(wakeLockCalls, [true]);
+
+      service.cancelConversation('child-1');
+      // Production flow: cancelRequest makes the real stream error, which
+      // unwinds the run and releases the lock.
+      streamControllers[midFor['child-1']]!.addError(StateError('cancelled'));
+      final result = await future;
+      expect(result.cancelled, isTrue);
+      await pumpEventQueue();
+
+      expect(wakeLockCalls, [true, false]);
+    });
+
+    test('a slot cancelled before start never touches the lock', () async {
+      final placeholder = await chatService.addMessage(
+        conversationId: 'child-1',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      service.prepareRound(
+        conversationId: 'child-1',
+        assistantMessageId: placeholder.id,
+        parentConversationId: 'parent-1',
+        wait: true,
+      );
+      service.cancelSlot(placeholder.id);
+      service.startRound(
+        conversationId: 'child-1',
+        slots: [
+          GenerationSlotRequest(
+            assistantMessageId: placeholder.id,
+            apiMessages: const [],
+            config: config,
+            modelId: 'model-1',
+          ),
+        ],
+        parentConversationId: 'parent-1',
+        wait: true,
+      );
+      await pumpEventQueue();
+
+      expect(wakeLockCalls, isEmpty);
+      // The abort removes the empty placeholder row.
+      expect(
+        chatService.messagesByConversation['child-1'] ?? const [],
+        isEmpty,
+      );
+    });
+
+    test('failRound (pre-start failure) never touches the lock', () async {
+      final placeholder = await chatService.addMessage(
+        conversationId: 'child-1',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      service.prepareRound(
+        conversationId: 'child-1',
+        assistantMessageId: placeholder.id,
+        parentConversationId: 'parent-1',
+        wait: true,
+      );
+      service.failRound('child-1', StateError('pipeline build failed'));
+      await pumpEventQueue();
+
+      expect(wakeLockCalls, isEmpty);
+    });
+  });
 }

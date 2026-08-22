@@ -1053,11 +1053,9 @@ class SettingsProvider extends ChangeNotifier {
         _ocrModelId = parts.sublist(1).join('::');
       }
     }
-    // load OCR prompt
+    // load OCR prompt (null = default; empty string is an explicit clear)
     final ocrp = prefs.getString(_ocrPromptKey);
-    _ocrPrompt = (ocrp == null || ocrp.trim().isEmpty)
-        ? defaultOcrPrompt
-        : ocrp;
+    _ocrPrompt = ocrp ?? defaultOcrPrompt;
     // load summary model
     final summarySel = prefs.getString(_summaryModelKey);
     if (summarySel != null && summarySel.contains('::')) {
@@ -3599,7 +3597,7 @@ Please translate the <source_text> section:
   }
 
   Future<void> setOcrPrompt(String prompt) async {
-    _ocrPrompt = prompt.trim().isEmpty ? defaultOcrPrompt : prompt;
+    _ocrPrompt = prompt.trim();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_ocrPromptKey, _ocrPrompt);

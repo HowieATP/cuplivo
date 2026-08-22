@@ -36,6 +36,7 @@ part 'providers/google_common.dart';
 part 'providers/google_gemini.dart';
 part 'providers/google_vertex.dart';
 part 'providers/claude_official.dart';
+part 'providers/zhipu_layout_parsing.dart';
 
 typedef ToolCallHandler =
     Future<String> Function(
@@ -644,10 +645,12 @@ class ChatApiService {
         kind == ProviderKind.openai &&
         allowImagesApiRouting &&
         _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
     final unicodeSafeMessages = _sanitizeMessages(messages);
     final stripUnsupportedImageInputs =
         !ocrActive &&
         !useOpenAIImagesApi &&
+        !useZhipuLayoutParsing &&
         !supportsImageInput(config, modelId);
     final safeMessages = stripUnsupportedImageInputs
         ? await _stripImageInputsFromMessages(unicodeSafeMessages)
@@ -658,7 +661,16 @@ class ChatApiService {
     final client = _clientFor(config, cancelToken);
 
     try {
-      if (kind == ProviderKind.openai) {
+      if (useZhipuLayoutParsing) {
+        yield* sendZhipuLayoutParsingStream(
+          client,
+          config,
+          modelId,
+          safeMessages,
+          userMediaPaths: safeUserMediaPaths,
+          extraHeaders: extraHeaders,
+        );
+      } else if (kind == ProviderKind.openai) {
         if (useOpenAIImagesApi) {
           yield* _sendOpenAIImagesStream(
             client,

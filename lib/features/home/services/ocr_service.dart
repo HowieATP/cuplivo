@@ -26,6 +26,9 @@ class OcrService {
   final int maxCacheEntries;
   final ChatService? chatService;
 
+  static const String defaultOcrUserPrompt =
+      'Please perform OCR on the attached image(s) and return only the extracted text and visual descriptions.';
+
   /// OCR 缓存 (path -> cached OCR text)
   final Map<String, OcrCacheEntry> _cache = <String, OcrCacheEntry>{};
 
@@ -69,6 +72,16 @@ class OcrService {
     chatService?.clearCacheByType('ocr');
   }
 
+  /// 构建发给 OCR 模型的消息。提示词为空时不附加 system，以兼容
+  /// GLM-OCR 等专用接口。
+  static List<Map<String, dynamic>> buildOcrRequestMessages(String prompt) {
+    final trimmed = prompt.trim();
+    return <Map<String, dynamic>>[
+      if (trimmed.isNotEmpty) {'role': 'system', 'content': trimmed},
+      {'role': 'user', 'content': defaultOcrUserPrompt},
+    ];
+  }
+
   /// 运行 OCR 识别图片内容
   ///
   /// [imagePaths] 图片路径列表
@@ -88,14 +101,7 @@ class OcrService {
 
     final cfg = settings.getProviderConfig(prov);
 
-    final messages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': settings.ocrPrompt},
-      {
-        'role': 'user',
-        'content':
-            'Please perform OCR on the attached image(s) and return only the extracted text and visual descriptions.',
-      },
-    ];
+    final messages = buildOcrRequestMessages(settings.ocrPrompt);
 
     String out = '';
     try {

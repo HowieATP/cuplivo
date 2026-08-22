@@ -400,7 +400,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
 
   @override
-  String get safMountSectionTitle => '安卓 SAF 挂载';
+  String get workspaceSafMountsEntry => '挂载目录';
+
+  @override
+  String safMountCount(Object count) {
+    return '已挂载 $count 个';
+  }
+
+  @override
+  String get safMountSectionTitle => '挂载目录';
 
   @override
   String get safMountAdd => '添加 SAF 挂载';
@@ -415,16 +423,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get safMountAliasHint => '小写字母开头，如 notes';
 
   @override
-  String get safMountReadOnlyLabel => '只读（AI 只能读取）';
-
-  @override
   String get safMountErrorAliasInvalid => '别名必须以小写字母或数字开头，只能包含 a-z 0-9 _ -';
 
   @override
-  String get safMountErrorAliasReserved => '该别名与工作区别名冲突';
+  String get safMountErrorAliasReserved => '该别名与当前工作区冲突';
 
   @override
   String get safMountErrorAliasDuplicate => '该别名已被使用';
+
+  @override
+  String get safMountErrorUriDuplicate => '该目录已挂载到另一个工作区';
 
   @override
   String get safMountErrorAddFailed => '添加挂载失败';
@@ -441,10 +449,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get safMountEmpty => '暂无 SAF 挂载。添加后 AI 即可读写外部文件夹。';
+  String get safMountEmpty => '暂无挂载目录。添加后当前工作区即可访问外部文件夹。';
 
   @override
-  String get safMountSectionNote => 'AI 的修改会镜像到外部目录，外部修改也会同步回来；删除会双向传播。';
+  String get safMountSectionNote =>
+      '访问权限使用当前工作区开启的文件与 Shell 工具；修改和删除会与外部目录双向同步。';
 
   @override
   String get safMountSyncNow => '立即同步';
@@ -8892,7 +8901,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageMountsErrorAliasReserved => '“workspaces” 为保留别名';
 
   @override
-  String get safMountSectionTitle => '安卓 SAF 挂载';
+  String get workspaceSafMountsEntry => '挂载目录';
+
+  @override
+  String safMountCount(Object count) {
+    return '已挂载 $count 个';
+  }
+
+  @override
+  String get safMountSectionTitle => '挂载目录';
 
   @override
   String get safMountAdd => '添加 SAF 挂载';
@@ -8907,16 +8924,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get safMountAliasHint => '小写字母开头，如 notes';
 
   @override
-  String get safMountReadOnlyLabel => '只读（AI 只能读取）';
-
-  @override
   String get safMountErrorAliasInvalid => '别名必须以小写字母或数字开头，只能包含 a-z 0-9 _ -';
 
   @override
-  String get safMountErrorAliasReserved => '该别名与工作区别名冲突';
+  String get safMountErrorAliasReserved => '该别名与当前工作区冲突';
 
   @override
   String get safMountErrorAliasDuplicate => '该别名已被使用';
+
+  @override
+  String get safMountErrorUriDuplicate => '该目录已挂载到另一个工作区';
 
   @override
   String get safMountErrorAddFailed => '添加挂载失败';
@@ -8933,10 +8950,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get safMountEmpty => '暂无 SAF 挂载。添加后 AI 即可读写外部文件夹。';
+  String get safMountEmpty => '暂无挂载目录。添加后当前工作区即可访问外部文件夹。';
 
   @override
-  String get safMountSectionNote => 'AI 的修改会镜像到外部目录，外部修改也会同步回来；删除会双向传播。';
+  String get safMountSectionNote =>
+      '访问权限使用当前工作区开启的文件与 Shell 工具；修改和删除会与外部目录双向同步。';
 
   @override
   String get safMountSyncNow => '立即同步';
@@ -17384,7 +17402,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageMountsErrorAliasReserved => '「workspaces」為保留別名';
 
   @override
-  String get safMountSectionTitle => 'Android SAF 掛載';
+  String get workspaceSafMountsEntry => '掛載目錄';
+
+  @override
+  String safMountCount(Object count) {
+    return '已掛載 $count 個';
+  }
+
+  @override
+  String get safMountSectionTitle => '掛載目錄';
 
   @override
   String get safMountAdd => '新增 SAF 掛載';
@@ -17399,16 +17425,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get safMountAliasHint => '小寫字母開頭，如 notes';
 
   @override
-  String get safMountReadOnlyLabel => '唯讀（AI 只能讀取）';
-
-  @override
   String get safMountErrorAliasInvalid => '別名必須以小寫字母或數字開頭，只能包含 a-z 0-9 _ -';
 
   @override
-  String get safMountErrorAliasReserved => '該別名與工作區別名衝突';
+  String get safMountErrorAliasReserved => '該別名與目前工作區衝突';
 
   @override
   String get safMountErrorAliasDuplicate => '該別名已被使用';
+
+  @override
+  String get safMountErrorUriDuplicate => '該目錄已掛載到另一個工作區';
 
   @override
   String get safMountErrorAddFailed => '新增掛載失敗';
@@ -17425,10 +17451,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get safMountEmpty => '尚無 SAF 掛載。新增後 AI 即可讀寫外部資料夾。';
+  String get safMountEmpty => '尚無掛載目錄。新增後目前工作區即可存取外部資料夾。';
 
   @override
-  String get safMountSectionNote => 'AI 的修改會鏡像到外部目錄，外部修改也會同步回來；刪除會雙向傳播。';
+  String get safMountSectionNote =>
+      '存取權限使用目前工作區啟用的檔案與 Shell 工具；修改和刪除會與外部目錄雙向同步。';
 
   @override
   String get safMountSyncNow => '立即同步';

@@ -162,7 +162,7 @@ class _WorkspaceTerminalPageState extends State<WorkspaceTerminalPage>
       final safMounts = context.read<SafMountSyncService>();
       final spec = await _sandbox.ptyLaunchSpec(
         hostPath,
-        binds: safMounts.guestBinds,
+        binds: safMounts.guestBindsFor(widget.workspaceId),
       );
       if (!mounted || sessionController.closed) return;
       final terminal = Terminal(

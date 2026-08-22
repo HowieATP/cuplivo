@@ -413,7 +413,15 @@ class AppLocalizationsEn extends AppLocalizations {
       '\"workspaces\" is a reserved alias';
 
   @override
-  String get safMountSectionTitle => 'Android SAF Mounts';
+  String get workspaceSafMountsEntry => 'Mounted directories';
+
+  @override
+  String safMountCount(Object count) {
+    return '$count mounted';
+  }
+
+  @override
+  String get safMountSectionTitle => 'Mounted directories';
 
   @override
   String get safMountAdd => 'Add SAF mount';
@@ -428,18 +436,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get safMountAliasHint => 'Lowercase start, e.g. notes';
 
   @override
-  String get safMountReadOnlyLabel => 'Read-only (AI can only read)';
-
-  @override
   String get safMountErrorAliasInvalid =>
       'Alias must start with a lowercase letter or digit and use only a-z 0-9 _ -';
 
   @override
   String get safMountErrorAliasReserved =>
-      'This alias conflicts with a workspace alias';
+      'This alias conflicts with the current workspace';
 
   @override
   String get safMountErrorAliasDuplicate => 'This alias is already in use';
+
+  @override
+  String get safMountErrorUriDuplicate =>
+      'This directory is already mounted in another workspace';
 
   @override
   String get safMountErrorAddFailed => 'Failed to add the mount';
@@ -457,11 +466,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get safMountEmpty =>
-      'No SAF mounts. Add one to let the AI read and write an external folder.';
+      'No mounted directories. Add one to let this workspace access an external folder.';
 
   @override
   String get safMountSectionNote =>
-      'AI edits are mirrored to the external directory; external edits are mirrored back. Deletions propagate both ways.';
+      'Access uses this workspace\'s enabled file and shell tools. Changes and deletions are mirrored both ways with the external directory.';
 
   @override
   String get safMountSyncNow => 'Sync now';

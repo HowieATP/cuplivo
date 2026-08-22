@@ -30,6 +30,14 @@ void main() {
         WorkspaceToolNames.write: true,
       },
       shellEnabled: true,
+      safMounts: const [
+        WorkspaceSafMount(
+          id: 'mount-id',
+          alias: 'notes',
+          uri: 'content://tree/notes',
+          displayName: 'Notes',
+        ),
+      ],
       dependencyPrefs: {
         WorkspaceDependencyIds.python: const DependencyInstallPref(
           sourceId: 'tuna',
@@ -43,6 +51,19 @@ void main() {
     expect(back.prefFor(WorkspaceDependencyIds.python).sourceId, 'tuna');
     expect(back.isToolNeedsApproval(WorkspaceToolNames.write), isTrue);
     expect(back.isToolNeedsApproval(WorkspaceToolNames.delete), isFalse);
+    expect(back.safMounts, hasLength(1));
+    expect(back.safMounts.single.id, 'mount-id');
+    expect(back.safMounts.single.alias, 'notes');
+    expect(back.safMounts.single.uri, 'content://tree/notes');
+  });
+
+  test('legacy workspace json without SAF mounts loads an empty list', () {
+    final ws = Workspace.fromJson({
+      'id': 'legacy',
+      'displayName': 'Legacy',
+      'alias': 'legacy',
+    });
+    expect(ws.safMounts, isEmpty);
   });
 
   test('legacy kelivo tool keys map to short names', () {

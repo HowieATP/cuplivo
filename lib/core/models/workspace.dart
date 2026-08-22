@@ -110,6 +110,42 @@ class WorkspaceDependencyIds {
   ];
 }
 
+/// An Android SAF directory selected for one workspace.
+///
+/// [id] is the stable runtime/storage identity. [alias] is only required to
+/// be unique inside the owning workspace.
+class WorkspaceSafMount {
+  final String id;
+  final String alias;
+  final String uri;
+  final String displayName;
+
+  const WorkspaceSafMount({
+    required this.id,
+    required this.alias,
+    required this.uri,
+    required this.displayName,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'alias': alias,
+    'uri': uri,
+    'displayName': displayName,
+  };
+
+  factory WorkspaceSafMount.fromJson(Map<String, dynamic> json) =>
+      WorkspaceSafMount(
+        id: (json['id'] as String? ?? '').trim(),
+        alias: (json['alias'] as String? ?? '').trim(),
+        uri: (json['uri'] as String? ?? '').trim(),
+        displayName: (json['displayName'] as String? ?? '').trim(),
+      );
+}
+
+bool isValidSafMountId(String id) =>
+    RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(id);
+
 /// A parallel, isolated workspace sandbox.
 class Workspace {
   static const String defaultAlias = 'default';
@@ -125,6 +161,7 @@ class Workspace {
   final bool shellEnabled;
   final String? customHostPath;
   final bool readOnly;
+  final List<WorkspaceSafMount> safMounts;
   final Map<String, DependencyInstallPref> dependencyPrefs;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -139,6 +176,7 @@ class Workspace {
     this.shellEnabled = false,
     this.customHostPath,
     this.readOnly = false,
+    List<WorkspaceSafMount>? safMounts,
     Map<String, DependencyInstallPref>? dependencyPrefs,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -156,6 +194,9 @@ class Workspace {
                for (final t in WorkspaceToolNames.allTools)
                  t: WorkspaceToolNames.defaultApprovalFor(t),
              },
+       ),
+       safMounts = List<WorkspaceSafMount>.unmodifiable(
+         safMounts ?? const <WorkspaceSafMount>[],
        ),
        dependencyPrefs = Map<String, DependencyInstallPref>.unmodifiable(
          dependencyPrefs ?? const <String, DependencyInstallPref>{},
@@ -198,6 +239,7 @@ class Workspace {
     bool? shellEnabled,
     String? customHostPath,
     bool? readOnly,
+    List<WorkspaceSafMount>? safMounts,
     Map<String, DependencyInstallPref>? dependencyPrefs,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -215,6 +257,7 @@ class Workspace {
           ? null
           : (customHostPath ?? this.customHostPath),
       readOnly: readOnly ?? this.readOnly,
+      safMounts: safMounts ?? this.safMounts,
       dependencyPrefs: dependencyPrefs ?? this.dependencyPrefs,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -231,6 +274,7 @@ class Workspace {
     'shellEnabled': shellEnabled,
     if (customHostPath != null) 'customHostPath': customHostPath,
     'readOnly': readOnly,
+    'safMounts': safMounts.map((e) => e.toJson()).toList(),
     'dependencyPrefs': {
       for (final e in dependencyPrefs.entries) e.key: e.value.toJson(),
     },
@@ -301,6 +345,18 @@ class Workspace {
       }
     }
 
+    final safMountsRaw = json['safMounts'];
+    final safMounts = <WorkspaceSafMount>[];
+    if (safMountsRaw is List) {
+      for (final value in safMountsRaw) {
+        if (value is Map) {
+          safMounts.add(
+            WorkspaceSafMount.fromJson(value.cast<String, dynamic>()),
+          );
+        }
+      }
+    }
+
     return Workspace(
       id: (json['id'] as String?)?.trim().isNotEmpty == true
           ? (json['id'] as String).trim()
@@ -320,6 +376,7 @@ class Workspace {
           ? (json['customHostPath'] as String).trim()
           : null,
       readOnly: json['readOnly'] as bool? ?? false,
+      safMounts: safMounts,
       dependencyPrefs: prefs,
       createdAt:
           DateTime.tryParse(json['createdAt']?.toString() ?? '') ??

@@ -819,8 +819,9 @@ private fun buildGuestCommand(
     "$hostWorkspace:/workspace",
   )
   for (bind in binds) {
-    // SAF mount mirrors bind under the reserved .mounts guest directory
-    // (ADR-0037). Read-only mounts append the ro proot flag.
+    // Extra mirrors bind under the reserved .mounts guest directory
+    // (ADR-0037). The generic payload retains read-only support, although
+    // workspace SAF mounts are always writable.
     val flag = if (bind.readOnly) "${bind.host}:${bind.guest}:ro" else "${bind.host}:${bind.guest}"
     argv += listOf("-b", flag)
   }

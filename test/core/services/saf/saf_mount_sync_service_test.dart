@@ -1,7 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:Cuplivo/core/models/workspace.dart';
+import 'package:Cuplivo/core/models/assistant.dart';
+import 'package:Cuplivo/core/providers/workspace_provider.dart';
+import 'package:Cuplivo/core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import 'package:Cuplivo/core/services/saf/saf_mount_sync_service.dart';
+import 'package:Cuplivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -232,19 +237,75 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
   Future<String> getApplicationCachePath() async => p.join(root.path, 'cache');
 }
 
+/// Keeps the synchronization regression cases concise while routing every
+/// operation through the default workspace's scoped production API.
+class _TestSafMountService {
+  _TestSafMountService(this.raw);
+
+  final SafMountSyncService raw;
+
+  Future<void> init() => raw.init();
+
+  List<WorkspaceSafMount> get entries => raw.entriesFor(Workspace.defaultId);
+
+  List<FilesystemMount> get mounts => raw.mountsFor(Workspace.defaultId);
+
+  List<Map<String, Object?>> get guestBinds =>
+      raw.guestBindsFor(Workspace.defaultId);
+
+  WorkspaceSafMount? entryByAlias(String alias) =>
+      raw.entryByAlias(Workspace.defaultId, alias);
+
+  Future<String?> addMount({
+    required String alias,
+    required String uri,
+    required String displayName,
+  }) => raw.addMount(
+    workspaceId: Workspace.defaultId,
+    alias: alias,
+    uri: uri,
+    displayName: displayName,
+  );
+
+  Future<void> removeMount(String alias) async {
+    final entry = entryByAlias(alias);
+    if (entry != null) {
+      await raw.removeMount(Workspace.defaultId, entry.id);
+    }
+  }
+
+  Future<void> syncNow(String alias) async {
+    final entry = entryByAlias(alias);
+    if (entry != null) await raw.syncNow(entry.id);
+  }
+
+  SafMountState stateOf(String alias) {
+    final entry = entryByAlias(alias);
+    return entry == null ? const SafMountState() : raw.stateOf(entry.id);
+  }
+
+  void notifyMutated(String alias) =>
+      raw.notifyMutated(Workspace.defaultId, alias);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
   late _FakeSafChannel channel;
-  late SafMountSyncService service;
+  late WorkspaceProvider workspaces;
+  late _TestSafMountService service;
 
   Future<void> pump() async {
     // Let debounce timers / async continuations settle.
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
 
-  String mirrorPath(String alias) => p.join(tempDir.path, 'saf_mounts', alias);
+  String mirrorPath(String alias) {
+    final entry = service.entryByAlias(alias);
+    if (entry == null) return p.join(tempDir.path, 'saf_mounts', alias);
+    return service.raw.mirrorPathFor(entry.id);
+  }
 
   File mirrorFile(String alias, String rel) =>
       File(p.join(mirrorPath(alias), rel));
@@ -255,9 +316,10 @@ void main() {
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
     SafMountSyncService.androidProbe = () => true;
     channel = _FakeSafChannel();
-    service = SafMountSyncService(
-      channel: channel,
-      reservedAliasesProvider: () => const <String>{'default'},
+    workspaces = WorkspaceProvider();
+    await workspaces.init();
+    service = _TestSafMountService(
+      SafMountSyncService(workspaces: workspaces, channel: channel),
     );
     await service.init();
     await pump();
@@ -265,6 +327,8 @@ void main() {
 
   tearDown(() async {
     await service.removeMount('notes');
+    service.raw.dispose();
+    workspaces.dispose();
     try {
       await tempDir.delete(recursive: true);
     } catch (_) {}
@@ -310,13 +374,14 @@ void main() {
       expect(err, SafMountSyncService.errorAliasReserved);
     });
 
-    test('rejects workspace_N aliases (marker-protocol collision)', () async {
+    test('allows another workspace-shaped alias inside default', () async {
       final err = await service.addMount(
         alias: 'workspace_4',
         uri: 'content://tree',
         displayName: 'x',
       );
-      expect(err, SafMountSyncService.errorAliasReserved);
+      expect(err, isNull);
+      expect(service.entryByAlias('workspace_4'), isNotNull);
     });
 
     test('rejects a duplicate alias', () async {
@@ -857,9 +922,8 @@ void main() {
       );
       await service.addMount(
         alias: 'robox',
-        uri: _FakeSafChannel.rootUri,
+        uri: 'content://tree/other',
         displayName: 'x',
-        readOnly: true,
       );
       await pump();
 
@@ -869,29 +933,35 @@ void main() {
       expect(binds[0]['host'], mirrorPath('notes'));
       expect(binds[0]['readOnly'], isFalse);
       expect(binds[1]['guest'], '/workspace/.mounts/robox');
-      expect(binds[1]['readOnly'], isTrue);
+      expect(binds[1]['readOnly'], isFalse);
     });
 
-    test('mount config survives a service restart via prefs', () async {
-      await service.addMount(
-        alias: 'notes',
-        uri: 'content://tree',
-        displayName: 'My Notes',
-      );
-      await pump();
+    test(
+      'mount config survives a service restart via workspace meta',
+      () async {
+        await service.addMount(
+          alias: 'notes',
+          uri: 'content://tree',
+          displayName: 'My Notes',
+        );
+        await pump();
 
-      final restarted = SafMountSyncService(
-        channel: channel,
-        reservedAliasesProvider: () => const <String>{},
-      );
-      await restarted.init();
-      await pump();
-      expect(restarted.entries, hasLength(1));
-      expect(restarted.entries.first.alias, 'notes');
-      expect(restarted.entries.first.uri, 'content://tree');
-      expect(restarted.mounts.first.isSafMount, isTrue);
-      expect(restarted.mounts.first.path, mirrorPath('notes'));
-    });
+        final restarted = SafMountSyncService(
+          workspaces: workspaces,
+          channel: channel,
+        );
+        await restarted.init();
+        await pump();
+        final entries = restarted.entriesFor(Workspace.defaultId);
+        expect(entries, hasLength(1));
+        expect(entries.first.alias, 'notes');
+        expect(entries.first.uri, 'content://tree');
+        final mounts = restarted.mountsFor(Workspace.defaultId);
+        expect(mounts.first.isSafMount, isTrue);
+        expect(mounts.first.path, mirrorPath('notes'));
+        restarted.dispose();
+      },
+    );
 
     test('removeMount wipes the mirror and the snapshot', () async {
       await service.addMount(
@@ -901,16 +971,246 @@ void main() {
       );
       await pump();
       await mirrorFile('notes', 'a.txt').writeAsString('x');
+      final entry = service.entryByAlias('notes')!;
+      final oldMirrorPath = service.raw.mirrorPathFor(entry.id);
+      final oldStatePath = service.raw.statePathFor(entry.id);
 
       await service.removeMount('notes');
       await pump();
-      expect(await Directory(mirrorPath('notes')).exists(), isFalse);
-      expect(
-        await File(
-          p.join(tempDir.path, 'saf_mounts', '.state', 'notes.json'),
-        ).exists(),
-        isFalse,
-      );
+      expect(await Directory(oldMirrorPath).exists(), isFalse);
+      expect(await File(oldStatePath).exists(), isFalse);
     });
+  });
+
+  group('workspace scoping', () {
+    test(
+      'isolates mounts and aliases while rejecting a duplicate URI',
+      () async {
+        final second = await workspaces.createWorkspace(displayName: 'Second');
+        final firstError = await service.raw.addMount(
+          workspaceId: Workspace.defaultId,
+          alias: 'notes',
+          uri: _FakeSafChannel.rootUri,
+          displayName: 'First notes',
+        );
+        final secondError = await service.raw.addMount(
+          workspaceId: second.id,
+          alias: 'notes',
+          uri: 'content://tree/second',
+          displayName: 'Second notes',
+        );
+        expect(firstError, isNull);
+        expect(secondError, isNull);
+
+        final firstEntries = service.raw.entriesFor(Workspace.defaultId);
+        final secondEntries = service.raw.entriesFor(second.id);
+        expect(firstEntries.map((e) => e.alias), ['notes']);
+        expect(secondEntries.map((e) => e.alias), ['notes']);
+        expect(firstEntries.single.id, isNot(secondEntries.single.id));
+        expect(
+          service.raw.mountsFor(Workspace.defaultId).single.path,
+          isNot(service.raw.mountsFor(second.id).single.path),
+        );
+        expect(
+          service.raw.guestBindsFor(Workspace.defaultId).single['readOnly'],
+          isFalse,
+        );
+
+        final duplicateUri = await service.raw.addMount(
+          workspaceId: second.id,
+          alias: 'shared',
+          uri: _FakeSafChannel.rootUri,
+          displayName: 'Duplicate',
+        );
+        expect(duplicateUri, SafMountSyncService.errorUriDuplicate);
+
+        final rootCollision = await service.raw.addMount(
+          workspaceId: second.id,
+          alias: second.alias,
+          uri: 'content://tree/collision',
+          displayName: 'Collision',
+        );
+        expect(rootCollision, SafMountSyncService.errorAliasReserved);
+      },
+    );
+
+    test(
+      'workspace tool enablement gates SAF paths without extra ACLs',
+      () async {
+        await service.addMount(
+          alias: 'notes',
+          uri: _FakeSafChannel.rootUri,
+          displayName: 'Notes',
+        );
+        final assistant = Assistant(
+          id: 'assistant',
+          name: 'Assistant',
+          workspaceEnabled: true,
+          workspaceId: Workspace.defaultId,
+        );
+        await workspaces.setToolEnabled(
+          Workspace.defaultId,
+          WorkspaceToolNames.write,
+          false,
+        );
+
+        final disabled = await WorkspaceToolsService.tryHandleToolCall(
+          name: WorkspaceToolNames.write,
+          args: const {
+            'path': '/workspace/.mounts/notes/disabled.txt',
+            'content': 'blocked',
+          },
+          assistant: assistant,
+          workspaces: workspaces,
+          safMounts: service.raw,
+        );
+        expect(disabled, isNull);
+        expect(
+          await File(p.join(mirrorPath('notes'), 'disabled.txt')).exists(),
+          isFalse,
+        );
+
+        await workspaces.setToolEnabled(
+          Workspace.defaultId,
+          WorkspaceToolNames.write,
+          true,
+        );
+        final enabled = await WorkspaceToolsService.tryHandleToolCall(
+          name: WorkspaceToolNames.write,
+          args: const {
+            'path': '/workspace/.mounts/notes/enabled.txt',
+            'content': 'allowed',
+          },
+          assistant: assistant,
+          workspaces: workspaces,
+          safMounts: service.raw,
+        );
+        expect(enabled, isNotNull);
+        expect(
+          await File(p.join(mirrorPath('notes'), 'enabled.txt')).readAsString(),
+          'allowed',
+        );
+      },
+    );
+
+    test(
+      'deleting a workspace cleans its private mirror and snapshot',
+      () async {
+        final second = await workspaces.createWorkspace(displayName: 'Second');
+        await service.raw.addMount(
+          workspaceId: second.id,
+          alias: 'docs',
+          uri: 'content://tree/second',
+          displayName: 'Docs',
+        );
+        final entry = service.raw.entriesFor(second.id).single;
+        final mirror = service.raw.mirrorPathFor(entry.id);
+        final snapshot = service.raw.statePathFor(entry.id);
+        await File(p.join(mirror, 'local.txt')).writeAsString('keep external');
+        await File(snapshot).writeAsString('{}');
+
+        expect(await workspaces.deleteWorkspace(second.id), isNull);
+        await pump();
+
+        expect(service.raw.entriesFor(second.id), isEmpty);
+        expect(await Directory(mirror).exists(), isFalse);
+        expect(await File(snapshot).exists(), isFalse);
+      },
+    );
+
+    test('cannot remove another workspace mount by stable ID', () async {
+      final second = await workspaces.createWorkspace(displayName: 'Second');
+      await service.raw.addMount(
+        workspaceId: second.id,
+        alias: 'docs',
+        uri: 'content://tree/second',
+        displayName: 'Docs',
+      );
+      final entry = service.raw.entriesFor(second.id).single;
+      final mirror = service.raw.mirrorPathFor(entry.id);
+
+      await service.raw.removeMount(Workspace.defaultId, entry.id);
+
+      expect(service.raw.entriesFor(second.id).single.id, entry.id);
+      expect(await Directory(mirror).exists(), isTrue);
+    });
+
+    test('legacy global config and mirrors are discarded', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        SafMountSyncService.legacyPrefsKey,
+        '[{"alias":"old"}]',
+      );
+      final legacyMirror = Directory(p.join(tempDir.path, 'saf_mounts', 'old'));
+      await legacyMirror.create(recursive: true);
+
+      await service.raw.reloadAfterRestore();
+
+      expect(prefs.containsKey(SafMountSyncService.legacyPrefsKey), isFalse);
+      expect(await legacyMirror.exists(), isFalse);
+    });
+
+    test(
+      'restore keeps the first valid URI and skips malformed mounts',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          WorkspaceProvider.metaPrefsKey,
+          jsonEncode([
+            {
+              'id': Workspace.defaultId,
+              'displayName': 'Default',
+              'alias': Workspace.defaultAlias,
+              'safMounts': [
+                {
+                  'id': 'mount_one',
+                  'alias': 'notes',
+                  'uri': 'content://tree/shared',
+                  'displayName': 'Notes',
+                },
+                {
+                  'id': '../unsafe',
+                  'alias': 'unsafe',
+                  'uri': 'content://tree/unsafe',
+                  'displayName': 'Unsafe',
+                },
+                {
+                  'id': 'mount_alias_duplicate',
+                  'alias': 'notes',
+                  'uri': 'content://tree/other',
+                  'displayName': 'Duplicate alias',
+                },
+              ],
+            },
+            {
+              'id': 'workspace_second',
+              'displayName': 'Second',
+              'alias': 'workspace_2',
+              'safMounts': [
+                {
+                  'id': 'mount_two',
+                  'alias': 'docs',
+                  'uri': 'content://tree/shared',
+                  'displayName': 'Duplicate URI',
+                },
+              ],
+            },
+          ]),
+        );
+
+        await workspaces.reloadFromPrefs();
+        await pump();
+
+        expect(
+          workspaces.getById(Workspace.defaultId)!.safMounts,
+          hasLength(1),
+        );
+        expect(
+          workspaces.getById(Workspace.defaultId)!.safMounts.single.id,
+          'mount_one',
+        );
+        expect(workspaces.getById('workspace_second')!.safMounts, isEmpty);
+      },
+    );
   });
 }

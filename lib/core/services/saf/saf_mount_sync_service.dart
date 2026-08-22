@@ -6,43 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../models/workspace.dart';
+import '../../providers/workspace_provider.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../../../utils/app_directories.dart';
-
-/// One Android SAF mount: a user-picked external directory (content:// tree
-/// URI) mirrored into an app-private host directory.
-///
-/// The mirror — not the URI — is what the filesystem engine, the model tools
-/// and the proot guest see; the sync service keeps the two sides in two-way
-/// mirror sync (see `docs/adr/0037-android-saf-mount-mirror-sync.md`).
-class SafMountEntry {
-  final String alias;
-  final String uri;
-  final String displayName;
-  final bool readOnly;
-
-  const SafMountEntry({
-    required this.alias,
-    required this.uri,
-    required this.displayName,
-    this.readOnly = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'alias': alias,
-    'uri': uri,
-    'displayName': displayName,
-    'readOnly': readOnly,
-  };
-
-  factory SafMountEntry.fromJson(Map<String, dynamic> json) => SafMountEntry(
-    alias: (json['alias'] as String? ?? '').trim(),
-    uri: (json['uri'] as String? ?? '').trim(),
-    displayName: (json['displayName'] as String? ?? '').trim(),
-    readOnly: json['readOnly'] as bool? ?? false,
-  );
-}
 
 enum SafMountStatus {
   /// No round running; last round succeeded (or none ran yet).
@@ -189,10 +158,11 @@ class SafChannel {
 /// - A failed SAF access marks the mount `unavailable`; nothing is deleted
 ///   or pushed while unavailable, and the mirror keeps all local changes.
 class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
-  static const String prefsKey = 'saf_mounts_v1';
+  static const String legacyPrefsKey = 'saf_mounts_v1';
   static const String errorAliasInvalid = 'alias_invalid';
   static const String errorAliasReserved = 'alias_reserved';
   static const String errorAliasDuplicate = 'alias_duplicate';
+  static const String errorUriDuplicate = 'uri_duplicate';
 
   static const Duration mutationDebounce = Duration(milliseconds: 500);
   static const Duration foregroundPollInterval = Duration(seconds: 60);
@@ -207,82 +177,76 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// must not count as a change.
   static const Duration mtimeTolerance = Duration(milliseconds: 1500);
 
-  final List<SafMountEntry> _entries = <SafMountEntry>[];
+  final WorkspaceProvider workspaces;
   final Map<String, SafMountState> _states = <String, SafMountState>{};
   final Set<String> _running = <String>{};
   final Map<String, Timer> _debounceTimers = <String, Timer>{};
+  Set<String> _knownMountIds = <String>{};
   Timer? _pollTimer;
   bool _loaded = false;
   Future<void>? _initFuture;
   late String _mirrorsRoot;
   late String _stateRoot;
 
-  /// Extra aliases that must never collide with a SAF alias (the workspace
-  /// aliases). Injected by the wiring layer because the provider tree
-  /// initializes both independently.
-  late Set<String> Function() reservedAliasesProvider;
-
   SafChannel channel;
 
-  SafMountSyncService({
-    SafChannel? channel,
-    Set<String> Function()? reservedAliasesProvider,
-  }) : channel = channel ?? SafChannel() {
-    this.reservedAliasesProvider =
-        reservedAliasesProvider ?? () => const <String>{};
+  SafMountSyncService({required this.workspaces, SafChannel? channel})
+    : channel = channel ?? SafChannel() {
     unawaited(init());
   }
 
   bool get loaded => _loaded;
 
-  List<SafMountEntry> get entries => List.unmodifiable(_entries);
+  List<WorkspaceSafMount> get _allEntries => [
+    for (final workspace in workspaces.workspaces) ...workspace.safMounts,
+  ];
 
-  SafMountEntry? entryByAlias(String alias) =>
-      _entries.where((e) => e.alias == alias).firstOrNull;
+  List<WorkspaceSafMount> entriesFor(String workspaceId) {
+    if (!_loaded || !androidProbe()) return const <WorkspaceSafMount>[];
+    return List<WorkspaceSafMount>.unmodifiable(
+      workspaces.getById(workspaceId)?.safMounts ?? const <WorkspaceSafMount>[],
+    );
+  }
 
-  /// `workspace_N` aliases are the auto-allocation scheme of the workspace
-  /// provider; a SAF mount on such an alias would collide with
-  /// `_isSyncedWorkspaceMount` (markers/tombstones fire for SAF deletions)
-  /// and with a future workspace creation. Reserved like `default`.
-  static bool _isWorkspacePatternAlias(String alias) =>
-      RegExp(r'^workspace_\d+$').hasMatch(alias);
+  WorkspaceSafMount? entryById(String mountId) =>
+      _allEntries.where((e) => e.id == mountId).firstOrNull;
 
-  List<FilesystemMount> get mounts {
-    if (!_loaded) return const <FilesystemMount>[];
+  WorkspaceSafMount? entryByAlias(String workspaceId, String alias) =>
+      entriesFor(workspaceId).where((e) => e.alias == alias).firstOrNull;
+
+  List<FilesystemMount> mountsFor(String workspaceId) {
     return [
-      for (final e in _entries)
+      for (final e in entriesFor(workspaceId))
         FilesystemMount(
           alias: e.alias,
-          path: mirrorPathFor(e.alias),
-          readOnly: e.readOnly,
+          path: mirrorPathFor(e.id),
+          readOnly: false,
           uri: e.uri,
         ),
     ];
   }
 
-  SafMountState stateOf(String alias) =>
-      _states[alias] ?? const SafMountState();
+  SafMountState stateOf(String mountId) =>
+      _states[mountId] ?? const SafMountState();
 
   /// proot bind payloads (`{host, guest, readOnly}`) for the Linux sandbox
   /// shell and the Workspace Terminal. Guests land under the reserved
-  /// `/workspace/.mounts/<alias>` directory (ADR-0037). `readOnly` is a real
-  /// boolean — the native parser compares against `true`. Empty until [init]
-  /// completes (a pre-init read must never touch the late mirror root).
-  List<Map<String, Object?>> get guestBinds {
-    if (!_loaded) return const <Map<String, Object?>>[];
+  /// `/workspace/.mounts/<alias>` directory (ADR-0037). SAF binds are always
+  /// writable; the owning workspace's enabled tools are the permission layer.
+  List<Map<String, Object?>> guestBindsFor(String workspaceId) {
     return [
-      for (final e in _entries)
+      for (final e in entriesFor(workspaceId))
         {
-          'host': mirrorPathFor(e.alias),
+          'host': mirrorPathFor(e.id),
           'guest': '/workspace/.mounts/${e.alias}',
-          'readOnly': e.readOnly,
+          'readOnly': false,
         },
     ];
   }
 
-  String mirrorPathFor(String alias) => p.join(_mirrorsRoot, alias);
+  String mirrorPathFor(String mountId) => p.join(_mirrorsRoot, mountId);
 
-  String statePathFor(String alias) => p.join(_stateRoot, '$alias.json');
+  String statePathFor(String mountId) => p.join(_stateRoot, '$mountId.json');
 
   Future<void> init() {
     if (_loaded) return Future.value();
@@ -290,6 +254,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _doInit() async {
+    await workspaces.init();
     try {
       WidgetsBinding.instance.addObserver(this);
     } catch (_) {
@@ -299,57 +264,61 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     final stateDir = await AppDirectories.getSafMountStateDirectory();
     _mirrorsRoot = mirrors.path;
     _stateRoot = stateDir.path;
+    await _clearLegacyGlobalMountsIfNeeded();
     try {
       await stateDir.create(recursive: true);
     } catch (e) {
       debugPrint('SafMountSyncService: state dir create failed: $e');
     }
-    final prefs = await SharedPreferences.getInstance();
-    if (androidProbe()) {
-      final raw = prefs.getString(prefsKey);
-      if (raw != null && raw.isNotEmpty) {
-        try {
-          final list = (jsonDecode(raw) as List)
-              .whereType<Map>()
-              .map((e) => SafMountEntry.fromJson(e.cast<String, dynamic>()))
-              .toList();
-          for (final e in list) {
-            if (!isValidMountAlias(e.alias) || e.uri.isEmpty) {
-              debugPrint(
-                'SafMountSyncService: skipping invalid persisted mount: '
-                '${e.alias}',
-              );
-              continue;
-            }
-            if (_isWorkspacePatternAlias(e.alias) ||
-                reservedAliasesProvider().contains(e.alias)) {
-              debugPrint(
-                'SafMountSyncService: skipping mount alias colliding with a '
-                'workspace: ${e.alias}',
-              );
-              continue;
-            }
-            _entries.add(e);
-          }
-        } catch (e) {
-          debugPrint('SafMountSyncService: failed to load mounts: $e');
-        }
-      }
-    } else {
-      // Config may ride a backup's settings.json onto desktop/iOS — keep it
-      // persisted but never mounted (same pattern as desktop external
-      // mounts on mobile, mirrored).
-      _entries.clear();
-    }
+    _knownMountIds = androidProbe()
+        ? _allEntries.map((e) => e.id).toSet()
+        : <String>{};
+    workspaces.addListener(_onWorkspacesChanged);
     await _ensureMirrorDirs();
     _loaded = true;
     notifyListeners();
   }
 
+  Future<void> _clearLegacyGlobalMountsIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey(legacyPrefsKey)) return;
+    try {
+      final root = Directory(_mirrorsRoot);
+      if (await root.exists()) await root.delete(recursive: true);
+    } catch (e) {
+      debugPrint('SafMountSyncService: legacy mirror cleanup failed: $e');
+    }
+    await prefs.remove(legacyPrefsKey);
+  }
+
+  Future<void> reloadAfterRestore() async {
+    await init();
+    await _clearLegacyGlobalMountsIfNeeded();
+    _onWorkspacesChanged();
+    await _ensureMirrorDirs();
+    await syncAll();
+  }
+
+  void _onWorkspacesChanged() {
+    if (!_loaded || !androidProbe()) return;
+    final current = _allEntries.map((e) => e.id).toSet();
+    final removed = _knownMountIds.difference(current);
+    final added = current.difference(_knownMountIds);
+    _knownMountIds = current;
+    for (final id in removed) {
+      unawaited(_cleanupMount(id));
+    }
+    for (final id in added) {
+      unawaited(Directory(mirrorPathFor(id)).create(recursive: true));
+    }
+    notifyListeners();
+  }
+
   Future<void> _ensureMirrorDirs() async {
-    for (final e in _entries) {
+    if (!androidProbe()) return;
+    for (final e in _allEntries) {
       try {
-        await Directory(mirrorPathFor(e.alias)).create(recursive: true);
+        await Directory(mirrorPathFor(e.id)).create(recursive: true);
       } catch (err) {
         debugPrint(
           'SafMountSyncService: failed to create mirror for '
@@ -371,95 +340,106 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Returns null on success or an error code for the UI to localize.
   Future<String?> addMount({
+    required String workspaceId,
     required String alias,
     required String uri,
     required String displayName,
-    bool readOnly = false,
   }) async {
     await init();
+    final workspace = workspaces.getById(workspaceId);
+    if (workspace == null) return errorAliasReserved;
     final trimmed = alias.trim();
     if (!isValidMountAlias(trimmed)) return errorAliasInvalid;
-    if (_isWorkspacePatternAlias(trimmed) ||
-        reservedAliasesProvider().contains(trimmed)) {
-      return errorAliasReserved;
-    }
-    if (_entries.any((e) => e.alias == trimmed)) {
+    if (trimmed == workspace.alias) return errorAliasReserved;
+    if (workspace.safMounts.any((e) => e.alias == trimmed)) {
       return errorAliasDuplicate;
     }
-    final entry = SafMountEntry(
+    final trimmedUri = uri.trim();
+    if (_allEntries.any((e) => e.uri == trimmedUri)) {
+      return errorUriDuplicate;
+    }
+    final entry = WorkspaceSafMount(
+      id: const Uuid().v4(),
       alias: trimmed,
-      uri: uri.trim(),
+      uri: trimmedUri,
       displayName: displayName.trim(),
-      readOnly: readOnly,
     );
     try {
-      await Directory(mirrorPathFor(trimmed)).create(recursive: true);
+      await Directory(mirrorPathFor(entry.id)).create(recursive: true);
     } catch (e) {
       debugPrint('SafMountSyncService: mirror create failed: $e');
       return errorAliasInvalid;
     }
-    _entries.add(entry);
     try {
-      await _persist();
+      await workspaces.addSafMount(workspaceId, entry);
     } catch (e) {
-      // The config lives in memory regardless; a failed persist only means
-      // the mount may not survive a restart. Do not fail the UI flow.
+      await _cleanupMount(entry.id);
       debugPrint('SafMountSyncService: persist failed after add: $e');
+      rethrow;
     }
-    notifyListeners();
     // Initial full pull completes before addMount returns: the caller's UI
     // sees a converged mirror, and tests get deterministic sequencing.
-    await syncNow(trimmed);
+    await syncNow(entry.id);
     return null;
   }
 
-  Future<void> removeMount(String alias) async {
+  Future<void> removeMount(String workspaceId, String mountId) async {
     await init();
-    _entries.removeWhere((e) => e.alias == alias);
-    _states.remove(alias);
-    _debounceTimers.remove(alias)?.cancel();
-    await _persist();
+    final ownsMount = workspaces
+        .getById(workspaceId)
+        ?.safMounts
+        .any((entry) => entry.id == mountId);
+    if (ownsMount != true) return;
+    _knownMountIds.remove(mountId);
+    await workspaces.removeSafMount(workspaceId, mountId);
+    await _cleanupMount(mountId);
     notifyListeners();
+  }
+
+  Future<void> _cleanupMount(String mountId) async {
+    _states.remove(mountId);
+    _debounceTimers.remove(mountId)?.cancel();
     try {
-      final mirror = Directory(mirrorPathFor(alias));
+      final mirror = Directory(mirrorPathFor(mountId));
       if (await mirror.exists()) await mirror.delete(recursive: true);
     } catch (e) {
-      debugPrint('SafMountSyncService: mirror cleanup failed for $alias: $e');
+      debugPrint('SafMountSyncService: mirror cleanup failed for $mountId: $e');
     }
     try {
-      final state = File(statePathFor(alias));
+      final state = File(statePathFor(mountId));
       if (await state.exists()) await state.delete();
     } catch (e) {
-      debugPrint('SafMountSyncService: state cleanup failed for $alias: $e');
+      debugPrint('SafMountSyncService: state cleanup failed for $mountId: $e');
     }
   }
 
   /// Called by the filesystem engine after an AI tool mutated a mount —
   /// schedules a debounced push round for SAF mounts.
-  void notifyMutated(String alias) {
-    if (entryByAlias(alias) == null) return;
-    _debounceTimers.remove(alias)?.cancel();
-    _debounceTimers[alias] = Timer(mutationDebounce, () {
-      _debounceTimers.remove(alias);
-      unawaited(syncNow(alias));
+  void notifyMutated(String workspaceId, String alias) {
+    final entry = entryByAlias(workspaceId, alias);
+    if (entry == null) return;
+    _debounceTimers.remove(entry.id)?.cancel();
+    _debounceTimers[entry.id] = Timer(mutationDebounce, () {
+      _debounceTimers.remove(entry.id);
+      unawaited(syncNow(entry.id));
     });
   }
 
   Future<void> syncAll() async {
     await init();
-    final aliases = _entries.map((e) => e.alias).toList();
-    for (final alias in aliases) {
-      await syncNow(alias);
+    final mountIds = _allEntries.map((e) => e.id).toList();
+    for (final mountId in mountIds) {
+      await syncNow(mountId);
     }
   }
 
-  Future<void> syncNow(String alias) async {
+  Future<void> syncNow(String mountId) async {
     await init();
-    final entry = entryByAlias(alias);
-    if (entry == null || !_running.add(alias)) return;
+    final entry = entryById(mountId);
+    if (entry == null || !_running.add(mountId)) return;
     try {
-      final state = stateOf(alias);
-      _states[alias] = state.copyWith(
+      final state = stateOf(mountId);
+      _states[mountId] = state.copyWith(
         status: SafMountStatus.syncing,
         clearError: true,
       );
@@ -470,25 +450,25 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
           // The provider persistently refused a delete (no exception): the
           // snapshot entry is retained and the next round retries — but the
           // UI must not claim "Synced" while a deletion never lands.
-          _states[alias] = _states[alias]!.copyWith(
+          _states[mountId] = _states[mountId]!.copyWith(
             status: SafMountStatus.error,
             lastError: 'SAF delete failed; will retry',
           );
         } else {
-          _states[alias] = _states[alias]!.copyWith(
+          _states[mountId] = _states[mountId]!.copyWith(
             status: SafMountStatus.idle,
             lastSyncAt: DateTime.now(),
           );
         }
       } on SafAccessException catch (e) {
-        debugPrint('SafMountSyncService: $alias unavailable: $e');
-        _states[alias] = _states[alias]!.copyWith(
+        debugPrint('SafMountSyncService: ${entry.alias} unavailable: $e');
+        _states[mountId] = _states[mountId]!.copyWith(
           status: SafMountStatus.unavailable,
           lastError: e.message,
         );
       } catch (e) {
-        debugPrint('SafMountSyncService: sync failed for $alias: $e');
-        _states[alias] = _states[alias]!.copyWith(
+        debugPrint('SafMountSyncService: sync failed for ${entry.alias}: $e');
+        _states[mountId] = _states[mountId]!.copyWith(
           status: SafMountStatus.error,
           lastError: e.toString(),
         );
@@ -496,7 +476,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
         notifyListeners();
       }
     } finally {
-      _running.remove(alias);
+      _running.remove(mountId);
     }
   }
 
@@ -516,19 +496,19 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// Runs one full two-way merge round. Returns true when a SAF-side delete
   /// was persistently refused (the round completed, but a deletion never
   /// landed and the snapshot entry was retained for retry).
-  Future<bool> _syncRound(SafMountEntry entry) async {
+  Future<bool> _syncRound(WorkspaceSafMount entry) async {
     final uri = entry.uri;
-    final mirrorRoot = Directory(mirrorPathFor(entry.alias));
+    final mirrorRoot = Directory(mirrorPathFor(entry.id));
     // The mount may have been removed while this round was queued behind the
     // execution lock (removeMount does not cancel in-flight rounds). If it is
     // gone, abort BEFORE touching the mirror or the SAF side — the mirror
     // directory may already be deleted, and pass 3 would otherwise misread
     // the missing mirror content as "deleted in the mirror" and delete the
     // user's real files.
-    if (entryByAlias(entry.alias) == null) return false;
+    if (entryById(entry.id) == null) return false;
     await mirrorRoot.create(recursive: true);
 
-    final snapshot = await _readSnapshot(entry.alias);
+    final snapshot = await _readSnapshot(entry.id);
 
     bool accessOk;
     try {
@@ -697,7 +677,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     // from the mirror was deleted in the mirror (AI / user) — delete it on
     // the SAF side too. (The reverse direction — SAF gone, mirror kept — is
     // pass 2.)
-    if (entryByAlias(entry.alias) == null) {
+    if (entryById(entry.id) == null) {
       // Removed mid-round (e.g. by clearAllData or the remove dialog): skip
       // deletion propagation entirely — the mirror was already deleted and
       // pass 3 would treat its absence as deletions in the user's real dir.
@@ -721,7 +701,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    await _writeSnapshot(entry.alias, next);
+    await _writeSnapshot(entry.id, next);
     return deleteFailed;
   }
 
@@ -749,7 +729,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   );
 
   Future<void> _copySafToMirror(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     SafEntry saf,
     Directory mirrorRoot,
     String rel,
@@ -767,7 +747,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
     // mirror, which the next round would misread as brand-new mirror content
     // and push into the user's real directory. Same-volume rename stays
     // atomic; per-alias single-flight guarantees a fixed temp name is safe.
-    final tmp = File(p.join(_stateRoot, '${entry.alias}_copy_tmp'));
+    final tmp = File(p.join(_stateRoot, '${entry.id}_copy_tmp'));
     await tmp.writeAsBytes(bytes, flush: true);
     await tmp.rename(target.path);
     final mtime = saf.lastModifiedMs;
@@ -784,7 +764,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// mirror mtime to the post-push SAF stat so the two converge without a
   /// ping-pong pull round. Returns the post-push snapshot stat.
   Future<_StatSnapshot> _pushMirrorAndAlign(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     SafEntry saf,
     Directory mirrorRoot,
     String rel,
@@ -825,7 +805,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// lookups reuse the round's [safTree] plus [createdSafDirs] so pushes
   /// never re-walk the whole SAF tree.
   Future<void> _pushMirrorToSaf(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     SafEntry? safEntry,
     Directory mirrorRoot,
     String rel,
@@ -887,7 +867,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// directories are memoized in [createdSafDirs] so siblings reuse them
   /// without extra channel round-trips.
   Future<String> _ensureParentSafDir(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     String rel,
     Map<String, SafEntry> safTree,
     Map<String, String> createdSafDirs,
@@ -927,7 +907,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// pre-push [safEntry] stat when the re-stat fails (the mtime tolerance
   /// absorbs the provider-side rewrite and the next round converges).
   Future<_StatSnapshot> _statSafAfterPush(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     SafEntry? safEntry,
     String rel,
     Map<String, SafEntry> safTree,
@@ -961,7 +941,7 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<bool> _deleteSafEntry(
-    SafMountEntry entry,
+    WorkspaceSafMount entry,
     String rel,
     Map<String, SafEntry> safTree,
   ) async {
@@ -1119,8 +1099,8 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   // Snapshot persistence
   // =====================================================================
 
-  Future<Map<String, _StatSnapshot>> _readSnapshot(String alias) async {
-    final f = File(statePathFor(alias));
+  Future<Map<String, _StatSnapshot>> _readSnapshot(String mountId) async {
+    final f = File(statePathFor(mountId));
     try {
       if (!await f.exists()) return <String, _StatSnapshot>{};
       final raw = await f.readAsString();
@@ -1132,18 +1112,18 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
           ),
       };
     } catch (e) {
-      debugPrint('SafMountSyncService: snapshot read failed for $alias: $e');
+      debugPrint('SafMountSyncService: snapshot read failed for $mountId: $e');
       return <String, _StatSnapshot>{};
     }
   }
 
   Future<void> _writeSnapshot(
-    String alias,
+    String mountId,
     Map<String, _StatSnapshot> snapshot,
   ) async {
     try {
       await Directory(_stateRoot).create(recursive: true);
-      final f = File(statePathFor(alias));
+      final f = File(statePathFor(mountId));
       final tmp = File('${f.path}.tmp');
       await tmp.writeAsString(
         jsonEncode({for (final e in snapshot.entries) e.key: e.value.toJson()}),
@@ -1151,16 +1131,8 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       );
       await tmp.rename(f.path);
     } catch (e) {
-      debugPrint('SafMountSyncService: snapshot write failed for $alias: $e');
+      debugPrint('SafMountSyncService: snapshot write failed for $mountId: $e');
     }
-  }
-
-  Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      prefsKey,
-      jsonEncode(_entries.map((e) => e.toJson()).toList()),
-    );
   }
 
   // =====================================================================
@@ -1188,6 +1160,21 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
       _pollTimer?.cancel();
       _pollTimer = null;
     }
+  }
+
+  @override
+  void dispose() {
+    workspaces.removeListener(_onWorkspacesChanged);
+    _pollTimer?.cancel();
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {
+      // Headless tests may not have a binding.
+    }
+    super.dispose();
   }
 }
 

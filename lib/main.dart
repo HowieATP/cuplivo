@@ -216,13 +216,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => McpToolService()),
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
         ChangeNotifierProvider(
-          create: (ctx) => SafMountSyncService(
-            // SAF aliases must never collide with workspace aliases.
-            reservedAliasesProvider: () {
-              final wp = ctx.read<WorkspaceProvider>();
-              return wp.workspaces.map((w) => w.alias).toSet();
-            },
-          ),
+          create: (ctx) =>
+              SafMountSyncService(workspaces: ctx.read<WorkspaceProvider>()),
         ),
         ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(

@@ -160,11 +160,47 @@ class WorkspaceProvider extends ChangeNotifier {
       final list = Workspace.decodeList(raw);
       _workspaces
         ..clear()
-        ..addAll(list);
+        ..addAll(_sanitizeSafMounts(list));
       _workspaces.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     } catch (e) {
       debugPrint('WorkspaceProvider: failed to load meta: $e');
     }
+  }
+
+  List<Workspace> _sanitizeSafMounts(List<Workspace> workspaces) {
+    final usedIds = <String>{};
+    final usedUris = <String>{};
+    return [
+      for (final workspace in workspaces)
+        workspace.copyWith(
+          safMounts: () {
+            final aliases = <String>{};
+            final mounts = <WorkspaceSafMount>[];
+            for (final mount in workspace.safMounts) {
+              final valid =
+                  isValidSafMountId(mount.id) &&
+                  !usedIds.contains(mount.id) &&
+                  mount.uri.isNotEmpty &&
+                  !usedUris.contains(mount.uri) &&
+                  isValidMountAlias(mount.alias) &&
+                  mount.alias != workspace.alias &&
+                  !aliases.contains(mount.alias);
+              if (!valid) {
+                debugPrint(
+                  'WorkspaceProvider: skipping invalid SAF mount '
+                  '${mount.alias} for ${workspace.id}',
+                );
+                continue;
+              }
+              usedIds.add(mount.id);
+              usedUris.add(mount.uri);
+              aliases.add(mount.alias);
+              mounts.add(mount);
+            }
+            return mounts;
+          }(),
+        ),
+    ];
   }
 
   Future<void> _runOneShotMigration(SharedPreferences prefs) async {
@@ -381,6 +417,25 @@ class WorkspaceProvider extends ChangeNotifier {
     final prefs = Map<String, DependencyInstallPref>.from(ws.dependencyPrefs);
     prefs[depId] = pref;
     await updateWorkspace(ws.copyWith(dependencyPrefs: prefs));
+  }
+
+  Future<void> addSafMount(String workspaceId, WorkspaceSafMount mount) async {
+    final ws = getById(workspaceId);
+    if (ws == null) return;
+    await updateWorkspace(ws.copyWith(safMounts: [...ws.safMounts, mount]));
+  }
+
+  Future<void> removeSafMount(String workspaceId, String mountId) async {
+    final ws = getById(workspaceId);
+    if (ws == null) return;
+    await updateWorkspace(
+      ws.copyWith(
+        safMounts: [
+          for (final m in ws.safMounts)
+            if (m.id != mountId) m,
+        ],
+      ),
+    );
   }
 
   Future<void> reorder(List<String> orderedIds) async {

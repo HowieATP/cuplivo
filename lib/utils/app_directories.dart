@@ -209,7 +209,7 @@ class AppDirectories {
   }
 
   /// Root directory that holds every Android SAF mount mirror
-  /// (`<alias>` subdirectories) plus the `.state/` snapshot directory.
+  /// (`<mountId>` subdirectories) plus the `.state/` snapshot directory.
   ///
   /// Deliberately OUTSIDE the sync roots (upload/images/avatars/fonts/
   /// skills/workspaces): SAF mount content is external user data and never

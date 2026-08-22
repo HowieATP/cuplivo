@@ -9,10 +9,12 @@ import '../../../../main.dart' show routeObserver;
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
+import '../../../core/services/saf/saf_mount_sync_service.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_expandable_section.dart';
+import '../../../shared/widgets/ios_settings_section.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
@@ -21,6 +23,7 @@ import '../../settings/pages/mount_files_page.dart';
 import '../controllers/dependency_install_controller.dart';
 import 'sandbox_files_page.dart';
 import 'workspace_terminal_page.dart';
+import 'workspace_saf_mounts_page.dart';
 
 class WorkspaceDetailPage extends StatefulWidget {
   const WorkspaceDetailPage({super.key, required this.workspaceId});
@@ -140,6 +143,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final wp = context.watch<WorkspaceProvider>();
+    final safMounts = context.watch<SafMountSyncService>();
     final ws = wp.getById(widget.workspaceId);
     if (ws == null) {
       return Scaffold(
@@ -174,13 +178,12 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
-          _sectionCard(
+          IosSettingsSection(
             children: [
-              _navRow(
-                context,
+              IosSettingsNavRow(
                 icon: Lucide.FolderOpen,
-                title: l10n.workspaceFilesEntry,
-                subtitle: '@${ws.alias}',
+                label: l10n.workspaceFilesEntry,
+                detailText: '@${ws.alias}',
                 onTap: () {
                   final path = wp.hostPathFor(ws);
                   if (path == null) return;
@@ -197,6 +200,24 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
                   );
                 },
               ),
+              if (Platform.isAndroid) ...[
+                const IosSettingsDivider(),
+                IosSettingsNavRow(
+                  icon: Lucide.HardDrive,
+                  label: l10n.workspaceSafMountsEntry,
+                  detailText: l10n.safMountCount(
+                    safMounts.entriesFor(ws.id).length,
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            WorkspaceSafMountsPage(workspaceId: ws.id),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),

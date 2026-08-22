@@ -807,10 +807,22 @@ abstract class AppLocalizations {
   /// **'\"workspaces\" is a reserved alias'**
   String get storageMountsErrorAliasReserved;
 
+  /// No description provided for @workspaceSafMountsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted directories'**
+  String get workspaceSafMountsEntry;
+
+  /// No description provided for @safMountCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} mounted'**
+  String safMountCount(Object count);
+
   /// No description provided for @safMountSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Android SAF Mounts'**
+  /// **'Mounted directories'**
   String get safMountSectionTitle;
 
   /// No description provided for @safMountAdd.
@@ -837,12 +849,6 @@ abstract class AppLocalizations {
   /// **'Lowercase start, e.g. notes'**
   String get safMountAliasHint;
 
-  /// No description provided for @safMountReadOnlyLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Read-only (AI can only read)'**
-  String get safMountReadOnlyLabel;
-
   /// No description provided for @safMountErrorAliasInvalid.
   ///
   /// In en, this message translates to:
@@ -852,7 +858,7 @@ abstract class AppLocalizations {
   /// No description provided for @safMountErrorAliasReserved.
   ///
   /// In en, this message translates to:
-  /// **'This alias conflicts with a workspace alias'**
+  /// **'This alias conflicts with the current workspace'**
   String get safMountErrorAliasReserved;
 
   /// No description provided for @safMountErrorAliasDuplicate.
@@ -860,6 +866,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This alias is already in use'**
   String get safMountErrorAliasDuplicate;
+
+  /// No description provided for @safMountErrorUriDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This directory is already mounted in another workspace'**
+  String get safMountErrorUriDuplicate;
 
   /// No description provided for @safMountErrorAddFailed.
   ///
@@ -888,13 +900,13 @@ abstract class AppLocalizations {
   /// No description provided for @safMountEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No SAF mounts. Add one to let the AI read and write an external folder.'**
+  /// **'No mounted directories. Add one to let this workspace access an external folder.'**
   String get safMountEmpty;
 
   /// No description provided for @safMountSectionNote.
   ///
   /// In en, this message translates to:
-  /// **'AI edits are mirrored to the external directory; external edits are mirrored back. Deletions propagate both ways.'**
+  /// **'Access uses this workspace\'s enabled file and shell tools. Changes and deletions are mirrored both ways with the external directory.'**
   String get safMountSectionNote;
 
   /// No description provided for @safMountSyncNow.

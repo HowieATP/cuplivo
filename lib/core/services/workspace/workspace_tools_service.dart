@@ -18,15 +18,14 @@ import 'workspace_path_presentation.dart';
 class WorkspaceToolsService {
   const WorkspaceToolsService._();
 
-  /// Workspace mounts plus any global Android SAF mounts (ADR-0037). SAF
-  /// mounts are global: every bound workspace sees the same set.
+  /// Workspace root plus the Android SAF mounts owned by this workspace.
   static List<FilesystemMount> combinedMounts(
     WorkspaceProvider workspaces,
     Workspace ws,
     SafMountSyncService? safMounts,
   ) => dedupeMounts(
     workspaces.mountsFor(ws),
-    safMounts?.mounts ?? const <FilesystemMount>[],
+    safMounts?.mountsFor(ws.id) ?? const <FilesystemMount>[],
   );
 
   /// SAF mounts whose alias collides with a workspace mount are shadowed —
@@ -66,7 +65,8 @@ class WorkspaceToolsService {
   /// flags. `readOnly` is a real boolean for the native parser.
   static List<Map<String, Object?>> _sandboxBinds(
     SafMountSyncService? safMounts,
-  ) => safMounts?.guestBinds ?? const <Map<String, Object?>>[];
+    String workspaceId,
+  ) => safMounts?.guestBindsFor(workspaceId) ?? const <Map<String, Object?>>[];
 
   static List<Map<String, dynamic>> buildToolDefinitions({
     required Assistant? assistant,
@@ -249,7 +249,7 @@ class WorkspaceToolsService {
       },
       onMountMutated: safMounts == null
           ? null
-          : (alias) => safMounts.notifyMutated(alias),
+          : (alias) => safMounts.notifyMutated(ws.id, alias),
     );
     final Map<String, dynamic> translatedArgs;
     try {
@@ -355,7 +355,7 @@ class WorkspaceToolsService {
         requestId: requestId,
         conversationId: conversationId,
         requireReady: true,
-        binds: _sandboxBinds(safMounts),
+        binds: _sandboxBinds(safMounts, ws.id),
       );
       return jsonEncode({
         'exitCode': result.exitCode,

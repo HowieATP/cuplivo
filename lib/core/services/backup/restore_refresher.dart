@@ -6,6 +6,7 @@ import '../../providers/group_chat_provider.dart';
 import '../../providers/mcp_provider.dart';
 import '../../providers/workspace_provider.dart';
 import '../chat/chat_service.dart';
+import '../saf/saf_mount_sync_service.dart';
 
 /// Re-reads every provider that mirrors persisted state after a restore /
 /// import rewrote SQLite or SharedPreferences, so the UI does not keep a
@@ -21,6 +22,7 @@ Future<void> refreshProvidersAfterRestore(BuildContext context) async {
   final groupChatProvider = context.read<GroupChatProvider>();
   final mcpProvider = context.read<McpProvider>();
   final workspaceProvider = context.read<WorkspaceProvider>();
+  final safMounts = context.read<SafMountSyncService>();
   try {
     await chatService.reloadCachesFromDb();
   } catch (e) {
@@ -30,6 +32,11 @@ Future<void> refreshProvidersAfterRestore(BuildContext context) async {
     await workspaceProvider.reloadFromPrefs();
   } catch (e) {
     debugPrint('refreshProvidersAfterRestore: WorkspaceProvider: $e');
+  }
+  try {
+    await safMounts.reloadAfterRestore();
+  } catch (e) {
+    debugPrint('refreshProvidersAfterRestore: SafMountSyncService: $e');
   }
   try {
     // Reload MCP BEFORE assistants: reloading assistants can fire provider

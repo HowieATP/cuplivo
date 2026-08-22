@@ -262,6 +262,58 @@ void main() {
         expect(edited, isNull);
       },
     );
+
+    test('appendMessageVersion keeps the provided timestamp', () async {
+      final service = createService();
+      await service.init();
+
+      final conversation = await service.createDraftConversation(
+        title: 'Temporary Chat',
+        temporary: true,
+      );
+      final original = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'original answer',
+      );
+      final originalTime = DateTime(2024, 1, 1, 10, 30);
+
+      final edited = await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'edited answer',
+        timestamp: originalTime,
+      );
+
+      expect(edited, isNotNull);
+      expect(edited!.timestamp, originalTime);
+    });
+
+    test(
+      'appendMessageVersion defaults to now when no timestamp is given',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'hello',
+        );
+        final before = DateTime.now();
+
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'hello, edited',
+        );
+
+        expect(edited, isNotNull);
+        expect(edited!.timestamp.isBefore(before), isFalse);
+      },
+    );
   });
 
   group('ChatService fork conversations', () {

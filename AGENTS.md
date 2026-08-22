@@ -69,6 +69,16 @@
 
 - `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when bumping version, always update both files simultaneously; in other cases, there is no need to update them.
 
+### 1.5 Theme System (主题系统)
+
+- `lib/theme/**` is the single source of truth for theming and tokens.
+- **ThemePalette (主题色板)**: named static light/dark `ColorScheme` pairs (id + bilingual name). The 9 presets in `ThemePalettes.all` are the only preset source; presets are never generated at runtime.
+- **Custom Theme (自定义主题)**: a user theme = required primary + optional secondary/tertiary colors stored as ARGB ints (`CustomTheme` model). The full M3 `ColorScheme` is generated at runtime from the primary via HCT TONAL_SPOT (`material_color_utilities`), never hand-written. Multiple named themes can be stored; only one is active (selected by id). When selected, it resolves to the runtime **Custom Palette** (`ThemePalettes.customPaletteId = 'custom'`) — never a member of `ThemePalettes.all`.
+- **Dynamic Color (系统动态色)** (Android 12+, mobile-only) and Custom Theme are mutually exclusive: an active Custom Theme wins over `useDynamicColor`. The legacy seed (`dynamic_color_seed_v1` + `custom_dynamic`) is migrated to a Custom Theme on first load.
+- **AppSemanticColors (语义色扩展)**: a `ThemeExtension` providing tokens `ColorScheme` lacks — `surfaceFill`, `surfaceCard`, `success`/`warning` (+ containers), `searchHighlight`, `chartSeries` — all derived from or harmonized with the active scheme, read via `context.appColors`. `surfaceContainerLowest→Highest` are derived from the scheme surface (never the purple-tinted M3 defaults).
+- New UI colors MUST use theme tokens (scheme roles, `AppSemanticColors`, theme constants) — never raw literals. Deliberate fixed colors must carry a `color-gate: ignore` marker (checked by `tool/check_colors.py`, not wired into CI).
+- See `docs/adr/0037-custom-themes-replace-seed.md` (phase 1) and `docs/adr/0038-semantic-color-migration.md` (phase 2).
+
 ## 2. Working Style
 
 - Debug-first.

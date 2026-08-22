@@ -14,6 +14,7 @@ import 'desktop/windows_paste_fix.dart';
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
 import 'theme/palettes.dart';
+import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'core/providers/chat_provider.dart';
@@ -215,8 +216,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
         ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              AssistantProvider(chatService: ctx.read<ChatService>()),
+          create: (ctx) => AssistantProvider(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (ctx) =>
@@ -338,9 +341,11 @@ class MyApp extends StatelessWidget {
           // One-time app update check after first build
           if (settings.showAppUpdates && !_didCheckUpdates) {
             _didCheckUpdates = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
               try {
-                context.read<UpdateProvider>().checkForUpdates();
+                await settings.loaded;
+                if (!context.mounted || !settings.showAppUpdates) return;
+                await context.read<UpdateProvider>().checkForUpdates();
               } catch (_) {}
             });
           }
@@ -439,24 +444,21 @@ class MyApp extends StatelessWidget {
               });
 
               final useDyn = isAndroid && settings.useDynamicColor;
-              final palette = ThemePalettes.byId(settings.themePaletteId);
-              final isCustomDyn =
-                  settings.themePaletteId == ThemePalettes.customDynamicId;
+              final custom = settings.selectedCustomTheme;
+              final isCustomPalette =
+                  settings.themePaletteId == ThemePalettes.customPaletteId &&
+                  custom != null;
+              final palette = isCustomPalette
+                  ? buildCustomThemePalette(custom)
+                  : ThemePalettes.byId(settings.themePaletteId);
 
               ColorScheme? lightDynOverride;
               ColorScheme? darkDynOverride;
-              if (isCustomDyn) {
-                final seed = settings.dynamicColorSeed;
-                if (seed != null) {
-                  lightDynOverride = ColorScheme.fromSeed(
-                    seedColor: Color(seed),
-                    brightness: Brightness.light,
-                  );
-                  darkDynOverride = ColorScheme.fromSeed(
-                    seedColor: Color(seed),
-                    brightness: Brightness.dark,
-                  );
-                }
+              if (isCustomPalette) {
+                // Custom theme wins over Android system dynamic color
+                // (ADR-0037) — the custom palette is used as-is.
+                lightDynOverride = null;
+                darkDynOverride = null;
               } else if (useDyn) {
                 lightDynOverride = lightDynamic;
                 darkDynOverride = darkDynamic;

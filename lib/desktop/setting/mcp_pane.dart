@@ -9,6 +9,7 @@ import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
 import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopMcpPane extends StatelessWidget {
   const DesktopMcpPane({super.key});
@@ -201,9 +202,7 @@ class _ServerCardState extends State<_ServerCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -212,7 +211,7 @@ class _ServerCardState extends State<_ServerCard> {
     String statusText;
     switch (widget.status) {
       case McpStatus.connected:
-        statusColor = Colors.green;
+        statusColor = context.appColors.success;
         statusText = l10n.mcpPageStatusConnected;
         break;
       case McpStatus.connecting:
@@ -221,7 +220,7 @@ class _ServerCardState extends State<_ServerCard> {
         break;
       case McpStatus.error:
       case McpStatus.idle:
-        statusColor = Colors.redAccent;
+        statusColor = Theme.of(context).colorScheme.error;
         statusText = l10n.mcpPageStatusDisconnected;
         break;
     }
@@ -286,7 +285,7 @@ class _ServerCardState extends State<_ServerCard> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                      color: context.appColors.surfaceFill,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
@@ -368,13 +367,13 @@ class _ServerCardState extends State<_ServerCard> {
                           Icon(
                             lucide.Lucide.MessageCircleWarning,
                             size: 14,
-                            color: Colors.red,
+                            color: cs.error,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               l10n.mcpPageConnectionFailed,
-                              style: TextStyle(fontSize: 12, color: Colors.red),
+                              style: TextStyle(fontSize: 12, color: cs.error),
                             ),
                           ),
                           TextButton(
@@ -425,9 +424,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -507,9 +504,7 @@ Future<void> _showErrorDetails(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF7F7F9),
+                    color: context.appColors.surfaceFill,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -605,9 +600,9 @@ Future<bool?> _confirmDelete(BuildContext context) async {
                               states,
                             ) {
                               if (states.contains(WidgetState.hovered)) {
-                                return isDark
-                                    ? Colors.white.withValues(alpha: 0.06)
-                                    : Colors.black.withValues(alpha: 0.05);
+                                return cs.onSurface.withValues(
+                                  alpha: isDark ? 0.06 : 0.05,
+                                );
                               }
                               return Colors.transparent;
                             }),

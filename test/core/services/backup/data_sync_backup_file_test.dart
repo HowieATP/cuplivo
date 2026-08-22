@@ -18,7 +18,9 @@ import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/models/incremental_backup.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
+import 'package:Cuplivo/core/services/backup/kelivo_v2_exception.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/search/search_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
@@ -291,6 +293,319 @@ void main() {
       },
     );
 
+    test('merge restore replaces workspaces files only when the backup entry '
+        'is newer', () async {
+      final sourceDir = Directory('${root.path}/source_ws');
+      await sourceDir.create(recursive: true);
+      final sourceFile = File('${sourceDir.path}/default/report.md');
+      await sourceFile.create(recursive: true);
+      await sourceFile.writeAsString('backup version');
+      // Even seconds: ZIP DOS timestamps round down to 2s granularity.
+      await sourceFile.setLastModified(DateTime(2026, 1, 2));
+
+      final zipFile = File('${root.path}/ws_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(sourceFile, 'workspaces/default/report.md');
+      encoder.closeSync();
+
+      final wsDir = Directory('${root.path}/workspaces');
+      await wsDir.create(recursive: true);
+      final localFile = File('${wsDir.path}/default/report.md');
+      await localFile.create(recursive: true);
+      await localFile.writeAsString('local version');
+      await localFile.setLastModified(DateTime(2026, 1, 1));
+
+      final sync = DataSync(chatService: ChatService());
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      // Backup entry (Jan 2) is newer than the local copy (Jan 1) →
+      // replaced (newer-wins, same rule as skills).
+      expect(await localFile.readAsString(), contains('backup version'));
+
+      // Local copy becomes newer than the backup entry (Jan 3) → kept.
+      await localFile.writeAsString('local version');
+      await localFile.setLastModified(DateTime(2026, 1, 3));
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      expect(await localFile.readAsString(), contains('local version'));
+    });
+
+    test(
+      'countFilesForSince mirrors pack rules (mtime, dot, skills)',
+      () async {
+        final since = DateTime(2026, 1, 1, 12);
+        // upload/: one file before since (excluded), one after (included).
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final oldFile = File('${uploadDir.path}/old.bin');
+        await oldFile.writeAsBytes(List<int>.filled(10, 1));
+        await oldFile.setLastModified(DateTime(2026, 1, 1, 11));
+        final newFile = File('${uploadDir.path}/new.bin');
+        await newFile.writeAsBytes(List<int>.filled(20, 2));
+        await newFile.setLastModified(DateTime(2026, 1, 2));
+
+        // workspaces/: visible file after since (included), dot-prefixed file
+        // after since (excluded — one dotfile rule, mirrors _packZipSync).
+        final wsDir = Directory('${root.path}/workspaces/default');
+        await wsDir.create(recursive: true);
+        final wsFile = File('${wsDir.path}/note.md');
+        await wsFile.writeAsBytes(List<int>.filled(30, 3));
+        await wsFile.setLastModified(DateTime(2026, 1, 2));
+        final dotFile = File('${wsDir.path}/.fetch_cache/x.md');
+        await dotFile.create(recursive: true);
+        await dotFile.writeAsBytes(List<int>.filled(40, 4));
+        await dotFile.setLastModified(DateTime(2026, 1, 2));
+
+        // skills/: one file after since (always counted).
+        final skillsDir = Directory('${root.path}/skills');
+        await skillsDir.create(recursive: true);
+        final skillFile = File('${skillsDir.path}/pdf-processing/SKILL.md');
+        await skillFile.create(recursive: true);
+        await skillFile.writeAsBytes(List<int>.filled(50, 5));
+        await skillFile.setLastModified(DateTime(2026, 1, 2));
+
+        final sync = DataSync(chatService: ChatService());
+        final result = await sync.countFilesForSince(since);
+
+        // upload new.bin (20) + workspaces note.md (30) + skill (50).
+        expect(result.fileCount, 3);
+        expect(result.totalBytes, 100);
+      },
+    );
+
+    test(
+      'merge restore newer-wins survives odd-second mtimes (UT timestamp)',
+      () async {
+        // Round-trip through the PRODUCTION writer + extractor: a genuinely
+        // newer peer copy whose mtime is an odd second (2026-01-02 00:00:57)
+        // must win over a local copy 500 ms older. DOS timestamps round down
+        // to even seconds (56) and would lose to 56.5; the UT (0x5455) extra
+        // field must carry the true second.
+        final wsDir = Directory('${root.path}/workspaces/default');
+        await wsDir.create(recursive: true);
+        final liveFile = File('${wsDir.path}/report.md');
+        await liveFile.create(recursive: true);
+        await liveFile.writeAsString('backup version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 57));
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+          ),
+        );
+
+        // The live copy now becomes device B's genuinely older copy (56.5s,
+        // inside the 2s DOS rounding window).
+        await liveFile.writeAsString('local version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 56, 500));
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        // Odd-second backup mtime must win (57 > 56.5).
+        expect(await liveFile.readAsString(), contains('backup version'));
+
+        // Local copy becomes genuinely newer (57.5s) → kept.
+        await liveFile.writeAsString('local version');
+        await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 57, 500));
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        expect(await liveFile.readAsString(), contains('local version'));
+      },
+    );
+
+    test(
+      'LAN-sync manifest restores ms-precision mtimes (sync_manifest.json wins)',
+      () async {
+        // The LAN-sync delta flow packs via includeFilePaths and rides a
+        // sync_manifest.json with ms mtimes. After a restore the file's mtime
+        // must equal the sender's exact stored value — otherwise the next
+        // sync's delta comparison sees drift and re-sends it forever. On a
+        // sub-second filesystem the manifest value (with the .789ms) also
+        // proves the manifest path wins over the ZIP's second-granularity UT
+        // field; on a whole-second filesystem (some CI runners) both values
+        // collapse to the same whole second and the round-trip equality is
+        // the meaningful assertion.
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final sourceFile = File('${uploadDir.path}/a.bin');
+        await sourceFile.writeAsBytes(List<int>.filled(16, 7));
+        await sourceFile.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 789));
+        final srcMtimeMs = sourceFile
+            .statSync()
+            .modified
+            .millisecondsSinceEpoch;
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+            includeFilePaths: {'upload/a.bin'},
+          ),
+        );
+
+        // Peer lacks the file entirely → merge copies it (absent → copied).
+        await sourceFile.delete();
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        expect(await sourceFile.exists(), isTrue);
+        final restoredMs = sourceFile
+            .statSync()
+            .modified
+            .millisecondsSinceEpoch;
+        expect(restoredMs, srcMtimeMs);
+        await DataSync.cleanupTemporaryBackupFile(zipFile);
+      },
+    );
+
+    test(
+      'LAN-sync delta: upload merge is newer-wins at ms precision',
+      () async {
+        // A delta sync sends an upload file only when the sender's ms mtime is
+        // strictly newer. The receiver's merge must therefore replace the local
+        // copy using the SAME ms-precision manifest mtime — otherwise a
+        // same-second newer sender (.800) loses to a same-second older local
+        // (.200) because the ZIP's UT field rounds down to whole seconds, and
+        // the file would re-send forever without ever being applied. Some CI
+        // filesystems store only whole-second mtimes, which collapses this
+        // scenario into a tie — the conservative keep-local is then correct.
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        final target = File('${uploadDir.path}/a.bin');
+        final packed = List<int>.filled(16, 7);
+        await target.writeAsBytes(packed);
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 800));
+        final srcMs = target.statSync().modified.millisecondsSinceEpoch;
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          incremental: IncrementalBackupConfig(
+            since: DateTime(2026, 1, 1),
+            includeSettings: false,
+            includeFiles: true,
+            updateBackupTime: false,
+            includeFilePaths: {'upload/a.bin'},
+          ),
+        );
+
+        // Local copy becomes the OLDER one within the same second — the exact
+        // scenario where the delta (ms) and a second-precision merge disagree.
+        await target.writeAsString('local version');
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 200));
+        final localMs = target.statSync().modified.millisecondsSinceEpoch;
+
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+
+        if (srcMs > localMs) {
+          // Sub-second filesystem: the strictly-newer backup wins and its
+          // ms mtime is applied.
+          expect(await target.readAsBytes(), packed);
+          expect(target.statSync().modified.millisecondsSinceEpoch, srcMs);
+        } else {
+          // Whole-second filesystem: the same-second tie collapsed to equal
+          // mtimes — conservative keep-local is correct.
+          expect(await target.readAsString(), 'local version');
+        }
+
+        // Local becomes genuinely newer (clearly later whole second) → kept
+        // (never regressed).
+        await target.writeAsString('local version 2');
+        await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 58));
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+        expect(await target.readAsString(), 'local version 2');
+
+        await DataSync.cleanupTemporaryBackupFile(zipFile);
+      },
+    );
+
+    test(
+      'restore progress fraction never regresses across directories',
+      () async {
+        // Three trees so the cumulative totalFiles jumps at directory
+        // boundaries (upload → images → workspaces). The raw fraction would
+        // dip to 0.5 after upload/ completes; the reported fraction must be
+        // monotonic non-decreasing.
+        final zipFile = File('${root.path}/progress.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final src = Directory('${root.path}/progress_src');
+        for (final name in [
+          'upload/a.txt',
+          'images/b.txt',
+          'workspaces/c.txt',
+        ]) {
+          final f = File('${src.path}/$name');
+          await f.create(recursive: true);
+          await f.writeAsString(name);
+          encoder.addFileSync(f, name);
+        }
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        final fractions = <double>[];
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+          onProgress: (p) {
+            if (p.stage == RestoreStage.copyingFiles && p.fraction != null) {
+              fractions.add(p.fraction!);
+            }
+          },
+        );
+
+        expect(fractions, isNotEmpty);
+        for (var i = 1; i < fractions.length; i++) {
+          expect(
+            fractions[i],
+            greaterThanOrEqualTo(fractions[i - 1]),
+            reason:
+                'fraction regressed at index $i: ${fractions[i - 1]} -> '
+                '${fractions[i]}',
+          );
+        }
+      },
+    );
+
     test(
       'skills are exported and restored regardless of includeFiles',
       () async {
@@ -476,7 +791,308 @@ void main() {
       },
     );
 
-    test('cleans temporary restore files when WebDAV restore fails', () async {
+    group('merge restore: provider proxy is device-local (issue #512)', () {
+      Future<void> restoreMerge(Map<String, dynamic> backupSettings) async {
+        final settingsFile = File('${root.path}/proxy_settings.json');
+        await settingsFile.writeAsString(jsonEncode(backupSettings));
+
+        final zipFile = File('${root.path}/proxy_merge_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.merge,
+        );
+      }
+
+      Map<String, dynamic> providerConfig(
+        String id,
+        String baseUrl,
+        Map<String, dynamic> proxy,
+      ) => {
+        'id': id,
+        'type': 'openai',
+        'name': id,
+        'baseUrl': baseUrl,
+        'apiKey': 'key-$id',
+        'models': <String>[],
+        ...proxy,
+      };
+
+      const localProxy = {
+        'proxyEnabled': true,
+        'proxyType': 'socks5',
+        'proxyHost': '127.0.0.1',
+        'proxyPort': '1080',
+        'proxyUsername': 'local-user',
+        'proxyPassword': 'local-pass',
+      };
+
+      const backupProxy = {
+        'proxyEnabled': false,
+        'proxyType': 'http',
+        'proxyHost': 'proxy.backup.example',
+        'proxyPort': '3128',
+        'proxyUsername': '',
+        'proxyPassword': '',
+      };
+
+      test(
+        'existing provider keeps local proxy, backup updates other fields',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'MyProvider': providerConfig(
+                'MyProvider',
+                'https://local.example/v1',
+                localProxy,
+              ),
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'MyProvider': providerConfig(
+                'MyProvider',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['MyProvider'] as Map<String, dynamic>;
+
+          // Non-proxy fields come from the backup.
+          expect(merged['baseUrl'], 'https://backup.example/v1');
+          expect(merged['apiKey'], 'key-MyProvider');
+
+          // Proxy fields stay local.
+          expect(merged['proxyEnabled'], isTrue);
+          expect(merged['proxyType'], 'socks5');
+          expect(merged['proxyHost'], '127.0.0.1');
+          expect(merged['proxyPort'], '1080');
+          expect(merged['proxyUsername'], 'local-user');
+          expect(merged['proxyPassword'], 'local-pass');
+        },
+      );
+
+      test('new provider imported from backup keeps its proxy', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'Existing': providerConfig(
+              'Existing',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'Existing': providerConfig(
+              'Existing',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+            'NewProvider': providerConfig(
+              'NewProvider',
+              'https://new.example/v1',
+              backupProxy,
+            ),
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        // Existing provider: proxy preserved locally, other fields updated.
+        final existing = configs['Existing'] as Map<String, dynamic>;
+        expect(existing['baseUrl'], 'https://backup.example/v1');
+        expect(existing['proxyHost'], '127.0.0.1');
+
+        // New provider: proxy imported as-is.
+        final added = configs['NewProvider'] as Map<String, dynamic>;
+        expect(added['proxyEnabled'], isFalse);
+        expect(added['proxyHost'], 'proxy.backup.example');
+        expect(added['proxyPort'], '3128');
+      });
+
+      test(
+        'legacy local provider without a proxy block gets no-proxy defaults',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'Legacy': {
+                'id': 'Legacy',
+                'type': 'openai',
+                'name': 'Legacy',
+                'baseUrl': 'https://local.example/v1',
+                'apiKey': 'legacy-key',
+                'models': <String>[],
+              },
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'Legacy': providerConfig(
+                'Legacy',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['Legacy'] as Map<String, dynamic>;
+
+          // Other fields still come from the backup.
+          expect(merged['baseUrl'], 'https://backup.example/v1');
+
+          // But the backup's proxy is replaced by the no-proxy defaults.
+          expect(merged['proxyEnabled'], isFalse);
+          expect(merged['proxyType'], 'http');
+          expect(merged['proxyHost'], '');
+          expect(merged['proxyPort'], '8080');
+          expect(merged['proxyUsername'], '');
+          expect(merged['proxyPassword'], '');
+        },
+      );
+
+      test(
+        'partial local proxy block never blends backup proxy fields',
+        () async {
+          // A local config imported from a third-party tool may carry only part
+          // of the proxy block (e.g. no password fields at all).
+          SharedPreferences.setMockInitialValues({
+            'provider_configs_v1': jsonEncode({
+              'Partial': {
+                'id': 'Partial',
+                'type': 'openai',
+                'name': 'Partial',
+                'baseUrl': 'https://local.example/v1',
+                'apiKey': 'partial-key',
+                'models': <String>[],
+                'proxyEnabled': true,
+                'proxyType': 'socks5',
+                'proxyHost': '127.0.0.1',
+                'proxyPort': '1080',
+              },
+            }),
+          });
+
+          await restoreMerge({
+            'provider_configs_v1': jsonEncode({
+              'Partial': providerConfig(
+                'Partial',
+                'https://backup.example/v1',
+                backupProxy,
+              ),
+            }),
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          final configs =
+              jsonDecode(prefs.getString('provider_configs_v1')!)
+                  as Map<String, dynamic>;
+          final merged = configs['Partial'] as Map<String, dynamic>;
+
+          // Present local fields win.
+          expect(merged['proxyEnabled'], isTrue);
+          expect(merged['proxyHost'], '127.0.0.1');
+
+          // Missing local fields fall to the no-proxy defaults, never the
+          // backup's values (backup had username/password empty, host
+          // proxy.backup.example — none of it may survive).
+          expect(merged['proxyUsername'], '');
+          expect(merged['proxyPassword'], '');
+        },
+      );
+
+      test('malformed provider entry does not abort the whole merge', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'LocalOnly': providerConfig(
+              'LocalOnly',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'GoodProvider': providerConfig(
+              'GoodProvider',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+            // Non-object provider value (hand-edited or legacy data).
+            'BrokenProvider': 'not-a-config',
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        // The malformed entry is carried over verbatim and the merge of the
+        // valid entries still completes.
+        expect(configs['BrokenProvider'], 'not-a-config');
+        expect(configs.keys, containsAll(['LocalOnly', 'GoodProvider']));
+        final added = configs['GoodProvider'] as Map<String, dynamic>;
+        expect(added['proxyHost'], 'proxy.backup.example');
+      });
+
+      test('local providers absent from the backup survive merge', () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'LocalOnly': providerConfig(
+              'LocalOnly',
+              'https://local.example/v1',
+              localProxy,
+            ),
+          }),
+        });
+
+        await restoreMerge({
+          'provider_configs_v1': jsonEncode({
+            'BackupOnly': providerConfig(
+              'BackupOnly',
+              'https://backup.example/v1',
+              backupProxy,
+            ),
+          }),
+        });
+
+        final prefs = await SharedPreferences.getInstance();
+        final configs =
+            jsonDecode(prefs.getString('provider_configs_v1')!)
+                as Map<String, dynamic>;
+
+        expect(configs.keys, containsAll(['LocalOnly', 'BackupOnly']));
+        final local = configs['LocalOnly'] as Map<String, dynamic>;
+        expect(local['baseUrl'], 'https://local.example/v1');
+        expect(local['proxyHost'], '127.0.0.1');
+      });
+    });
+
+    test('cleans temporary restore files after a file-copy failure', () async {
       final sourceDir = Directory('${root.path}/source_upload');
       await sourceDir.create(recursive: true);
       final sourceFile = File('${sourceDir.path}/file.txt');
@@ -488,6 +1104,9 @@ void main() {
       encoder.addFileSync(sourceFile, 'upload/file.txt');
       encoder.closeSync();
 
+      // A file occupying the upload target makes the files-restore step throw
+      // (EEXIST). Since #475, that failure is logged-and-continued — the
+      // restore completes and the downloaded temp file is still cleaned up.
       await File('${root.path}/upload').writeAsString('not a directory');
 
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -510,12 +1129,9 @@ void main() {
         lastModified: null,
       );
 
-      await expectLater(
-        sync.restoreFromWebDav(
-          const WebDavConfig(includeChats: false, includeFiles: true),
-          item,
-        ),
-        throwsA(anything),
+      await sync.restoreFromWebDav(
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        item,
       );
 
       expect(await File('${tmpDir.path}/restore_source.zip').exists(), isFalse);
@@ -712,6 +1328,7 @@ void main() {
           final data =
               jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[])))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
           final toolEvents = data['toolEvents'] as Map;
@@ -777,11 +1394,168 @@ void main() {
           final data =
               jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
                   as Map<String, dynamic>;
+          expect(data['version'], 1);
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
 
           expect(convs, isEmpty);
           expect(msgs, isEmpty);
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: edit-only activity exports the conversation with its full version chain',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        const gid = 'test-group-1';
+
+        final conv = Conversation(
+          id: 'test-conv-3',
+          title: 'Edited Conversation',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['msg-v0', 'msg-v1'],
+          versionSelections: {gid: 1},
+        );
+        final v0 = ChatMessage(
+          id: 'msg-v0',
+          role: 'assistant',
+          content: 'original answer',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 0,
+        );
+        final v1 = ChatMessage(
+          id: 'msg-v1',
+          role: 'assistant',
+          content: 'edited answer',
+          // Edited versions preserve the ORIGINAL timestamp.
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 1,
+        );
+        await chatService.restoreConversation(conv, [v0, v1]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+
+          expect(convs, hasLength(1));
+          expect(convs[0]['id'], 'test-conv-3');
+          expect((convs[0]['versionSelections'] as Map)[gid], 1);
+          expect(msgs, hasLength(2));
+          expect(msgs.map((m) => m['id']), containsAll(['msg-v0', 'msg-v1']));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: version groups export atomically when the selected version is the original',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        const gid = 'test-group-2';
+
+        final conv = Conversation(
+          id: 'test-conv-4',
+          title: 'Reverted Conversation',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['msg-rv0', 'msg-rv1'],
+          // User edited to v1 but switched the selection back to v0.
+          versionSelections: {gid: 0},
+        );
+        final v0 = ChatMessage(
+          id: 'msg-rv0',
+          role: 'user',
+          content: 'original prompt',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 0,
+        );
+        final v1 = ChatMessage(
+          id: 'msg-rv1',
+          role: 'user',
+          content: 'edited prompt',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+          groupId: gid,
+          version: 1,
+        );
+        await chatService.restoreConversation(conv, [v0, v1]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+
+          expect(convs, hasLength(1));
+          expect(msgs, hasLength(2));
+          expect(msgs.map((m) => m['id']), containsAll(['msg-rv0', 'msg-rv1']));
         } finally {
           archive?.clearSync();
           input.closeSync();
@@ -887,6 +1661,64 @@ void main() {
         expect(scope.updatedConversations.messageCount, 1);
         expect(scope.updatedConversations.oldestTitle, 'Old Chat');
         expect(scope.newFileCount, 0);
+
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: analyzeIncrementalScope counts edit-only activity as whole version groups',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        const gid = 'scope-group-1';
+
+        // Edit-only conversation: all message timestamps predate since, but
+        // updatedAt is fresh and a version was appended.
+        final conv = Conversation(
+          id: 'scope-conv',
+          title: 'Edit Only',
+          createdAt: oldDate,
+          updatedAt: DateTime.now(),
+          messageIds: ['scope-v0', 'scope-v1'],
+          versionSelections: {gid: 1},
+        );
+        await chatService.restoreConversation(conv, [
+          ChatMessage(
+            id: 'scope-v0',
+            role: 'assistant',
+            content: 'original',
+            timestamp: oldDate,
+            conversationId: conv.id,
+            isStreaming: false,
+            groupId: gid,
+            version: 0,
+          ),
+          ChatMessage(
+            id: 'scope-v1',
+            role: 'assistant',
+            content: 'edited',
+            timestamp: oldDate,
+            conversationId: conv.id,
+            isStreaming: false,
+            groupId: gid,
+            version: 1,
+          ),
+        ]);
+
+        final sync = DataSync(chatService: chatService);
+        final scope = await sync.analyzeIncrementalScope(
+          IncrementalBackupConfig(since: since, includeFiles: false),
+        );
+
+        expect(scope.newConversations.count, 0);
+        expect(scope.updatedConversations.count, 1);
+        expect(scope.updatedConversations.oldestTitle, 'Edit Only');
+        // Whole version group counts, matching the atomic export.
+        expect(scope.updatedConversations.messageCount, 2);
 
         await chatService.close();
       },
@@ -1026,6 +1858,122 @@ void main() {
         };
         expect(byId['a1']!.ocrMode, 'always');
         expect(byId['a2']!.ocrMode, 'never');
+      },
+    );
+
+    test(
+      'overwrite restore keeps assistants when a later file-copy step fails',
+      () async {
+        // Real initialized service: the chats restore path self-initializes
+        // (restoreConversationsBatch → init), which opens a real SQLite file
+        // under the fake app-data dir. Using an in-memory fake here would
+        // leave that file handle open and break the teardown delete.
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+
+        // Occupy root/fonts with a FILE: the files-restore step's
+        // Directory.create then throws (EEXIST) mid-restore. The restore
+        // must log-and-continue instead of losing the assistants that were
+        // already committed before the file copying (issue #475).
+        final fontsBlocker = File('${root.path}/fonts');
+        await fontsBlocker.writeAsString('blocker');
+
+        final zipFile = File('${root.path}/full-with-files.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final settingsFile = File('${root.path}/settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({
+            'assistants_v1': jsonEncode([
+              {'id': 'a1', 'name': 'Alpha'},
+              {'id': 'a2', 'name': 'Beta'},
+            ]),
+          }),
+        );
+        encoder.addFileSync(settingsFile, 'settings.json');
+        final conv = Conversation(
+          id: 'c1',
+          title: 'Chat 1',
+          createdAt: DateTime(2025, 1, 1),
+          updatedAt: DateTime(2025, 1, 2),
+          messageIds: const ['m1'],
+        );
+        final msg = ChatMessage(
+          id: 'm1',
+          role: 'user',
+          content: 'hello',
+          conversationId: 'c1',
+          timestamp: DateTime(2025, 1, 2),
+          isStreaming: false,
+        );
+        final chatsFile = File('${root.path}/chats.json');
+        await chatsFile.writeAsString(
+          jsonEncode({
+            'version': 2,
+            'conversations': [conv.toJson()],
+            'messages': [msg.toJson()],
+            'toolEvents': <String, dynamic>{},
+            'geminiThoughtSigs': <String, dynamic>{},
+            'groupChats': <dynamic>[],
+            'groupMembers': <dynamic>[],
+          }),
+        );
+        encoder.addFileSync(chatsFile, 'chats.json');
+        final fontEntry = File('${root.path}/font.ttf');
+        await fontEntry.writeAsBytes(List<int>.filled(64, 7));
+        encoder.addFileSync(fontEntry, 'fonts/font.ttf');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: chatService);
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+          mode: RestoreMode.overwrite,
+        );
+
+        final assistants = await chatService.getAllAssistants();
+        expect(assistants, hasLength(2));
+        expect(assistants.map((a) => a.id), containsAll(['a1', 'a2']));
+        expect(chatService.getAllCompleteConversations(), hasLength(1));
+      },
+    );
+
+    test(
+      'Kelivo v2 backup (manifest.json) throws typed exception before any write',
+      () async {
+        final chatService = _InMemoryChatService();
+        addTearDown(chatService.closeDb);
+
+        final zipFile = File('${root.path}/kelivo-v2.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final manifestFile = File('${root.path}/manifest.json');
+        await manifestFile.writeAsString(
+          jsonEncode({
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'sqlite',
+          }),
+        );
+        encoder.addFileSync(manifestFile, 'manifest.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: chatService);
+        await expectLater(
+          sync.restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: true, includeFiles: true),
+            mode: RestoreMode.overwrite,
+          ),
+          throwsA(isA<KelivoV2BackupException>()),
+        );
+
+        // No side effects: prefs untouched, DB untouched.
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('assistants_v1'), isFalse);
+        expect(await chatService.getAllAssistants(), isEmpty);
+        expect(chatService.getAllCompleteConversations(), isEmpty);
       },
     );
   });
@@ -1215,6 +2163,289 @@ void main() {
                 )
                 as Map<String, dynamic>;
         expect(settings['image_upload_quality_v1'], 'original');
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
+
+    test(
+      'export converts search_services_v1 apiKeys to Kelivo string list',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'search_services_v1': jsonEncode([
+            {
+              'type': 'tavily',
+              'id': 'tavily-1',
+              'url': 'https://api.tavily.com/search',
+              'apiKey': 'primary-key',
+              'apiKeys': [
+                {
+                  'id': 'k1',
+                  'key': 'primary-key',
+                  'isEnabled': true,
+                  'priority': 5,
+                },
+                {
+                  'id': 'k2',
+                  'key': 'backup-key',
+                  'isEnabled': true,
+                  'priority': 6,
+                },
+              ],
+            },
+          ]),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map<String, dynamic>;
+          final services =
+              jsonDecode(settings['search_services_v1'] as String) as List;
+          final service = services.single as Map<String, dynamic>;
+          expect(service['type'], 'tavily');
+          expect(service['apiKey'], 'primary-key');
+          expect(service['apiKeys'], ['primary-key', 'backup-key']);
+          expect(service['keyConfigs'], isA<List>());
+          expect(service['keyConfigs'], hasLength(2));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test('round-trip restores full keyConfigs for search services', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_services_v1': jsonEncode([
+          {
+            'type': 'tavily',
+            'id': 'tavily-1',
+            'url': 'https://api.tavily.com/search',
+            'apiKey': 'primary-key',
+            'apiKeys': [
+              {
+                'id': 'k1',
+                'key': 'primary-key',
+                'isEnabled': true,
+                'priority': 5,
+              },
+              {
+                'id': 'k2',
+                'key': 'backup-key',
+                'isEnabled': true,
+                'priority': 6,
+              },
+            ],
+          },
+        ]),
+      });
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        final settings =
+            jsonDecode(
+                  utf8.decode(archive.findFile('settings.json')!.readBytes()!),
+                )
+                as Map<String, dynamic>;
+        final services =
+            jsonDecode(settings['search_services_v1'] as String) as List;
+        final service = services.single as Map<String, dynamic>;
+
+        final restored = SearchServiceOptions.fromJson(service);
+        expect(restored.apiKeys, hasLength(2));
+        expect(restored.apiKeys.first.key, 'primary-key');
+        expect(restored.apiKeys.last.key, 'backup-key');
+        expect(restored.apiKeys.last.isEnabled, isTrue);
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
+
+    test(
+      'export splits apiKeys to Kelivo string list for all new providers',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'search_services_v1': jsonEncode([
+            {
+              'type': 'doubao',
+              'id': 'doubao-1',
+              'apiKey': 'primary-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'primary-key', 'isEnabled': true},
+                {'id': 'k2', 'key': 'backup-key', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'stepfun',
+              'id': 'stepfun-1',
+              'url': '',
+              'category': 'research',
+              'apiKey': 'sf-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'sf-key', 'isEnabled': true},
+                {'id': 'k2', 'key': 'sf-extra', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'firecrawl',
+              'id': 'firecrawl-1',
+              'url': '',
+              'apiKey': '',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'fc-key', 'isEnabled': true},
+              ],
+            },
+            {
+              'type': 'tinyfish',
+              'id': 'tinyfish-1',
+              'url': '',
+              'apiKey': 'tf-key',
+              'apiKeys': [
+                {'id': 'k1', 'key': 'tf-key', 'isEnabled': true},
+              ],
+            },
+          ]),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map<String, dynamic>;
+          final services =
+              jsonDecode(settings['search_services_v1'] as String) as List;
+          final byType = <String, Map<String, dynamic>>{
+            for (final e in services)
+              (e as Map<String, dynamic>)['type'] as String: e,
+          };
+          final doubao = byType['doubao']!;
+          expect(doubao['apiKeys'], ['primary-key', 'backup-key']);
+          expect(doubao['keyConfigs'], hasLength(2));
+
+          final stepfun = byType['stepfun']!;
+          expect(stepfun['apiKeys'], ['sf-key', 'sf-extra']);
+          expect(stepfun['keyConfigs'], hasLength(2));
+
+          final firecrawl = byType['firecrawl']!;
+          expect(firecrawl['apiKeys'], ['fc-key']);
+          expect(firecrawl['keyConfigs'], hasLength(1));
+
+          final tinyfish = byType['tinyfish']!;
+          expect(tinyfish['apiKeys'], ['tf-key']);
+          expect(tinyfish['keyConfigs'], hasLength(1));
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test('round-trip restores all new provider types from backup', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_services_v1': jsonEncode([
+          {
+            'type': 'doubao',
+            'id': 'doubao-1',
+            'apiKey': 'primary-key',
+            'apiKeys': ['primary-key', 'backup-key'],
+          },
+          {
+            'type': 'stepfun',
+            'id': 'stepfun-1',
+            'url': 'https://api.stepfun.com/v1/search',
+            'category': 'research',
+            'apiKey': 'sf-key',
+            'apiKeys': ['sf-key', 'sf-extra'],
+          },
+          {
+            'type': 'firecrawl',
+            'id': 'firecrawl-1',
+            'url': '',
+            'apiKey': 'fc-key',
+            'apiKeys': ['fc-key'],
+          },
+          {
+            'type': 'tinyfish',
+            'id': 'tinyfish-1',
+            'url': '',
+            'apiKey': 'tf-key',
+            'apiKeys': ['tf-key'],
+          },
+        ]),
+      });
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        final settings =
+            jsonDecode(
+                  utf8.decode(archive.findFile('settings.json')!.readBytes()!),
+                )
+                as Map<String, dynamic>;
+        final services =
+            jsonDecode(settings['search_services_v1'] as String) as List;
+        final restored = services
+            .map(
+              (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
+            )
+            .toList();
+
+        expect(restored, hasLength(4));
+        expect(restored[0], isA<DoubaoOptions>());
+        expect(restored[0].apiKeys.map((k) => k.key), [
+          'primary-key',
+          'backup-key',
+        ]);
+        expect(restored[1], isA<StepFunOptions>());
+        expect((restored[1] as StepFunOptions).category, 'research');
+        expect(restored[1].apiKeys.map((k) => k.key), ['sf-key', 'sf-extra']);
+        expect(restored[2], isA<FirecrawlOptions>());
+        expect(restored[2].apiKeys.map((k) => k.key), ['fc-key']);
+        expect(restored[3], isA<TinyFishOptions>());
+        expect(restored[3].apiKeys.map((k) => k.key), ['tf-key']);
       } finally {
         archive?.clearSync();
         input.closeSync();

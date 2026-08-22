@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
@@ -12,9 +16,28 @@ import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_client.dart';
+import 'package:Cuplivo/core/services/sync/lan_sync_logic.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_models.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_server.dart';
 import 'package:Cuplivo/core/services/sync/windows_firewall.dart';
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.root);
+
+  final String root;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => root;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$root/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$root/tmp';
+}
 
 /// Minimal ChatService fake: only the index-building surface is real,
 /// backed by an in-memory Drift repo.
@@ -27,8 +50,20 @@ class _FakeChatService extends ChatService {
   @override
   ChatDatabaseRepository get repo => _repo;
 
+  /// Export paths (`_exportChatsToFile`, `_exportSettingsJson`) self-init
+  /// when uninitialized — that would open a real SQLite file under the fake
+  /// app-data dir and leave it locked for the teardown delete.
+  @override
+  bool get initialized => true;
+
   @override
   List<Conversation> getAllCompleteConversations() => _conversations;
+
+  @override
+  List<ChatMessage> getMessages(String conversationId) {
+    final count = _repo.getMessageCountSync(conversationId);
+    return _repo.getMessagesRangeSync(conversationId, start: 0, limit: count);
+  }
 
   @override
   Future<List<Assistant>> getAllAssistants() => _repo.getAllAssistants();
@@ -125,6 +160,13 @@ void main() {
       // getMessageIdsSync reads a separate raw-sqlite sync connection, which
       // only exists for file-based repos after ensureReady().
       tempDir = await Directory.systemTemp.createTemp('cuplivo_lan_sync_test');
+      // The SyncIndex now always carries the file manifest, whose builder
+      // resolves app directories through the path provider.
+      final prevProvider = PathProviderPlatform.instance;
+      final support = Directory('${tempDir.path}/support');
+      await support.create(recursive: true);
+      PathProviderPlatform.instance = _FakePathProviderPlatform(support.path);
+      addTearDown(() => PathProviderPlatform.instance = prevProvider);
       final dbFile = File('${tempDir.path}${Platform.pathSeparator}test.db');
       repo = ChatDatabaseRepository.open(file: dbFile);
       await repo.ensureReady();
@@ -251,10 +293,10 @@ void main() {
     test(
       'exchange keeps phase done when the restore callback throws',
       () async {
-        // The restore flow pops the sheet itself (widget layer). When the
-        // restore callback throws, the phase must stay `done` (NOT reset to
-        // planReceived) so the widget's `_exchange` returns false and the
-        // caller does not pop a second time (issue #182 double-pop guard).
+        // The section's _restoreAndRestart catches restore failures itself,
+        // but if the callback still throws, the phase must stay `done` (NOT
+        // reset to planReceived) so the widget's `_exchange` returns false
+        // and the caller does not close twice (issue #182 double-pop guard).
         final zipBytes = utf8.encode('PK fake zip content');
         final lanClient = LanSyncClient(
           chatService: chatService,
@@ -350,5 +392,511 @@ void main() {
       expect(await receivedFile!.readAsBytes(), zipBytes);
       await receivedFile!.delete();
     });
+
+    test(
+      'exchange zip includes settings.json so settings/assistants sync',
+      () async {
+        // Full DataSync export path needs prefs + path provider fakes.
+        SharedPreferences.setMockInitialValues({});
+        PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+
+        final conversation = Conversation(id: 'c1', title: 'Chat 1');
+        await repo.putConversation(conversation);
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm1',
+            role: 'user',
+            content: 'hello',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 1),
+          ),
+        );
+        chatService._conversations.add(conversation);
+
+        final plan = SyncPlan(
+          conversations: const [],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2025, 1, 1),
+        );
+        late http.Request captured;
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/sync/plan') {
+              return http.Response(plan.toJsonString(), 200);
+            }
+            captured = request;
+            return http.Response(
+              '{"empty":true}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+
+        await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+        await lanClient.exchange(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        expect(lanClient.phase, LanSyncPhase.noData);
+        expect(captured, isNotNull);
+        final contentType = captured.headers['content-type']!;
+        expect(contentType, startsWith('multipart/form-data'));
+        final boundary = contentType.split('boundary=').last;
+        final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+        final zipBytes = parts['zip'];
+        expect(zipBytes, isNotNull);
+
+        final archive = ZipDecoder().decodeBytes(zipBytes!);
+        try {
+          expect(archive.findFile('settings.json'), isNotNull);
+          expect(archive.findFile('chats.json'), isNotNull);
+        } finally {
+          archive.clearSync();
+        }
+      },
+    );
+
+    test(
+      'negotiate computes outbound file stats from the plan since',
+      () async {
+        // Install the fake path provider so countFilesForSince walks real
+        // temp dirs; restore the previous instance afterwards.
+        final prevProvider = PathProviderPlatform.instance;
+        final support = Directory('${tempDir.path}/support');
+        await support.create(recursive: true);
+        PathProviderPlatform.instance = _FakePathProviderPlatform(support.path);
+        addTearDown(() => PathProviderPlatform.instance = prevProvider);
+
+        // One qualifying upload file (mtime after the plan's since).
+        final uploadDir = Directory('${support.path}/upload');
+        await uploadDir.create(recursive: true);
+        final f = File('${uploadDir.path}/a.bin');
+        await f.writeAsBytes(List<int>.filled(16, 7));
+        await f.setLastModified(DateTime(2026, 1, 2));
+
+        final planWithSince = SyncPlan(
+          conversations: const [],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2026, 1, 1),
+          serverFileCount: 3,
+          serverFileSizeBytes: 999,
+        );
+
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient(
+            (request) async => http.Response(planWithSince.toJsonString(), 200),
+          ),
+        );
+
+        final plan = await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        // Peer's inbound payload comes from the plan...
+        expect(plan.serverFileCount, 3);
+        expect(plan.serverFileSizeBytes, 999);
+        // ...our own outbound payload is computed locally (1 file, 16 bytes).
+        expect(lanClient.outboundFileCount, 1);
+        expect(lanClient.outboundFileSizeBytes, 16);
+      },
+    );
+
+    test(
+      'modern peer: exchange packs exactly the file delta plus sync_manifest.json',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        // setUp already installed the fake path provider rooted at
+        // tempDir/support — drop files under its sync trees.
+        final support = Directory('${tempDir.path}/support');
+        final uploadDir = Directory('${support.path}/upload');
+        await uploadDir.create(recursive: true);
+        final a = File('${uploadDir.path}/a.bin');
+        await a.writeAsBytes(List<int>.filled(16, 7));
+        await a.setLastModified(DateTime(2026, 1, 2));
+        final wsDir = Directory('${support.path}/workspaces');
+        await wsDir.create(recursive: true);
+        final w = File('${wsDir.path}/w.txt');
+        await w.writeAsString('data');
+        await w.setLastModified(DateTime(2026, 1, 3));
+        final wMtimeMs = w.statSync().modified.millisecondsSinceEpoch;
+
+        final peerManifest = <String, FileManifestEntry>{
+          // a.bin exists on the peer but OLDER → we send ours.
+          'upload/a.bin': FileManifestEntry(
+            size: 16,
+            mtimeMs: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+          ),
+          // peer-only file we lack → never in our outbound delta.
+          'upload/peer-only.bin': FileManifestEntry(
+            size: 5,
+            mtimeMs: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+          ),
+        };
+        final plan = SyncPlan(
+          conversations: const [],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: null,
+          serverFileManifest: peerManifest,
+        );
+        late http.Request captured;
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/sync/plan') {
+              return http.Response(plan.toJsonString(), 200);
+            }
+            captured = request;
+            return http.Response(
+              '{"empty":true}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+
+        await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+        // File-only delta (all conversations identical, since null) still
+        // drives the exchange.
+        expect(lanClient.outboundFileCount, 2);
+        expect(lanClient.phase, LanSyncPhase.planReceived);
+        await lanClient.exchange(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        expect(lanClient.phase, LanSyncPhase.noData);
+        expect(captured, isNotNull);
+        final contentType = captured.headers['content-type']!;
+        final boundary = contentType.split('boundary=').last;
+        final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+        final zipBytes = parts['zip'];
+        expect(zipBytes, isNotNull);
+
+        final archive = ZipDecoder().decodeBytes(zipBytes!);
+        try {
+          // Exactly the delta files are packed; the peer-only file is not.
+          expect(archive.findFile('upload/a.bin'), isNotNull);
+          expect(archive.findFile('workspaces/w.txt'), isNotNull);
+          expect(archive.findFile('upload/peer-only.bin'), isNull);
+          // ms-precision manifest rides inside the zip.
+          final manifestEntry = archive.findFile('sync_manifest.json');
+          expect(manifestEntry, isNotNull);
+          final manifest =
+              jsonDecode(utf8.decode(manifestEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          expect(manifest, contains('upload/a.bin'));
+          expect(manifest, contains('workspaces/w.txt'));
+          expect((manifest['workspaces/w.txt'] as Map)['mtime'], wMtimeMs);
+        } finally {
+          archive.clearSync();
+        }
+      },
+    );
+
+    test(
+      'per-conversation since exports only that conversation\u2019s increments',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final conversation = Conversation(id: 'c1', title: 'Chat 1');
+        await repo.putConversation(conversation);
+        // Pre-fork history (before this conversation's fork point) and the
+        // post-fork increment.
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm_old',
+            role: 'user',
+            content: 'history',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 1),
+          ),
+        );
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm_new',
+            role: 'user',
+            content: 'increment',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 3),
+          ),
+        );
+        chatService._conversations.add(conversation);
+
+        // Modern server: the plan carries the per-conversation fork timestamp
+        // (the fork message 'mf' has 2025-01-02), so the export window is this
+        // conversation's own fork point — pre-fork m_old (2025-01-01) is NOT
+        // re-sent even though it predates the global since too.
+        final plan = SyncPlan(
+          conversations: const [
+            SyncConvPlan(
+              conversationId: 'c1',
+              state: SyncConvState.initiatorOnly,
+              forkPointMessageId: 'mf',
+              initiatorIncrementCount: 1,
+              serverIncrementCount: 0,
+              since: null,
+            ),
+          ],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2025, 1, 2),
+          serverFileManifest: const {},
+        );
+        final resolvedPlan = SyncPlan(
+          conversations: [
+            SyncConvPlan(
+              conversationId: 'c1',
+              state: SyncConvState.initiatorOnly,
+              forkPointMessageId: 'mf',
+              initiatorIncrementCount: 1,
+              serverIncrementCount: 0,
+              since: DateTime(2025, 1, 2),
+            ),
+          ],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2025, 1, 2),
+          serverFileManifest: const {},
+        );
+        expect(plan.since, DateTime(2025, 1, 2));
+        expect(resolvedPlan.conversations.single.since, DateTime(2025, 1, 2));
+
+        late http.Request captured;
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/sync/plan') {
+              return http.Response(resolvedPlan.toJsonString(), 200);
+            }
+            captured = request;
+            return http.Response(
+              '{"empty":true}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+
+        await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+        await lanClient.exchange(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        final contentType = captured.headers['content-type']!;
+        final boundary = contentType.split('boundary=').last;
+        final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+        final archive = ZipDecoder().decodeBytes(parts['zip']!);
+        try {
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+          final chats =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          final messages = (chats['messages'] as List).cast<Map>();
+          // Only the post-fork increment is exported; pre-fork m_old is not.
+          expect(messages, hasLength(1));
+          expect(messages.single['id'], 'm_new');
+        } finally {
+          archive.clearSync();
+        }
+      },
+    );
+
+    test('one-sided conversations export their whole transcript', () async {
+      SharedPreferences.setMockInitialValues({});
+      final conversation = Conversation(id: 'c1', title: 'Chat 1');
+      await repo.putConversation(conversation);
+      await repo.putMessage(
+        ChatMessage(
+          id: 'm1',
+          role: 'user',
+          content: 'only',
+          conversationId: 'c1',
+          timestamp: DateTime(2020, 1, 1),
+        ),
+      );
+      chatService._conversations.add(conversation);
+
+      final plan = SyncPlan(
+        conversations: const [
+          SyncConvPlan(
+            conversationId: 'c1',
+            state: SyncConvState.initiatorOnly,
+            forkPointMessageId: null,
+            initiatorIncrementCount: 1,
+            serverIncrementCount: 0,
+            since: null,
+          ),
+        ],
+        missingAssistantIds: const [],
+        remoteMissingAssistantIds: const [],
+        since: DateTime(2025, 1, 2),
+        serverFileManifest: const {},
+      );
+      late http.Request captured;
+      final lanClient = LanSyncClient(
+        chatService: chatService,
+        dataSync: dataSync,
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/sync/plan') {
+            return http.Response(plan.toJsonString(), 200);
+          }
+          captured = request;
+          return http.Response(
+            '{"empty":true}',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      await lanClient.negotiate(host: '192.168.1.100', port: 9527, pin: '1234');
+      await lanClient.exchange(host: '192.168.1.100', port: 9527, pin: '1234');
+
+      final contentType = captured.headers['content-type']!;
+      final boundary = contentType.split('boundary=').last;
+      final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+      final archive = ZipDecoder().decodeBytes(parts['zip']!);
+      try {
+        final chatsEntry = archive.findFile('chats.json');
+        expect(chatsEntry, isNotNull);
+        final chats =
+            jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                as Map<String, dynamic>;
+        // Null per-conversation since → the whole (ancient) transcript rides.
+        final messages = (chats['messages'] as List).cast<Map>();
+        expect(messages, hasLength(1));
+        expect(messages.single['id'], 'm1');
+      } finally {
+        archive.clearSync();
+      }
+    });
+
+    test(
+      'old peer: client falls back to the global since for the chat export',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final conversation = Conversation(
+          id: 'c1',
+          title: 'Chat 1',
+          createdAt: DateTime(2025, 1, 1),
+          updatedAt: DateTime(2025, 1, 3),
+        );
+        await repo.putConversation(conversation);
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm_old',
+            role: 'user',
+            content: 'history',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 1),
+          ),
+        );
+        await repo.putMessage(
+          ChatMessage(
+            id: 'm_new',
+            role: 'user',
+            content: 'increment',
+            conversationId: 'c1',
+            timestamp: DateTime(2025, 1, 3),
+          ),
+        );
+        chatService._conversations.add(conversation);
+
+        // Old server: no serverFileManifest, no per-conversation since. The
+        // client must NOT fall into per-conversation mode (which would export
+        // the whole transcript) — it keeps the global-since message filter.
+        final plan = SyncPlan(
+          conversations: const [
+            SyncConvPlan(
+              conversationId: 'c1',
+              state: SyncConvState.initiatorOnly,
+              forkPointMessageId: 'mf',
+              initiatorIncrementCount: 1,
+              serverIncrementCount: 0,
+              since: null,
+            ),
+          ],
+          missingAssistantIds: const [],
+          remoteMissingAssistantIds: const [],
+          since: DateTime(2025, 1, 2),
+        );
+        late http.Request captured;
+        final lanClient = LanSyncClient(
+          chatService: chatService,
+          dataSync: dataSync,
+          httpClient: MockClient((request) async {
+            if (request.url.path == '/sync/plan') {
+              return http.Response(plan.toJsonString(), 200);
+            }
+            captured = request;
+            return http.Response(
+              '{"empty":true}',
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+
+        await lanClient.negotiate(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+        await lanClient.exchange(
+          host: '192.168.1.100',
+          port: 9527,
+          pin: '1234',
+        );
+
+        final contentType = captured.headers['content-type']!;
+        final boundary = contentType.split('boundary=').last;
+        final parts = parseMultipartBytes(captured.bodyBytes, boundary);
+        final archive = ZipDecoder().decodeBytes(parts['zip']!);
+        try {
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+          final chats =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
+          // Global-since window: only the post-since increment rides; the
+          // pre-since history is not re-sent (a full transcript would include
+          // m_old and indicate per-conversation mode leaked in).
+          final messages = (chats['messages'] as List).cast<Map>();
+          expect(messages, hasLength(1));
+          expect(messages.single['id'], 'm_new');
+        } finally {
+          archive.clearSync();
+        }
+      },
+    );
   });
 }

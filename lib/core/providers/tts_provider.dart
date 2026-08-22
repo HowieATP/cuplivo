@@ -10,11 +10,13 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../utils/utf16_safe_cut.dart';
 import '../services/network/logging_http_client.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
 import '../services/backup/double_pref_keys.dart' show prefDouble;
+import '../services/ios_keep_alive.dart';
 
 String ttsAudioFileExtensionForMime(String? mime) {
   switch ((mime ?? '').toLowerCase()) {
@@ -427,6 +429,7 @@ class TtsProvider extends ChangeNotifier {
     bool flush = true,
     bool reuseResolvedNetworkAudio = false,
   }) async {
+    _suspendKeepAliveForMedia();
     final content = _stripMarkdown(text).trim();
     if (content.isEmpty) return;
     if (flush) await _stopPlaybackEngines();
@@ -550,8 +553,27 @@ class TtsProvider extends ChangeNotifier {
     return true;
   }
 
+  // Keep-alive media coordination: while TTS plays, suspend the silent-audio
+  // keep-alive leg so both don't fight over the audio session. Boolean state
+  // machine — Dart only emits 0→1 / 1→0 transitions, so it can never drift
+  // out of sync with the native counter.
+  bool _keepAliveSuspendedForMedia = false;
+
+  void _suspendKeepAliveForMedia() {
+    if (_keepAliveSuspendedForMedia) return;
+    _keepAliveSuspendedForMedia = true;
+    unawaited(IosKeepAliveService.instance.suspendSilentAudio());
+  }
+
+  void _resumeKeepAliveForMedia() {
+    if (!_keepAliveSuspendedForMedia) return;
+    _keepAliveSuspendedForMedia = false;
+    unawaited(IosKeepAliveService.instance.resumeSilentAudio());
+  }
+
   Future<void> stop() async {
     _sessionId++;
+    _resumeKeepAliveForMedia();
     await _stopPlaybackEngines();
     _stopInternal(updateState: true);
   }
@@ -778,7 +800,9 @@ class TtsProvider extends ChangeNotifier {
       _advanceSystemChunkOrFinish();
       return;
     }
-    final text = chunk.text.substring(charOffset);
+    final text = chunk.text.substring(
+      utf16SafeTailStart(chunk.text, charOffset),
+    );
     final ok = await _trySpeak(text);
     if (!ok && session == _sessionId) {
       _error = 'TTS speak failed';
@@ -919,6 +943,7 @@ class TtsProvider extends ChangeNotifier {
   }
 
   void _finishPlayback({required TtsPlaybackStatus status, String? error}) {
+    _resumeKeepAliveForMedia();
     _isSpeaking = false;
     _isPaused = false;
     _usingNetwork = false;
@@ -1170,6 +1195,7 @@ class TtsProvider extends ChangeNotifier {
   @override
   void dispose() {
     _sessionId++;
+    _resumeKeepAliveForMedia();
     _playerCompleteSub?.cancel();
     _playerPositionSub?.cancel();
     _playerDurationSub?.cancel();

@@ -14,6 +14,7 @@ import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
@@ -32,7 +33,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
-import '../../../desktop/mcp_servers_popover.dart';
+import '../../../desktop/tools_hub_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
@@ -48,7 +49,7 @@ import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
-import '../../assistant/widgets/mcp_assistant_sheet.dart';
+import '../../home/widgets/tools_hub_sheet.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
@@ -239,8 +240,7 @@ class _CompressContextOptionsDialogState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final panelColor = isDark ? const Color(0xFF1C1C1E) : cs.surface;
+    final panelColor = context.appColors.surfaceCard;
     final constrainedWidth = MediaQuery.of(
       context,
     ).size.width.clamp(0.0, 420.0).toDouble();
@@ -465,10 +465,9 @@ class _KeepCountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final enabled = onTap != null;
     return IosCardPress(
-      baseColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+      baseColor: context.appColors.surfaceFill,
       borderRadius: BorderRadius.circular(10),
       pressedScale: 0.98,
       onTap: onTap,
@@ -505,7 +504,7 @@ class _SegmentButton extends StatelessWidget {
     final selectedBg = isDark
         ? cs.primary.withValues(alpha: 0.22)
         : cs.primary.withValues(alpha: 0.12);
-    final baseBg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
+    final baseBg = context.appColors.surfaceFill;
 
     return IosCardPress(
       baseColor: selected ? selectedBg : baseBg,
@@ -548,10 +547,7 @@ class _DialogActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = primary
-        ? cs.primary
-        : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
+    final base = primary ? cs.primary : context.appColors.surfaceFill;
 
     return IosCardPress(
       baseColor: base,
@@ -1550,17 +1546,17 @@ class _HomePageState extends State<HomePage>
               context,
             ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
           },
-          onOpenMcp: () {
+          onOpenToolsHub: () {
             final a = context.read<AssistantProvider>().currentAssistant;
             if (a != null) {
               if (PlatformUtils.isDesktop) {
-                showDesktopMcpServersPopover(
+                showDesktopToolsHubPopover(
                   context,
                   anchorKey: _inputBarKey,
                   assistantId: a.id,
                 );
               } else {
-                showAssistantMcpSheet(context, assistantId: a.id);
+                showToolsHubSheet(context, assistantId: a.id);
               }
             }
           },
@@ -2064,6 +2060,7 @@ class _HomePageState extends State<HomePage>
     bool deleteAllVersions = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2084,10 +2081,7 @@ class _HomePageState extends State<HomePage>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.homePageDelete,
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text(l10n.homePageDelete, style: TextStyle(color: cs.error)),
           ),
         ],
       ),
@@ -2110,6 +2104,7 @@ class _HomePageState extends State<HomePage>
     required bool deleteAllVersions,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     if (_controller.selectedItems.isEmpty) {
       showAppSnackBar(
         context,
@@ -2143,10 +2138,7 @@ class _HomePageState extends State<HomePage>
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.homePageDelete,
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text(l10n.homePageDelete, style: TextStyle(color: cs.error)),
           ),
         ],
       ),

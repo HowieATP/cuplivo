@@ -322,6 +322,30 @@ abstract class AppLocalizations {
   /// **'Assistants'**
   String get storageSpaceCategoryAssistantData;
 
+  /// No description provided for @storageSpaceCategoryWorkspaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspaces'**
+  String get storageSpaceCategoryWorkspaces;
+
+  /// No description provided for @storageSpaceCategorySkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get storageSpaceCategorySkills;
+
+  /// No description provided for @storageSpaceCategoryFonts.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get storageSpaceCategoryFonts;
+
+  /// No description provided for @storageSpaceCategorySandbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox'**
+  String get storageSpaceCategorySandbox;
+
   /// No description provided for @storageSpaceCategoryCache.
   ///
   /// In en, this message translates to:
@@ -417,6 +441,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Images'**
   String get storageSpaceSubAssistantImages;
+
+  /// No description provided for @storageSpaceSubSandboxPerWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace sandboxes'**
+  String get storageSpaceSubSandboxPerWorkspace;
+
+  /// No description provided for @storageSpaceSubDescSandboxPerWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-workspace Linux root filesystem and temp files; regenerated when dependencies are re-installed.'**
+  String get storageSpaceSubDescSandboxPerWorkspace;
+
+  /// No description provided for @storageSpaceSubSandboxSharedRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared sandbox runtime'**
+  String get storageSpaceSubSandboxSharedRuntime;
+
+  /// No description provided for @storageSpaceSubDescSandboxSharedRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Linux sandbox runtime (iOS); re-created automatically.'**
+  String get storageSpaceSubDescSandboxSharedRuntime;
 
   /// No description provided for @storageSpaceSubCacheAvatars.
   ///
@@ -531,6 +579,77 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear Logs'**
   String get storageSpaceClearLogsButton;
+
+  /// No description provided for @storageSpaceClearSandboxButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Sandbox'**
+  String get storageSpaceClearSandboxButton;
+
+  /// No description provided for @storageSpaceCompactDbButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact Database'**
+  String get storageSpaceCompactDbButton;
+
+  /// No description provided for @storageSpaceCompactDbConfirmPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to compact'**
+  String get storageSpaceCompactDbConfirmPrompt;
+
+  /// No description provided for @storageSpaceCompactDbRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Compacting…'**
+  String get storageSpaceCompactDbRunning;
+
+  /// No description provided for @storageSpaceCompactDbHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted data leaves gaps in the database file. Compacting reclaims that space.'**
+  String get storageSpaceCompactDbHint;
+
+  /// No description provided for @storageSpaceCompactDbResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Database compacted: {before} → {after}, saved {saved} ({pct}%)'**
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  );
+
+  /// No description provided for @storageSpaceCompactDbNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to compact'**
+  String get storageSpaceCompactDbNone;
+
+  /// No description provided for @storageSpaceCompactDbFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact failed: {error}'**
+  String storageSpaceCompactDbFailed(Object error);
+
+  /// No description provided for @storageSpaceSandboxClearPartialDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox cleared. The shared runtime will be removed after the app restarts.'**
+  String get storageSpaceSandboxClearPartialDone;
+
+  /// No description provided for @storageSpaceScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning…'**
+  String get storageSpaceScanning;
+
+  /// No description provided for @storageSpaceScanningProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning… {files} files, {size}'**
+  String storageSpaceScanningProgress(Object files, Object size);
 
   /// No description provided for @storageSpaceViewLogsButton.
   ///
@@ -843,6 +962,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to read {name}: {error}'**
   String mountFilesPreviewReadFailed(Object error, Object name);
+
+  /// No description provided for @filePreviewOpenWithSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Open with another app'**
+  String get filePreviewOpenWithSystem;
 
   /// No description provided for @mountFilesPreviewTruncated.
   ///
@@ -3245,6 +3370,12 @@ abstract class AppLocalizations {
   /// **'Download PNG'**
   String get markdownMathDownloadPngLabel;
 
+  /// No description provided for @markdownMathSavePngLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Gallery'**
+  String get markdownMathSavePngLabel;
+
   /// No description provided for @markdownMathDefaultFileNameStem.
   ///
   /// In en, this message translates to:
@@ -3766,6 +3897,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If you have any issues, join the Cuplivo QQ group to give feedback.'**
   String get backupPageRikkaHubStep5;
+
+  /// No description provided for @backupPageKelivoCompatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot Import Kelivo v2 Backup'**
+  String get backupPageKelivoCompatTitle;
+
+  /// No description provided for @backupPageKelivoCompatContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup uses the Kelivo v2 (v1.2) format, which this version cannot import directly. Please open the kelivo-helper compat tool to downgrade it to a compatible format first, then import the converted file.'**
+  String get backupPageKelivoCompatContent;
+
+  /// No description provided for @backupPageKelivoCompatOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Downgrade Tool'**
+  String get backupPageKelivoCompatOpen;
+
+  /// No description provided for @backupPageKelivoCompatUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/compat'**
+  String get backupPageKelivoCompatUrl;
 
   /// No description provided for @backupPageNotSupportedYet.
   ///
@@ -4336,6 +4491,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No changes to sync.'**
   String get lanSyncPlanNoChanges;
+
+  /// No description provided for @lanSyncPlanToSendFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files to send ({size})'**
+  String lanSyncPlanToSendFiles(Object count, Object size);
+
+  /// No description provided for @lanSyncPlanToReceiveFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files to receive ({size})'**
+  String lanSyncPlanToReceiveFiles(Object count, Object size);
+
+  /// No description provided for @lanSyncRestoreExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting sync data...'**
+  String get lanSyncRestoreExtracting;
+
+  /// No description provided for @lanSyncRestoreMergingChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Merging chats...'**
+  String get lanSyncRestoreMergingChats;
+
+  /// No description provided for @lanSyncRestoreCopyingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing files...'**
+  String get lanSyncRestoreCopyingFiles;
+
+  /// No description provided for @lanSyncRestoreRestoringSkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring skills...'**
+  String get lanSyncRestoreRestoringSkills;
+
+  /// No description provided for @lanSyncRestoreFilesProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{total} files · {size}'**
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total);
+
+  /// No description provided for @lanSyncRestoreChatsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{total} conversations'**
+  String lanSyncRestoreChatsProgress(Object count, Object total);
+
+  /// No description provided for @lanSyncRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync data merge failed'**
+  String get lanSyncRestoreFailed;
 
   /// No description provided for @lanSyncErrorInvalidPin.
   ///
@@ -5495,6 +5704,30 @@ abstract class AppLocalizations {
   /// **'Unpin'**
   String get sideDrawerMenuUnpin;
 
+  /// No description provided for @sideDrawerMenuBatchPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin selected'**
+  String get sideDrawerMenuBatchPin;
+
+  /// No description provided for @sideDrawerMenuBatchUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin selected'**
+  String get sideDrawerMenuBatchUnpin;
+
+  /// No description provided for @sideDrawerBatchPinSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned {count} conversations'**
+  String sideDrawerBatchPinSuccess(int count);
+
+  /// No description provided for @sideDrawerBatchUnpinSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned {count} conversations'**
+  String sideDrawerBatchUnpinSuccess(int count);
+
   /// No description provided for @sideDrawerMenuRegenerateTitle.
   ///
   /// In en, this message translates to:
@@ -5997,11 +6230,41 @@ abstract class AppLocalizations {
   /// **'Reasoning Strength'**
   String get chatInputBarReasoningStrengthTooltip;
 
-  /// No description provided for @chatInputBarMcpServersTooltip.
+  /// No description provided for @chatInputBarToolsTooltip.
   ///
   /// In en, this message translates to:
-  /// **'MCP Servers'**
-  String get chatInputBarMcpServersTooltip;
+  /// **'Tools'**
+  String get chatInputBarToolsTooltip;
+
+  /// No description provided for @toolsHubLocalToolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Tools'**
+  String get toolsHubLocalToolsTitle;
+
+  /// No description provided for @toolsHubWorkspaceUnbound.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspace bound'**
+  String get toolsHubWorkspaceUnbound;
+
+  /// No description provided for @toolsHubOpenTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Terminal'**
+  String get toolsHubOpenTerminal;
+
+  /// No description provided for @toolsHubTerminalDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind and enable a workspace first'**
+  String get toolsHubTerminalDisabledHint;
+
+  /// No description provided for @toolsHubWorkspaceManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Workspaces'**
+  String get toolsHubWorkspaceManage;
 
   /// No description provided for @chatInputBarMoreTooltip.
   ///
@@ -8298,6 +8561,276 @@ abstract class AppLocalizations {
   /// **'URL Required'**
   String get searchServicesPageUrlRequiredStatus;
 
+  /// No description provided for @searchServiceEditorProviderTypeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search provider'**
+  String get searchServiceEditorProviderTypeTitle;
+
+  /// No description provided for @searchServiceEditorConfigurationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration'**
+  String get searchServiceEditorConfigurationTitle;
+
+  /// No description provided for @searchServiceEditorNoConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'This provider does not require additional configuration.'**
+  String get searchServiceEditorNoConfiguration;
+
+  /// No description provided for @searchServiceEditorMultiKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-key rotation'**
+  String get searchServiceEditorMultiKeyTitle;
+
+  /// No description provided for @searchServiceEditorMultiKeyNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get searchServiceEditorMultiKeyNone;
+
+  /// No description provided for @searchServiceEditorMultiKeyCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} keys'**
+  String searchServiceEditorMultiKeyCount(Object count);
+
+  /// No description provided for @searchApiKeysPageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.'**
+  String get searchApiKeysPageDescription;
+
+  /// No description provided for @searchApiKeysPagePrimaryBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary'**
+  String get searchApiKeysPagePrimaryBadge;
+
+  /// No description provided for @searchApiKeysPageRevealKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal API key'**
+  String get searchApiKeysPageRevealKey;
+
+  /// No description provided for @searchApiKeysPageDeleteKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete API key'**
+  String get searchApiKeysPageDeleteKey;
+
+  /// No description provided for @searchApiKeysPageBatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste one or more keys — one per line or comma-separated'**
+  String get searchApiKeysPageBatchHint;
+
+  /// No description provided for @searchApiKeysPageBatchResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {added}, skipped {skipped} duplicate(s)'**
+  String searchApiKeysPageBatchResult(Object added, Object skipped);
+
+  /// No description provided for @searchApiKeysPageAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get searchApiKeysPageAdd;
+
+  /// No description provided for @searchApiKeysPageEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No keys configured yet.'**
+  String get searchApiKeysPageEmpty;
+
+  /// No description provided for @searchServiceEditorUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account usage'**
+  String get searchServiceEditorUsageTitle;
+
+  /// No description provided for @searchServiceEditorUsageNotQueried.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage has not been queried yet.'**
+  String get searchServiceEditorUsageNotQueried;
+
+  /// No description provided for @searchServiceEditorUsageQuery.
+  ///
+  /// In en, this message translates to:
+  /// **'Check usage'**
+  String get searchServiceEditorUsageQuery;
+
+  /// No description provided for @searchServiceEditorUsageQuerying.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get searchServiceEditorUsageQuerying;
+
+  /// No description provided for @searchServiceEditorUsageRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{remaining} credits remaining'**
+  String searchServiceEditorUsageRemaining(Object remaining);
+
+  /// No description provided for @searchServiceEditorUsageBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance: {balance}'**
+  String searchServiceEditorUsageBalance(Object balance);
+
+  /// No description provided for @searchServiceEditorUsageUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {limit} credits used'**
+  String searchServiceEditorUsageUsed(Object limit, Object used);
+
+  /// No description provided for @searchServiceEditorUsageFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not query usage: {message}'**
+  String searchServiceEditorUsageFailed(Object message);
+
+  /// No description provided for @searchServiceEditorTestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Test search'**
+  String get searchServiceEditorTestTitle;
+
+  /// No description provided for @searchServiceEditorTestQueryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a query'**
+  String get searchServiceEditorTestQueryHint;
+
+  /// No description provided for @searchServiceEditorTestRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run test search'**
+  String get searchServiceEditorTestRun;
+
+  /// No description provided for @searchServiceEditorTestRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching…'**
+  String get searchServiceEditorTestRunning;
+
+  /// No description provided for @searchServiceEditorTestNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider returned no results.'**
+  String get searchServiceEditorTestNoResults;
+
+  /// No description provided for @searchServiceEditorTestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search failed: {message}'**
+  String searchServiceEditorTestFailed(Object message);
+
+  /// No description provided for @searchServiceEditorResultOpenTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open result'**
+  String get searchServiceEditorResultOpenTooltip;
+
+  /// No description provided for @searchServiceEditorDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete search service'**
+  String get searchServiceEditorDeleteTooltip;
+
+  /// No description provided for @searchServiceEditorDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete search service?'**
+  String get searchServiceEditorDeleteTitle;
+
+  /// No description provided for @searchServiceEditorDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {provider}? This cannot be undone.'**
+  String searchServiceEditorDeleteMessage(Object provider);
+
+  /// No description provided for @searchServiceEditorDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get searchServiceEditorDeleteConfirm;
+
+  /// No description provided for @searchServiceEditorDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get searchServiceEditorDiscardTitle;
+
+  /// No description provided for @searchServiceEditorDiscardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your unsaved search service settings will be lost.'**
+  String get searchServiceEditorDiscardMessage;
+
+  /// No description provided for @searchServiceEditorKeepEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get searchServiceEditorKeepEditing;
+
+  /// No description provided for @searchServiceEditorDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get searchServiceEditorDiscard;
+
+  /// No description provided for @searchServiceEditorCategoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get searchServiceEditorCategoryLabel;
+
+  /// No description provided for @searchServiceEditorCountryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get searchServiceEditorCountryLabel;
+
+  /// No description provided for @searchServiceEditorLocationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get searchServiceEditorLocationLabel;
+
+  /// No description provided for @searchServiceEditorLanguageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get searchServiceEditorLanguageLabel;
+
+  /// No description provided for @searchServiceEditorIncludeDomainsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Include domains'**
+  String get searchServiceEditorIncludeDomainsLabel;
+
+  /// No description provided for @searchServiceEditorExcludeDomainsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude domains'**
+  String get searchServiceEditorExcludeDomainsLabel;
+
+  /// No description provided for @searchServiceEditorApiKeyOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key (optional)'**
+  String get searchServiceEditorApiKeyOptional;
+
+  /// No description provided for @searchServicesDialogBatchPasteKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch paste keys'**
+  String get searchServicesDialogBatchPasteKeys;
+
   /// No description provided for @searchServicesAddDialogTitle.
   ///
   /// In en, this message translates to:
@@ -9066,6 +9599,30 @@ abstract class AppLocalizations {
   /// **'New Chat on Launch'**
   String get displaySettingsPageNewChatOnLaunchTitle;
 
+  /// No description provided for @displaySettingsPageStartupAssistantPinnedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a pinned assistant'**
+  String get displaySettingsPageStartupAssistantPinnedTitle;
+
+  /// No description provided for @displaySettingsPageStartupAssistantPinnedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Always switch to the designated assistant on launch'**
+  String get displaySettingsPageStartupAssistantPinnedSubtitle;
+
+  /// No description provided for @displaySettingsPageStartupAssistantPickerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Startup assistant'**
+  String get displaySettingsPageStartupAssistantPickerLabel;
+
+  /// No description provided for @displaySettingsPageStartupAssistantNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get displaySettingsPageStartupAssistantNone;
+
   /// No description provided for @displaySettingsPageEnterToSendTitle.
   ///
   /// In en, this message translates to:
@@ -9324,17 +9881,125 @@ abstract class AppLocalizations {
   /// **'Color Palettes'**
   String get themeSettingsPageColorPalettesSection;
 
-  /// No description provided for @themeSettingsPageCustomDynamicTitle.
+  /// No description provided for @themeSettingsPageCustomPaletteName.
   ///
   /// In en, this message translates to:
-  /// **'Custom Dynamic'**
-  String get themeSettingsPageCustomDynamicTitle;
+  /// **'Custom'**
+  String get themeSettingsPageCustomPaletteName;
 
-  /// No description provided for @themeSettingsPageSeedColorLabel.
+  /// No description provided for @themeSettingsPageCustomColorReset.
   ///
   /// In en, this message translates to:
-  /// **'Seed Color'**
-  String get themeSettingsPageSeedColorLabel;
+  /// **'Reset'**
+  String get themeSettingsPageCustomColorReset;
+
+  /// No description provided for @themeSettingsPageCustomThemesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Themes'**
+  String get themeSettingsPageCustomThemesSection;
+
+  /// No description provided for @customThemeNewTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'New Theme'**
+  String get customThemeNewTheme;
+
+  /// No description provided for @customThemeEditTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Theme'**
+  String get customThemeEditTheme;
+
+  /// No description provided for @customThemeImportTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Theme'**
+  String get customThemeImportTheme;
+
+  /// No description provided for @customThemeNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme name'**
+  String get customThemeNameLabel;
+
+  /// No description provided for @customThemePrimaryColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary'**
+  String get customThemePrimaryColor;
+
+  /// No description provided for @customThemeSecondaryColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary'**
+  String get customThemeSecondaryColor;
+
+  /// No description provided for @customThemeTertiaryColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Tertiary'**
+  String get customThemeTertiaryColor;
+
+  /// No description provided for @customThemeColorAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get customThemeColorAuto;
+
+  /// No description provided for @customThemeSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get customThemeSave;
+
+  /// No description provided for @customThemeCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get customThemeCancel;
+
+  /// No description provided for @customThemeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get customThemeDelete;
+
+  /// No description provided for @customThemeDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this theme?'**
+  String get customThemeDeleteConfirm;
+
+  /// No description provided for @customThemeDeleteConfirmActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this theme? The app will switch to the default palette.'**
+  String get customThemeDeleteConfirmActive;
+
+  /// No description provided for @customThemeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme JSON copied to clipboard'**
+  String get customThemeCopied;
+
+  /// No description provided for @customThemeCopyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get customThemeCopyAction;
+
+  /// No description provided for @customThemeImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the theme JSON here'**
+  String get customThemeImportHint;
+
+  /// No description provided for @customThemeImportInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid theme JSON'**
+  String get customThemeImportInvalid;
 
   /// No description provided for @ttsServicesPageBackButton.
   ///
@@ -10571,6 +11236,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Grok'**
   String get searchServiceNameGrok;
+
+  /// No description provided for @searchServiceNameStepFun.
+  ///
+  /// In en, this message translates to:
+  /// **'StepFun'**
+  String get searchServiceNameStepFun;
+
+  /// No description provided for @searchServiceNameFirecrawl.
+  ///
+  /// In en, this message translates to:
+  /// **'Firecrawl'**
+  String get searchServiceNameFirecrawl;
+
+  /// No description provided for @searchServiceNameTinyFish.
+  ///
+  /// In en, this message translates to:
+  /// **'TinyFish'**
+  String get searchServiceNameTinyFish;
+
+  /// No description provided for @searchServiceNameDoubao.
+  ///
+  /// In en, this message translates to:
+  /// **'Doubao'**
+  String get searchServiceNameDoubao;
+
+  /// No description provided for @searchProviderStepFunDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'StepFun web search via POST /v1/search.'**
+  String get searchProviderStepFunDescription;
+
+  /// No description provided for @searchProviderFirecrawlDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Firecrawl Search API v2. API key is optional. Scrape is not supported here.'**
+  String get searchProviderFirecrawlDescription;
+
+  /// No description provided for @searchProviderTinyFishDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.'**
+  String get searchProviderTinyFishDescription;
+
+  /// No description provided for @searchProviderDoubaoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Doubao web search API by Volcano Engine.'**
+  String get searchProviderDoubaoDescription;
 
   /// No description provided for @searchProviderGrokDescription.
   ///
@@ -12315,7 +13028,7 @@ abstract class AppLocalizations {
   /// No description provided for @worldBookEntryKeywordsHint.
   ///
   /// In en, this message translates to:
-  /// **'Type a keyword and tap + to add.'**
+  /// **'Type a keyword and press Enter or tap + to add.'**
   String get worldBookEntryKeywordsHint;
 
   /// No description provided for @worldBookEntryKeywordInputHint.
@@ -14676,6 +15389,12 @@ abstract class AppLocalizations {
   /// **'Bound workspace'**
   String get workspaceBindTitle;
 
+  /// No description provided for @workspaceBindDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable workspace to select'**
+  String get workspaceBindDisabledHint;
+
   /// No description provided for @workspaceEntryTitle.
   ///
   /// In en, this message translates to:
@@ -15077,6 +15796,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Workspace'**
   String get assistantEditLocalToolWorkspaceTitle;
+
+  /// No description provided for @iosKeepAliveMasterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhanced Background Execution'**
+  String get iosKeepAliveMasterTitle;
+
+  /// No description provided for @iosKeepAliveMasterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep agent tasks running while the app is in the background.'**
+  String get iosKeepAliveMasterSubtitle;
+
+  /// No description provided for @iosKeepAliveSilentAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent Audio Keep-Alive'**
+  String get iosKeepAliveSilentAudioTitle;
+
+  /// No description provided for @iosKeepAliveSilentAudioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Play an inaudible track so iOS keeps the process alive in the background.'**
+  String get iosKeepAliveSilentAudioSubtitle;
+
+  /// No description provided for @iosKeepAliveLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location Keep-Alive'**
+  String get iosKeepAliveLocationTitle;
+
+  /// No description provided for @iosKeepAliveLocationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use background location updates to keep the app alive while backgrounded.'**
+  String get iosKeepAliveLocationSubtitle;
+
+  /// No description provided for @iosKeepAlivePrivacyModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activity Privacy Mode'**
+  String get iosKeepAlivePrivacyModeTitle;
+
+  /// No description provided for @iosKeepAlivePrivacyModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide session content from the Lock Screen and Dynamic Island.'**
+  String get iosKeepAlivePrivacyModeSubtitle;
+
+  /// No description provided for @iosKeepAliveStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-alive status unavailable'**
+  String get iosKeepAliveStatusUnavailable;
+
+  /// No description provided for @iosKeepAliveSilentAudioActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio active'**
+  String get iosKeepAliveSilentAudioActive;
+
+  /// No description provided for @iosKeepAliveSilentAudioInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio inactive'**
+  String get iosKeepAliveSilentAudioInactive;
+
+  /// No description provided for @iosKeepAliveLocationAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Location authorized'**
+  String get iosKeepAliveLocationAuthorized;
+
+  /// No description provided for @iosKeepAliveLocationNotAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Location not authorized — tap to open system settings'**
+  String get iosKeepAliveLocationNotAuthorized;
+
+  /// No description provided for @iosKeepAliveSurvivalExtended.
+  ///
+  /// In en, this message translates to:
+  /// **'Extended background survival'**
+  String get iosKeepAliveSurvivalExtended;
+
+  /// No description provided for @iosKeepAliveSurvivalShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard background survival (~30s)'**
+  String get iosKeepAliveSurvivalShort;
+
+  /// No description provided for @iosKeepAliveConfigAudioReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio ready'**
+  String get iosKeepAliveConfigAudioReady;
+
+  /// No description provided for @iosKeepAliveConfigAudioOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio off'**
+  String get iosKeepAliveConfigAudioOff;
+
+  /// No description provided for @iosKeepAliveConfigLocationReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Location ready'**
+  String get iosKeepAliveConfigLocationReady;
+
+  /// No description provided for @iosKeepAliveConfigLocationPermissionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission needed'**
+  String get iosKeepAliveConfigLocationPermissionNeeded;
+
+  /// No description provided for @iosKeepAliveConfigLocationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location off'**
+  String get iosKeepAliveConfigLocationOff;
+
+  /// No description provided for @iosKeepAliveInterruptedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted by the system previously'**
+  String get iosKeepAliveInterruptedNotice;
+
+  /// No description provided for @iosBackgroundGenerationPrivacyActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Task'**
+  String get iosBackgroundGenerationPrivacyActiveTitle;
+
+  /// No description provided for @iosBackgroundGenerationPrivacyActiveDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Task in progress…'**
+  String get iosBackgroundGenerationPrivacyActiveDetail;
 }
 
 class _AppLocalizationsDelegate

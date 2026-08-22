@@ -10,6 +10,7 @@ import '../chat/chat_service.dart';
 import '../backup/data_sync.dart';
 import '../../models/backup.dart';
 import '../../models/incremental_backup.dart';
+import 'lan_sync_logic.dart';
 import 'lan_sync_models.dart';
 
 /// Callback for delivering the received zip file to the UI for restore + restart.
@@ -47,6 +48,33 @@ class LanSyncClient extends ChangeNotifier {
   /// The last computed sync plan (null until round 1 completes).
   SyncPlan? _plan;
   SyncPlan? get plan => _plan;
+
+  /// Outbound file payload for the current plan (mirrors `_packZipSync`),
+  /// computed from the plan's `since`. Null until [negotiate] completes or
+  /// when `since` is null (nothing will be packed).
+  int? _outboundFileCount;
+  int? _outboundFileSizeBytes;
+  int? get outboundFileCount => _outboundFileCount;
+  int? get outboundFileSizeBytes => _outboundFileSizeBytes;
+
+  /// The exact zip-entry paths this device must pack in round 2 (modern-peer
+  /// file delta). Null for old peers / when nothing differs — the zip then
+  /// falls back to the `since`-based filter (or is skipped entirely).
+  Set<String>? _outboundDelta;
+
+  /// This device's file manifest, built once in [_buildIndex] and reused for
+  /// the round-2 delta computation so the tree is only walked once per sync.
+  Map<String, FileManifestEntry>? _localManifest;
+
+  /// Restore progress snapshot, non-null only while this device is
+  /// merge-restoring a received zip (the mask content in the UI).
+  RestoreProgress? _restoreProgress;
+  RestoreProgress? get restoreProgress => _restoreProgress;
+
+  /// Non-null when a received-zip restore failed; the UI shows the failed
+  /// state (with a close action) instead of the progress mask.
+  String? _restoreError;
+  String? get restoreError => _restoreError;
 
   /// Whether a sync operation is in progress.
   bool _busy = false;
@@ -114,6 +142,26 @@ class LanSyncClient extends ChangeNotifier {
 
       final plan = SyncPlan.fromJsonString(response.body);
       _plan = plan;
+      // Compute our own outbound file payload so the plan preview can show
+      // "will send N files". Modern peer: exact per-file delta against the
+      // server's manifest. Old peer: stat-only `since`-based count.
+      if (plan.serverFileManifest != null) {
+        final localManifest =
+            _localManifest ?? await _dataSync.buildFileManifest();
+        final delta = computeFileDelta(localManifest, plan.serverFileManifest!);
+        _outboundDelta = delta;
+        _outboundFileCount = delta.length;
+        _outboundFileSizeBytes = sumDeltaBytes(localManifest, delta);
+      } else if (plan.since != null) {
+        final outboundStats = await _dataSync.countFilesForSince(plan.since!);
+        _outboundFileCount = outboundStats.fileCount;
+        _outboundFileSizeBytes = outboundStats.totalBytes;
+        _outboundDelta = null;
+      } else {
+        _outboundDelta = null;
+        _outboundFileCount = null;
+        _outboundFileSizeBytes = null;
+      }
       _phase = LanSyncPhase.planReceived;
       notifyListeners();
       return plan;
@@ -140,15 +188,26 @@ class LanSyncClient extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Build our incremental zip using the plan's `since`.
+      // Build our incremental zip. Triggered by a conversation delta
+      // (`plan.since`) and/or OUR OWN outbound file delta (modern peer). A
+      // server-only delta still requires the exchange (to receive the server's
+      // zip) but must not ship our settings for nothing.
       File? myZip;
-      if (plan.since != null) {
+      final hasConversationDelta = plan.since != null;
+      final outboundDelta = _outboundDelta;
+      final hasFileDelta = outboundDelta?.isNotEmpty ?? false;
+      if (hasConversationDelta || hasFileDelta) {
         final cfg = const WebDavConfig(includeChats: true, includeFiles: true);
         final incremental = IncrementalBackupConfig(
-          since: plan.since!,
-          includeSettings: false,
+          since: plan.since ?? DateTime(2000),
+          // Settings (including assistants and providers) ride settings.json.
+          // Merge restore fills absent slots + unions mergeable lists, so
+          // both peers converge on the union of their configuration.
+          includeSettings: true,
           includeFiles: true,
           updateBackupTime: false,
+          conversationSince: _buildConversationSince(plan),
+          includeFilePaths: outboundDelta,
         );
         myZip = await _dataSync.exportToFile(cfg, incremental: incremental);
       }
@@ -234,7 +293,32 @@ class LanSyncClient extends ChangeNotifier {
     final assistantIds = (await _chatService.getAllAssistants())
         .map((a) => a.id)
         .toList();
-    return SyncIndex(conversations: convMap, assistantIds: assistantIds);
+    final manifest = await _dataSync.buildFileManifest();
+    _localManifest = manifest;
+    return SyncIndex(
+      conversations: convMap,
+      assistantIds: assistantIds,
+      fileManifest: manifest,
+    );
+  }
+
+  /// Per-conversation chat export windows derived from the plan: every
+  /// non-identical conversation is exported, scoped to its own fork-point
+  /// timestamp (null = one-sided → whole transcript); identical conversations
+  /// are absent → skipped by the transport.
+  ///
+  /// Returns null against an old peer (no `serverFileManifest` in the plan,
+  /// hence no per-conversation `since` either) so the zip falls back to the
+  /// single global `since` — exactly the pre-delta chat filtering. Exporting
+  /// full transcripts there would only bloat the payload, not break anything.
+  static Map<String, DateTime?>? _buildConversationSince(SyncPlan plan) {
+    if (plan.serverFileManifest == null) return null;
+    final sinceByConv = <String, DateTime?>{};
+    for (final convPlan in plan.conversations) {
+      if (convPlan.state == SyncConvState.identical) continue;
+      sinceByConv[convPlan.conversationId] = convPlan.since;
+    }
+    return sinceByConv;
   }
 
   Future<Directory> _getTempDir() async {
@@ -249,8 +333,30 @@ class LanSyncClient extends ChangeNotifier {
   /// Resets the client state for a new sync session.
   void reset() {
     _plan = null;
+    _outboundFileCount = null;
+    _outboundFileSizeBytes = null;
+    _outboundDelta = null;
+    _localManifest = null;
+    _restoreProgress = null;
+    _restoreError = null;
     _phase = LanSyncPhase.idle;
     _busy = false;
+    notifyListeners();
+  }
+
+  /// Sets the restore progress snapshot for the mask UI. Passing null clears
+  /// it (and any error). Notifies listeners so the dialog/sheet rebuilds.
+  void setRestoreProgress(RestoreProgress? progress) {
+    _restoreProgress = progress;
+    if (progress == null) _restoreError = null;
+    notifyListeners();
+  }
+
+  /// Marks the received-zip restore as failed with [message]. The UI shows
+  /// the failed state (close action) instead of the progress mask.
+  void setRestoreError(String message) {
+    _restoreError = message;
+    _restoreProgress = null;
     notifyListeners();
   }
 }

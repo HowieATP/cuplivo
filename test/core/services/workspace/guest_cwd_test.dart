@@ -17,7 +17,6 @@ void main() {
     test('accepts relative paths and resolves them under /workspace', () {
       expect(normalizeGuestCwd('src'), '/workspace/src');
       expect(normalizeGuestCwd('src/lib'), '/workspace/src/lib');
-      expect(normalizeGuestCwd('/src'), '/workspace/src');
       expect(normalizeGuestCwd('a//b'), '/workspace/a/b');
       expect(normalizeGuestCwd('./a'), '/workspace/a');
     });
@@ -34,14 +33,20 @@ void main() {
       expect(normalizeGuestCwd('/workspaceX/src'), isNull);
     });
 
+    test('rejects absolute paths outside /workspace', () {
+      expect(normalizeGuestCwd('/'), isNull);
+      expect(normalizeGuestCwd('/src'), isNull);
+      expect(normalizeGuestCwd('/etc'), isNull);
+      expect(normalizeGuestCwd('//workspace/src'), isNull);
+    });
+
     test('rejects traversal that escapes /workspace', () {
-      final dotdot = '..';
-      expect(normalizeGuestCwd('/workspace/${dotdot}/etc'), isNull);
-      expect(normalizeGuestCwd('/workspace/${dotdot}/${dotdot}/root'), isNull);
-      expect(normalizeGuestCwd('${dotdot}/${dotdot}/root'), isNull);
-      expect(normalizeGuestCwd('/workspace/a/${dotdot}/${dotdot}/root'), isNull);
-      expect(normalizeGuestCwd(dotdot), isNull);
-      expect(normalizeGuestCwd('${dotdot}/a'), isNull);
+      expect(normalizeGuestCwd('/workspace/../etc'), isNull);
+      expect(normalizeGuestCwd('/workspace/../../root'), isNull);
+      expect(normalizeGuestCwd('../../root'), isNull);
+      expect(normalizeGuestCwd('/workspace/a/../../root'), isNull);
+      expect(normalizeGuestCwd('..'), isNull);
+      expect(normalizeGuestCwd('../a'), isNull);
     });
 
     test('rejects NUL bytes', () {

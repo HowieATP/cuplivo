@@ -7,8 +7,8 @@ import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/collapsible_group_header.dart';
-import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/tool_toggle_row.dart';
 import '../../../theme/app_font_weights.dart';
 import '../pages/skills_page.dart';
 import '../skill_manager.dart';
@@ -153,8 +153,9 @@ class _SkillsSheetState extends State<SkillsSheet>
           for (final skill in skills)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _SkillSheetRow(
-                name: skill.name,
+              child: ToolToggleRow(
+                icon: Lucide.BookOpen,
+                title: skill.name,
                 enabled: assistant.skillIds.contains(skill.name),
                 onChanged: (v) => _toggle(assistant, skill.name, v),
               ),
@@ -184,8 +185,9 @@ class _SkillsSheetState extends State<SkillsSheet>
                 for (final skill in skills)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: _SkillSheetRow(
-                      name: skill.name,
+                    child: ToolToggleRow(
+                      icon: Lucide.BookOpen,
+                      title: skill.name,
                       enabled: assistant.skillIds.contains(skill.name),
                       onChanged: (v) => _toggle(assistant, skill.name, v),
                     ),
@@ -288,53 +290,6 @@ class _NavIconButton extends StatelessWidget {
         child: Center(
           child: Icon(icon, size: 20, color: color ?? cs.onSurface),
         ),
-      ),
-    );
-  }
-}
-
-class _SkillSheetRow extends StatelessWidget {
-  const _SkillSheetRow({
-    required this.name,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final String name;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final iconColor = enabled
-        ? cs.primary
-        : cs.onSurface.withValues(alpha: 0.7);
-    return IosCardPress(
-      borderRadius: BorderRadius.circular(14),
-      baseColor: cs.surface,
-      duration: const Duration(milliseconds: 260),
-      onTap: () => onChanged(!enabled),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          Icon(Lucide.BookOpen, size: 18, color: iconColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: AppFontWeights.medium,
-                color: cs.onSurface,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          IosSwitch(value: enabled, onChanged: onChanged),
-        ],
       ),
     );
   }

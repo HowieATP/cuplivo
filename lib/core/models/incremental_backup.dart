@@ -32,12 +32,27 @@ class IncrementalBackupConfig {
   final bool includeFiles;
   final bool updateBackupTime;
   final IncrementalScope? scope;
+
+  /// LAN-sync per-conversation chat export window. Presence of a key means the
+  /// conversation is exported; the value is that conversation's own `since`
+  /// (null = one-sided conversation → export the whole conversation). Absence
+  /// means the conversation is identical on both peers and is skipped. When
+  /// null, the single global [since] is used (normal incremental backups).
+  final Map<String, DateTime?>? conversationSince;
+
+  /// LAN-sync per-file delta: the exact set of zip-entry paths to pack (e.g.
+  /// `workspaces/x`). When set, replaces the mtime `>= since` file filter in
+  /// the zip packer. Null → legacy mtime filter (normal backups / old peers).
+  final Set<String>? includeFilePaths;
+
   const IncrementalBackupConfig({
     required this.since,
     this.includeSettings = true,
     this.includeFiles = true,
     this.updateBackupTime = true,
     this.scope,
+    this.conversationSince,
+    this.includeFilePaths,
   });
 
   /// Returns true if [timestamp] is on or after [since].

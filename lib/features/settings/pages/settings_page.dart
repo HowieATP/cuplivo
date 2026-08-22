@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../utils/format.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_semantic_colors.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../provider/pages/providers_page.dart';
 import 'display_settings_page.dart';
@@ -459,9 +461,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
       // Light: white with slight transparency; Dark: subtle translucent dark
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -531,7 +531,13 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
   @override
   void initState() {
     super.initState();
-    _future = StorageUsageService.computeReport();
+    final wp = context.read<WorkspaceProvider>();
+    _future = StorageUsageService.computeReport(
+      workspaceHostPaths: [
+        for (final w in wp.workspaces)
+          if (wp.hostPathFor(w) case final host?) host,
+      ],
+    );
   }
 
   @override
@@ -737,9 +743,7 @@ Widget _sheetOption(
     builder: (pressed) {
       final base = cs.onSurface;
       final bgTarget = pressed
-          ? (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.05))
+          ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
           : Colors.transparent;
       return _AnimatedPressColor(
         pressed: pressed,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -96,8 +97,7 @@ class _OptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
+    final cardColor = context.appColors.surfaceFill;
     final radius = BorderRadius.circular(14);
 
     return IosCardPress(

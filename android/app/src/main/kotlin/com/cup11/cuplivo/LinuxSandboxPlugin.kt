@@ -162,7 +162,16 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
           mainHandler.post { result.success(supported) }
         }.start()
       }
-      "getAbi" -> result.success(primaryAbi())
+      "getAbi" -> result.success(currentSandboxAbi())
+      "hasCompatibleRootfs" -> {
+        val workspace = call.argument<String>("workspacePath")
+        if (workspace.isNullOrBlank()) {
+          result.error("bad_args", "workspacePath required", null)
+          return
+        }
+        val linuxDir = File(workspace, ".sandbox/linux")
+        result.success(rootfsHasCompatibleShell(linuxDir, currentSandboxAbi()))
+      }
       "extractRootfs" -> {
         val workspace = call.argument<String>("workspacePath")
         val archivePath = call.argument<String>("archivePath")
@@ -454,17 +463,6 @@ class LinuxSandboxPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Activ
     "stderrTruncated" to false,
   )
 
-  private fun primaryAbi(): String {
-    val abis = Build.SUPPORTED_ABIS
-    if (abis.isNotEmpty()) {
-      val a = abis[0]
-      if (a.contains("arm64")) return "arm64-v8a"
-      if (a.contains("x86_64") || a.contains("amd64")) return "x86_64"
-      return a
-    }
-    return "arm64-v8a"
-  }
-
   private fun hasProot(): Boolean {
     val exec = NativeLibResolver.resolve(appContext, EXEC_LIB)
     val loader = NativeLibResolver.resolve(appContext, LOADER_LIB)
@@ -746,7 +744,7 @@ private object NativeLibResolver {
   }
 
   private fun copyFromApk(appContext: Context, libFileName: String): File? {
-    val abi = primaryAbi()
+    val abi = currentSandboxAbi()
     val entryNames = listOf(
       "lib/$abi/$libFileName",
       "lib/${abi.replace('-', '_')}/$libFileName",
@@ -783,17 +781,6 @@ private object NativeLibResolver {
       "copyFromApk: no $libFileName entry found (abi=$abi, entries=$entryNames, apks=$apkPaths)",
     )
     return null
-  }
-
-  private fun primaryAbi(): String {
-    val abis = Build.SUPPORTED_ABIS
-    if (abis.isNotEmpty()) {
-      val a = abis[0]
-      if (a.contains("arm64")) return "arm64-v8a"
-      if (a.contains("x86_64") || a.contains("amd64")) return "x86_64"
-      return a
-    }
-    return "arm64-v8a"
   }
 }
 
@@ -1121,8 +1108,10 @@ private fun normalizeGuestCwd(raw: String?): String? {
     trimmed.startsWith("/workspace/") -> {
       relative = trimmed.removePrefix("/workspace/")
     }
-    trimmed.startsWith("/workspace") -> return null // "/workspaceX" is not a subpath
-    else -> relative = trimmed.trimStart('/')
+    // Absolute paths outside /workspace are invalid, including lookalikes
+    // such as "/workspaceX".
+    trimmed.startsWith("/") -> return null
+    else -> relative = trimmed
   }
 
   val segments = ArrayDeque<String>()
@@ -1143,6 +1132,109 @@ private fun normalizeGuestCwd(raw: String?): String? {
   }
 }
 
+/**
+ * Chooses the first supported sandbox ABI in Android's preference order for
+ * the current process bitness.
+ */
+internal fun selectSandboxAbi(
+  supportedAbis: Array<String>,
+  is64BitProcess: Boolean,
+): String {
+  val normalized = supportedAbis.map { it.lowercase() }
+  for (abi in normalized) {
+    if (is64BitProcess) {
+      if (abi.contains("arm64") || abi.contains("aarch64")) return "arm64-v8a"
+      if (abi.contains("x86_64") || abi.contains("amd64")) return "x86_64"
+    } else {
+      if (
+        abi == "armeabi-v7a" || abi == "armeabi" ||
+        abi.contains("armv7") || (abi.startsWith("arm") && !abi.contains("64"))
+      ) {
+        return "armeabi-v7a"
+      }
+      if (abi == "x86" || abi == "i686") return "x86"
+    }
+  }
+  return normalized.firstOrNull() ?: "unknown"
+}
+
+/** Validates the ELF identity of a rootfs shell against its sandbox ABI. */
+internal fun elfHeaderMatchesSandboxAbi(header: ByteArray, abi: String): Boolean {
+  if (header.size < ELF_HEADER_PREFIX_SIZE) return false
+  if (
+    header[0] != 0x7f.toByte() || header[1] != 'E'.code.toByte() ||
+    header[2] != 'L'.code.toByte() || header[3] != 'F'.code.toByte()
+  ) {
+    return false
+  }
+  val elfClass = header[4].toInt() and 0xff
+  val byteOrder = header[5].toInt() and 0xff
+  val low = header[18].toInt() and 0xff
+  val high = header[19].toInt() and 0xff
+  val machine = when (byteOrder) {
+    ELF_DATA_LITTLE_ENDIAN -> low or (high shl 8)
+    ELF_DATA_BIG_ENDIAN -> (low shl 8) or high
+    else -> return false
+  }
+  return when (abi) {
+    "armeabi-v7a" -> elfClass == ELF_CLASS_32 && machine == ELF_MACHINE_ARM
+    "arm64-v8a" -> elfClass == ELF_CLASS_64 && machine == ELF_MACHINE_AARCH64
+    "x86_64" -> elfClass == ELF_CLASS_64 && machine == ELF_MACHINE_X86_64
+    else -> false
+  }
+}
+
+private fun currentSandboxAbi(): String {
+  val is64BitProcess = AndroidProcess.is64Bit()
+  val processAbis = if (is64BitProcess) {
+    Build.SUPPORTED_64_BIT_ABIS
+  } else {
+    Build.SUPPORTED_32_BIT_ABIS
+  }
+  return selectSandboxAbi(processAbis, is64BitProcess)
+}
+
+private fun rootfsHasCompatibleShell(linuxDir: File, abi: String): Boolean {
+  val shell = listOf(File(linuxDir, "bin/sh"), File(linuxDir, "bin/bash"))
+    .firstOrNull { it.isFile }
+    ?: return false
+  val header = readFilePrefix(shell, ELF_HEADER_PREFIX_SIZE)
+  val compatible = header != null && elfHeaderMatchesSandboxAbi(header, abi)
+  if (!compatible) {
+    Log.w(
+      TAG,
+      "rootfs shell architecture mismatch: abi=$abi shell=${shell.absolutePath}",
+    )
+  }
+  return compatible
+}
+
+private fun readFilePrefix(file: File, size: Int): ByteArray? {
+  return try {
+    file.inputStream().use { input ->
+      val buffer = ByteArray(size)
+      var offset = 0
+      while (offset < size) {
+        val count = input.read(buffer, offset, size - offset)
+        if (count <= 0) break
+        offset += count
+      }
+      if (offset == size) buffer else buffer.copyOf(offset)
+    }
+  } catch (e: Exception) {
+    Log.w(TAG, "readFilePrefix failed for ${file.absolutePath}: ${e.message}")
+    null
+  }
+}
+
+private const val ELF_HEADER_PREFIX_SIZE = 20
+private const val ELF_CLASS_32 = 1
+private const val ELF_CLASS_64 = 2
+private const val ELF_DATA_LITTLE_ENDIAN = 1
+private const val ELF_DATA_BIG_ENDIAN = 2
+private const val ELF_MACHINE_ARM = 40
+private const val ELF_MACHINE_X86_64 = 62
+private const val ELF_MACHINE_AARCH64 = 183
 private const val MAX_EXEC_TIMEOUT_MS = 3_600_000L
 private const val TAG = "LinuxSandbox"
 private const val EXEC_LIB = "libproot_exec.so"

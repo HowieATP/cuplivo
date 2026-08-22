@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_labeled_switch_row.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/qq_group_join_sheet.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_semantic_colors.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
 
@@ -478,9 +479,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,

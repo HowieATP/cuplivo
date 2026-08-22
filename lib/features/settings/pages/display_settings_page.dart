@@ -4,18 +4,22 @@ import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../../../core/services/android_background.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/ios_keep_alive.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/assistant_provider.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
+import '../../../features/assistant/widgets/assistant_select_sheet.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
@@ -36,6 +40,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
 
     String paletteName() {
       final settings = context.read<SettingsProvider>();
+      if (settings.themePaletteId == ThemePalettes.customPaletteId) {
+        final custom = settings.selectedCustomTheme;
+        if (custom != null) {
+          final name = custom.name;
+          return name.isEmpty ? l10n.themeSettingsPageCustomPaletteName : name;
+        }
+      }
       final palette = ThemePalettes.byId(settings.themePaletteId);
       return Localizations.localeOf(context).languageCode == 'zh'
           ? palette.displayNameZh
@@ -805,9 +816,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white12
-                            : const Color(0xFFF2F3F5),
+                        color: context.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -1273,9 +1282,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1631,9 +1638,7 @@ Widget _sheetOption(
                 base)
           : base;
       final bgTarget = pressed
-          ? (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.05))
+          ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
           : Colors.transparent;
       return TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: target),
@@ -2036,7 +2041,6 @@ class _AutoCollapseCodeBlockLinesRowState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
 
     // Keep controller in sync when not editing
@@ -2087,7 +2091,7 @@ class _AutoCollapseCodeBlockLinesRowState
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
-                  fillColor: isDark ? Colors.white10 : Colors.white,
+                  fillColor: context.appColors.surfaceFill,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 8,
@@ -2303,6 +2307,67 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setNewChatOnLaunch(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Pin,
+                label: l10n.displaySettingsPageStartupAssistantPinnedTitle,
+                subtitle:
+                    l10n.displaySettingsPageStartupAssistantPinnedSubtitle,
+                value: sp.startupAssistantMode == StartupAssistantMode.pinned,
+                onChanged: (v) async {
+                  final settings = context.read<SettingsProvider>();
+                  if (v) {
+                    var pinnedId = settings.pinnedAssistantId;
+                    pinnedId ??= context
+                        .read<AssistantProvider>()
+                        .currentAssistantId;
+                    if (pinnedId == null) return;
+                    await settings.setPinnedAssistantId(pinnedId);
+                    await settings.setStartupAssistantMode(
+                      StartupAssistantMode.pinned,
+                    );
+                  } else {
+                    await settings.setStartupAssistantMode(
+                      StartupAssistantMode.mostRecent,
+                    );
+                  }
+                },
+              ),
+              if (sp.startupAssistantMode == StartupAssistantMode.pinned) ...[
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Bot,
+                  label: l10n.displaySettingsPageStartupAssistantPickerLabel,
+                  detailBuilder: (ctx) {
+                    final ap = ctx.read<AssistantProvider>();
+                    final pinnedId = context
+                        .read<SettingsProvider>()
+                        .pinnedAssistantId;
+                    String? name;
+                    for (final a in ap.assistants) {
+                      if (a.id == pinnedId) {
+                        name = a.name;
+                        break;
+                      }
+                    }
+                    return Text(
+                      name ?? l10n.displaySettingsPageStartupAssistantNone,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                  onTap: () async {
+                    final id = await showAssistantMoveSelector(context);
+                    if (id != null && context.mounted) {
+                      await context
+                          .read<SettingsProvider>()
+                          .setPinnedAssistantId(id);
+                    }
+                  },
+                ),
+              ],
               _iosDivider(context),
               _iosSwitchRow(
                 context,
@@ -2562,16 +2627,19 @@ class IosBackgroundSettingsPage extends StatefulWidget {
 
 class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
   late Future<IosBackgroundGenerationStatus> _statusFuture;
+  late Future<IosKeepAliveStatus> _keepAliveStatusFuture;
 
   @override
   void initState() {
     super.initState();
     _statusFuture = IosBackgroundGenerationService.instance.getStatus();
+    _keepAliveStatusFuture = IosKeepAliveService.instance.getStatus();
   }
 
   void _refreshStatus() {
     setState(() {
       _statusFuture = IosBackgroundGenerationService.instance.getStatus();
+      _keepAliveStatusFuture = IosKeepAliveService.instance.getStatus();
     });
   }
 
@@ -2588,6 +2656,33 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
     if (!mounted) return;
     await settings.setIosBackgroundNotificationsEnabled(granted);
     _refreshStatus();
+  }
+
+  Future<void> _setLocationKeepAliveEnabled(bool enabled) async {
+    final settings = context.read<SettingsProvider>();
+    if (!enabled) {
+      await settings.setIosLocationKeepAliveEnabled(false);
+      await _pushKeepAliveConfig();
+      _refreshStatus();
+      return;
+    }
+
+    final granted = await IosKeepAliveService.instance
+        .requestLocationAuthorization();
+    if (!mounted) return;
+    await settings.setIosLocationKeepAliveEnabled(granted);
+    await _pushKeepAliveConfig();
+    _refreshStatus();
+  }
+
+  Future<void> _pushKeepAliveConfig() async {
+    final settings = context.read<SettingsProvider>();
+    await IosKeepAliveService.instance.configure(
+      masterEnabled: settings.iosKeepAliveEnabled,
+      silentAudioEnabled: settings.iosSilentAudioKeepAliveEnabled,
+      locationEnabled: settings.iosLocationKeepAliveEnabled,
+      liveActivityPrivacyMode: settings.iosLiveActivityPrivacyMode,
+    );
   }
 
   Future<void> _openAppSettings() async {
@@ -2628,6 +2723,60 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
             context,
             title: l10n.iosBackgroundLimitNoticeTitle,
             body: l10n.iosBackgroundLimitNoticeBody,
+          ),
+          const SizedBox(height: 12),
+          _iosSectionCard(
+            children: [
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Zap,
+                label: l10n.iosKeepAliveMasterTitle,
+                subtitle: l10n.iosKeepAliveMasterSubtitle,
+                value: sp.iosKeepAliveEnabled,
+                onChanged: (v) async {
+                  await context.read<SettingsProvider>().setIosKeepAliveEnabled(
+                    v,
+                  );
+                  await _pushKeepAliveConfig();
+                  _refreshStatus();
+                },
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Volume2,
+                label: l10n.iosKeepAliveSilentAudioTitle,
+                subtitle: l10n.iosKeepAliveSilentAudioSubtitle,
+                value: sp.iosSilentAudioKeepAliveEnabled,
+                onChanged: (v) async {
+                  await context
+                      .read<SettingsProvider>()
+                      .setIosSilentAudioKeepAliveEnabled(v);
+                  await _pushKeepAliveConfig();
+                  _refreshStatus();
+                },
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Pin,
+                label: l10n.iosKeepAliveLocationTitle,
+                subtitle: l10n.iosKeepAliveLocationSubtitle,
+                value: sp.iosLocationKeepAliveEnabled,
+                onChanged: _setLocationKeepAliveEnabled,
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Shield,
+                label: l10n.iosKeepAlivePrivacyModeTitle,
+                subtitle: l10n.iosKeepAlivePrivacyModeSubtitle,
+                value: sp.iosLiveActivityPrivacyMode,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setIosLiveActivityPrivacyMode(v),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           _iosSectionCard(
@@ -2702,6 +2851,48 @@ class _IosBackgroundSettingsPageState extends State<IosBackgroundSettingsPage> {
                         : l10n.iosBackgroundNotificationsNotAuthorized,
                     onTap: _openNotificationSettings,
                   ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          FutureBuilder<IosKeepAliveStatus>(
+            future: _keepAliveStatusFuture,
+            builder: (context, snapshot) {
+              final status = snapshot.data;
+              final sp2 = context.read<SettingsProvider>();
+              return _iosSectionCard(
+                children: [
+                  _iosNavRow(
+                    context,
+                    icon: Lucide.Volume2,
+                    label: sp2.iosSilentAudioKeepAliveEnabled
+                        ? l10n.iosKeepAliveConfigAudioReady
+                        : l10n.iosKeepAliveConfigAudioOff,
+                  ),
+                  _iosDivider(context),
+                  _iosNavRow(
+                    context,
+                    icon: Lucide.Pin,
+                    label: !sp2.iosLocationKeepAliveEnabled
+                        ? l10n.iosKeepAliveConfigLocationOff
+                        : status?.locationAuthorized == true
+                        ? l10n.iosKeepAliveConfigLocationReady
+                        : l10n.iosKeepAliveConfigLocationPermissionNeeded,
+                    onTap: !sp2.iosLocationKeepAliveEnabled
+                        ? null
+                        : status?.locationAuthorized == true
+                        ? null
+                        : _openAppSettings,
+                  ),
+                  if ((status?.interruptionCount ?? 0) > 0) ...[
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.TriangleAlert,
+                      label: l10n.iosKeepAliveInterruptedNotice,
+                    ),
+                  ],
                 ],
               );
             },

@@ -105,8 +105,21 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'grok-4.5'), 'low');
       expect(openAINormalizeReasoningEffort('max', 'grok-4.5'), 'high');
       expect(openAINormalizeReasoningEffort('off', 'x-ai/grok-4.5'), 'low');
+      expect(openAINormalizeReasoningEffort('off', 'grok-4.6'), 'low');
+      expect(openAINormalizeReasoningEffort('max', 'grok-4.6'), 'high');
+      expect(openAINormalizeReasoningEffort('off', 'x-ai/grok-4.6'), 'low');
       expect(
         openAINormalizeReasoningEffort('high', 'meta/muse-spark-1.1'),
+        'auto',
+      );
+      expect(openAINormalizeReasoningEffort('high', 'muse-spark'), 'auto');
+      expect(openAINormalizeReasoningEffort('high', 'muse-spark-1.2'), 'auto');
+      expect(
+        openAINormalizeReasoningEffort('high', 'muse-glimmer-30b'),
+        'auto',
+      );
+      expect(
+        openAINormalizeReasoningEffort('high', 'meta/muse-glimmer-30b'),
         'auto',
       );
     });

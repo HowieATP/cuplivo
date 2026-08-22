@@ -6,3 +6,18 @@ licensed under GNU GPL v2 or later.
 Cuplivo vendors them solely as the Android userland chroot helper for the optional
 Linux sandbox feature. Corresponding source for PRoot is available from the
 upstream project. No AGPL application source from third-party apps is included.
+
+armeabi-v7a runtime provenance
+-------------------------------
+The ARMv7 binaries are taken from the relocatable, statically linked Android
+package produced by green-green-avk/build-proot-android v0.15 at signed commit:
+https://github.com/green-green-avk/build-proot-android/tree/01f83b8841358450c78333d1b33ab30d4943bec4
+
+Archive: packages/proot-android-armv7a.tar.gz
+SHA-256: 3b91c7200adf60c5a61707cf1c7540f3fd16cc97357bb17fea3f4b38819142cb
+
+Deployed as libproot_exec.so from root/bin/proot:
+SHA-256: 0e55b204087166d98dfc6183fc63c673acd83daba366799e0a03301780dc2d0a
+
+Deployed as libproot_loader.so from root/libexec/proot/loader:
+SHA-256: 0f08d951cbcbb7065928a0ee89a1b6be89f306bc37fb589bc304f58fb696cc27

@@ -29,9 +29,7 @@ class _CreateActionIconButtonState extends State<CreateActionIconButton> {
 
   @override
   Widget build(BuildContext context) {
-    final color = _pressed
-        ? widget.color.withValues(alpha: 0.7)
-        : widget.color;
+    final color = _pressed ? widget.color.withValues(alpha: 0.7) : widget.color;
     return Tooltip(
       message: widget.tooltip,
       child: Semantics(

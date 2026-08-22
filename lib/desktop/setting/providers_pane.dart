@@ -1,7 +1,6 @@
 part of '../desktop_settings_page.dart';
 
 // ===== Providers (Desktop right content) =====
-
 class _DesktopProvidersBody extends StatefulWidget {
   const _DesktopProvidersBody({super.key, this.initialSelectedKey});
   final String? initialSelectedKey;
@@ -12,7 +11,6 @@ class _DesktopProvidersBody extends StatefulWidget {
 class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   static const Duration _groupReorderRestoreDelay = Duration(milliseconds: 300);
   static const Duration _groupReorderCollapseDelay = Duration(milliseconds: 32);
-
   String? _selectedKey;
   final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
       GlobalKey<_DesktopProviderDetailPaneState>();
@@ -24,7 +22,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   bool _temporarilyCollapseGroupedProviders = false;
   bool _groupHeaderDragActive = false;
   bool _groupHeaderRestorePending = false;
-
   @override
   void dispose() {
     _groupReorderRestoreTimer?.cancel();
@@ -37,7 +34,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   bool _effectiveGroupCollapsed(SettingsProvider settings, String groupKey) =>
       _temporarilyCollapseGroupedProviders ||
       settings.isGroupCollapsed(groupKey);
-
   void _startTemporaryGroupCollapse() {
     _groupReorderRestoreTimer?.cancel();
     setState(() {
@@ -72,7 +68,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   }
 
   String _normalizeSearchQuery(String value) => value.trim().toLowerCase();
-
   bool _matchesQuery(String value, String normalizedQuery) {
     if (normalizedQuery.isEmpty) return true;
     return value.toLowerCase().contains(normalizedQuery);
@@ -120,7 +115,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       for (final g in groups) g.id: <({String name, String key})>[],
       ungroupedKey: <({String name, String key})>[],
     };
-
     for (final p in items) {
       final gid = settings.groupIdForProvider(p.key);
       final groupKey = (gid != null && groupById.containsKey(gid))
@@ -130,10 +124,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         p,
       );
     }
-
     final rows = <_DesktopProviderGroupingRowVM>[];
     final searching = normalizedQuery.isNotEmpty;
-
     List<({String name, String key})> providersForGroup(
       String groupKey,
       String title,
@@ -159,7 +151,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       groups: groups,
       ungroupedIndex: settings.providerUngroupedDisplayIndex,
     );
-
     for (final groupKey in displayKeys) {
       final isUngrouped = groupKey == ungroupedKey;
       final title = isUngrouped
@@ -251,7 +242,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                       onPressed: () => Navigator.of(ctx).pop(true),
                       child: Text(
                         l10n.providerDetailPageDeleteButton,
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(color: colorScheme.error),
                       ),
                     ),
                   ],
@@ -283,7 +274,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
-
     // Base providers (same as mobile list)
     List<({String name, String key})> base() => [
       (name: 'OpenAI', key: 'OpenAI'),
@@ -299,7 +289,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Grok', key: 'Grok'),
       (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
     ];
-
     final cfgs = settings.providerConfigs;
     final baseKeys = {for (final p in base()) p.key};
     final dynamicItems = <({String name, String key})>[];
@@ -337,7 +326,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
             normalizedQuery: _searchQuery,
           )
         : const <_DesktopProviderGroupingRowVM>[];
-
     _selectedKey ??=
         (widget.initialSelectedKey ??
         (ordered.isNotEmpty ? ordered.first.key : null));
@@ -351,7 +339,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 ? settings.getProviderConfig(selectedKey).name
                 : selectedKey,
           );
-
     return Container(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -415,7 +402,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                 }
                                 if (groupingRows.isEmpty) return;
                                 final sp = context.read<SettingsProvider>();
-
                                 final logicRows = <ProviderGroupingRowVM>[
                                   for (final r in groupingRows)
                                     if (r is _DesktopProviderGroupingHeaderVM)
@@ -429,7 +415,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                         groupKey: r.groupKey,
                                       ),
                                 ];
-
                                 if (logicRows[oldIndex]
                                     is ProviderGroupingHeaderVM) {
                                   final intent =
@@ -439,7 +424,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                         newIndex: newIndex,
                                       );
                                   if (intent == null) return;
-
                                   final visibleHeaderKeys = [
                                     for (final row in groupingRows)
                                       if (row
@@ -455,7 +439,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                   final oldActualIndex = fullDisplayKeys
                                       .indexOf(intent.groupKey);
                                   if (oldActualIndex < 0) return;
-
                                   final targetInsertIndex =
                                       mapVisibleGroupTargetToActualInsertIndex(
                                         fullDisplayKeys: fullDisplayKeys,
@@ -468,7 +451,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                       targetInsertIndex > oldActualIndex
                                       ? targetInsertIndex + 1
                                       : targetInsertIndex;
-
                                   try {
                                     await sp.reorderProviderGroupsWithUngrouped(
                                       oldActualIndex,
@@ -481,14 +463,12 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                   }
                                   return;
                                 }
-
                                 final analysis = analyzeProviderGroupingReorder(
                                   rows: logicRows,
                                   oldIndex: oldIndex,
                                   newIndex: newIndex,
                                   isGroupCollapsed: sp.isGroupCollapsed,
                                 );
-
                                 if (analysis.blockedReason ==
                                     ProviderGroupingReorderBlockedReason
                                         .targetGroupCollapsed) {
@@ -501,7 +481,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                   if (mounted) setState(() {});
                                   return;
                                 }
-
                                 final intent = analysis.intent;
                                 if (intent == null) return;
                                 final targetGroupId =
@@ -723,7 +702,6 @@ class _DesktopProviderGroupingHeaderVM extends _DesktopProviderGroupingRowVM {
     required this.count,
     required this.collapsed,
   });
-
   final String groupKey;
   final String title;
   final int count;
@@ -735,7 +713,6 @@ class _DesktopProviderGroupingProviderVM extends _DesktopProviderGroupingRowVM {
     required this.item,
     required this.groupKey,
   });
-
   final ({String name, String key}) item;
   final String groupKey;
 }
@@ -747,26 +724,19 @@ class _DesktopProvidersSearchField extends StatelessWidget {
     required this.onChanged,
     required this.onClear,
   });
-
   final TextEditingController controller;
   final String hintText;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final hasText = controller.text.trim().isNotEmpty;
-
     return TextField(
       controller: controller,
       onChanged: onChanged,
-      style: TextStyle(
-        color: isDark ? Colors.white : Colors.black87,
-        fontSize: 14,
-      ),
+      style: TextStyle(color: cs.onSurface, fontSize: 14),
       cursorColor: cs.primary,
       decoration: InputDecoration(
         hintText: hintText,
@@ -804,9 +774,7 @@ class _DesktopProvidersSearchField extends StatelessWidget {
           minHeight: 34,
         ),
         filled: true,
-        fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.12)
-            : const Color(0xFFEBEBEB),
+        fillColor: context.appColors.surfaceFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -831,12 +799,10 @@ class _DesktopProviderGroupHeaderRow extends StatefulWidget {
     required this.collapsed,
     this.onToggle,
   });
-
   final String title;
   final int count;
   final bool collapsed;
   final VoidCallback? onToggle;
-
   @override
   State<_DesktopProviderGroupHeaderRow> createState() =>
       _DesktopProviderGroupHeaderRowState();
@@ -845,17 +811,13 @@ class _DesktopProviderGroupHeaderRow extends StatefulWidget {
 class _DesktopProviderGroupHeaderRowState
     extends State<_DesktopProviderGroupHeaderRow> {
   bool _hover = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
-
     return MouseRegion(
       cursor: widget.onToggle == null
           ? SystemMouseCursors.basic
@@ -928,7 +890,6 @@ class _DesktopProviderDetailPaneState
   final FocusNode _searchFocus = FocusNode();
   bool _showApiKey = false;
   bool _eyeHover = false;
-
   // 批量选择模式相关
   bool _isSelectionMode = false;
   final Set<String> _selectedModels = {};
@@ -939,10 +900,8 @@ class _DesktopProviderDetailPaneState
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
   int _providerScopedStateEpoch = 0;
-
   // Connection test state for inline dialog
   // Keep local to this file to avoid cross-file coupling
-
   // Persistent controllers for provider top inputs (desktop)
   // Avoid rebuilding controllers each frame which breaks focus/IME
   final TextEditingController _apiKeyCtrl = TextEditingController();
@@ -961,7 +920,6 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _proxyPassCtrl = TextEditingController();
   bool _balanceLoading = false;
   bool _customRequestExpanded = false;
-
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
     // Do not disturb ongoing IME composition
@@ -1139,14 +1097,12 @@ class _DesktopProviderDetailPaneState
       widget.providerKey,
       explicitType: cfg.providerType,
     );
-
     final models = List<String>.from(cfg.models);
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
     final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
     final filtered = _applyFilter(models, _filterCtrl.text.trim());
     final groups = _groupModels(filtered);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1305,7 +1261,6 @@ class _DesktopProviderDetailPaneState
                 ),
                 const SizedBox(height: 12),
               ],
-
               if (widget.providerKey.toLowerCase() == 'siliconflow') ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1368,7 +1323,6 @@ class _DesktopProviderDetailPaneState
                 ),
                 const SizedBox(height: 12),
               ],
-
               // API Key (hidden when Google Vertex)
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
                 Row(
@@ -1451,10 +1405,13 @@ class _DesktopProviderDetailPaneState
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: _eyeHover
-                                  ? (Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white.withValues(alpha: 0.06)
-                                        : Colors.black.withValues(alpha: 0.04))
+                                  ? cs.onSurface.withValues(
+                                      alpha:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? 0.06
+                                          : 0.04,
+                                    )
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -1500,7 +1457,6 @@ class _DesktopProviderDetailPaneState
                 ],
                 const SizedBox(height: 14),
               ],
-
               // API Base URL or Vertex AI fields
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
                 _sectionLabel(
@@ -1754,7 +1710,6 @@ class _DesktopProviderDetailPaneState
                         withData: true,
                       );
                       if (res == null || res.files.isEmpty) return;
-
                       final file = res.files.first;
                       // Desktop FilePicker may not include bytes unless withData is true; fall back to disk read.
                       String? content;
@@ -1775,7 +1730,6 @@ class _DesktopProviderDetailPaneState
                         );
                         return;
                       }
-
                       String projectId = cfg.projectId ?? '';
                       try {
                         final obj = jsonDecode(content);
@@ -1796,7 +1750,6 @@ class _DesktopProviderDetailPaneState
                   ),
                 ),
               ],
-
               // API Path (OpenAI chat)
               if (kind == ProviderKind.openai &&
                   (cfg.useResponseApi != true)) ...[
@@ -1864,7 +1817,6 @@ class _DesktopProviderDetailPaneState
                   ),
                 ),
               ],
-
               const SizedBox(height: 18),
               // Models header with count + search + actions (test / add / fetch)
               Row(
@@ -2108,7 +2060,6 @@ class _DesktopProviderDetailPaneState
                   ],
                 ],
               ),
-
               const SizedBox(height: 6),
               // Accordion groups
               for (final entry in groups.entries)
@@ -2168,12 +2119,11 @@ class _DesktopProviderDetailPaneState
   }
 
   InputDecoration _inputDecoration(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       isDense: true,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+      fillColor: context.appColors.surfaceFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
@@ -2249,12 +2199,11 @@ class _DesktopProviderDetailPaneState
   }
 
   InputDecoration _proxyInputDecoration(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       isDense: true,
       filled: true,
-      fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+      fillColor: context.appColors.surfaceFill,
       hintStyle: TextStyle(
         fontSize: 14,
         color: cs.onSurface.withValues(alpha: 0.5),
@@ -2637,10 +2586,7 @@ class _DesktopProviderDetailPaneState
                                       options: groupOptions,
                                       maxLabelWidth: 150,
                                       triggerFillColor:
-                                          Theme.of(ctx).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white10
-                                          : const Color(0xFFF7F7F9),
+                                          ctx.appColors.surfaceFill,
                                       onSelected: (v) async {
                                         if (v ==
                                             SettingsProvider
@@ -2666,7 +2612,7 @@ class _DesktopProviderDetailPaneState
                                           TextEditingController();
                                       final ok = await showDialog<bool>(
                                         context: ctx,
-                                        barrierColor: Colors.black.withValues(
+                                        barrierColor: cs.scrim.withValues(
                                           alpha: 0.12,
                                         ),
                                         builder: (dctx) => AlertDialog(
@@ -2719,7 +2665,7 @@ class _DesktopProviderDetailPaneState
                                       showDialog<void>(
                                         context: ctx,
                                         barrierDismissible: true,
-                                        barrierColor: Colors.black.withValues(
+                                        barrierColor: cs.scrim.withValues(
                                           alpha: 0.12,
                                         ),
                                         builder: (_) =>
@@ -2837,10 +2783,7 @@ class _DesktopProviderDetailPaneState
                                               ],
                                               maxLabelWidth: 150,
                                               triggerFillColor:
-                                                  Theme.of(ctx).brightness ==
-                                                      Brightness.dark
-                                                  ? Colors.white10
-                                                  : const Color(0xFFF7F7F9),
+                                                  ctx.appColors.surfaceFill,
                                               onSelected: (v) async {
                                                 final old = spWatch
                                                     .getProviderConfig(
@@ -3231,10 +3174,7 @@ class _DesktopProviderDetailPaneState
                                             ),
                                           ],
                                           triggerFillColor:
-                                              Theme.of(ctx).brightness ==
-                                                  Brightness.dark
-                                              ? Colors.white10
-                                              : const Color(0xFFF7F7F9),
+                                              ctx.appColors.surfaceFill,
                                           onSelected: (value) async {
                                             final old = spWatch
                                                 .getProviderConfig(
@@ -3296,10 +3236,7 @@ class _DesktopProviderDetailPaneState
                                         value: proxyTypeNow,
                                         options: proxyTypeOptions,
                                         triggerFillColor:
-                                            Theme.of(ctx).brightness ==
-                                                Brightness.dark
-                                            ? Colors.white10
-                                            : const Color(0xFFF7F7F9),
+                                            ctx.appColors.surfaceFill,
                                         onSelected: (value) async {
                                           final old = spWatch.getProviderConfig(
                                             widget.providerKey,
@@ -3608,9 +3545,7 @@ class _DesktopProviderDetailPaneState
                 decoration: InputDecoration(
                   hintText: l10n.sideDrawerImageUrlDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx2.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.transparent),
@@ -3669,12 +3604,13 @@ class _DesktopProviderDetailPaneState
     String providerKey,
   ) async {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
     final controller = TextEditingController();
     String value = '';
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.16),
+      barrierColor: cs.scrim.withValues(alpha: 0.16),
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         bool valid(String s) => s.trim().isNotEmpty;
@@ -3788,7 +3724,6 @@ class _DesktopProviderDetailPaneState
     final icons = BrandAssets.selectableIcons;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cfg = settings.getProviderConfig(providerKey);
-
     await showDialog<void>(
       context: context,
       builder: (ctx) {
@@ -3835,6 +3770,7 @@ class _DesktopProviderDetailPaneState
                             child: Container(
                               decoration: BoxDecoration(
                                 color: isDark
+                                    // color-gate: ignore
                                     ? Colors.white10
                                     : cs.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
@@ -3932,7 +3868,6 @@ class _DesktopProviderDetailPaneState
         bool detecting = false;
         String? testingKeyId;
         StateSetter? setDRef;
-
         Future<void> pickDetectModel(BuildContext dctx) async {
           final sel = await showModelSelector(
             dctx,
@@ -4588,12 +4523,10 @@ class _DesktopProviderDetailPaneState
   }
 
   // Replaced with desktop centered dialog: showModelFetchDialog
-
   // Future<void> _showGetModelsDialog(BuildContext context) async {
   //   // For now this acts similar to Detect, but kept separate per spec.
   //   return _showDetectModelsDialog(context);
   // }
-
   Future<void> _createModel(BuildContext context) async {
     final res = await showDesktopCreateModelDialog(
       context,
@@ -4680,7 +4613,7 @@ class _DesktopProviderDetailPaneState
             break;
           case _TestState.success:
             message = l10n.providerDetailPageTestSuccessMessage;
-            color = Colors.green;
+            color = context.appColors.success;
             break;
           case _TestState.error:
             message = errorMessage.isNotEmpty ? errorMessage : 'Error';
@@ -4749,9 +4682,7 @@ class _DesktopProviderDetailPaneState
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(ctx).brightness == Brightness.dark
-                                  ? Colors.white10
-                                  : const Color(0xFFF7F7F9),
+                              color: ctx.appColors.surfaceFill,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: cs.outlineVariant.withValues(
@@ -5024,7 +4955,6 @@ class _DesktopProviderDetailPaneState
     );
     if (ok != true) return;
     if (!mounted) return;
-
     final sp = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
     final deletedCount = await sp.deleteModels(
@@ -5160,10 +5090,8 @@ class _DesktopProviderDetailPaneState
 
   Future<void> _startDetection() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
-
     final modelsToTest = Set<String>.from(_selectedModels);
     final detectionEpoch = _providerScopedStateEpoch;
-
     setState(() {
       _isDetecting = true;
       _detectionResults.removeWhere((id, _) => modelsToTest.contains(id));
@@ -5172,13 +5100,11 @@ class _DesktopProviderDetailPaneState
       _pendingModels.addAll(modelsToTest);
       _currentDetectingModel = null;
     });
-
     final sp = context.read<SettingsProvider>();
     final cfg = sp.getProviderConfig(
       widget.providerKey,
       defaultName: widget.displayName,
     );
-
     for (final modelId in modelsToTest) {
       if (!mounted || detectionEpoch != _providerScopedStateEpoch) return;
       if (mounted) {
@@ -5187,7 +5113,6 @@ class _DesktopProviderDetailPaneState
           _pendingModels.remove(modelId);
         });
       }
-
       try {
         await ProviderManager.testConnection(
           cfg,
@@ -5210,7 +5135,6 @@ class _DesktopProviderDetailPaneState
       }
       await Future.delayed(const Duration(milliseconds: 500));
     }
-
     if (mounted && detectionEpoch == _providerScopedStateEpoch) {
       setState(() {
         _isDetecting = false;
@@ -5237,7 +5161,6 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
   final GlobalKey _key = GlobalKey();
   final LayerLink _link = LayerLink();
   OverlayEntry? _entry;
-
   void _close() {
     _entry?.remove();
     _entry = null;
@@ -5271,7 +5194,7 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
                     listen: false,
                   ).usePureBackground)
                   ? (isDark ? Colors.black : Colors.white)
-                  : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+                  : ctx.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -5373,7 +5296,6 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
   final GlobalKey _key = GlobalKey();
   final LayerLink _link = LayerLink();
   OverlayEntry? _entry;
-
   void _close() {
     _entry?.remove();
     _entry = null;
@@ -5425,7 +5347,7 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
                           listen: false,
                         ).usePureBackground)
                         ? (isDark ? Colors.black : Colors.white)
-                        : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+                        : ctx.appColors.surfaceCard,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -5511,10 +5433,7 @@ class _GreyCapsule extends StatelessWidget {
   final String label;
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : const Color(0xFFF2F3F5);
+    final bg = context.appColors.surfaceFill;
     final fg = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.85);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -5557,9 +5476,7 @@ class _IconBtnState extends State<_IconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -5609,9 +5526,7 @@ class _IconTextBtnState extends State<_IconTextBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -5648,7 +5563,6 @@ class _IconTextBtnState extends State<_IconTextBtn> {
 
 class _DesktopProviderGroupsDialog extends StatefulWidget {
   const _DesktopProviderGroupsDialog();
-
   @override
   State<_DesktopProviderGroupsDialog> createState() =>
       _DesktopProviderGroupsDialogState();
@@ -5666,7 +5580,7 @@ class _DesktopProviderGroupsDialogState
     final controller = TextEditingController(text: initialText);
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.12),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
       builder: (ctx) => AlertDialog(
         title: Text(title),
         content: TextField(
@@ -5731,9 +5645,10 @@ class _DesktopProviderGroupsDialogState
   Future<void> _deleteGroup(BuildContext context, String groupId) async {
     final sp = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.12),
+      barrierColor: cs.scrim.withValues(alpha: 0.12),
       builder: (ctx) => AlertDialog(
         title: Text(l10n.providerGroupsDeleteConfirmTitle),
         content: Text(l10n.providerGroupsDeleteConfirmContent),
@@ -5746,7 +5661,7 @@ class _DesktopProviderGroupsDialogState
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.providerGroupsDeleteConfirmOk,
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: cs.error),
             ),
           ),
         ],
@@ -5768,7 +5683,6 @@ class _DesktopProviderGroupsDialogState
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final groups = sp.providerGroups;
-
     final counts = <String, int>{};
     int ungroupedCount = 0;
     for (final k in sp.providersOrder) {
@@ -5796,7 +5710,6 @@ class _DesktopProviderGroupsDialogState
           isUngrouped: key == SettingsProvider.providerUngroupedGroupKey,
         ),
     ];
-
     return Dialog(
       backgroundColor: cs.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -5916,18 +5829,16 @@ class _DesktopProviderGroupCard extends StatelessWidget {
     this.onDelete,
     required this.dragHandle,
   });
-
   final String title;
   final int count;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final Widget dragHandle;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final bg = context.appColors.surfaceFill;
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.12 : 0.10,
     );
@@ -5977,7 +5888,6 @@ class _DesktopProviderGroupCard extends StatelessWidget {
 class _DesktopCountPill extends StatelessWidget {
   const _DesktopCountPill({required this.count});
   final int count;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -6002,22 +5912,18 @@ class _DesktopCountPill extends StatelessWidget {
 
 class _DesktopDragHandle extends StatefulWidget {
   const _DesktopDragHandle();
-
   @override
   State<_DesktopDragHandle> createState() => _DesktopDragHandleState();
 }
 
 class _DesktopDragHandleState extends State<_DesktopDragHandle> {
   bool _hover = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.grab,
@@ -6048,7 +5954,6 @@ class _DesktopProviderShareDialog extends StatefulWidget {
   });
   final String providerKey;
   final String displayName;
-
   @override
   State<_DesktopProviderShareDialog> createState() =>
       _DesktopProviderShareDialogState();
@@ -6059,7 +5964,6 @@ class _DesktopProviderShareDialogState
   late final String _code;
   final GlobalKey _qrKey = GlobalKey();
   bool _copyingQr = false;
-
   @override
   void initState() {
     super.initState();
@@ -6106,7 +6010,6 @@ class _DesktopProviderShareDialogState
         return true;
       }
     } catch (_) {}
-
     try {
       final file = File(
         p.join(Directory.systemTemp.path, 'kelivo-provider-qr.png'),
@@ -6280,7 +6183,6 @@ class _DialogActionButton extends StatefulWidget {
   final String label;
   final VoidCallback? onTap;
   final bool filled;
-
   @override
   State<_DialogActionButton> createState() => _DialogActionButtonState();
 }
@@ -6288,7 +6190,6 @@ class _DialogActionButton extends StatefulWidget {
 class _DialogActionButtonState extends State<_DialogActionButton> {
   bool _hover = false;
   bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -6306,7 +6207,6 @@ class _DialogActionButtonState extends State<_DialogActionButton> {
         ? cs.primary.withValues(alpha: isDark ? 0.30 : 0.25)
         : cs.primary.withValues(alpha: 0.35);
     final fg = widget.filled ? cs.onPrimary : cs.primary;
-
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hover = true),
@@ -6396,6 +6296,7 @@ class _BrandCircle extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.10),
         shape: BoxShape.circle,
       ),
@@ -6434,10 +6335,13 @@ class _ProviderListRowState extends State<_ProviderListRow> {
   bool _hover = false;
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final hoverBg = _hover && !widget.selected
-        ? Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04)
+        ? cs.onSurface.withValues(
+            alpha: Theme.of(context).brightness == Brightness.dark
+                ? 0.06
+                : 0.04,
+          )
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -6508,8 +6412,9 @@ class _ProviderListRowState extends State<_ProviderListRow> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: (widget.enabled ? Colors.green : Colors.orange)
-                      .withValues(alpha: 0.12),
+                  color: widget.enabled
+                      ? context.appColors.successContainer
+                      : context.appColors.warningContainer,
                   borderRadius: BorderRadius.circular(999),
                   // No border for left list status
                 ),
@@ -6521,7 +6426,9 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                         )!.providersPageDisabledStatus,
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.enabled ? Colors.green : Colors.orange,
+                    color: widget.enabled
+                        ? context.appColors.success
+                        : context.appColors.warning,
                     fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
@@ -6554,12 +6461,8 @@ class _AddFullWidthButtonState extends State<_AddFullWidthButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.06);
+    final baseBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.06);
     final bg = _hover ? hoverBg : baseBg;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -6615,10 +6518,7 @@ class _DesktopIosSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final Color base = cs.surface;
-    final Color bg = isDark
-        ? Color.lerp(base, Colors.white, 0.06)!
-        : const Color(0xFFF7F7F9);
+    final Color bg = context.appColors.surfaceFill;
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -6667,7 +6567,7 @@ class _DesktopKeyRow extends StatelessWidget {
     Color statusColor(ApiKeyStatus st) {
       switch (st) {
         case ApiKeyStatus.active:
-          return Colors.green;
+          return context.appColors.success;
         case ApiKeyStatus.disabled:
           return cs.onSurface.withValues(alpha: 0.6);
         case ApiKeyStatus.error:
@@ -6948,7 +6848,6 @@ class _ModelRow extends StatelessWidget {
         baseId = apiId;
       }
     }
-
     ModelInfo effective() {
       final base = infer(baseId);
       if (ov == null) return base;
@@ -6968,7 +6867,6 @@ class _ModelRow extends StatelessWidget {
     } else {
       displayName = baseId;
     }
-
     return GestureDetector(
       onTap: isSelectionMode
           ? () => onSelectionChanged?.call(!isSelected)
@@ -7034,7 +6932,9 @@ class _ModelRow extends StatelessWidget {
                         ? lucide.Lucide.CheckCircle
                         : lucide.Lucide.XCircle,
                     size: 16,
-                    color: detectionResult! ? Colors.green : cs.error,
+                    color: detectionResult!
+                        ? context.appColors.success
+                        : cs.error,
                   ),
                 ),
               ),
@@ -7091,10 +6991,8 @@ class _ModelRow extends StatelessWidget {
 /// Desktop collapsible header row for the custom request section.
 class _CustomRequestHeaderRow extends StatelessWidget {
   const _CustomRequestHeaderRow({required this.expanded, required this.onTap});
-
   final bool expanded;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -7132,12 +7030,10 @@ class _DesktopCustomRequestSection extends StatelessWidget {
     required this.mode,
     required this.entries,
   });
-
   final String providerKey;
   final String displayName;
   final KeyMode mode;
   final List<Map<String, String>> entries;
-
   Future<void> _save(
     BuildContext context,
     List<Map<String, String>> updated,
@@ -7206,11 +7102,10 @@ class _CardPressState extends State<_CardPress> {
   bool _pressed = false;
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -7237,11 +7132,7 @@ class _CardPressState extends State<_CardPress> {
     );
   }
 }
-
 // Removed embedded default model pane; now in setting/default_model_pane.dart
-
 // Removed default model prompt dialogs; migrated to setting/default_model_pane.dart
-
 // Removed embedded default model card; now in setting/default_model_pane.dart
-
 // ===== Display Settings Body =====

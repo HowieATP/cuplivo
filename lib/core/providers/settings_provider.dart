@@ -29,6 +29,8 @@ import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../prompts/constants/compress_prompts.dart' as compress_prompts;
 import '../prompts/constants/ocr_prompts.dart' as ocr_prompts;
+import 'package:Cuplivo/theme/custom_theme.dart';
+import 'package:Cuplivo/theme/palettes.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -47,6 +49,9 @@ enum DesktopMessageNavButtonsMode {
 
 // Mobile: message navigation buttons visibility mode
 enum MobileMessageNavButtonsMode { always, scroll, never }
+
+// Which assistant becomes current on cold start.
+enum StartupAssistantMode { mostRecent, pinned }
 
 enum _MigrationResult { noChange, applied, failed }
 
@@ -112,6 +117,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
   static const String _dynamicColorSeedKey = 'dynamic_color_seed_v1';
+  static const String _customThemesKey = 'custom_themes_v1';
+  static const String _customThemeSelectedKey = 'custom_theme_selected_v1';
   static const String _thinkingBudgetKey = 'thinking_budget_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
@@ -185,6 +192,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_new_chat_on_launch_v1';
   static const String _displayNewChatAfterDeleteKey =
       'display_new_chat_after_delete_v1';
+  static const String _startupAssistantModeKey = 'startup_assistant_mode_v1';
+  static const String _pinnedAssistantIdKey = 'pinned_assistant_id_v1';
   static const String _displayEnterToSendOnMobileKey =
       'display_enter_to_send_on_mobile_v1';
   static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
@@ -278,6 +287,14 @@ class SettingsProvider extends ChangeNotifier {
       'ios_live_activity_enabled_v1';
   static const String _iosBackgroundNotificationsEnabledKey =
       'ios_background_notifications_enabled_v1';
+  // Advanced background keep-alive settings
+  static const String _iosKeepAliveEnabledKey = 'ios_keepalive_enabled_v1';
+  static const String _iosSilentAudioKeepAliveEnabledKey =
+      'ios_silent_audio_keepalive_enabled_v1';
+  static const String _iosLocationKeepAliveEnabledKey =
+      'ios_location_keepalive_enabled_v1';
+  static const String _iosLiveActivityPrivacyModeKey =
+      'ios_live_activity_privacy_mode_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
@@ -420,9 +437,22 @@ class SettingsProvider extends ChangeNotifier {
   bool _useDynamicColor = true; // when supported on Android
   bool get useDynamicColor => _useDynamicColor;
   int? _dynamicColorSeed;
-  int? get dynamicColorSeed => _dynamicColorSeed;
   bool _dynamicColorSupported = false; // runtime capability, not persisted
   bool get dynamicColorSupported => _dynamicColorSupported;
+
+  List<CustomTheme> _customThemes = const <CustomTheme>[];
+  List<CustomTheme> get customThemes =>
+      List<CustomTheme>.unmodifiable(_customThemes);
+  String? _selectedCustomThemeId;
+  String? get selectedCustomThemeId => _selectedCustomThemeId;
+  CustomTheme? get selectedCustomTheme {
+    final id = _selectedCustomThemeId;
+    if (id == null) return null;
+    for (final t in _customThemes) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 
   // When enabled, force pure white/black backgrounds regardless of theme color
   bool _usePureBackground = false;
@@ -647,8 +677,11 @@ class SettingsProvider extends ChangeNotifier {
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
 
+  late final Future<void> _loaded;
+  Future<void> get loaded => _loaded;
+
   SettingsProvider() {
-    _load();
+    _loaded = _load();
   }
 
   Future<_MigrationResult> _migrateEmbeddingModelOverrides(
@@ -810,6 +843,7 @@ class SettingsProvider extends ChangeNotifier {
     _themePaletteId = prefs.getString(_themePaletteKey) ?? 'default';
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
     _dynamicColorSeed = prefs.getInt(_dynamicColorSeedKey);
+    _loadCustomThemes(prefs);
     var providerConfigsLoaded = false;
     final cfgStr = prefs.getString(_providerConfigsKey);
     if (cfgStr != null && cfgStr.isNotEmpty) {
@@ -1019,11 +1053,9 @@ class SettingsProvider extends ChangeNotifier {
         _ocrModelId = parts.sublist(1).join('::');
       }
     }
-    // load OCR prompt
+    // load OCR prompt (null = default; empty string is an explicit clear)
     final ocrp = prefs.getString(_ocrPromptKey);
-    _ocrPrompt = (ocrp == null || ocrp.trim().isEmpty)
-        ? defaultOcrPrompt
-        : ocrp;
+    _ocrPrompt = ocrp ?? defaultOcrPrompt;
     // load summary model
     final summarySel = prefs.getString(_summaryModelKey);
     if (summarySel != null && summarySel.contains('::')) {
@@ -1196,6 +1228,10 @@ class SettingsProvider extends ChangeNotifier {
     _newChatOnAssistantSwitch =
         prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
+    _startupAssistantMode = _startupAssistantModeFromString(
+      prefs.getString(_startupAssistantModeKey),
+    );
+    _pinnedAssistantId = prefs.getString(_pinnedAssistantIdKey);
     // Enter to send on mobile: iOS defaults to true, Android defaults to false
     final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
     if (enterToSendPref == null) {
@@ -1386,6 +1422,13 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
     _iosBackgroundNotificationsEnabled =
         prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
+    _iosKeepAliveEnabled = prefs.getBool(_iosKeepAliveEnabledKey) ?? false;
+    _iosSilentAudioKeepAliveEnabled =
+        prefs.getBool(_iosSilentAudioKeepAliveEnabledKey) ?? false;
+    _iosLocationKeepAliveEnabled =
+        prefs.getBool(_iosLocationKeepAliveEnabledKey) ?? false;
+    _iosLiveActivityPrivacyMode =
+        prefs.getBool(_iosLiveActivityPrivacyModeKey) ?? false;
 
     // load search settings
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -2625,16 +2668,146 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_useDynamicColorKey, v);
   }
 
-  Future<void> setDynamicColorSeed(int? seed) async {
-    if (_dynamicColorSeed == seed) return;
-    _dynamicColorSeed = seed;
+  void _loadCustomThemes(SharedPreferences prefs) {
+    final raw = prefs.getStringList(_customThemesKey) ?? const <String>[];
+    final themes = <CustomTheme>[];
+    for (final s in raw) {
+      try {
+        themes.add(CustomTheme.parse(s));
+      } catch (e) {
+        debugPrint(
+          '[SettingsProvider] dropped unparseable custom theme entry: $e',
+        );
+      }
+    }
+    _customThemes = themes;
+    _selectedCustomThemeId = prefs.getString(_customThemeSelectedKey);
+    if (_selectedCustomThemeId != null &&
+        !_customThemes.any((t) => t.id == _selectedCustomThemeId)) {
+      _selectedCustomThemeId = null;
+    }
+    // One-time migration from the legacy single seed (custom_dynamic palette).
+    // The seed becomes a Custom Theme with only a primary color; if the seed
+    // was the active palette, the migrated theme is selected and the palette
+    // becomes 'custom'. See docs/adr/0037-custom-themes-replace-seed.md.
+    final seed = _dynamicColorSeed;
+    if (seed != null) {
+      final migrated = CustomTheme(
+        id: 'migrated_$seed',
+        name: '',
+        primaryArgb: seed,
+      );
+      if (!_customThemes.any((t) => t.id == migrated.id)) {
+        _customThemes = <CustomTheme>[migrated, ..._customThemes];
+      }
+      final wasActive = _themePaletteId == 'custom_dynamic';
+      if (wasActive) {
+        _selectedCustomThemeId ??= migrated.id;
+        _themePaletteId = ThemePalettes.customPaletteId;
+        unawaited(
+          prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId),
+        );
+        if (_selectedCustomThemeId != null) {
+          unawaited(
+            prefs.setString(_customThemeSelectedKey, _selectedCustomThemeId!),
+          );
+        }
+      }
+      unawaited(
+        prefs.setStringList(
+          _customThemesKey,
+          _customThemes.map((t) => t.export()).toList(),
+        ),
+      );
+      unawaited(prefs.remove(_dynamicColorSeedKey));
+    }
+    // Stale cleanup: the 'custom_dynamic' palette id was removed with the
+    // legacy seed feature. If it survived without a seed (e.g. a settings
+    // restore that trimmed the seed key), reset it to the default palette.
+    if (_themePaletteId == 'custom_dynamic') {
+      _themePaletteId = ThemePalettes.defaultId;
+      unawaited(prefs.setString(_themePaletteKey, ThemePalettes.defaultId));
+    }
+  }
+
+  Future<void> _persistCustomThemes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _customThemesKey,
+      _customThemes.map((t) => t.export()).toList(),
+    );
+    final sel = _selectedCustomThemeId;
+    if (sel == null) {
+      await prefs.remove(_customThemeSelectedKey);
+    } else {
+      await prefs.setString(_customThemeSelectedKey, sel);
+    }
+  }
+
+  /// Insert or update a custom theme. Returns the saved theme (with an id
+  /// assigned when [theme.id] is empty).
+  Future<CustomTheme> saveCustomTheme(CustomTheme theme) async {
+    var t = theme;
+    if (t.id.isEmpty) {
+      t = t.copyWith(id: 'ct_${DateTime.now().microsecondsSinceEpoch}');
+    }
+    final idx = _customThemes.indexWhere((e) => e.id == t.id);
+    final next = List<CustomTheme>.of(_customThemes);
+    if (idx >= 0) {
+      next[idx] = t;
+    } else {
+      next.add(t);
+    }
+    _customThemes = next;
+    notifyListeners();
+    await _persistCustomThemes();
+    return t;
+  }
+
+  Future<void> deleteCustomTheme(String id) async {
+    if (!_customThemes.any((t) => t.id == id)) return;
+    final wasSelected = _selectedCustomThemeId == id;
+    _customThemes = _customThemes.where((t) => t.id != id).toList();
+    if (wasSelected) {
+      // Deleting the active theme deselects it and falls back to the default
+      // palette — the user removed what they were using (ADR-0037).
+      _selectedCustomThemeId = null;
+      if (_themePaletteId == ThemePalettes.customPaletteId) {
+        _themePaletteId = ThemePalettes.defaultId;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_themePaletteKey, ThemePalettes.defaultId);
+      }
+    }
+    notifyListeners();
+    await _persistCustomThemes();
+  }
+
+  /// Select a custom theme and make it the active palette.
+  Future<void> selectCustomTheme(String id) async {
+    if (!_customThemes.any((t) => t.id == id)) return;
+    final changed =
+        _selectedCustomThemeId != id ||
+        _themePaletteId != ThemePalettes.customPaletteId;
+    if (!changed) return;
+    _selectedCustomThemeId = id;
+    _themePaletteId = ThemePalettes.customPaletteId;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    if (seed != null) {
-      await prefs.setInt(_dynamicColorSeedKey, seed);
-    } else {
-      await prefs.remove(_dynamicColorSeedKey);
+    await prefs.setString(_customThemeSelectedKey, id);
+    await prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId);
+  }
+
+  /// Parse a shared custom-theme JSON string, save it and return the stored
+  /// theme (a fresh id is assigned when the id is missing or already taken).
+  /// Importing activates the theme, matching the editor flow (ADR-0037).
+  Future<CustomTheme> importCustomTheme(String source) async {
+    var t = CustomTheme.parse(source);
+    if (t.id.isEmpty || _customThemes.any((e) => e.id == t.id)) {
+      t = t.copyWith(id: 'ct_${DateTime.now().microsecondsSinceEpoch}');
     }
+    final saved = await saveCustomTheme(t);
+    await selectCustomTheme(saved.id);
+    return saved;
   }
 
   Future<void> setUsePureBackground(bool v) async {
@@ -2807,6 +2980,72 @@ class SettingsProvider extends ChangeNotifier {
     if (_dynamicColorSupported == v) return;
     _dynamicColorSupported = v;
     notifyListeners();
+  }
+
+  // ===== iOS advanced background keep-alive =====
+  bool _iosKeepAliveEnabled = false;
+  bool get iosKeepAliveEnabled => _iosKeepAliveEnabled;
+  Future<void> setIosKeepAliveEnabled(bool v) async {
+    if (_iosKeepAliveEnabled == v) return;
+    _iosKeepAliveEnabled = v;
+    if (!v) {
+      _iosSilentAudioKeepAliveEnabled = false;
+      _iosLocationKeepAliveEnabled = false;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iosKeepAliveEnabledKey, _iosKeepAliveEnabled);
+    if (!v) {
+      await prefs.setBool(_iosSilentAudioKeepAliveEnabledKey, false);
+      await prefs.setBool(_iosLocationKeepAliveEnabledKey, false);
+    }
+  }
+
+  bool _iosSilentAudioKeepAliveEnabled = false;
+  bool get iosSilentAudioKeepAliveEnabled => _iosSilentAudioKeepAliveEnabled;
+  Future<void> setIosSilentAudioKeepAliveEnabled(bool v) async {
+    if (_iosSilentAudioKeepAliveEnabled == v) return;
+    _iosSilentAudioKeepAliveEnabled = v;
+    if (v) _iosKeepAliveEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosSilentAudioKeepAliveEnabledKey,
+      _iosSilentAudioKeepAliveEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosKeepAliveEnabledKey, true);
+    }
+  }
+
+  bool _iosLocationKeepAliveEnabled = false;
+  bool get iosLocationKeepAliveEnabled => _iosLocationKeepAliveEnabled;
+  Future<void> setIosLocationKeepAliveEnabled(bool v) async {
+    if (_iosLocationKeepAliveEnabled == v) return;
+    _iosLocationKeepAliveEnabled = v;
+    if (v) _iosKeepAliveEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosLocationKeepAliveEnabledKey,
+      _iosLocationKeepAliveEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosKeepAliveEnabledKey, true);
+    }
+  }
+
+  bool _iosLiveActivityPrivacyMode = false;
+  bool get iosLiveActivityPrivacyMode => _iosLiveActivityPrivacyMode;
+  Future<void> setIosLiveActivityPrivacyMode(bool v) async {
+    if (_iosLiveActivityPrivacyMode == v) return;
+    _iosLiveActivityPrivacyMode = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosLiveActivityPrivacyModeKey,
+      _iosLiveActivityPrivacyMode,
+    );
   }
 
   Future<void> toggleTheme() => setThemeMode(
@@ -3358,7 +3597,7 @@ Please translate the <source_text> section:
   }
 
   Future<void> setOcrPrompt(String prompt) async {
-    _ocrPrompt = prompt.trim().isEmpty ? defaultOcrPrompt : prompt;
+    _ocrPrompt = prompt.trim();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_ocrPromptKey, _ocrPrompt);
@@ -3994,6 +4233,85 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_displayNewChatAfterDeleteKey, v);
+  }
+
+  // Startup assistant: which assistant becomes current on cold start.
+  // mostRecent = follow the most-recently opened conversation (default);
+  // pinned = always switch to the designated [pinnedAssistantId].
+  StartupAssistantMode _startupAssistantMode = StartupAssistantMode.mostRecent;
+  StartupAssistantMode get startupAssistantMode => _startupAssistantMode;
+  Future<void> setStartupAssistantMode(StartupAssistantMode v) async {
+    if (_startupAssistantMode == v) return;
+    _startupAssistantMode = v;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  String? _pinnedAssistantId;
+  String? get pinnedAssistantId => _pinnedAssistantId;
+  Future<void> setPinnedAssistantId(String? id) async {
+    if (_pinnedAssistantId == id) return;
+    _pinnedAssistantId = id;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  static StartupAssistantMode _startupAssistantModeFromString(String? raw) {
+    for (final mode in StartupAssistantMode.values) {
+      if (mode.name == raw) return mode;
+    }
+    return StartupAssistantMode.mostRecent;
+  }
+
+  /// Clears the pinned assistant and reverts to
+  /// [StartupAssistantMode.mostRecent], unconditionally. Used to self-heal a
+  /// dangling pin (a `pinned` mode whose id no longer resolves — e.g. after a
+  /// backup restore from a device that had a different assistant set). Updates
+  /// the live in-memory state (single source of truth), notifies listeners,
+  /// and persists.
+  Future<void> clearPinnedAssistant() async {
+    if (_startupAssistantMode == StartupAssistantMode.mostRecent &&
+        _pinnedAssistantId == null) {
+      return;
+    }
+    _pinnedAssistantId = null;
+    _startupAssistantMode = StartupAssistantMode.mostRecent;
+    notifyListeners();
+    await _persistStartupAssistant();
+  }
+
+  /// Clears the pinned assistant (and reverts to [StartupAssistantMode.mostRecent])
+  /// when [assistantId] is the currently pinned assistant. Used by
+  /// [AssistantProvider.deleteAssistant] so a deleted assistant never leaves a
+  /// dangling pin.
+  Future<void> clearPinnedAssistantIfPinned(String assistantId) async {
+    if (_pinnedAssistantId != assistantId) return;
+    await clearPinnedAssistant();
+  }
+
+  /// Prefs-only variant of [clearPinnedAssistantIfPinned] for callers without
+  /// access to the live [SettingsProvider] instance. The running instance's
+  /// in-memory state is NOT updated — prefer the instance method when available.
+  static Future<void> clearPinnedAssistantPrefsIfPinned(
+    String assistantId,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(_pinnedAssistantIdKey) != assistantId) return;
+    await prefs.setString(
+      _startupAssistantModeKey,
+      StartupAssistantMode.mostRecent.name,
+    );
+    await prefs.remove(_pinnedAssistantIdKey);
+  }
+
+  Future<void> _persistStartupAssistant() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_startupAssistantModeKey, _startupAssistantMode.name);
+    if (_pinnedAssistantId == null) {
+      await prefs.remove(_pinnedAssistantIdKey);
+    } else {
+      await prefs.setString(_pinnedAssistantIdKey, _pinnedAssistantId!);
+    }
   }
 
   // Display: enter key sends message on mobile (iOS defaults true, Android defaults false)
@@ -4861,6 +5179,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._startupAssistantMode = _startupAssistantMode;
+    copy._pinnedAssistantId = _pinnedAssistantId;
     copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
     copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
     copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
@@ -4887,6 +5207,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
+    copy._customThemes = _customThemes;
+    copy._selectedCustomThemeId = _selectedCustomThemeId;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;

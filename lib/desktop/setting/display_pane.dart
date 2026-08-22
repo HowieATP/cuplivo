@@ -1,7 +1,6 @@
 part of '../desktop_settings_page.dart';
 
 // ===== Display Settings Body =====
-
 class _DisplaySettingsBody extends StatelessWidget {
   const _DisplaySettingsBody({super.key});
   @override
@@ -126,6 +125,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowNewChatOnLaunch(),
                   _RowDivider(),
+                  _StartupAssistantSection(),
+                  _RowDivider(),
                   _ToggleRowMsgNavButtons(),
                   _RowDivider(),
                   _SendShortcutRow(),
@@ -179,7 +180,6 @@ class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.title, required this.children});
   final String title;
   final List<Widget> children;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -188,13 +188,13 @@ class _SettingsCard extends StatelessWidget {
     return Material(
       color: sp.usePureBackground
           ? (isDark ? Colors.black : Colors.white)
-          : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+          : context.appColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           width: 0.5,
           color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
+              ? cs.onSurface.withValues(alpha: 0.06)
               : cs.outlineVariant.withValues(alpha: 0.12),
         ),
       ),
@@ -312,16 +312,12 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final items = [
       (ThemeMode.light, l10n.settingsPageLightMode, lucide.Lucide.Sun),
       (ThemeMode.dark, l10n.settingsPageDarkMode, lucide.Lucide.Moon),
       (ThemeMode.system, l10n.settingsPageSystemMode, lucide.Lucide.Monitor),
     ];
-
-    final trackBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
+    final trackBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
     return Container(
       decoration: BoxDecoration(
         color: trackBg,
@@ -355,9 +351,9 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         );
                       }
                       if (_hover == i) {
-                        return isDark
-                            ? Colors.white.withValues(alpha: 0.10)
-                            : Colors.black.withValues(alpha: 0.06);
+                        return cs.onSurface.withValues(
+                          alpha: isDark ? 0.10 : 0.06,
+                        );
                       }
                       return Colors.transparent;
                     }(),
@@ -418,36 +414,180 @@ class _ThemeDots extends StatelessWidget {
   const _ThemeDots();
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final selected = sp.themePaletteId;
-    final regularPalettes = ThemePalettes.all
-        .where((p) => p.id != ThemePalettes.customDynamicId)
-        .toList();
+    final isCustomActive = selected == ThemePalettes.customPaletteId;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        for (final p in regularPalettes)
+        for (final p in ThemePalettes.all)
           _ThemeDot(
             color: p.light.primary,
             selected: selected == p.id,
             onTap: () => context.read<SettingsProvider>().setThemePalette(p.id),
           ),
-        _CustomDynamicDot(
-          selected: selected == ThemePalettes.customDynamicId,
-          onTap: () {
-            final settings = context.read<SettingsProvider>();
-            final previousId = settings.themePaletteId;
-            settings.setThemePalette(ThemePalettes.customDynamicId);
-            _showDesktopHuePicker(
+        for (final t in sp.customThemes)
+          _CustomThemeDotEntry(
+            theme: t,
+            selected: isCustomActive && sp.selectedCustomThemeId == t.id,
+            onTap: () =>
+                context.read<SettingsProvider>().selectCustomTheme(t.id),
+            onMenu: (pos) => showDesktopContextMenuAt(
               context,
-              settings,
-              settings.dynamicColorSeed,
-              previousId,
-            );
-          },
+              globalPosition: pos,
+              items: [
+                DesktopContextMenuItem(
+                  icon: lucide.Lucide.Pencil,
+                  label: l10n.customThemeEditTheme,
+                  onTap: () => showCustomThemeEditor(context, initial: t),
+                ),
+                DesktopContextMenuItem(
+                  icon: lucide.Lucide.Copy,
+                  label: l10n.customThemeCopyAction,
+                  onTap: () => exportCustomThemeToClipboard(context, t),
+                ),
+                DesktopContextMenuItem(
+                  icon: lucide.Lucide.Trash2,
+                  label: l10n.customThemeDelete,
+                  danger: true,
+                  onTap: () async {
+                    final isActive = sp.selectedCustomThemeId == t.id;
+                    final ok = await showCustomThemeConfirmDialog(
+                      context,
+                      message: isActive
+                          ? l10n.customThemeDeleteConfirmActive
+                          : l10n.customThemeDeleteConfirm,
+                    );
+                    if (ok && context.mounted) {
+                      await context.read<SettingsProvider>().deleteCustomTheme(
+                        t.id,
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        _ThemeActionDot(
+          icon: lucide.Lucide.Plus,
+          tooltip: l10n.customThemeNewTheme,
+          onTap: () => showCustomThemeEditor(context),
+        ),
+        _ThemeActionDot(
+          icon: lucide.Lucide.Download,
+          tooltip: l10n.customThemeImportTheme,
+          onTap: () => showImportCustomThemeDialog(context),
         ),
       ],
+    );
+  }
+}
+
+class _CustomThemeDotEntry extends StatefulWidget {
+  const _CustomThemeDotEntry({
+    required this.theme,
+    required this.selected,
+    required this.onTap,
+    required this.onMenu,
+  });
+  final CustomTheme theme;
+  final bool selected;
+  final VoidCallback onTap;
+  final ValueChanged<Offset> onMenu;
+  @override
+  State<_CustomThemeDotEntry> createState() => _CustomThemeDotEntryState();
+}
+
+class _CustomThemeDotEntryState extends State<_CustomThemeDotEntry> {
+  bool _hover = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onSecondaryTapDown: (d) => widget.onMenu(d.globalPosition),
+        onLongPressStart: (d) => widget.onMenu(d.globalPosition),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: widget.selected
+                  ? cs.onSurface.withValues(alpha: 0.85)
+                  : cs.surface,
+              width: 2,
+            ),
+          ),
+          child: ClipOval(
+            child: CustomThemeDot(
+              theme: widget.theme,
+              size: 20,
+              selected: widget.selected || _hover,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeActionDot extends StatefulWidget {
+  const _ThemeActionDot({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  @override
+  State<_ThemeActionDot> createState() => _ThemeActionDotState();
+}
+
+class _ThemeActionDotState extends State<_ThemeActionDot> {
+  bool _hover = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(
+        message: widget.tooltip,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _hover
+                  ? cs.onSurface.withValues(alpha: 0.08)
+                  : cs.onSurface.withValues(alpha: 0.04),
+              border: Border.all(
+                color: cs.onSurface.withValues(alpha: _hover ? 0.35 : 0.2),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              widget.icon,
+              size: 13,
+              color: cs.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -504,129 +644,6 @@ class _ThemeDotState extends State<_ThemeDot> {
       ),
     );
   }
-}
-
-class _CustomDynamicDot extends StatefulWidget {
-  const _CustomDynamicDot({required this.selected, required this.onTap});
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  State<_CustomDynamicDot> createState() => _CustomDynamicDotState();
-}
-
-class _CustomDynamicDotState extends State<_CustomDynamicDot> {
-  bool _hover = false;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final settings = context.watch<SettingsProvider>();
-    final seed = settings.dynamicColorSeed;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          curve: Curves.easeOutCubic,
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: seed != null
-                ? null
-                : const SweepGradient(
-                    colors: [
-                      Color(0xFFFF0000),
-                      Color(0xFFFFFF00),
-                      Color(0xFF00FF00),
-                      Color(0xFF00FFFF),
-                      Color(0xFF0000FF),
-                      Color(0xFFFF00FF),
-                      Color(0xFFFF0000),
-                    ],
-                  ),
-            color: seed != null ? Color(seed) : null,
-            boxShadow: _hover
-                ? [
-                    BoxShadow(
-                      color: (seed != null ? Color(seed) : cs.onSurface)
-                          .withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : [],
-            border: Border.all(
-              color: widget.selected
-                  ? cs.onSurface.withValues(alpha: 0.85)
-                  : Colors.white,
-              width: 2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _showDesktopHuePicker(
-  BuildContext context,
-  SettingsProvider settings,
-  int? currentSeed,
-  String previousPaletteId,
-) async {
-  final l10n = AppLocalizations.of(context)!;
-  double hue = currentSeed != null
-      ? HSVColor.fromColor(Color(currentSeed)).hue
-      : 260.0;
-
-  await showDialog(
-    context: context,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text(l10n.themeSettingsPageSeedColorLabel),
-            content: SizedBox(
-              width: 280,
-              child: HueSlider(
-                hue: hue,
-                onChanged: (v) {
-                  setDialogState(() => hue = v);
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  settings.setThemePalette(previousPaletteId);
-                  Navigator.of(dialogContext).pop();
-                },
-                child: Text(l10n.homePageCancel),
-              ),
-              TextButton(
-                onPressed: () {
-                  final seedColor = HSVColor.fromAHSV(
-                    1.0,
-                    hue,
-                    0.85,
-                    0.90,
-                  ).toColor();
-                  settings.setDynamicColorSeed(seedColor.toARGB32());
-                  settings.setThemePalette(ThemePalettes.customDynamicId);
-                  Navigator.of(dialogContext).pop();
-                },
-                child: Text(l10n.assistantEditEmojiDialogSave),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
 }
 
 class _ToggleRowPureBackground extends StatelessWidget {
@@ -724,7 +741,6 @@ class _TopicPositionDropdownState extends State<_TopicPositionDropdown> {
         label: l10n.desktopDisplaySettingsTopicPositionRight,
       ),
     ];
-
     return DesktopSelectDropdown<DesktopTopicPosition>(
       value: sp.desktopTopicPosition,
       options: options,
@@ -760,7 +776,6 @@ class _BackgroundStyleDropdownState extends State<_BackgroundStyleDropdown> {
         label: l10n.displaySettingsPageChatMessageBackgroundSolid,
       ),
     ];
-
     return DesktopSelectDropdown<ChatMessageBackgroundStyle>(
       value: sp.chatMessageBackgroundStyle,
       options: options,
@@ -793,9 +808,7 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.12)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -863,7 +876,6 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
   final GlobalKey _key = GlobalKey();
   OverlayEntry? _entry;
   final LayerLink _link = LayerLink();
-
   void _openDropdownOverlay() {
     if (_entry != null) return;
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
@@ -1006,9 +1018,7 @@ class _HoverDropdownButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = hovered || open
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     final angle = open ? 3.1415926 : 0.0;
     return MouseRegion(
@@ -1111,9 +1121,7 @@ class _OverlayMenuItemState extends State<_OverlayMenuItem> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.08)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1163,7 +1171,6 @@ class _OverlayItem extends StatefulWidget {
   final Color background;
   final bool selected;
   final VoidCallback onTap;
-
   @override
   State<_OverlayItem> createState() => _OverlayItemState();
 }
@@ -1176,9 +1183,7 @@ class _OverlayItemState extends State<_OverlayItem> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? Color.alphaBlend(
-            (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.04)),
+            cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
             widget.background,
           )
         : widget.background;
@@ -1302,9 +1307,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1C1C1E)
-                  : Colors.white,
+              color: context.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -1411,9 +1414,7 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: _hover
-                ? (isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.black.withValues(alpha: 0.04))
+                ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -1550,7 +1551,6 @@ class _BorderInputState extends State<_BorderInput> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     // hover to change border color (not background)
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -1582,7 +1582,7 @@ class _BorderInputState extends State<_BorderInput> {
         decoration: InputDecoration(
           isDense: true,
           filled: true,
-          fillColor: isDark ? Colors.white10 : Colors.white,
+          fillColor: context.appColors.surfaceFill,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 6,
             vertical: 8,
@@ -1715,9 +1715,7 @@ class _DesktopFontDropdownButtonState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1777,7 +1775,6 @@ Future<String?> _showDesktopFontChooserDialog(
   final rootNavigator = Navigator.of(context, rootNavigator: true);
   final ctrl = TextEditingController();
   String? result;
-
   Future<List<String>> fetchSystemFonts() async {
     try {
       final sf = SystemFonts();
@@ -1819,8 +1816,7 @@ Future<String?> _showDesktopFontChooserDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+        final bg = ctx.appColors.surfaceCard;
         final cs2 = Theme.of(ctx).colorScheme;
         return Dialog(
           elevation: 0,
@@ -1910,10 +1906,7 @@ Future<String?> _showDesktopFontChooserDialog(
                         isDense: true,
                         filled: true,
                         hintText: l10n.desktopFontFilterHint,
-                        fillColor:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(
@@ -1951,6 +1944,7 @@ Future<String?> _showDesktopFontChooserDialog(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: Theme.of(context).brightness == Brightness.dark
+                              // color-gate: ignore
                               ? Colors.white10
                               : Colors.black.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(10),
@@ -2028,9 +2022,7 @@ class _FontRowItemState extends State<_FontRowItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     final sample = 'Aa字';
     return MouseRegion(
@@ -2690,7 +2682,6 @@ class _ToggleRowMsgNavButtons extends StatelessWidget {
         label: l10n.displaySettingsPageMessageNavButtonsModeNever,
       ),
     ];
-
     return _LabeledRow(
       label: l10n.displaySettingsPageMessageNavButtonsTitle,
       trailing: DesktopSelectDropdown<DesktopMessageNavButtonsMode>(
@@ -2775,6 +2766,81 @@ class _ToggleRowNewChatOnLaunch extends StatelessWidget {
       label: l10n.displaySettingsPageNewChatOnLaunchTitle,
       value: sp.newChatOnLaunch,
       onChanged: (v) => context.read<SettingsProvider>().setNewChatOnLaunch(v),
+    );
+  }
+}
+
+class _StartupAssistantSection extends StatelessWidget {
+  const _StartupAssistantSection();
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SettingsProvider>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _ToggleRowStartupAssistantPinned(),
+        if (sp.startupAssistantMode == StartupAssistantMode.pinned) ...[
+          const _RowDivider(),
+          const _StartupAssistantPickerRow(),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToggleRowStartupAssistantPinned extends StatelessWidget {
+  const _ToggleRowStartupAssistantPinned();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageStartupAssistantPinnedTitle,
+      value: sp.startupAssistantMode == StartupAssistantMode.pinned,
+      onChanged: (v) async {
+        final settings = context.read<SettingsProvider>();
+        if (v) {
+          var pinnedId = settings.pinnedAssistantId;
+          pinnedId ??= context.read<AssistantProvider>().currentAssistantId;
+          if (pinnedId == null) return;
+          await settings.setPinnedAssistantId(pinnedId);
+          await settings.setStartupAssistantMode(StartupAssistantMode.pinned);
+        } else {
+          await settings.setStartupAssistantMode(
+            StartupAssistantMode.mostRecent,
+          );
+        }
+      },
+    );
+  }
+}
+
+class _StartupAssistantPickerRow extends StatelessWidget {
+  const _StartupAssistantPickerRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final ap = context.watch<AssistantProvider>();
+    final pinnedId = sp.pinnedAssistantId;
+    String? name;
+    for (final a in ap.assistants) {
+      if (a.id == pinnedId) {
+        name = a.name;
+        break;
+      }
+    }
+    return _LabeledRow(
+      label: l10n.displaySettingsPageStartupAssistantPickerLabel,
+      trailing: _DesktopFontDropdownButton(
+        display: name ?? l10n.displaySettingsPageStartupAssistantNone,
+        onTap: () async {
+          final id = await showAssistantMoveSelector(context);
+          if (id != null && context.mounted) {
+            await context.read<SettingsProvider>().setPinnedAssistantId(id);
+          }
+        },
+      ),
     );
   }
 }
@@ -3125,7 +3191,6 @@ class _OpacityInputGroup extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final VoidCallback onCommit;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3190,7 +3255,6 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
   final LayerLink _link = LayerLink();
   final GlobalKey _triggerKey = GlobalKey();
   OverlayEntry? _entry;
-
   void _toggle() {
     if (_open) {
       _close();
@@ -3223,7 +3287,6 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
     if (rb == null) return;
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
-
     _entry = OverlayEntry(
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -3233,9 +3296,8 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
         ).usePureBackground;
         final bgColor = usePure
             ? (isDark ? Colors.black : Colors.white)
-            : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
+            : ctx.appColors.surfaceCard;
         final sp = Provider.of<SettingsProvider>(ctx, listen: false);
-
         return Stack(
           children: [
             Positioned.fill(
@@ -3270,14 +3332,11 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
     final label = _labelFor(context, sp.desktopSendShortcut);
-
     final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
-
     return CompositedTransformTarget(
       link: _link,
       child: MouseRegion(
@@ -3293,7 +3352,7 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
             constraints: const BoxConstraints(minWidth: 130, minHeight: 34),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF141414) : Colors.white,
+              color: context.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: _open
@@ -3358,7 +3417,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
-
   @override
   void initState() {
     super.initState();
@@ -3385,7 +3443,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
-
     // Platform-specific modifier key
     final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
     final items = <(DesktopSendShortcut, String)>[
@@ -3395,7 +3452,6 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
       ),
       (DesktopSendShortcut.ctrlEnter, '$modifier + Enter'),
     ];
-
     return FadeTransition(
       opacity: _opacity,
       child: SlideTransition(

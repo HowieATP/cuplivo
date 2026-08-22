@@ -9,8 +9,10 @@ import 'dart:ui' as ui;
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/app_semantic_colors.dart';
 import '../theme/palettes.dart';
-import '../shared/widgets/hue_slider.dart';
+import '../theme/custom_theme.dart';
+import '../features/settings/widgets/custom_theme_widgets.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../core/providers/codex_device_code_controller.dart';
@@ -33,6 +35,7 @@ import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/group_chat_provider.dart';
+import '../features/assistant/widgets/assistant_select_sheet.dart';
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';
 import '../features/group_chat/pages/group_chat_settings_page.dart';
@@ -366,9 +369,7 @@ class _SettingsMenu extends StatelessWidget {
               onTap: () => onSelect(items[i].$1),
               color: cs.onSurface.withValues(alpha: 0.9),
               selectedColor: cs.primary,
-              hoverBg: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
+              hoverBg: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
             ),
             if (i != items.length - 1) const SizedBox(height: 8),
           ],

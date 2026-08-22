@@ -24,11 +24,12 @@ String? normalizeGuestCwd(String? raw) {
     return '/workspace';
   } else if (trimmed.startsWith('/workspace/')) {
     relative = trimmed.substring('/workspace/'.length);
-  } else if (trimmed.startsWith('/workspace')) {
-    // "/workspaceX" is not a /workspace subpath.
+  } else if (trimmed.startsWith('/')) {
+    // Absolute paths outside /workspace are invalid, including lookalikes
+    // such as "/workspaceX".
     return null;
   } else {
-    relative = trimmed.replaceFirst(RegExp(r'^/+'), '');
+    relative = trimmed;
   }
 
   final segments = <String>[];

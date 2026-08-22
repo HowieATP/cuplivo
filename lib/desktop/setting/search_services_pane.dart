@@ -5,11 +5,14 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/search/search_service.dart';
+import '../../core/services/search/search_service_usage_service.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -20,7 +23,6 @@ class DesktopSearchServicesPane extends StatefulWidget {
 
 class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
   final Map<String, bool> _testing = <String, bool>{};
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -32,7 +34,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
       services.isNotEmpty ? services.length - 1 : 0,
     );
     final common = settings.searchCommonOptions;
-
     return Container(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -79,7 +80,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
               SliverReorderableList(
                 itemCount: services.length,
                 itemBuilder: (context, index) {
@@ -159,7 +159,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                   }
                 },
               ),
-
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -244,7 +243,6 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
   }
 
   // list height helper removed after switching to sliver-based list
-
   Future<void> _testConnection(
     BuildContext context,
     SearchServiceOptions s,
@@ -295,13 +293,10 @@ class _ServiceCardState extends State<_ServiceCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = SearchService.getService(widget.service).name;
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover || widget.selected
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
-
     // Connection/testing status capsule
     final l10n = AppLocalizations.of(context)!;
     final conn = context
@@ -316,18 +311,17 @@ class _ServiceCardState extends State<_ServiceCard> {
       statusFg = cs.primary;
     } else if (conn == true) {
       statusText = l10n.searchServicesPageConnectedStatus;
-      statusBg = Colors.green.withValues(alpha: 0.12);
-      statusFg = Colors.green;
+      statusBg = context.appColors.successContainer;
+      statusFg = context.appColors.success;
     } else if (conn == false) {
       statusText = l10n.searchServicesPageFailedStatus;
-      statusBg = Colors.orange.withValues(alpha: 0.12);
-      statusFg = Colors.orange;
+      statusBg = context.appColors.warningContainer;
+      statusFg = context.appColors.warning;
     } else {
       statusText = l10n.searchServicesPageNotTestedStatus;
       statusBg = cs.onSurface.withValues(alpha: 0.06);
       statusFg = cs.onSurface.withValues(alpha: 0.7);
     }
-
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -421,7 +415,6 @@ class _ToggleRow extends StatelessWidget {
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -544,9 +537,7 @@ class _StepperButtonState extends State<_StepperButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = Colors.transparent;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.10)
-              : Colors.black.withValues(alpha: 0.07))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.07)
         : base;
     final c = widget.enabled
         ? cs.onSurface
@@ -614,6 +605,10 @@ class _BrandBadge extends StatelessWidget {
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
+    if (s is StepFunOptions) return 'stepfun';
+    if (s is FirecrawlOptions) return 'firecrawl';
+    if (s is TinyFishOptions) return 'tinyfish';
+    if (s is DoubaoOptions) return 'doubao';
     return 'search';
   }
 
@@ -622,6 +617,7 @@ class _BrandBadge extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = BrandAssets.assetForName(name);
+    // color-gate: ignore
     final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -683,9 +679,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -713,9 +707,7 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -747,7 +739,6 @@ Widget _divider(BuildContext context) {
 }
 
 // ===== Dialogs =====
-
 Future<SearchServiceOptions?> _showAddServiceDialog(
   BuildContext context,
 ) async {
@@ -804,8 +795,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'systemPrompt': TextEditingController(
       text: GrokOptions.defaultSystemPrompt,
     ),
+    'category': TextEditingController(),
+    'country': TextEditingController(),
+    'location': TextEditingController(),
+    'includeDomains': TextEditingController(),
+    'excludeDomains': TextEditingController(),
   };
-
   @override
   void dispose() {
     for (final c in _controllers.values) {
@@ -869,6 +864,22 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  final keyText = (_controllers['apiKey']?.text ?? '').trim();
+                  final keyed =
+                      _selectedType != 'bing_local' &&
+                      _selectedType != 'duckduckgo' &&
+                      _selectedType != 'searxng' &&
+                      _selectedType != 'firecrawl';
+                  if (keyed && keyText.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          l10n.searchServicesEditDialogApiKeyRequired,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   final created = _createService();
                   Navigator.of(context).pop(created);
                 },
@@ -1062,6 +1073,108 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             obscureText: true,
           ),
         ];
+      case 'doubao':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+        ];
+      case 'stepfun':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: StepFunOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['category'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorCategoryLabel,
+              hintText: 'programming / research / gov / business',
+            ),
+          ),
+        ];
+      case 'firecrawl':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesDialogApiKey,
+              hintText: l10n.searchServiceEditorApiKeyOptional,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: FirecrawlOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['country'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorCountryLabel,
+              hintText: 'US',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['location'],
+            decoration: deco(l10n.searchServiceEditorLocationLabel),
+          ),
+        ];
+      case 'tinyfish':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: TinyFishOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['location'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorLocationLabel,
+              hintText: 'US',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['language'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServiceEditorLanguageLabel,
+              hintText: 'en',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['includeDomains'],
+            decoration: deco(l10n.searchServiceEditorIncludeDomainsLabel),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['excludeDomains'],
+            decoration: deco(l10n.searchServiceEditorExcludeDomainsLabel),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1070,7 +1183,6 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 
   SearchServiceOptions _createService() {
     final id = const Uuid().v4().substring(0, 8);
-
     List<ApiKeyConfig> makeKeys() {
       final key = _controllers['apiKey']?.text;
       if (key == null || key.isEmpty) return [];
@@ -1150,6 +1262,33 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           customUrl: _controllers['customUrl']!.text.trim(),
           systemPrompt: _controllers['systemPrompt']!.text,
         );
+      case 'doubao':
+        return DoubaoOptions(id: id, apiKeys: makeKeys());
+      case 'stepfun':
+        return StepFunOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          category: _controllers['category']!.text.trim(),
+        );
+      case 'firecrawl':
+        return FirecrawlOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          country: _controllers['country']!.text.trim(),
+          location: _controllers['location']!.text.trim(),
+        );
+      case 'tinyfish':
+        return TinyFishOptions(
+          id: id,
+          apiKeys: makeKeys(),
+          url: _controllers['url']!.text.trim(),
+          location: _controllers['location']!.text.trim(),
+          language: _controllers['language']!.text.trim(),
+          includeDomains: _controllers['includeDomains']!.text.trim(),
+          excludeDomains: _controllers['excludeDomains']!.text.trim(),
+        );
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -1167,7 +1306,6 @@ class _EditServiceDialog extends StatefulWidget {
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
   late List<ApiKeyConfig> _editKeys;
-
   @override
   void initState() {
     super.initState();
@@ -1214,6 +1352,23 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['customUrl'] = TextEditingController(text: s.customUrl);
       _controllers['systemPrompt'] = TextEditingController(
         text: s.systemPrompt,
+      );
+    } else if (s is StepFunOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['category'] = TextEditingController(text: s.category);
+    } else if (s is FirecrawlOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['country'] = TextEditingController(text: s.country);
+      _controllers['location'] = TextEditingController(text: s.location);
+    } else if (s is TinyFishOptions) {
+      _controllers['url'] = TextEditingController(text: s.url);
+      _controllers['location'] = TextEditingController(text: s.location);
+      _controllers['language'] = TextEditingController(text: s.language);
+      _controllers['includeDomains'] = TextEditingController(
+        text: s.includeDomains,
+      );
+      _controllers['excludeDomains'] = TextEditingController(
+        text: s.excludeDomains,
       );
     }
   }
@@ -1278,7 +1433,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                   if (_editKeys.isEmpty &&
                       widget.service is! BingLocalOptions &&
                       widget.service is! DuckDuckGoOptions &&
-                      widget.service is! SearXNGOptions) {
+                      widget.service is! SearXNGOptions &&
+                      widget.service is! FirecrawlOptions) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -1304,9 +1460,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     final s = widget.service;
     InputDecoration deco(String hint) =>
         _deskInputDecoration(context).copyWith(hintText: hint);
-
     final fields = <Widget>[];
-
     if (s is TavilyOptions) {
       fields.addAll([
         TextField(
@@ -1445,11 +1599,102 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           obscureText: true,
         ),
       ]);
+    } else if (s is StepFunOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: StepFunOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['category'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorCategoryLabel,
+            hintText: 'programming / research / gov / business',
+          ),
+        ),
+      ]);
+    } else if (s is FirecrawlOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: FirecrawlOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['country'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorCountryLabel,
+            hintText: 'US',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['location'],
+          decoration: deco(l10n.searchServiceEditorLocationLabel),
+        ),
+      ]);
+    } else if (s is TinyFishOptions) {
+      fields.addAll([
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: TinyFishOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['location'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorLocationLabel,
+            hintText: 'US',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['language'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServiceEditorLanguageLabel,
+            hintText: 'en',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['includeDomains'],
+          decoration: deco(l10n.searchServiceEditorIncludeDomainsLabel),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['excludeDomains'],
+          decoration: deco(l10n.searchServiceEditorExcludeDomainsLabel),
+        ),
+      ]);
     }
-
     if (SearchService.serviceUsesKeys(s)) {
       if (fields.isNotEmpty) fields.add(const SizedBox(height: 12));
       fields.addAll(_buildKeyManagement());
+    }
+    if (SearchServiceUsageService.supports(s)) {
+      if (fields.isNotEmpty) fields.add(const SizedBox(height: 14));
+      fields.add(
+        _DialogUsagePanel(
+          optionsBuilder: _updateService,
+          timeout: Duration(
+            milliseconds: context
+                .read<SettingsProvider>()
+                .searchCommonOptions
+                .timeout
+                .clamp(1000, 30000),
+          ),
+        ),
+      );
     }
     return fields;
   }
@@ -1457,7 +1702,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
   List<Widget> _buildKeyManagement() {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-
     final rows = <Widget>[];
     for (int i = 0; i < _editKeys.length; i++) {
       final k = _editKeys[i];
@@ -1510,9 +1754,75 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       rows.add(const SizedBox(height: 8));
     }
 
-    rows.add(_SmallIconBtn(icon: lucide.Lucide.Plus, onTap: () => _addKey()));
+    rows.add(
+      Row(
+        children: [
+          _SmallIconBtn(icon: lucide.Lucide.Plus, onTap: () => _addKey()),
+          const SizedBox(width: 8),
+          _SmallIconBtn(
+            icon: lucide.Lucide.ClipboardPen,
+            onTap: () => _pasteKeys(),
+          ),
+        ],
+      ),
+    );
 
     return [const SizedBox(height: 4), ...rows];
+  }
+
+  Future<void> _pasteKeys() async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(l10n.searchServicesDialogBatchPasteKeys),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 6,
+          decoration: InputDecoration(
+            hintText: l10n.searchApiKeysPageBatchHint,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.searchServicesEditDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: Text(l10n.searchServicesEditDialogSave),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.isEmpty || !mounted) return;
+    final parsed = _parseBatchKeys(result);
+    if (parsed.isEmpty) return;
+    final existing = _editKeys.map((k) => k.key.trim()).toSet();
+    setState(() {
+      for (final key in parsed) {
+        if (existing.contains(key)) continue;
+        existing.add(key);
+        _editKeys.add(ApiKeyConfig.create(key));
+      }
+    });
+  }
+
+  static List<String> _parseBatchKeys(String input) {
+    final seen = <String>{};
+    final keys = <String>[];
+    for (final part in input.split(RegExp(r'[\s,;]+'))) {
+      final key = part.trim();
+      if (key.isEmpty || !seen.add(key)) continue;
+      keys.add(key);
+    }
+    return keys;
   }
 
   Future<void> _addKey() async {
@@ -1544,8 +1854,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       ),
     );
     controller.dispose();
-    if (result != null && result.isNotEmpty && mounted) {
-      setState(() => _editKeys.add(ApiKeyConfig.create(result)));
+    final key = result?.trim() ?? '';
+    if (key.isNotEmpty && mounted) {
+      setState(() => _editKeys.add(ApiKeyConfig.create(key)));
     }
   }
 
@@ -1638,8 +1949,306 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         systemPrompt: _controllers['systemPrompt']!.text,
       );
     }
+    if (s is DoubaoOptions) {
+      return DoubaoOptions(id: s.id, apiKeys: _editKeys);
+    }
+    if (s is StepFunOptions) {
+      return StepFunOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        category: (_controllers['category']?.text ?? '').trim(),
+      );
+    }
+    if (s is FirecrawlOptions) {
+      return FirecrawlOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        sources: s.sources,
+        categories: s.categories,
+        country: (_controllers['country']?.text ?? '').trim(),
+        location: (_controllers['location']?.text ?? '').trim(),
+      );
+    }
+    if (s is TinyFishOptions) {
+      return TinyFishOptions(
+        id: s.id,
+        apiKeys: _editKeys,
+        url: (_controllers['url']?.text ?? '').trim(),
+        location: (_controllers['location']?.text ?? '').trim(),
+        language: (_controllers['language']?.text ?? '').trim(),
+        includeDomains: (_controllers['includeDomains']?.text ?? '').trim(),
+        excludeDomains: (_controllers['excludeDomains']?.text ?? '').trim(),
+      );
+    }
     return s;
   }
+}
+
+class _DialogUsagePanel extends StatefulWidget {
+  const _DialogUsagePanel({
+    required this.optionsBuilder,
+    required this.timeout,
+  });
+
+  final SearchServiceOptions Function() optionsBuilder;
+  final Duration timeout;
+
+  @override
+  State<_DialogUsagePanel> createState() => _DialogUsagePanelState();
+}
+
+class _DialogUsagePanelState extends State<_DialogUsagePanel> {
+  SearchServiceUsageInfo? _usage;
+  String? _error;
+  bool _loading = false;
+  int _requestGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = widget.optionsBuilder();
+    _usage = SearchServiceUsageService.cachedUsage(draft);
+    if (SearchServiceUsageService.hasCredential(draft)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _query();
+      });
+    }
+  }
+
+  Future<void> _query() async {
+    if (_loading) return;
+    final options = widget.optionsBuilder();
+    final key = SearchServiceUsageService.cacheKey(options);
+    final generation = ++_requestGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final usage = await SearchServiceUsageService.fetch(
+        options,
+        timeout: widget.timeout,
+      );
+      if (!mounted ||
+          generation != _requestGeneration ||
+          SearchServiceUsageService.cacheKey(widget.optionsBuilder()) != key) {
+        return;
+      }
+      setState(() => _usage = usage);
+    } catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      var message = error.toString();
+      while (message.startsWith('Exception: ')) {
+        message = message.substring('Exception: '.length).trim();
+      }
+      setState(() => _error = message);
+    } finally {
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final usage = _usage;
+    final draft = widget.optionsBuilder();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(lucide.Lucide.Wallet, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.searchServiceEditorUsageTitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+              ),
+              if (_loading)
+                SizedBox.square(
+                  dimension: 22,
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 13,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Tooltip(
+                  message: l10n.searchServiceEditorUsageQuery,
+                  child: _SmallIconBtn(
+                    icon: lucide.Lucide.RefreshCw,
+                    onTap: _query,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ..._buildStatus(context, draft, usage),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildStatus(
+    BuildContext context,
+    SearchServiceOptions options,
+    SearchServiceUsageInfo? usage,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    if (_loading && usage == null) {
+      return [
+        Text(
+          l10n.searchServiceEditorUsageQuerying,
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ];
+    }
+    final error = _error;
+    final errorRow = error == null
+        ? null
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(lucide.Lucide.TriangleAlert, size: 15, color: cs.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  l10n.searchServiceEditorUsageFailed(error),
+                  style: TextStyle(fontSize: 12, height: 1.35, color: cs.error),
+                ),
+              ),
+            ],
+          );
+    if (error != null && usage == null) {
+      return [errorRow!];
+    }
+    final value = usage;
+    if (value == null) {
+      return [
+        Text(
+          l10n.searchServiceEditorUsageNotQueried,
+          style: TextStyle(
+            fontSize: 12,
+            color: cs.onSurface.withValues(alpha: 0.55),
+          ),
+        ),
+      ];
+    }
+    final rows = <Widget>[];
+    if (options is TavilyOptions && value.used != null && value.limit != null) {
+      final limit = value.limit!;
+      final progress = limit <= 0
+          ? 0.0
+          : (value.used! / limit).clamp(0.0, 1.0).toDouble();
+      rows.addAll([
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.searchServiceEditorUsageRemaining(
+                  _formatUsageNumber(context, value.remaining),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: AppFontWeights.semibold,
+                  color: cs.primary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              l10n.searchServiceEditorUsageUsed(
+                _formatUsageNumber(context, value.used!),
+                _formatUsageNumber(context, limit),
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 5,
+            color: cs.primary,
+            backgroundColor: cs.primary.withValues(alpha: 0.13),
+          ),
+        ),
+      ]);
+    } else if (options is LinkUpOptions) {
+      rows.add(
+        Text(
+          l10n.searchServiceEditorUsageBalance(
+            _formatUsageNumber(context, value.remaining),
+          ),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.primary,
+          ),
+        ),
+      );
+    } else {
+      rows.add(
+        Text(
+          l10n.searchServiceEditorUsageRemaining(
+            _formatUsageNumber(context, value.remaining),
+          ),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.primary,
+          ),
+        ),
+      );
+    }
+    if (errorRow != null) {
+      rows.add(const SizedBox(height: 8));
+      rows.add(errorRow);
+    }
+    return rows;
+  }
+}
+
+String _formatUsageNumber(BuildContext context, num value) {
+  final format =
+      NumberFormat.decimalPattern(
+          Localizations.localeOf(context).toLanguageTag(),
+        )
+        ..minimumFractionDigits = 0
+        ..maximumFractionDigits = 2;
+  return format.format(value);
 }
 
 class _ServiceTypeChips extends StatefulWidget {
@@ -1671,6 +2280,10 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'serper', brand: 'serper'),
     (type: 'querit', brand: 'querit'),
     (type: 'grok', brand: 'grok'),
+    (type: 'stepfun', brand: 'stepfun'),
+    (type: 'firecrawl', brand: 'firecrawl'),
+    (type: 'tinyfish', brand: 'tinyfish'),
+    (type: 'doubao', brand: 'doubao'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -1686,7 +2299,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
         final name = _serviceTypeName(context, it.type);
         final bg = selected
             ? cs.primary.withValues(alpha: isDark ? 0.18 : 0.12)
-            : (isDark ? Colors.white12 : const Color(0xFFF7F7F9));
+            : context.appColors.surfaceFill;
         final fg = selected ? cs.primary : cs.onSurface.withValues(alpha: 0.85);
         return GestureDetector(
           onTap: () => widget.onChanged(it.type),
@@ -1755,6 +2368,14 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameQuerit;
     case 'grok':
       return l10n.searchServiceNameGrok;
+    case 'stepfun':
+      return l10n.searchServiceNameStepFun;
+    case 'firecrawl':
+      return l10n.searchServiceNameFirecrawl;
+    case 'tinyfish':
+      return l10n.searchServiceNameTinyFish;
+    case 'doubao':
+      return l10n.searchServiceNameDoubao;
     default:
       return type;
   }
@@ -1780,7 +2401,6 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
   final GlobalKey _key = GlobalKey();
   static const List<({String type, String brand})> _types =
       _ServiceTypeChipsState._types;
-
   void _toggle() {
     _open ? _close() : _openOverlay();
   }
@@ -1825,9 +2445,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(ctx).brightness == Brightness.dark
-                            ? const Color(0xFF1C1C1E)
-                            : Colors.white,
+                        color: ctx.appColors.surfaceCard,
                         border: Border.all(
                           color: cs.outlineVariant.withValues(alpha: 0.12),
                           width: 0.5,
@@ -1899,15 +2517,12 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
         orElse: () => _types.first,
       )
       .brand;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover || _open
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
         : Colors.transparent;
     return CompositedTransformTarget(
       link: _link,
@@ -1986,9 +2601,7 @@ class _DropdownItemState extends State<_DropdownItem> {
     final bg = widget.selected
         ? cs.primary.withValues(alpha: 0.08)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.04))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -2058,9 +2671,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final bg = widget.filled
         ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05))
+              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
@@ -2106,12 +2717,11 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: false,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(

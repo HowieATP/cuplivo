@@ -143,13 +143,12 @@ final class CuplivoLinuxSandboxPlugin: NSObject {
       return "/workspace"
     } else if trimmed.hasPrefix("/workspace/") {
       relative = String(trimmed.dropFirst("/workspace/".count))
-    } else if trimmed.hasPrefix("/workspace") {
-      // "/workspaceX" is not a /workspace subpath.
+    } else if trimmed.hasPrefix("/") {
+      // Absolute paths outside /workspace are invalid, including lookalikes
+      // such as "/workspaceX".
       return nil
     } else {
-      var rel = trimmed
-      while rel.hasPrefix("/") { rel.removeFirst() }
-      relative = rel
+      relative = trimmed
     }
 
     var segments: [String] = []

@@ -1546,7 +1546,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
 
   /// Per-request routing/body metadata persisted on the originating user
   /// message (schema v15) so regenerate can replay image-mode routing and
-  /// image generation options. See docs/adr/0018-per-message-request-metadata.md.
+  /// image generation options. See docs/adr/0033-per-message-request-metadata.md.
   final bool? requestAllowImagesApiRouting;
   final String? requestExtraBodyJson;
   const MessageRow({

@@ -305,9 +305,12 @@ class _GroupChatPageState extends State<GroupChatPage> {
     final g = context.read<GroupChatProvider>().getById(widget.groupChatId);
     if (g == null) return;
 
+    final keepOriginalTimestamp =
+        message.role == 'assistant' || !result.shouldSend;
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,
       content: result.content,
+      timestamp: keepOriginalTimestamp ? message.timestamp : null,
     );
     if (newMsg == null) return;
     final gid = newMsg.groupId ?? newMsg.id;
@@ -483,7 +486,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
               focusNode: _inputFocus,
               loading: _loading || _orchestrator.isBusy,
               mode: ChatInputMode.groupChat,
-              showMcpButton: false,
+              showToolsHubButton: false,
               supportsReasoning: false,
               showMoreButton: false,
               showQuickPhraseButton: false,

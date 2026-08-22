@@ -43,8 +43,9 @@ class ScrollNavButtonsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDark ? Colors.white : Colors.black87;
+    final cs = Theme.of(context).colorScheme;
+    final iconColor = cs.onSurface;
+    final isDark = cs.brightness == Brightness.dark;
     final buttonDiameter = iconSize + buttonPadding * 2;
     final hoverHeight = buttonDiameter * 4 + buttonSpacing * 3 + 24;
     final hoverWidth = buttonDiameter + 24;

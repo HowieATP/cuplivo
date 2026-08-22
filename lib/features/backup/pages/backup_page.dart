@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../../shared/dialogs/restart_required_dialog.dart';
 import '../../../shared/dialogs/rikkahub_migrate_dialog.dart';
+import '../../../shared/dialogs/kelivo_compat_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../shared/widgets/lan_sync_section.dart';
@@ -141,8 +143,7 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final cardColor = context.appColors.surfaceFill;
 
     return showDialog<RestoreMode>(
       context: context,
@@ -604,6 +605,13 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
+                                              if (await maybeShowKelivoCompatError(
+                                                context,
+                                                e,
+                                              )) {
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
                                                 message: e.toString(),
@@ -667,6 +675,13 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
+                                      if (!context.mounted) return;
+                                      if (await maybeShowKelivoCompatError(
+                                        context,
+                                        e,
+                                      )) {
+                                        return;
+                                      }
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -994,6 +1009,13 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
+                                              if (await maybeShowKelivoCompatError(
+                                                context,
+                                                e,
+                                              )) {
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
                                                 message: e.toString(),
@@ -1058,6 +1080,13 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
+                                      if (!context.mounted) return;
+                                      if (await maybeShowKelivoCompatError(
+                                        context,
+                                        e,
+                                      )) {
+                                        return;
+                                      }
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -1410,6 +1439,8 @@ class _BackupPageState extends State<BackupPage> {
       );
     } catch (e) {
       if (!context.mounted) return;
+      if (await maybeShowKelivoCompatError(context, e)) return;
+      if (!context.mounted) return;
       showAppSnackBar(
         context,
         message: e.toString(),
@@ -1679,9 +1710,8 @@ class _InputRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
-    final fieldBg = isDark ? Colors.white12 : const Color(0xFFF2F3F5);
+    final fieldBg = context.appColors.surfaceFill;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1864,9 +1894,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -2195,11 +2223,7 @@ class _RemoteListSheet extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Container(
                               decoration: BoxDecoration(
-                                color:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white10
-                                    : const Color(0xFFF7F7F9),
+                                color: context.appColors.surfaceFill,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: cs.outlineVariant.withValues(
@@ -2287,9 +2311,7 @@ class _ActionCard extends StatelessWidget {
       builder: (pressed) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final overlay = pressed
-            ? (isDark
-                  ? Colors.black.withValues(alpha: 0.06)
-                  : Colors.white.withValues(alpha: 0.05))
+            ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05)
             : Colors.transparent;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -2570,7 +2592,6 @@ class _S3SettingsPageState extends State<_S3SettingsPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -2669,9 +2690,7 @@ class _S3SettingsPageState extends State<_S3SettingsPage> {
                             const SizedBox(height: 12),
                             Container(
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.white10
-                                    : const Color(0xFFF2F3F5),
+                                color: context.appColors.surfaceFill,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: cs.outlineVariant.withValues(

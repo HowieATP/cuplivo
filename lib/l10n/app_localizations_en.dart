@@ -129,6 +129,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryAssistantData => 'Assistants';
 
   @override
+  String get storageSpaceCategoryWorkspaces => 'Workspaces';
+
+  @override
+  String get storageSpaceCategorySkills => 'Skills';
+
+  @override
+  String get storageSpaceCategoryFonts => 'Fonts';
+
+  @override
+  String get storageSpaceCategorySandbox => 'Sandbox';
+
+  @override
   String get storageSpaceCategoryCache => 'Cache';
 
   @override
@@ -179,6 +191,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceSubAssistantImages => 'Images';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => 'Workspace sandboxes';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      'Per-workspace Linux root filesystem and temp files; regenerated when dependencies are re-installed.';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => 'Shared sandbox runtime';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      'Shared Linux sandbox runtime (iOS); re-created automatically.';
 
   @override
   String get storageSpaceSubCacheAvatars => 'Avatar cache';
@@ -246,6 +272,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => 'Clear Logs';
+
+  @override
+  String get storageSpaceClearSandboxButton => 'Clear Sandbox';
+
+  @override
+  String get storageSpaceCompactDbButton => 'Compact Database';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => 'Tap again to compact';
+
+  @override
+  String get storageSpaceCompactDbRunning => 'Compacting…';
+
+  @override
+  String get storageSpaceCompactDbHint =>
+      'Deleted data leaves gaps in the database file. Compacting reclaims that space.';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return 'Database compacted: $before → $after, saved $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => 'Nothing to compact';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return 'Compact failed: $error';
+  }
+
+  @override
+  String get storageSpaceSandboxClearPartialDone =>
+      'Sandbox cleared. The shared runtime will be removed after the app restarts.';
+
+  @override
+  String get storageSpaceScanning => 'Scanning…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return 'Scanning… $files files, $size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => 'View Logs';
@@ -451,6 +523,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String mountFilesPreviewReadFailed(Object error, Object name) {
     return 'Failed to read $name: $error';
   }
+
+  @override
+  String get filePreviewOpenWithSystem => 'Open with another app';
 
   @override
   String mountFilesPreviewTruncated(Object total) {
@@ -1752,6 +1827,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markdownMathDownloadPngLabel => 'Download PNG';
 
   @override
+  String get markdownMathSavePngLabel => 'Save to Gallery';
+
+  @override
   String get markdownMathDefaultFileNameStem => 'math';
 
   @override
@@ -2029,6 +2107,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get backupPageRikkaHubStep5 =>
       'If you have any issues, join the Cuplivo QQ group to give feedback.';
+
+  @override
+  String get backupPageKelivoCompatTitle => 'Cannot Import Kelivo v2 Backup';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      'This backup uses the Kelivo v2 (v1.2) format, which this version cannot import directly. Please open the kelivo-helper compat tool to downgrade it to a compatible format first, then import the converted file.';
+
+  @override
+  String get backupPageKelivoCompatOpen => 'Open Downgrade Tool';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => 'Not supported yet';
@@ -2335,6 +2427,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lanSyncPlanNoChanges => 'No changes to sync.';
+
+  @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '$count files to send ($size)';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '$count files to receive ($size)';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => 'Extracting sync data...';
+
+  @override
+  String get lanSyncRestoreMergingChats => 'Merging chats...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => 'Writing files...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => 'Restoring skills...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total files · $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total conversations';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => 'Sync data merge failed';
 
   @override
   String get lanSyncErrorInvalidPin => 'Invalid PIN';
@@ -3003,6 +3130,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerMenuUnpin => 'Unpin';
 
   @override
+  String get sideDrawerMenuBatchPin => 'Pin selected';
+
+  @override
+  String get sideDrawerMenuBatchUnpin => 'Unpin selected';
+
+  @override
+  String sideDrawerBatchPinSuccess(int count) {
+    return 'Pinned $count conversations';
+  }
+
+  @override
+  String sideDrawerBatchUnpinSuccess(int count) {
+    return 'Unpinned $count conversations';
+  }
+
+  @override
   String get sideDrawerMenuRegenerateTitle => 'Regenerate Title';
 
   @override
@@ -3292,7 +3435,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarReasoningStrengthTooltip => 'Reasoning Strength';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP Servers';
+  String get chatInputBarToolsTooltip => 'Tools';
+
+  @override
+  String get toolsHubLocalToolsTitle => 'Local Tools';
+
+  @override
+  String get toolsHubWorkspaceUnbound => 'No workspace bound';
+
+  @override
+  String get toolsHubOpenTerminal => 'Open Terminal';
+
+  @override
+  String get toolsHubTerminalDisabledHint =>
+      'Bind and enable a workspace first';
+
+  @override
+  String get toolsHubWorkspaceManage => 'Manage Workspaces';
 
   @override
   String get chatInputBarMoreTooltip => 'Add';
@@ -4549,6 +4708,163 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesPageUrlRequiredStatus => 'URL Required';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => 'Search provider';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => 'Configuration';
+
+  @override
+  String get searchServiceEditorNoConfiguration =>
+      'This provider does not require additional configuration.';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => 'Multi-key rotation';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => 'Not configured';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '$count keys';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      'Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => 'Primary';
+
+  @override
+  String get searchApiKeysPageRevealKey => 'Reveal API key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => 'Delete API key';
+
+  @override
+  String get searchApiKeysPageBatchHint =>
+      'Paste one or more keys — one per line or comma-separated';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return 'Added $added, skipped $skipped duplicate(s)';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => 'Add';
+
+  @override
+  String get searchApiKeysPageEmpty => 'No keys configured yet.';
+
+  @override
+  String get searchServiceEditorUsageTitle => 'Account usage';
+
+  @override
+  String get searchServiceEditorUsageNotQueried =>
+      'Usage has not been queried yet.';
+
+  @override
+  String get searchServiceEditorUsageQuery => 'Check usage';
+
+  @override
+  String get searchServiceEditorUsageQuerying => 'Checking…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '$remaining credits remaining';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return 'Balance: $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '$used of $limit credits used';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return 'Could not query usage: $message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => 'Test search';
+
+  @override
+  String get searchServiceEditorTestQueryHint => 'Enter a query';
+
+  @override
+  String get searchServiceEditorTestRun => 'Run test search';
+
+  @override
+  String get searchServiceEditorTestRunning => 'Searching…';
+
+  @override
+  String get searchServiceEditorTestNoResults =>
+      'The provider returned no results.';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return 'Search failed: $message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => 'Open result';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => 'Delete search service';
+
+  @override
+  String get searchServiceEditorDeleteTitle => 'Delete search service?';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return 'Delete $provider? This cannot be undone.';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => 'Delete';
+
+  @override
+  String get searchServiceEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get searchServiceEditorDiscardMessage =>
+      'Your unsaved search service settings will be lost.';
+
+  @override
+  String get searchServiceEditorKeepEditing => 'Keep editing';
+
+  @override
+  String get searchServiceEditorDiscard => 'Discard';
+
+  @override
+  String get searchServiceEditorCategoryLabel => 'Category';
+
+  @override
+  String get searchServiceEditorCountryLabel => 'Country';
+
+  @override
+  String get searchServiceEditorLocationLabel => 'Location';
+
+  @override
+  String get searchServiceEditorLanguageLabel => 'Language';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => 'Include domains';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => 'Exclude domains';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key (optional)';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => 'Batch paste keys';
+
+  @override
   String get searchServicesAddDialogTitle => 'Add Search Service';
 
   @override
@@ -4993,6 +5309,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => 'New Chat on Launch';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle =>
+      'Start with a pinned assistant';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      'Always switch to the designated assistant on launch';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel =>
+      'Startup assistant';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => 'None';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => 'Enter Key to Send';
 
   @override
@@ -5132,10 +5463,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get themeSettingsPageColorPalettesSection => 'Color Palettes';
 
   @override
-  String get themeSettingsPageCustomDynamicTitle => 'Custom Dynamic';
+  String get themeSettingsPageCustomPaletteName => 'Custom';
 
   @override
-  String get themeSettingsPageSeedColorLabel => 'Seed Color';
+  String get themeSettingsPageCustomColorReset => 'Reset';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => 'Custom Themes';
+
+  @override
+  String get customThemeNewTheme => 'New Theme';
+
+  @override
+  String get customThemeEditTheme => 'Edit Theme';
+
+  @override
+  String get customThemeImportTheme => 'Import Theme';
+
+  @override
+  String get customThemeNameLabel => 'Theme name';
+
+  @override
+  String get customThemePrimaryColor => 'Primary';
+
+  @override
+  String get customThemeSecondaryColor => 'Secondary';
+
+  @override
+  String get customThemeTertiaryColor => 'Tertiary';
+
+  @override
+  String get customThemeColorAuto => 'Auto';
+
+  @override
+  String get customThemeSave => 'Save';
+
+  @override
+  String get customThemeCancel => 'Cancel';
+
+  @override
+  String get customThemeDelete => 'Delete';
+
+  @override
+  String get customThemeDeleteConfirm => 'Delete this theme?';
+
+  @override
+  String get customThemeDeleteConfirmActive =>
+      'Delete this theme? The app will switch to the default palette.';
+
+  @override
+  String get customThemeCopied => 'Theme JSON copied to clipboard';
+
+  @override
+  String get customThemeCopyAction => 'Copy';
+
+  @override
+  String get customThemeImportHint => 'Paste the theme JSON here';
+
+  @override
+  String get customThemeImportInvalid => 'Invalid theme JSON';
 
   @override
   String get ttsServicesPageBackButton => 'Back';
@@ -5814,6 +6200,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => 'Doubao';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      'StepFun web search via POST /v1/search.';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2. API key is optional. Scrape is not supported here.';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      'Doubao web search API by Volcano Engine.';
 
   @override
   String get searchProviderGrokDescription =>
@@ -6762,7 +7176,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => 'Keywords';
 
   @override
-  String get worldBookEntryKeywordsHint => 'Type a keyword and tap + to add.';
+  String get worldBookEntryKeywordsHint =>
+      'Type a keyword and press Enter or tap + to add.';
 
   @override
   String get worldBookEntryKeywordInputHint => 'Type a keyword';
@@ -8124,6 +8539,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceBindTitle => 'Bound workspace';
 
   @override
+  String get workspaceBindDisabledHint => 'Enable workspace to select';
+
+  @override
   String get workspaceEntryTitle => 'Workspace';
 
   @override
@@ -8333,4 +8751,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => 'Workspace';
+
+  @override
+  String get iosKeepAliveMasterTitle => 'Enhanced Background Execution';
+
+  @override
+  String get iosKeepAliveMasterSubtitle =>
+      'Keep agent tasks running while the app is in the background.';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => 'Silent Audio Keep-Alive';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle =>
+      'Play an inaudible track so iOS keeps the process alive in the background.';
+
+  @override
+  String get iosKeepAliveLocationTitle => 'Location Keep-Alive';
+
+  @override
+  String get iosKeepAliveLocationSubtitle =>
+      'Use background location updates to keep the app alive while backgrounded.';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity Privacy Mode';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle =>
+      'Hide session content from the Lock Screen and Dynamic Island.';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => 'Keep-alive status unavailable';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => 'Silent audio active';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => 'Silent audio inactive';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => 'Location authorized';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized =>
+      'Location not authorized — tap to open system settings';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => 'Extended background survival';
+
+  @override
+  String get iosKeepAliveSurvivalShort => 'Standard background survival (~30s)';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => 'Silent audio ready';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => 'Silent audio off';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => 'Location ready';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded =>
+      'Location permission needed';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => 'Location off';
+
+  @override
+  String get iosKeepAliveInterruptedNotice =>
+      'Interrupted by the system previously';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => 'Background Task';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => 'Task in progress…';
 }

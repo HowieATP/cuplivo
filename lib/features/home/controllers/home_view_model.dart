@@ -9,12 +9,14 @@ import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/proactive_care_message_flow.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../../utils/utf16_safe_cut.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
@@ -55,9 +57,9 @@ String buildCompressContextContent(
   final maxChars = options.maxChars ?? CompressContextOptions.defaultMaxChars;
   if (maxChars <= 0 || joined.length <= maxChars) return joined;
   return switch (options.mode) {
-    CompressContextLimitMode.start => joined.substring(0, maxChars),
+    CompressContextLimitMode.start => truncateHeadUtf16Safe(joined, maxChars),
     CompressContextLimitMode.recent => joined.substring(
-      joined.length - maxChars,
+      utf16SafeTailStart(joined, joined.length - maxChars),
     ),
     CompressContextLimitMode.unlimited ||
     CompressContextLimitMode.keepRecent => joined,
@@ -1452,7 +1454,7 @@ class HomeViewModel extends ChangeNotifier {
               '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}',
         )
         .join('\n\n');
-    final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
+    final content = truncateHeadUtf16Safe(joined, 3000);
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
     String prompt = settings.titlePrompt
@@ -1744,6 +1746,8 @@ class HomeViewModel extends ChangeNotifier {
     final history = ProactiveCareMessageFlow.buildHistory(
       conversation: convo,
       messages: _chatService.getMessages(convo.id),
+      assistant: assistant,
+      applySendRegexes: false,
     );
 
     final l10n = AppLocalizations.of(_contextProvider);
@@ -1843,7 +1847,16 @@ class HomeViewModel extends ChangeNotifier {
       final history = ProactiveCareMessageFlow.buildHistory(
         conversation: convo,
         messages: _chatService.getMessages(convo.id),
+        assistant: assistant,
+        applySendRegexes: true,
       );
+      final recentChats = assistant.enableRecentChatsReference
+          ? ChatContextTransforms.selectRecentChats(
+              _chatService.getAllConversations(),
+              assistantId: assistant.id,
+              currentConversationId: convo.id,
+            )
+          : const <Conversation>[];
       final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
           ? assistant.proactiveCarePrompt
           : (l10n?.assistantEditProactiveCarePromptDefault ?? '');
@@ -1854,6 +1867,7 @@ class HomeViewModel extends ChangeNotifier {
         history: history,
         carePrompt: carePrompt,
         now: DateTime.now(),
+        recentChats: recentChats,
       );
 
       final reply = await ProactiveCareMessageFlow.requestCareReply(

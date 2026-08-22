@@ -237,7 +237,7 @@ class MessageGenerationService {
   /// Replay the per-message request metadata of the last user message in the
   /// given context: the image-mode routing decision and the image options
   /// body persisted at send time. See
-  /// docs/adr/0018-per-message-request-metadata.md.
+  /// docs/adr/0033-per-message-request-metadata.md.
   static ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
   resolveRequestOptionsFromMessages(
     List<ChatMessage> messages, {
@@ -278,7 +278,7 @@ class MessageGenerationService {
     );
     // Persist per-message request metadata (routing decision + image options
     // body) so regenerate/continue can replay them. See
-    // docs/adr/0018-per-message-request-metadata.md.
+    // docs/adr/0033-per-message-request-metadata.md.
     await chatService.updateMessage(
       message.id,
       requestAllowImagesApiRouting: input.allowImagesApiRouting,

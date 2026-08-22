@@ -126,6 +126,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -174,6 +186,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -237,6 +263,50 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceCompactDbButton => '压缩数据库';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次点击确认压缩';
+
+  @override
+  String get storageSpaceCompactDbRunning => '压缩中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '删除的数据会在数据库文件中留下空洞，压缩可回收这部分空间。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '数据库已压缩：$before → $after，节省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '无需压缩';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '压缩失败：$error';
+  }
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -433,6 +503,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String mountFilesPreviewReadFailed(Object error, Object name) {
     return '读取 $name 失败：$error';
   }
+
+  @override
+  String get filePreviewOpenWithSystem => '用其他应用打开';
 
   @override
   String mountFilesPreviewTruncated(Object total) {
@@ -1688,6 +1761,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get markdownMathDownloadPngLabel => '下载 PNG';
 
   @override
+  String get markdownMathSavePngLabel => '保存到相册';
+
+  @override
   String get markdownMathDefaultFileNameStem => '公式';
 
   @override
@@ -1954,6 +2030,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暂不支持';
@@ -2255,6 +2345,41 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lanSyncPlanNoChanges => '无待同步内容。';
+
+  @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '将发送 $count 个文件（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '将接收 $count 个文件（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解压同步数据...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合并聊天记录...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在写入文件...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢复技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 个文件 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 个会话';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步数据合并失败';
 
   @override
   String get lanSyncErrorInvalidPin => 'PIN 错误';
@@ -2890,6 +3015,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sideDrawerMenuUnpin => '取消置顶';
 
   @override
+  String get sideDrawerMenuBatchPin => '置顶';
+
+  @override
+  String get sideDrawerMenuBatchUnpin => '取消置顶';
+
+  @override
+  String sideDrawerBatchPinSuccess(int count) {
+    return '已置顶 $count 个会话';
+  }
+
+  @override
+  String sideDrawerBatchUnpinSuccess(int count) {
+    return '已取消置顶 $count 个会话';
+  }
+
+  @override
   String get sideDrawerMenuRegenerateTitle => '重新生成标题';
 
   @override
@@ -3170,7 +3311,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarReasoningStrengthTooltip => '思维链强度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP服务器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本地工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未绑定工作区';
+
+  @override
+  String get toolsHubOpenTerminal => '打开终端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先绑定并开启工作区';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作区';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -4371,6 +4527,158 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '显示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '删除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分类';
+
+  @override
+  String get searchServiceEditorCountryLabel => '国家/地区';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '语言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含域名';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除域名';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可选）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批量粘贴 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '添加搜索服务';
 
   @override
@@ -4777,6 +5085,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次启动时自动切换到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
@@ -4906,10 +5227,64 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
-  String get themeSettingsPageCustomDynamicTitle => '自定义动态色';
+  String get themeSettingsPageCustomPaletteName => '自定义';
 
   @override
-  String get themeSettingsPageSeedColorLabel => '种子颜色';
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定义主题';
+
+  @override
+  String get customThemeNewTheme => '新建主题';
+
+  @override
+  String get customThemeEditTheme => '编辑主题';
+
+  @override
+  String get customThemeImportTheme => '导入主题';
+
+  @override
+  String get customThemeNameLabel => '主题名称';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '辅色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自动';
+
+  @override
+  String get customThemeSave => '保存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '删除';
+
+  @override
+  String get customThemeDeleteConfirm => '删除该主题？';
+
+  @override
+  String get customThemeDeleteConfirmActive => '删除该主题？应用将切换为默认配色。';
+
+  @override
+  String get customThemeCopied => '主题 JSON 已复制到剪贴板';
+
+  @override
+  String get customThemeCopyAction => '复制';
+
+  @override
+  String get customThemeImportHint => '在此粘贴主题 JSON';
+
+  @override
+  String get customThemeImportInvalid => '无效的主题 JSON';
 
   @override
   String get ttsServicesPageBackButton => '返回';
@@ -5564,6 +5939,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServiceNameGrok => 'Grok';
 
   @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
+
+  @override
   String get searchProviderGrokDescription =>
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
@@ -5797,14 +6199,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '委派任务并等待子助手的完整输出作为工具结果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下载 Skills';
+  String get assistantEditSkillDownloadTitle => '下载技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '创建 Skills';
+  String get assistantEditSkillCreateTitle => '创建技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
@@ -6477,7 +6879,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => '关键词';
 
   @override
-  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加。';
+  String get worldBookEntryKeywordsHint => '输入关键词后点 + 或按回车添加。';
 
   @override
   String get worldBookEntryKeywordInputHint => '输入关键词';
@@ -6981,7 +7383,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiAIAddModelTooltip => '添加模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手动添加';
@@ -6993,7 +7395,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsImportFileLabel => '从文件导入';
 
   @override
-  String get skillsImportChoiceTitle => '导入 skills';
+  String get skillsImportChoiceTitle => '导入技能';
 
   @override
   String get skillsImportFromFile => '从文件导入';
@@ -7015,13 +7417,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsGitHubDownloadFailed => '下载仓库失败。仓库可能不存在或为私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '选择要导入的 skills';
+  String get skillsGitHubSelectTitle => '选择要导入的技能';
 
   @override
-  String get skillsEmptyMessage => '暂无 skills。从文件导入或手动创建一个。';
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
 
   @override
-  String get skillsDeleteConfirmTitle => '删除 skills';
+  String get skillsDeleteConfirmTitle => '删除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -7030,7 +7432,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已导入 $count 个 skills';
+    return '已导入 $count 个技能';
   }
 
   @override
@@ -7043,29 +7445,29 @@ class AppLocalizationsZh extends AppLocalizations {
       'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
 
   @override
-  String get skillsNameInvalid => 'skills 名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
+  String get skillsNameInvalid => '技能名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '保存 skills 失败：$detail';
+    return '保存技能失败：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '导入 $count 个 skills 失败';
+    return '导入 $count 个技能失败';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '删除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分类';
@@ -7097,11 +7499,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '启用 skills？';
+  String get skillsEnableImportedTitle => '启用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '为“$assistantName”启用 $count 个已导入的 skills？';
+    return '为“$assistantName”启用 $count 个已导入的技能？';
   }
 
   @override
@@ -7111,10 +7513,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsEnableImportedDismiss => '暂不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '导入 skills';
+  String get skillsSheetImportAction => '导入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -7762,6 +8164,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceBindTitle => '绑定工作区';
 
   @override
+  String get workspaceBindDisabledHint => '开启工作区后选择';
+
+  @override
   String get workspaceEntryTitle => '工作区';
 
   @override
@@ -7963,6 +8368,75 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -8087,6 +8561,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作区';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '缓存';
 
   @override
@@ -8135,6 +8621,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '图片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作区沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每个工作区内的 Linux 根文件系统与临时文件；重新安装依赖后自动重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱运行时';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱运行时（iOS）；会自动重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '头像缓存';
@@ -8198,6 +8698,50 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceCompactDbButton => '压缩数据库';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次点击确认压缩';
+
+  @override
+  String get storageSpaceCompactDbRunning => '压缩中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '删除的数据会在数据库文件中留下空洞，压缩可回收这部分空间。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '数据库已压缩：$before → $after，节省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '无需压缩';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '压缩失败：$error';
+  }
+
+  @override
+  String get storageSpaceSandboxClearPartialDone => '沙箱已清除。共享运行时将在应用重启后移除。';
+
+  @override
+  String get storageSpaceScanning => '扫描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '扫描中… 已扫描 $files 个文件，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -8394,6 +8938,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String mountFilesPreviewReadFailed(Object error, Object name) {
     return '读取 $name 失败：$error';
   }
+
+  @override
+  String get filePreviewOpenWithSystem => '用其他应用打开';
 
   @override
   String mountFilesPreviewTruncated(Object total) {
@@ -9649,6 +10196,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get markdownMathDownloadPngLabel => '下载 PNG';
 
   @override
+  String get markdownMathSavePngLabel => '保存到相册';
+
+  @override
   String get markdownMathDefaultFileNameStem => '公式';
 
   @override
@@ -9915,6 +10465,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageRikkaHubStep5 => '如有问题可进入 Cuplivo 的 QQ 群反馈';
+
+  @override
+  String get backupPageKelivoCompatTitle => '无法导入 Kelivo v2 备份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此备份使用 Kelivo v2（v1.2）格式，当前版本无法直接导入。请先通过 kelivo-helper 兼容工具将其降级为兼容格式，再导入转换后的文件。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '打开降级工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暂不支持';
@@ -10216,6 +10780,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get lanSyncPlanNoChanges => '无待同步内容。';
+
+  @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '将发送 $count 个文件（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '将接收 $count 个文件（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解压同步数据...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合并聊天记录...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在写入文件...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢复技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 个文件 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 个会话';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步数据合并失败';
 
   @override
   String get lanSyncErrorInvalidPin => 'PIN 错误';
@@ -10851,6 +11450,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sideDrawerMenuUnpin => '取消置顶';
 
   @override
+  String get sideDrawerMenuBatchPin => '置顶';
+
+  @override
+  String get sideDrawerMenuBatchUnpin => '取消置顶';
+
+  @override
+  String sideDrawerBatchPinSuccess(int count) {
+    return '已置顶 $count 个会话';
+  }
+
+  @override
+  String sideDrawerBatchUnpinSuccess(int count) {
+    return '已取消置顶 $count 个会话';
+  }
+
+  @override
   String get sideDrawerMenuRegenerateTitle => '重新生成标题';
 
   @override
@@ -11131,7 +11746,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarReasoningStrengthTooltip => '思维链强度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP服务器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本地工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未绑定工作区';
+
+  @override
+  String get toolsHubOpenTerminal => '打开终端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先绑定并开启工作区';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作区';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -12332,6 +12962,158 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '显示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '删除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分类';
+
+  @override
+  String get searchServiceEditorCountryLabel => '国家/地区';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '语言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含域名';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除域名';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可选）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批量粘贴 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '添加搜索服务';
 
   @override
@@ -12738,6 +13520,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次启动时自动切换到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '启动助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
@@ -12867,10 +13662,64 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
-  String get themeSettingsPageCustomDynamicTitle => '自定义动态色';
+  String get themeSettingsPageCustomPaletteName => '自定义';
 
   @override
-  String get themeSettingsPageSeedColorLabel => '种子颜色';
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定义主题';
+
+  @override
+  String get customThemeNewTheme => '新建主题';
+
+  @override
+  String get customThemeEditTheme => '编辑主题';
+
+  @override
+  String get customThemeImportTheme => '导入主题';
+
+  @override
+  String get customThemeNameLabel => '主题名称';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '辅色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自动';
+
+  @override
+  String get customThemeSave => '保存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '删除';
+
+  @override
+  String get customThemeDeleteConfirm => '删除该主题？';
+
+  @override
+  String get customThemeDeleteConfirmActive => '删除该主题？应用将切换为默认配色。';
+
+  @override
+  String get customThemeCopied => '主题 JSON 已复制到剪贴板';
+
+  @override
+  String get customThemeCopyAction => '复制';
+
+  @override
+  String get customThemeImportHint => '在此粘贴主题 JSON';
+
+  @override
+  String get customThemeImportInvalid => '无效的主题 JSON';
 
   @override
   String get ttsServicesPageBackButton => '返回';
@@ -13525,6 +14374,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServiceNameGrok => 'Grok';
 
   @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
+
+  @override
   String get searchProviderGrokDescription =>
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
@@ -13758,14 +14634,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '委派任务并等待子助手的完整输出作为工具结果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下载 Skills';
+  String get assistantEditSkillDownloadTitle => '下载技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允许助手通过 GitHub 仓库 URL 下载并安装技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '创建 Skills';
+  String get assistantEditSkillCreateTitle => '创建技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允许助手根据 SKILL.md 内容创建新技能。';
@@ -14438,7 +15314,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get worldBookEntryKeywordsLabel => '关键词';
 
   @override
-  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加。';
+  String get worldBookEntryKeywordsHint => '输入关键词后点 + 或按回车添加。';
 
   @override
   String get worldBookEntryKeywordInputHint => '输入关键词';
@@ -14942,7 +15818,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get multiAIAddModelTooltip => '添加模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手动添加';
@@ -14954,7 +15830,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsImportFileLabel => '从文件导入';
 
   @override
-  String get skillsImportChoiceTitle => '导入 skills';
+  String get skillsImportChoiceTitle => '导入技能';
 
   @override
   String get skillsImportFromFile => '从文件导入';
@@ -14976,13 +15852,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsGitHubDownloadFailed => '下载仓库失败。仓库可能不存在或为私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '选择要导入的 skills';
+  String get skillsGitHubSelectTitle => '选择要导入的技能';
 
   @override
-  String get skillsEmptyMessage => '暂无 skills。从文件导入或手动创建一个。';
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
 
   @override
-  String get skillsDeleteConfirmTitle => '删除 skills';
+  String get skillsDeleteConfirmTitle => '删除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -14991,7 +15867,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已导入 $count 个 skills';
+    return '已导入 $count 个技能';
   }
 
   @override
@@ -15004,29 +15880,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
 
   @override
-  String get skillsNameInvalid => 'skills 名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
+  String get skillsNameInvalid => '技能名称无效。仅允许小写字母、数字和连字符（不能包含空格、斜杠或点号）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '保存 skills 失败：$detail';
+    return '保存技能失败：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '导入 $count 个 skills 失败';
+    return '导入 $count 个技能失败';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '删除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分类';
@@ -15058,11 +15934,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '启用 skills？';
+  String get skillsEnableImportedTitle => '启用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '为“$assistantName”启用 $count 个已导入的 skills？';
+    return '为“$assistantName”启用 $count 个已导入的技能？';
   }
 
   @override
@@ -15072,10 +15948,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsEnableImportedDismiss => '暂不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '导入 skills';
+  String get skillsSheetImportAction => '导入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -15723,6 +16599,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceBindTitle => '绑定工作区';
 
   @override
+  String get workspaceBindDisabledHint => '开启工作区后选择';
+
+  @override
   String get workspaceEntryTitle => '工作区';
 
   @override
@@ -15924,6 +16803,75 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作区';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增强后台执行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在应用进入后台时保持代理任务继续运行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '静默音频保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段听不见的音轨，让 iOS 在后台保持进程存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用后台定位更新，在应用退到后台时保持进程存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隐私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在锁屏和灵动岛上隐藏会话内容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活状态不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '静默音频运行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '静默音频未运行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授权';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授权——点击打开系统设置';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延长后台存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '标准后台存活（约 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '静音音频就绪';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '静音音频未开启';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就绪';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位权限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未开启';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系统中断';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '后台任务';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16048,6 +16996,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
+  String get storageSpaceCategoryWorkspaces => '工作區';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategoryFonts => '字體';
+
+  @override
+  String get storageSpaceCategorySandbox => '沙箱';
+
+  @override
   String get storageSpaceCategoryCache => '快取';
 
   @override
@@ -16096,6 +17056,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubAssistantImages => '圖片';
+
+  @override
+  String get storageSpaceSubSandboxPerWorkspace => '工作區沙箱';
+
+  @override
+  String get storageSpaceSubDescSandboxPerWorkspace =>
+      '每個工作區內的 Linux 根檔案系統與暫存檔；重新安裝依賴後自動重建。';
+
+  @override
+  String get storageSpaceSubSandboxSharedRuntime => '共享沙箱執行環境';
+
+  @override
+  String get storageSpaceSubDescSandboxSharedRuntime =>
+      '共享的 Linux 沙箱執行環境（iOS）；會自動重建。';
 
   @override
   String get storageSpaceSubCacheAvatars => '頭像快取';
@@ -16159,6 +17133,51 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceClearSandboxButton => '清除沙箱';
+
+  @override
+  String get storageSpaceCompactDbButton => '壓縮資料庫';
+
+  @override
+  String get storageSpaceCompactDbConfirmPrompt => '再次點擊確認壓縮';
+
+  @override
+  String get storageSpaceCompactDbRunning => '壓縮中…';
+
+  @override
+  String get storageSpaceCompactDbHint => '刪除的資料會在資料庫檔案中留下空洞，壓縮可回收這部分空間。';
+
+  @override
+  String storageSpaceCompactDbResult(
+    Object after,
+    Object before,
+    Object pct,
+    Object saved,
+  ) {
+    return '資料庫已壓縮：$before → $after，節省 $saved ($pct%)';
+  }
+
+  @override
+  String get storageSpaceCompactDbNone => '無需壓縮';
+
+  @override
+  String storageSpaceCompactDbFailed(Object error) {
+    return '壓縮失敗：$error';
+  }
+
+  @override
+  String get storageSpaceSandboxClearPartialDone =>
+      '沙箱已清除。共享執行環境將在應用程式重新啟動後移除。';
+
+  @override
+  String get storageSpaceScanning => '掃描中…';
+
+  @override
+  String storageSpaceScanningProgress(Object files, Object size) {
+    return '掃描中… 已掃描 $files 個檔案，$size';
+  }
 
   @override
   String get storageSpaceViewLogsButton => '查看日誌';
@@ -16354,6 +17373,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String mountFilesPreviewReadFailed(Object error, Object name) {
     return '讀取 $name 失敗：$error';
   }
+
+  @override
+  String get filePreviewOpenWithSystem => '用其他應用程式開啟';
 
   @override
   String mountFilesPreviewTruncated(Object total) {
@@ -17609,6 +18631,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get markdownMathDownloadPngLabel => '下載 PNG';
 
   @override
+  String get markdownMathSavePngLabel => '儲存到相簿';
+
+  @override
   String get markdownMathDefaultFileNameStem => '公式';
 
   @override
@@ -17875,6 +18900,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageRikkaHubStep5 => '如有問題可進入 Cuplivo 的 QQ 群回饋';
+
+  @override
+  String get backupPageKelivoCompatTitle => '無法匯入 Kelivo v2 備份';
+
+  @override
+  String get backupPageKelivoCompatContent =>
+      '此備份使用 Kelivo v2（v1.2）格式，目前版本無法直接匯入。請先透過 kelivo-helper 相容工具將其降級為相容格式，再匯入轉換後的檔案。';
+
+  @override
+  String get backupPageKelivoCompatOpen => '開啟降級工具';
+
+  @override
+  String get backupPageKelivoCompatUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
 
   @override
   String get backupPageNotSupportedYet => '暫不支援';
@@ -18176,6 +19215,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get lanSyncPlanNoChanges => '無待同步內容。';
+
+  @override
+  String lanSyncPlanToSendFiles(Object count, Object size) {
+    return '將傳送 $count 個檔案（$size）';
+  }
+
+  @override
+  String lanSyncPlanToReceiveFiles(Object count, Object size) {
+    return '將接收 $count 個檔案（$size）';
+  }
+
+  @override
+  String get lanSyncRestoreExtracting => '正在解壓同步資料...';
+
+  @override
+  String get lanSyncRestoreMergingChats => '正在合併聊天記錄...';
+
+  @override
+  String get lanSyncRestoreCopyingFiles => '正在寫入檔案...';
+
+  @override
+  String get lanSyncRestoreRestoringSkills => '正在恢復技能...';
+
+  @override
+  String lanSyncRestoreFilesProgress(Object count, Object size, Object total) {
+    return '$count/$total 個檔案 · 共 $size';
+  }
+
+  @override
+  String lanSyncRestoreChatsProgress(Object count, Object total) {
+    return '$count/$total 個對話';
+  }
+
+  @override
+  String get lanSyncRestoreFailed => '同步資料合併失敗';
 
   @override
   String get lanSyncErrorInvalidPin => 'PIN 錯誤';
@@ -18810,6 +19884,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sideDrawerMenuUnpin => '取消置頂';
 
   @override
+  String get sideDrawerMenuBatchPin => '置頂';
+
+  @override
+  String get sideDrawerMenuBatchUnpin => '取消置頂';
+
+  @override
+  String sideDrawerBatchPinSuccess(int count) {
+    return '已置頂 $count 個會話';
+  }
+
+  @override
+  String sideDrawerBatchUnpinSuccess(int count) {
+    return '已取消置頂 $count 個會話';
+  }
+
+  @override
   String get sideDrawerMenuRegenerateTitle => '重新生成標題';
 
   @override
@@ -19090,7 +20180,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarReasoningStrengthTooltip => '思維鏈強度';
 
   @override
-  String get chatInputBarMcpServersTooltip => 'MCP伺服器';
+  String get chatInputBarToolsTooltip => '工具管理';
+
+  @override
+  String get toolsHubLocalToolsTitle => '本機工具';
+
+  @override
+  String get toolsHubWorkspaceUnbound => '未綁定工作區';
+
+  @override
+  String get toolsHubOpenTerminal => '開啟終端';
+
+  @override
+  String get toolsHubTerminalDisabledHint => '需先綁定並開啟工作區';
+
+  @override
+  String get toolsHubWorkspaceManage => '管理工作區';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -20290,6 +21395,158 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageUrlRequiredStatus => '需要 URL';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜尋提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服務設定';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商無需額外設定。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 輪詢';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未設定';
+
+  @override
+  String searchServiceEditorMultiKeyCount(Object count) {
+    return '共 $count 個 Key';
+  }
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 依序輪詢使用，第一個為主 Key；不查額度，以防觸發服務商風控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageRevealKey => '顯示 API Key';
+
+  @override
+  String get searchApiKeysPageDeleteKey => '刪除 API Key';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次貼上多個 Key：每行一個，或以逗號分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(Object added, Object skipped) {
+    return '已新增 $added 個，略過 $skipped 個重複';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '新增';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未設定任何 Key。';
+
+  @override
+  String get searchServiceEditorUsageTitle => '帳戶用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查詢用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查詢用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查詢中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(Object remaining) {
+    return '剩餘 $remaining 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(Object balance) {
+    return '餘額 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(Object limit, Object used) {
+    return '已使用 $used / $limit 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(Object message) {
+    return '用量查詢失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '測試搜尋';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '輸入測試關鍵字';
+
+  @override
+  String get searchServiceEditorTestRun => '執行測試搜尋';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜尋中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未回傳任何結果。';
+
+  @override
+  String searchServiceEditorTestFailed(Object message) {
+    return '搜尋失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '開啟結果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '刪除搜尋服務';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '刪除搜尋服務？';
+
+  @override
+  String searchServiceEditorDeleteMessage(Object provider) {
+    return '確定刪除 $provider 嗎？此操作無法復原。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '刪除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放棄變更？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未儲存的搜尋服務設定將會遺失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '繼續編輯';
+
+  @override
+  String get searchServiceEditorDiscard => '放棄';
+
+  @override
+  String get searchServiceEditorCategoryLabel => '分類';
+
+  @override
+  String get searchServiceEditorCountryLabel => '國家/地區';
+
+  @override
+  String get searchServiceEditorLocationLabel => '位置';
+
+  @override
+  String get searchServiceEditorLanguageLabel => '語言';
+
+  @override
+  String get searchServiceEditorIncludeDomainsLabel => '包含網域';
+
+  @override
+  String get searchServiceEditorExcludeDomainsLabel => '排除網域';
+
+  @override
+  String get searchServiceEditorApiKeyOptional => 'API Key（可選）';
+
+  @override
+  String get searchServicesDialogBatchPasteKeys => '批次貼上 Key';
+
+  @override
   String get searchServicesAddDialogTitle => '新增搜尋服務';
 
   @override
@@ -20696,6 +21953,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageNewChatOnLaunchTitle => '啟動時新建對話';
 
   @override
+  String get displaySettingsPageStartupAssistantPinnedTitle => '固定啟動助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPinnedSubtitle =>
+      '每次啟動時自動切換到指定助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantPickerLabel => '啟動助手';
+
+  @override
+  String get displaySettingsPageStartupAssistantNone => '未指定';
+
+  @override
   String get displaySettingsPageEnterToSendTitle => '回車鍵發送訊息';
 
   @override
@@ -20825,10 +22095,64 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
-  String get themeSettingsPageCustomDynamicTitle => '自訂動態色';
+  String get themeSettingsPageCustomPaletteName => '自定義';
 
   @override
-  String get themeSettingsPageSeedColorLabel => '種子顏色';
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定義主題';
+
+  @override
+  String get customThemeNewTheme => '新增主題';
+
+  @override
+  String get customThemeEditTheme => '編輯主題';
+
+  @override
+  String get customThemeImportTheme => '匯入主題';
+
+  @override
+  String get customThemeNameLabel => '主題名稱';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '輔色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自動';
+
+  @override
+  String get customThemeSave => '儲存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '刪除';
+
+  @override
+  String get customThemeDeleteConfirm => '刪除該主題？';
+
+  @override
+  String get customThemeDeleteConfirmActive => '刪除該主題？應用程式將切換為預設配色。';
+
+  @override
+  String get customThemeCopied => '主題 JSON 已複製到剪貼簿';
+
+  @override
+  String get customThemeCopyAction => '複製';
+
+  @override
+  String get customThemeImportHint => '在此貼上主題 JSON';
+
+  @override
+  String get customThemeImportInvalid => '無效的主題 JSON';
 
   @override
   String get ttsServicesPageBackButton => '返回';
@@ -21484,6 +22808,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServiceNameGrok => 'Grok';
 
   @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '透過 StepFun POST /v1/search 進行網頁搜尋。';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。API Key 可選。此處不支援 Scrape。';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包網頁搜尋 API。';
+
+  @override
   String get searchProviderGrokDescription =>
       '透過 xAI Responses API 使用 Grok 搜尋。呼叫網頁和 X 搜尋工具，並返回帶引用的來源。';
 
@@ -21718,14 +23069,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '委派任務並等待子助手的完整輸出作為工具結果。';
 
   @override
-  String get assistantEditSkillDownloadTitle => '下載 Skills';
+  String get assistantEditSkillDownloadTitle => '下載技能';
 
   @override
   String get assistantEditSkillDownloadSubtitle =>
       '允許助手透過 GitHub 儲存庫 URL 下載並安裝技能。';
 
   @override
-  String get assistantEditSkillCreateTitle => '建立 Skills';
+  String get assistantEditSkillCreateTitle => '建立技能';
 
   @override
   String get assistantEditSkillCreateSubtitle => '允許助手根據 SKILL.md 內容建立新技能。';
@@ -22398,7 +23749,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get worldBookEntryKeywordsLabel => '關鍵詞';
 
   @override
-  String get worldBookEntryKeywordsHint => '輸入關鍵詞後點 + 新增。';
+  String get worldBookEntryKeywordsHint => '輸入關鍵詞後點 + 或按 Enter 新增。';
 
   @override
   String get worldBookEntryKeywordInputHint => '輸入關鍵詞';
@@ -22902,7 +24253,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get multiAIAddModelTooltip => '新增模型';
 
   @override
-  String get skillsTitle => 'skills';
+  String get skillsTitle => '技能 (skills)';
 
   @override
   String get skillsImportManualTitle => '手動新增';
@@ -22914,7 +24265,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsImportFileLabel => '從檔案匯入';
 
   @override
-  String get skillsImportChoiceTitle => '匯入 skills';
+  String get skillsImportChoiceTitle => '匯入技能';
 
   @override
   String get skillsImportFromFile => '從檔案匯入';
@@ -22936,13 +24287,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsGitHubDownloadFailed => '下載儲存庫失敗。儲存庫可能不存在或為私有。';
 
   @override
-  String get skillsGitHubSelectTitle => '選擇要匯入的 skills';
+  String get skillsGitHubSelectTitle => '選擇要匯入的技能';
 
   @override
-  String get skillsEmptyMessage => '暫無 skills。從檔案匯入或手動建立一個。';
+  String get skillsEmptyMessage => '暫無技能。從檔案匯入或手動建立一個。';
 
   @override
-  String get skillsDeleteConfirmTitle => '刪除 skills';
+  String get skillsDeleteConfirmTitle => '刪除技能';
 
   @override
   String skillsDeleteConfirmMessage(String name) {
@@ -22951,7 +24302,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String skillsImportSuccess(int count) {
-    return '已匯入 $count 個 skills';
+    return '已匯入 $count 個技能';
   }
 
   @override
@@ -22964,29 +24315,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'SKILL.md 必須包含有效的 YAML 前置元資料且包含 name 欄位。';
 
   @override
-  String get skillsNameInvalid => 'skills 名稱無效。僅允許小寫字母、數字和連字號（不能包含空格、斜線或點號）。';
+  String get skillsNameInvalid => '技能名稱無效。僅允許小寫字母、數字和連字號（不能包含空格、斜線或點號）。';
 
   @override
   String get skillsFrontmatterNameMissing => 'SKILL.md 前置元資料必須包含 name 欄位。';
 
   @override
   String skillsSaveFailed(String detail) {
-    return '儲存 skills 失敗：$detail';
+    return '儲存技能失敗：$detail';
   }
 
   @override
   String skillsImportFailed(int count) {
-    return '匯入 $count 個 skills 失敗';
+    return '匯入 $count 個技能失敗';
   }
 
   @override
   String get skillsDeleteConfirmDeleteButton => '刪除';
 
   @override
-  String get assistantEditPageSkillsTab => 'skills';
+  String get assistantEditPageSkillsTab => '技能 (skills)';
 
   @override
-  String get settingsPageSkills => 'skills';
+  String get settingsPageSkills => '技能 (skills)';
 
   @override
   String get skillsUncategorizedGroup => '未分類';
@@ -23018,11 +24369,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsClearAll => '全部清除';
 
   @override
-  String get skillsEnableImportedTitle => '啟用 skills？';
+  String get skillsEnableImportedTitle => '啟用技能？';
 
   @override
   String skillsEnableImportedMessage(int count, String assistantName) {
-    return '為「$assistantName」啟用 $count 個已匯入的 skills？';
+    return '為「$assistantName」啟用 $count 個已匯入的技能？';
   }
 
   @override
@@ -23032,10 +24383,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsEnableImportedDismiss => '暫不';
 
   @override
-  String get skillsSheetManageAction => '管理 skills';
+  String get skillsSheetManageAction => '管理技能';
 
   @override
-  String get skillsSheetImportAction => '匯入 skills';
+  String get skillsSheetImportAction => '匯入技能';
 
   @override
   String responseTruncated(String reason) {
@@ -23684,6 +25035,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceBindTitle => '綁定工作區';
 
   @override
+  String get workspaceBindDisabledHint => '開啟工作區後選擇';
+
+  @override
   String get workspaceEntryTitle => '工作區';
 
   @override
@@ -23885,4 +25239,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolWorkspaceTitle => '工作區';
+
+  @override
+  String get iosKeepAliveMasterTitle => '增強背景執行';
+
+  @override
+  String get iosKeepAliveMasterSubtitle => '在 App 進入背景時保持代理任務繼續運行。';
+
+  @override
+  String get iosKeepAliveSilentAudioTitle => '靜默音訊保活';
+
+  @override
+  String get iosKeepAliveSilentAudioSubtitle => '播放一段聽不見的音軌，讓 iOS 在背景保持程序存活。';
+
+  @override
+  String get iosKeepAliveLocationTitle => '定位保活';
+
+  @override
+  String get iosKeepAliveLocationSubtitle => '使用背景定位更新，在 App 退到背景時保持程序存活。';
+
+  @override
+  String get iosKeepAlivePrivacyModeTitle => 'Live Activity 隱私模式';
+
+  @override
+  String get iosKeepAlivePrivacyModeSubtitle => '在鎖定畫面與動態島上隱藏會話內容。';
+
+  @override
+  String get iosKeepAliveStatusUnavailable => '保活狀態不可用';
+
+  @override
+  String get iosKeepAliveSilentAudioActive => '靜默音訊運行中';
+
+  @override
+  String get iosKeepAliveSilentAudioInactive => '靜默音訊未運行';
+
+  @override
+  String get iosKeepAliveLocationAuthorized => '定位已授權';
+
+  @override
+  String get iosKeepAliveLocationNotAuthorized => '定位未授權——點擊開啟系統設定';
+
+  @override
+  String get iosKeepAliveSurvivalExtended => '延長背景存活';
+
+  @override
+  String get iosKeepAliveSurvivalShort => '標準背景存活（約 30 秒）';
+
+  @override
+  String get iosKeepAliveConfigAudioReady => '靜默音訊就緒';
+
+  @override
+  String get iosKeepAliveConfigAudioOff => '靜默音訊未開啟';
+
+  @override
+  String get iosKeepAliveConfigLocationReady => '定位就緒';
+
+  @override
+  String get iosKeepAliveConfigLocationPermissionNeeded => '需要定位權限';
+
+  @override
+  String get iosKeepAliveConfigLocationOff => '定位未開啟';
+
+  @override
+  String get iosKeepAliveInterruptedNotice => '曾被系統中斷';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveTitle => '背景任務';
+
+  @override
+  String get iosBackgroundGenerationPrivacyActiveDetail => '任務進行中…';
 }

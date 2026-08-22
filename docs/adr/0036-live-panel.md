@@ -1,4 +1,4 @@
-# ADR-0030: Live Panel Generalizes the Subagent Panel; Download Progress in a Separate Store
+# ADR-0036: Live Panel Generalizes the Subagent Panel; Download Progress in a Separate Store
 
 The handoff-only 子代理面板 (`SubagentPanel`) becomes the **LivePanel**, a unified
 conversation-scoped status surface above the input bar hosting four entry kinds

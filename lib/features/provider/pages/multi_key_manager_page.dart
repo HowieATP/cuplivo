@@ -11,6 +11,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class MultiKeyManagerPage extends StatefulWidget {
   const MultiKeyManagerPage({
@@ -247,7 +248,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     Color statusColor(ApiKeyStatus st) {
       switch (st) {
         case ApiKeyStatus.active:
-          return Colors.green;
+          return context.appColors.success;
         case ApiKeyStatus.disabled:
           return cs.onSurface.withValues(alpha: 0.6);
         case ApiKeyStatus.error:
@@ -826,7 +827,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   Future<List<String>?> _showAddKeysSheet() async {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final inputCtrl = TextEditingController();
     final result = await showModalBottomSheet<List<String>?>(
       context: context,
@@ -893,7 +893,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   decoration: InputDecoration(
                     hintText: l10n.multiKeyPageAddHint,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    fillColor: context.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
@@ -941,7 +941,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   Future<ApiKeyConfig?> _showEditKeySheet(ApiKeyConfig k) async {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final aliasCtrl = TextEditingController(text: k.name ?? '');
     final keyCtrl = TextEditingController(text: k.key);
     final priCtrl = TextEditingController(text: k.priority.toString());
@@ -1008,7 +1007,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   decoration: InputDecoration(
                     hintText: l10n.multiKeyPageAlias,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    fillColor: context.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
@@ -1039,7 +1038,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   decoration: InputDecoration(
                     hintText: l10n.multiKeyPageKey,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    fillColor: context.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
@@ -1071,7 +1070,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   decoration: InputDecoration(
                     hintText: l10n.multiKeyPagePriority,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    fillColor: context.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(

@@ -562,6 +562,7 @@ Future<void> _extractTarBz2Cancellable(
   String destinationPath,
   SherpaDownloadCancellationToken token,
 ) async {
+  final cancelMarker = File('$archivePath.cancel');
   final resultPort = ReceivePort();
   final exitPort = ReceivePort();
   Isolate? isolate;
@@ -576,7 +577,11 @@ Future<void> _extractTarBz2Cancellable(
       token.whenCancelled.then<Object>((_) => _cancelledMarker),
     ]);
     if (identical(result, _cancelledMarker)) {
-      isolate.kill(priority: Isolate.immediate);
+      // Cooperative cancellation: signal the isolate through a marker file so
+      // it can close its own file handles, then exit, before the archive is
+      // deleted. Killing an isolate with Isolate.immediate leaks its open
+      // handles, and Windows refuses to delete files another handle has open.
+      await cancelMarker.create();
       await exitPort.first;
       throw const SherpaDownloadCancelledException();
     }
@@ -588,6 +593,8 @@ Future<void> _extractTarBz2Cancellable(
         ? response[1]?.toString() ?? 'Model extraction failed'
         : 'Model extraction failed';
     switch (type) {
+      case 'cancelled':
+        throw const SherpaDownloadCancelledException();
       case 'format':
         throw FormatException(message);
       case 'filesystem':
@@ -599,6 +606,7 @@ Future<void> _extractTarBz2Cancellable(
     isolate?.kill(priority: Isolate.immediate);
     resultPort.close();
     exitPort.close();
+    if (await cancelMarker.exists()) await cancelMarker.delete();
   }
 }
 
@@ -607,6 +615,8 @@ void _extractTarBz2Isolate(List<Object> message) {
   try {
     _extractTarBz2Securely(message[1] as String, message[2] as String);
     resultPort.send(const <String?>[null, null]);
+  } on SherpaDownloadCancelledException catch (_) {
+    resultPort.send(const <String?>['cancelled']);
   } on FormatException catch (error) {
     resultPort.send(<String?>['format', error.message.toString()]);
   } on FileSystemException catch (error) {
@@ -617,8 +627,16 @@ void _extractTarBz2Isolate(List<Object> message) {
 }
 
 void _extractTarBz2Securely(String archivePath, String destinationPath) {
+  // The extraction isolate must close its own file handles before the archive
+  // is deleted; the main isolate signals cancellation by creating this marker
+  // (a port message could not be observed synchronously while the decoder
+  // blocks the event loop). Only checked at phase boundaries, so a cancel
+  // lands once the current decode stage has finished.
+  final cancelMarker = File('$archivePath.cancel');
+  bool cancelled() => cancelMarker.existsSync();
   final tarFile = File('$archivePath.uncompressed.part');
   try {
+    if (cancelled()) throw const SherpaDownloadCancelledException();
     final compressedInput = InputFileStream(archivePath);
     final tarOutput = OutputFileStream(tarFile.path);
     try {
@@ -635,6 +653,7 @@ void _extractTarBz2Securely(String archivePath, String destinationPath) {
       tarOutput.closeSync();
     }
 
+    if (cancelled()) throw const SherpaDownloadCancelledException();
     final tarInput = InputFileStream(tarFile.path);
     Archive? archive;
     try {
@@ -648,6 +667,7 @@ void _extractTarBz2Securely(String archivePath, String destinationPath) {
           }
         },
       );
+      if (cancelled()) throw const SherpaDownloadCancelledException();
       _extractArchiveToDiskVerified(archive, destinationPath);
     } finally {
       archive?.clearSync();

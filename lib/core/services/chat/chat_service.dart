@@ -1595,6 +1595,7 @@ class ChatService extends ChangeNotifier {
   Future<ChatMessage?> appendMessageVersion({
     required String messageId,
     required String content,
+    DateTime? timestamp,
   }) async {
     if (!_initialized) await init();
     final original =
@@ -1630,6 +1631,7 @@ class ChatService extends ChangeNotifier {
       speakerAssistantId: original.speakerAssistantId,
       requestAllowImagesApiRouting: original.requestAllowImagesApiRouting,
       requestExtraBodyJson: original.requestExtraBodyJson,
+      timestamp: timestamp,
     );
     // Append to conversation order at the end (we'll group when rendering)
     if (_draftConversations.containsKey(cid)) {
@@ -1887,7 +1889,7 @@ class ChatService extends ChangeNotifier {
       }
     } catch (_) {}
     // iOS Linux sandbox: the shared iSH rootfs lives OUTSIDE @workspaces
-    // (Application Support, ADR-0029), so wipe it separately. Refuse while
+    // (Application Support, ADR-0035), so wipe it separately. Refuse while
     // the kernel is booted — deleting a live fakefs mount would corrupt the
     // running guest; it goes away on the next clear after a relaunch.
     if (Platform.isIOS) {

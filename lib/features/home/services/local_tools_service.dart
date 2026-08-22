@@ -7,6 +7,7 @@ import '../../../core/models/assistant.dart';
 import '../../../features/skills/github_importer.dart';
 import '../../../features/skills/skill_importer.dart';
 import '../../../features/skills/skill_manager.dart';
+import '../../../features/skills/skill_paths.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
 typedef SkillsImportedCallback = Future<void> Function(List<String> names);
@@ -618,6 +619,18 @@ class LocalToolsService {
       return jsonEncode({
         'error': 'name_missing',
         'message': 'The YAML frontmatter must contain a "name" field.',
+      });
+    }
+
+    // Validate the name before the existence check: on a case-insensitive
+    // filesystem (Windows) an invalid name like "ALPHA" would otherwise
+    // collide with an existing "alpha" directory and be misreported as
+    // already_exists. Keep the payload identical to the saveSkill error path.
+    final nameError = SkillPaths.validateName(name);
+    if (nameError != null) {
+      return jsonEncode({
+        'error': 'save_failed',
+        'message': 'Failed to save skill: $nameError',
       });
     }
 

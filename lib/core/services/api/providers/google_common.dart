@@ -60,9 +60,9 @@ bool _isGemini35FlashLiteModel(String modelId) {
   );
 }
 
-bool _isGemini36FlashModel(String modelId) {
+bool _isGemini36PlusFlashModel(String modelId) {
   return modelId.contains(
-    RegExp(r'gemini-3\.6-flash([._:@/-]|$)', caseSensitive: false),
+    RegExp(r'gemini-3\.(?:6|7)-flash([._:@/-]|$)', caseSensitive: false),
   );
 }
 
@@ -104,7 +104,7 @@ Map<String, dynamic> _googleThinkingConfig(
   );
   final isGemini35Flash = _isGemini35FlashModel(upstreamModelId);
   final isGemini35FlashLite = _isGemini35FlashLiteModel(upstreamModelId);
-  final isGemini36Flash = _isGemini36FlashModel(upstreamModelId);
+  final isGemini36PlusFlash = _isGemini36PlusFlashModel(upstreamModelId);
   if (isGemini3ProImage) {
     return {
       'includeThoughts': true,
@@ -134,12 +134,12 @@ Map<String, dynamic> _googleThinkingConfig(
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
-  // Gemini 3 Flash, 3.5 Flash/Lite, and 3.6 Flash support
+  // Gemini 3 Flash, 3.5 Flash/Lite, and 3.6/3.7 Flash support
   // 'minimal', 'low', 'medium', and 'high'.
-  if (isGemini3Flash || isGemini35Flash || isGemini36Flash) {
+  if (isGemini3Flash || isGemini35Flash || isGemini36PlusFlash) {
     String level = isGemini35FlashLite
         ? 'minimal'
-        : (isGemini35Flash || isGemini36Flash ? 'medium' : 'high');
+        : (isGemini35Flash || isGemini36PlusFlash ? 'medium' : 'high');
     if (off) {
       level = 'minimal';
     } else if (budget != null && budget > 0) {
@@ -267,7 +267,7 @@ Map<String, dynamic> _googleApiPart(Map part) {
 
 int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
   if (_isGemini35FlashModel(upstreamModelId) ||
-      _isGemini36FlashModel(upstreamModelId)) {
+      _isGemini36PlusFlashModel(upstreamModelId)) {
     return 65536;
   }
   return null;
@@ -521,7 +521,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           'name': name,
           if (desc.isNotEmpty) 'description': desc,
         };
-        if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
+        if (params != null) {
+          // Gemini validation + drop additionalProperties (rejected with
+          // HTTP 400, issue #425). MCP tools are already sanitized by
+          // ToolHandlerService; this covers built-in tools too.
+          d['parameters'] = ChatApiService._stripAdditionalProperties(
+            _cleanSchemaForGemini(params),
+          );
+        }
         decls.add(d);
       }
       if (decls.isNotEmpty) {
@@ -992,7 +999,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (params != null) {
         // Google Gemini requires strict JSON Schema compliance
         // Fix array properties that are missing 'items' field
-        final cleanedParams = _cleanSchemaForGemini(params);
+        final cleanedParams = ChatApiService._stripAdditionalProperties(
+          _cleanSchemaForGemini(params),
+        );
         d['parameters'] = cleanedParams;
       }
       decls.add(d);

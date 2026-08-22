@@ -24,6 +24,7 @@ import '../logs/request_body_beautifier.dart';
 import '../logs/request_log_ai_analysis.dart';
 import '../logs/request_log_parser.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 /// Mobile log viewer - shows list of log files and allows viewing/exporting
 class LogViewerPage extends StatefulWidget {
@@ -78,9 +79,10 @@ Future<void> _startRequestLogAiAnalysis(
         ],
       ),
     );
-    Navigator.of(context, rootNavigator: true).popUntil(
-      (route) => route.isFirst,
-    );
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => route.isFirst);
   } catch (error, stackTrace) {
     debugPrint(
       'LogViewerPage: failed to prepare AI request-log analysis: '
@@ -350,7 +352,7 @@ class _LogFilesList extends StatelessWidget {
     }
 
     final Color tileBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color border = cs.outlineVariant.withValues(
       alpha: isDark ? 0.26 : 0.38,
@@ -447,8 +449,8 @@ class _FileIcon extends StatelessWidget {
     final Color bg = isCurrent
         ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.14)
         : (isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFF2F3F5));
+              ? cs.onSurface.withValues(alpha: 0.08)
+              : context.appColors.surfaceFill);
     final Color fg = isCurrent
         ? cs.primary
         : cs.onSurface.withValues(alpha: 0.72);
@@ -799,7 +801,7 @@ class _CategoryChip extends StatelessWidget {
     final Color bg = selected
         ? cs.primary.withValues(alpha: isDark ? 0.85 : 0.90)
         : isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color fg = selected
         ? cs.onPrimary
@@ -851,7 +853,7 @@ class _RequestLogSummaryBar extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final Color bg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color border = cs.outlineVariant.withValues(
       alpha: isDark ? 0.26 : 0.38,
@@ -859,7 +861,7 @@ class _RequestLogSummaryBar extends StatelessWidget {
 
     final Color errorPillBg = Color.alphaBlend(
       cs.error.withValues(alpha: isDark ? 0.18 : 0.12),
-      isDark ? Colors.white.withValues(alpha: 0.08) : Colors.white,
+      isDark ? cs.onSurface.withValues(alpha: 0.08) : Colors.white,
     );
     final Color errorPillFg = cs.error.withValues(alpha: isDark ? 0.92 : 0.88);
 
@@ -957,7 +959,7 @@ class _RequestLogCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color tileBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color border = cs.outlineVariant.withValues(
       alpha: isDark ? 0.26 : 0.38,
@@ -1063,9 +1065,7 @@ class _InlineErrorPreview extends StatelessWidget {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color base = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : const Color(0xFFF6F7F9);
+    final Color base = context.appColors.surfaceFill;
     final Color bg = Color.alphaBlend(
       cs.error.withValues(alpha: isDark ? 0.12 : 0.07),
       base,
@@ -1182,7 +1182,7 @@ class _StatusPill extends StatelessWidget {
     final Color bg = () {
       if (isError || code >= 400) {
         final Color base = isDark
-            ? Colors.white.withValues(alpha: 0.08)
+            ? cs.onSurface.withValues(alpha: 0.08)
             : Colors.white;
         return Color.alphaBlend(
           cs.error.withValues(alpha: isDark ? 0.18 : 0.12),
@@ -1394,10 +1394,8 @@ class _RequestLogDetailPageState extends State<_RequestLogDetailPage> {
             IconButton(
               icon: Icon(Lucide.Bot, color: cs.onSurface, size: 20),
               tooltip: l10n.requestLogAiAnalysisTooltip,
-              onPressed: () => _startRequestLogAiAnalysis(
-                context,
-                <RequestLogEntry>[entry],
-              ),
+              onPressed: () =>
+                  _startRequestLogAiAnalysis(context, <RequestLogEntry>[entry]),
             ),
           IconButton(
             icon: Icon(Lucide.Copy, color: cs.onSurface, size: 20),
@@ -1571,7 +1569,7 @@ class _ErrorHeroCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final Color base = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color bg = Color.alphaBlend(
       cs.error.withValues(alpha: isDark ? 0.14 : 0.08),
@@ -1655,7 +1653,7 @@ class _SectionCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color bg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color border = cs.outlineVariant.withValues(
       alpha: isDark ? 0.26 : 0.38,
@@ -1711,8 +1709,9 @@ class _CodeBlock extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color neutralBg = isDark
+        // color-gate: ignore
         ? Colors.black.withValues(alpha: 0.16)
-        : const Color(0xFFF6F7F9);
+        : const Color(0xFFF6F7F9); // color-gate: ignore
     final Color bg = () {
       if (tone == _CodeTone.error) {
         return Color.alphaBlend(
@@ -1840,7 +1839,7 @@ class _SegTabBar extends StatelessWidget {
                 segWidth * tabs.length + gap * (tabs.length - 1);
 
             final Color shellBg = isDark
-                ? Colors.white.withValues(alpha: 0.08)
+                ? cs.onSurface.withValues(alpha: 0.08)
                 : Colors.white;
 
             List<Widget> children = [];
@@ -1979,7 +1978,7 @@ class _LogSettingsSheet extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
 
     final Color tileBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
+        ? cs.onSurface.withValues(alpha: 0.06)
         : Colors.white;
     final Color border = cs.outlineVariant.withValues(
       alpha: isDark ? 0.26 : 0.38,
@@ -2156,26 +2155,25 @@ class _LogSettingsSheet extends StatelessWidget {
 // Beautified request body rendering
 // ---------------------------------------------------------------------------
 
-/// Role color pair (light, dark).
-class _RoleColor {
-  const _RoleColor(this.label, this.light, this.dark);
-  final String label;
-  final Color light;
-  final Color dark;
-
-  Color color(bool isDark) => isDark ? dark : light;
+/// Role accent color, derived from the active theme's [AppSemanticColors]
+/// chart series (indices 6/0/5/3 for system/user/assistant/tool).
+Color _roleColor(BuildContext context, TurnRole role) {
+  return context.appColors.chartSeries[switch (role) {
+    TurnRole.system => 6,
+    TurnRole.user => 0,
+    TurnRole.assistant => 5,
+    TurnRole.tool => 3,
+  }];
 }
 
-const _roleColors = <TurnRole, _RoleColor>{
-  TurnRole.system: _RoleColor('SYSTEM', Color(0xFFCA8A04), Color(0xFFFACC15)),
-  TurnRole.user: _RoleColor('USER', Color(0xFF2563EB), Color(0xFF60A5FA)),
-  TurnRole.assistant: _RoleColor(
-    'ASSISTANT',
-    Color(0xFF16A34A),
-    Color(0xFF86EFAC),
-  ),
-  TurnRole.tool: _RoleColor('TOOL', Color(0xFF8B5CF6), Color(0xFFA78BFA)),
-};
+String _roleLabel(TurnRole role) {
+  return switch (role) {
+    TurnRole.system => 'SYSTEM',
+    TurnRole.user => 'USER',
+    TurnRole.assistant => 'ASSISTANT',
+    TurnRole.tool => 'TOOL',
+  };
+}
 
 /// Renders a [BeautifiedBody]: colored turn blocks on top, config JSON below.
 class _BeautifiedBodyView extends StatelessWidget {
@@ -2238,12 +2236,12 @@ class _TurnBlock extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final rc = _roleColors[turn.role]!;
-    final color = rc.color(isDark);
+    final color = _roleColor(context, turn.role);
+    final label = _roleLabel(turn.role);
 
     final children = <Widget>[
       Text(
-        rc.label,
+        label,
         style: TextStyle(
           fontSize: 10.5,
           fontWeight: AppFontWeights.heavy,

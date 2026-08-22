@@ -23,14 +23,95 @@ import '../chat/chat_service.dart';
 import '../deleted_records_store.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment;
+import '../sync/lan_sync_models.dart' show FileManifestEntry;
 import 'kelivo_image_settings_mapper.dart';
+import 'kelivo_v2_exception.dart';
 import 'double_pref_keys.dart';
 import '../../../utils/app_directories.dart';
+
+/// Stage of a restore-in-progress, for UI progress display.
+enum RestoreStage {
+  /// ZIP extraction (runs in an isolate — indeterminate).
+  extracting,
+
+  /// Chat / message merge into SQLite.
+  mergingChats,
+
+  /// File tree copying (upload/images/avatars/fonts/workspaces).
+  copyingFiles,
+
+  /// Skill file restore.
+  restoringSkills,
+}
+
+/// Snapshot of restore progress.
+///
+/// [fraction] is null while the stage is indeterminate. [filesCopied] /
+/// [filesTotal] and [bytesCopied] / [bytesTotal] are only meaningful during
+/// [RestoreStage.copyingFiles]; [conversationsMerged] / [conversationsTotal]
+/// during [RestoreStage.mergingChats].
+class RestoreProgress {
+  final RestoreStage stage;
+  final double? fraction;
+  final int filesCopied;
+  final int filesTotal;
+  final int bytesCopied;
+  final int bytesTotal;
+  final int conversationsMerged;
+  final int conversationsTotal;
+
+  const RestoreProgress({
+    required this.stage,
+    this.fraction,
+    this.filesCopied = 0,
+    this.filesTotal = 0,
+    this.bytesCopied = 0,
+    this.bytesTotal = 0,
+    this.conversationsMerged = 0,
+    this.conversationsTotal = 0,
+  });
+}
+
+/// Optional progress callback threaded through a restore. Null for callers
+/// that do not surface progress (backup page/pane, S3, BackupProvider).
+typedef RestoreProgressCallback = void Function(RestoreProgress progress);
 
 class DataSync {
   final ChatService chatService;
   final Future<Set<String>> Function(String type)? _localIdResolver;
   DataSync({required this.chatService, this._localIdResolver});
+
+  // Upstream (Kelivo) legacy chats.json importer only accepts version 1 (or a
+  // missing field); anything else is rejected with FormatException. Cuplivo's
+  // own importer never reads this field, so exporting v1 keeps backups
+  // importable into Kelivo without affecting Cuplivo round-trips. Never bump
+  // this past 1 without relaxing Kelivo's _parseChatBackup constraint first.
+  static const int _chatsJsonVersion = 1;
+
+  // Proxy fields inside a provider config. Proxy is device-local: during a
+  // merge restore these fields are never adopted from the backup for
+  // providers that already exist locally (issue #512).
+  static const List<String> _providerProxyFields = [
+    'proxyEnabled',
+    'proxyType',
+    'proxyHost',
+    'proxyPort',
+    'proxyUsername',
+    'proxyPassword',
+  ];
+
+  // The no-proxy state the app writes for fresh configs (mirrors
+  // SettingsProvider's defaults). Used when a legacy local provider config
+  // carries no proxy block at all, so the backup's proxy never survives even
+  // in disabled form.
+  static const Map<String, dynamic> _noProxyProviderDefaults = {
+    'proxyEnabled': false,
+    'proxyType': 'http',
+    'proxyHost': '',
+    'proxyPort': '8080',
+    'proxyUsername': '',
+    'proxyPassword': '',
+  };
 
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
@@ -211,6 +292,7 @@ class DataSync {
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       final packSince = incremental?.since;
+      final packIncludeFilePaths = incremental?.includeFilePaths;
       await Isolate.run(() {
         _packZipSync(
           outPath: outPath,
@@ -219,6 +301,7 @@ class DataSync {
           deletedJsonPath: deletedJsonPath,
           includeFiles: effectiveIncludeFiles,
           since: packSince,
+          includeFilePaths: packIncludeFilePaths,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -347,8 +430,15 @@ class DataSync {
     required String skillsDirPath,
     required String workspacesDirPath,
     DateTime? since,
+    Set<String>? includeFilePaths,
   }) {
     final writer = _StreamingZipWriter(outPath);
+    // LAN-sync delta flow only: collect the exact (size, ms mtime) of every
+    // packed file so the receiving side restores matching mtimes (kills
+    // cross-run re-send churn). Null → legacy mtime-filter path, no manifest.
+    final manifest = includeFilePaths != null
+        ? <String, ({int size, int mtimeMs})>{}
+        : null;
     try {
       // settings.json
       if (settingsPath != null) {
@@ -366,14 +456,49 @@ class DataSync {
       }
 
       // skills/ — always included, independent of includeFiles
-      _addDirectoryToZip(writer, skillsDirPath, 'skills', since: since);
+      _addDirectoryToZip(
+        writer,
+        skillsDirPath,
+        'skills',
+        since: since,
+        includeFilePaths: includeFilePaths,
+        manifestOut: manifest,
+      );
 
       // files under upload/, images/, avatars/
       if (includeFiles) {
-        _addDirectoryToZip(writer, uploadDirPath, 'upload', since: since);
-        _addDirectoryToZip(writer, avatarsDirPath, 'avatars', since: since);
-        _addDirectoryToZip(writer, imagesDirPath, 'images', since: since);
-        _addDirectoryToZip(writer, fontsDirPath, 'fonts', since: since);
+        _addDirectoryToZip(
+          writer,
+          uploadDirPath,
+          'upload',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          avatarsDirPath,
+          'avatars',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          imagesDirPath,
+          'images',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
+        _addDirectoryToZip(
+          writer,
+          fontsDirPath,
+          'fonts',
+          since: since,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
+        );
         // workspaces/ — user content; dot-prefixed entries (e.g.
         // .fetch_cache/) are excluded from backup/sync (one dotfile rule,
         // same as the server's glob/grep convention).
@@ -383,7 +508,20 @@ class DataSync {
           'workspaces',
           since: since,
           skipDotEntries: true,
+          includeFilePaths: includeFilePaths,
+          manifestOut: manifest,
         );
+      }
+
+      // sync_manifest.json — exact ms mtimes of the packed files, consumed by
+      // the restore side. Deliberately NOT named manifest.json: that name is
+      // the Kelivo-v2 backup detector and would mis-reject this zip.
+      if (manifest != null) {
+        final manifestJson = jsonEncode({
+          for (final entry in manifest.entries)
+            entry.key: {'size': entry.value.size, 'mtime': entry.value.mtimeMs},
+        });
+        writer.addBytes(utf8.encode(manifestJson), 'sync_manifest.json');
       }
 
       writer.closeSync();
@@ -403,12 +541,20 @@ class DataSync {
   }
 
   /// Add all files from [srcDirPath] into the zip under [zipPrefix].
+  ///
+  /// When [includeFilePaths] is set (LAN-sync delta flow), a file is packed
+  /// iff its zip-entry name (`<zipPrefix>/<relPosix>`) is in the set — this
+  /// replaces the mtime `>= since` filter. Otherwise [since] behaves as before.
+  /// [manifestOut], when non-null, is filled with the packed files' exact
+  /// (size, ms mtime) keyed by zip-entry name.
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix, {
     DateTime? since,
     bool skipDotEntries = false,
+    Set<String>? includeFilePaths,
+    Map<String, ({int size, int mtimeMs})>? manifestOut,
   }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
@@ -422,20 +568,94 @@ class DataSync {
             relPosix.split('/').any((s) => s.startsWith('.'))) {
           continue;
         }
-        if (since != null) {
+        final entryName = '$zipPrefix/$relPosix';
+        if (includeFilePaths != null) {
+          if (!includeFilePaths.contains(entryName)) continue;
+        } else if (since != null) {
           try {
             if (ent.lastModifiedSync().isBefore(since)) continue;
           } catch (_) {
             // Cannot read modification time — include conservatively
           }
         }
-        _addFileToZip(writer, ent.path, '$zipPrefix/$relPosix');
+        if (manifestOut != null) {
+          try {
+            final stat = ent.statSync();
+            manifestOut[entryName] = (
+              size: stat.size,
+              mtimeMs: stat.modified.millisecondsSinceEpoch,
+            );
+          } catch (_) {
+            // Cannot stat — the pack call below surfaces a real error later.
+          }
+        }
+        _addFileToZip(writer, ent.path, entryName);
       }
     }
   }
 
   static String _zipEntryName(String name) {
     return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
+  }
+
+  /// Lists the files of [dir] with their root-relative POSIX paths.
+  ///
+  /// Mirrors the dot-entry rule of [_addDirectoryToZip]: when [skipDot] is
+  /// set, any relative path with a dot-prefixed segment is excluded. Returns
+  /// empty when the directory does not exist.
+  static List<({File file, String rel})> _listFiles(
+    Directory dir, {
+    bool skipDot = false,
+  }) {
+    if (!dir.existsSync()) return const [];
+    final out = <({File file, String rel})>[];
+    for (final ent in dir.listSync(recursive: true, followLinks: false)) {
+      if (ent is File) {
+        final rel = p.relative(ent.path, from: dir.path);
+        if (skipDot &&
+            rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
+          continue;
+        }
+        out.add((file: ent, rel: rel));
+      }
+    }
+    return out;
+  }
+
+  /// Sets [target]'s mtime, preferring the LAN-sync manifest's ms precision
+  /// when present; otherwise falls back to [source]'s own mtime (the ZIP's
+  /// second-granularity UT field). Best-effort — never throws.
+  static Future<void> _setTargetMtime(
+    File target,
+    File source,
+    String extractDirPath,
+    Map<String, ({int size, int mtimeMs})>? manifest,
+  ) async {
+    final mtime = await _backupFileMtime(source, extractDirPath, manifest);
+    try {
+      await target.setLastModified(mtime);
+    } catch (_) {}
+  }
+
+  /// The effective mtime of an extracted backup file. When the LAN-sync
+  /// `sync_manifest.json` carries an entry for the file, its exact ms mtime is
+  /// used — this makes the merge's newer-wins comparison agree precisely with
+  /// the delta (`computeFileDelta` compares ms mtimes), so a same-second tie
+  /// can never keep the receiver's older copy and re-send forever. Otherwise
+  /// falls back to the ZIP's own (second-granularity) mtime.
+  static Future<DateTime> _backupFileMtime(
+    File source,
+    String extractDirPath,
+    Map<String, ({int size, int mtimeMs})>? manifest,
+  ) async {
+    final key = p
+        .relative(source.path, from: extractDirPath)
+        .replaceAll('\\', '/');
+    final entry = manifest?[key];
+    if (entry != null) {
+      return DateTime.fromMillisecondsSinceEpoch(entry.mtimeMs);
+    }
+    return source.lastModified();
   }
 
   /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
@@ -462,6 +682,9 @@ class DataSync {
   /// than loading the entire archive into a single byte array.
   static void _extractZipSync(String zipPath, String extractDirPath) {
     final inputStream = InputFileStream(zipPath);
+    // Full-second mtimes from UT (0x5455) extra fields, keyed by raw entry
+    // name. Empty when absent — DOS timestamps (even-second) are the fallback.
+    final utMtimes = _readUtMtimes(zipPath);
     try {
       final archive = ZipDecoder().decodeStream(inputStream);
       try {
@@ -482,7 +705,8 @@ class DataSync {
             } finally {
               output.closeSync();
             }
-            final dt = _decodeDosDateTime(entry.lastModTime);
+            final dt =
+                utMtimes[entry.name] ?? _decodeDosDateTime(entry.lastModTime);
             if (dt != null) {
               try {
                 File(outPath).setLastModifiedSync(dt);
@@ -498,6 +722,116 @@ class DataSync {
     } finally {
       inputStream.closeSync();
     }
+  }
+
+  /// Runs the synchronous ZIP extraction in an isolate.
+  ///
+  /// The closure passed to `Isolate.run` is created inside a STATIC method
+  /// taking only plain strings. A closure created in an instance method can
+  /// over-capture the enclosing frame (including `this` and callback params
+  /// like the restore `onProgress` tear-off, whose owner graph reaches the
+  /// LAN sync `HttpServer` on the server side) — sending such a closure fails
+  /// with "object is unsendable" (dart-lang/sdk#52661).
+  static Future<void> _runExtractInIsolate(
+    String zipPath,
+    String extractDirPath,
+  ) => Isolate.run(() => _extractZipSync(zipPath, extractDirPath));
+
+  /// Reads full-second mtimes from a zip's central-directory UT (0x5455)
+  /// extra fields, keyed by raw entry name.
+  ///
+  /// ZIP DOS timestamps round down to even seconds; the UT field carries the
+  /// true Unix-second mtime so the newer-wins merge comparison is not biased
+  /// against odd-second mtimes. Returns an empty map when no entry carries
+  /// the field or the layout cannot be parsed (callers fall back to DOS).
+  static Map<String, DateTime> _readUtMtimes(String zipPath) {
+    final raf = File(zipPath).openSync();
+    try {
+      final length = raf.lengthSync();
+      if (length < 22) return const {};
+      // EOCD (22 bytes) + max comment (65535): read the whole tail.
+      final tailLen = length - 22 > 0xffff ? 22 + 0xffff : length;
+      raf.setPositionSync(length - tailLen);
+      final tail = raf.readSync(tailLen);
+      // Scan backwards for the last EOCD signature (0x06054b50).
+      var eocdPos = -1;
+      for (var i = tail.length - 22; i >= 0; i--) {
+        if (tail[i] == 0x50 &&
+            tail[i + 1] == 0x4b &&
+            tail[i + 2] == 0x05 &&
+            tail[i + 3] == 0x06) {
+          eocdPos = i;
+          break;
+        }
+      }
+      if (eocdPos < 0) return const {};
+      final cdSize = ByteData.sublistView(
+        tail,
+      ).getUint32(eocdPos + 12, Endian.little);
+      final cdOffset = ByteData.sublistView(
+        tail,
+      ).getUint32(eocdPos + 16, Endian.little);
+      if (cdOffset + cdSize > length) return const {};
+
+      raf.setPositionSync(cdOffset);
+      final cd = raf.readSync(cdSize);
+      final view = ByteData.sublistView(cd);
+      final result = <String, DateTime>{};
+      var pos = 0;
+      while (pos + 46 <= cd.length) {
+        // Central directory header signature (0x02014b50).
+        if (view.getUint32(pos, Endian.little) != 0x02014b50) break;
+        final nameLen = view.getUint16(pos + 28, Endian.little);
+        final extraLen = view.getUint16(pos + 30, Endian.little);
+        final commentLen = view.getUint16(pos + 32, Endian.little);
+        final nameStart = pos + 46;
+        final extraStart = nameStart + nameLen;
+        final next = extraStart + extraLen + commentLen;
+        if (next > cd.length) break;
+        if (extraLen >= 9) {
+          final name = _decodeZipName(
+            cd.sublist(nameStart, nameStart + nameLen),
+          );
+          final ut = _parseUtMtime(view, extraStart, extraLen);
+          if (name != null && ut != null) result[name] = ut;
+        }
+        pos = next;
+      }
+      return result;
+    } finally {
+      raf.closeSync();
+    }
+  }
+
+  /// Decodes a central-directory entry name the same way archive_io does:
+  /// UTF-8 first, latin-1 on parse error. Null when the entry has no name.
+  static String? _decodeZipName(List<int> bytes) {
+    if (bytes.isEmpty) return null;
+    try {
+      return utf8.decode(bytes);
+    } catch (_) {
+      return String.fromCharCodes(bytes);
+    }
+  }
+
+  /// Extracts the mtime from a UT (0x5455) extra field inside [view] starting
+  /// at [start] with [length] bytes. Returns null when absent or malformed.
+  static DateTime? _parseUtMtime(ByteData view, int start, int length) {
+    var pos = start;
+    final end = start + length;
+    while (pos + 4 <= end) {
+      final id = view.getUint16(pos, Endian.little);
+      final size = view.getUint16(pos + 2, Endian.little);
+      final dataStart = pos + 4;
+      if (dataStart + size > end) return null;
+      if (id == 0x5455 && size >= 5 && (view.getUint8(dataStart) & 1) != 0) {
+        final secs = view.getUint32(dataStart + 1, Endian.little);
+        if (secs == 0) return null;
+        return DateTime.fromMillisecondsSinceEpoch(secs * 1000, isUtc: true);
+      }
+      pos = dataStart + size;
+    }
+    return null;
   }
 
   Future<void> backupToWebDav(
@@ -662,6 +996,7 @@ class DataSync {
     WebDavConfig cfg,
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
+    RestoreProgressCallback? onProgress,
   }) async {
     // Stream the download to a file instead of buffering in memory.
     final client = http.Client();
@@ -679,7 +1014,12 @@ class DataSync {
       file = File(p.join(tmpDir.path, item.displayName));
       final sink = file.openWrite();
       await streamed.stream.pipe(sink);
-      await _restoreFromBackupFile(file, cfg, mode: mode);
+      await _restoreFromBackupFile(
+        file,
+        cfg,
+        mode: mode,
+        onProgress: onProgress,
+      );
     } finally {
       client.close();
       await _deleteFileQuietly(file);
@@ -707,9 +1047,10 @@ class DataSync {
     File file,
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
+    RestoreProgressCallback? onProgress,
   }) async {
     if (!await file.exists()) throw Exception('备份文件不存在');
-    await _restoreFromBackupFile(file, cfg, mode: mode);
+    await _restoreFromBackupFile(file, cfg, mode: mode, onProgress: onProgress);
   }
 
   // ===== Internal helpers =====
@@ -826,6 +1167,27 @@ class DataSync {
     return out;
   }
 
+  /// Messages qualifying for incremental export, at version-group granularity.
+  ///
+  /// Edited versions preserve the original message timestamp, so a
+  /// timestamp-only filter would drop them while `versionSelections` still
+  /// references the missing version. `version > 0` also matches multi-AI
+  /// adopted threads (renumbered without being edited), which only ever
+  /// produces superset exports. Qualify by group: every message whose group
+  /// contains a changed or versioned message is included.
+  List<ChatMessage> _incrementalQualifiedMessages(
+    List<ChatMessage> msgs,
+    bool Function(DateTime) sinceCheck,
+  ) {
+    final qualifiedGroups = msgs
+        .where((m) => sinceCheck(m.timestamp) || m.version > 0)
+        .map((m) => m.groupId ?? m.id)
+        .toSet();
+    return msgs
+        .where((m) => qualifiedGroups.contains(m.groupId ?? m.id))
+        .toList();
+  }
+
   /// Analyze incremental scope for preview purposes — scans conversations and
   /// files to produce metadata counts and representative titles.
   /// Does not modify any state; safe to call repeatedly.
@@ -851,9 +1213,10 @@ class DataSync {
         newConvs.add(c);
       } else if (c.updatedAt.isAfter(since) ||
           c.updatedAt.isAtSameMomentAs(since)) {
-        final filtered = chatService
-            .getMessages(c.id)
-            .where((m) => sinceCheck(m.timestamp));
+        final filtered = _incrementalQualifiedMessages(
+          chatService.getMessages(c.id),
+          sinceCheck,
+        );
         final count = filtered.length;
         if (count > 0) {
           updatedMsgCount += count;
@@ -865,63 +1228,10 @@ class DataSync {
     newConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     updatedConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-    int fileCount = 0;
-    int totalBytes = 0;
-    if (includeFiles) {
-      final dirs = [
-        await _getUploadDir(),
-        await _getAvatarsDir(),
-        await _getImagesDir(),
-        await _getFontsDir(),
-        await _getWorkspacesDir(),
-      ];
-      for (final dir in dirs) {
-        if (!await dir.exists()) continue;
-        final isWorkspaces = p.equals(
-          p.normalize(dir.path),
-          p.normalize((await _getWorkspacesDir()).path),
-        );
-        await for (final ent in dir.list(recursive: true, followLinks: false)) {
-          if (ent is File) {
-            if (isWorkspaces) {
-              final rel = p.relative(ent.path, from: dir.path);
-              if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-                continue;
-              }
-            }
-            try {
-              final mod = await ent.lastModified();
-              if (mod.isBefore(since)) continue;
-            } catch (_) {
-              // Cannot read modification time — include conservatively
-            }
-            fileCount++;
-            totalBytes += await ent.length();
-          }
-        }
-      }
-    }
-
-    // skills/ is always exported independent of includeFiles (see
-    // _packZipSync), so count it unconditionally to match the actual ZIP.
-    final skillsDir = await _getSkillsDir();
-    if (await skillsDir.exists()) {
-      await for (final ent in skillsDir.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (ent is File) {
-          try {
-            final mod = await ent.lastModified();
-            if (mod.isBefore(since)) continue;
-          } catch (_) {
-            // Cannot read modification time — include conservatively
-          }
-          fileCount++;
-          totalBytes += await ent.length();
-        }
-      }
-    }
+    final counted = await _countFilesForSince(
+      since,
+      includeFiles: includeFiles,
+    );
 
     return IncrementalScope(
       newConversations: ConvRange(
@@ -936,9 +1246,122 @@ class DataSync {
         oldestTitle: updatedConvs.isNotEmpty ? updatedConvs.first.title : null,
         newestTitle: updatedConvs.length > 1 ? updatedConvs.last.title : null,
       ),
-      newFileCount: fileCount,
-      totalFileSizeBytes: totalBytes,
+      newFileCount: counted.fileCount,
+      totalFileSizeBytes: counted.totalBytes,
     );
+  }
+
+  /// Counts the files a LAN sync peer would pack from this device for the
+  /// given [since], and their total bytes. Stat-only — never reads file
+  /// contents. Mirrors `_packZipSync` exactly (mtime >= [since]; `skills/`
+  /// always counted; `workspaces/` skips dot-prefixed entries; mtime-read
+  /// failures counted conservatively) so a preview never drifts from the
+  /// actual zip payload.
+  Future<({int fileCount, int totalBytes})> countFilesForSince(
+    DateTime since,
+  ) => _countFilesForSince(since, includeFiles: true);
+
+  /// Shared implementation behind [countFilesForSince] and
+  /// [analyzeIncrementalScope]. When [includeFiles] is false only `skills/`
+  /// is counted, mirroring `_packZipSync`.
+  Future<({int fileCount, int totalBytes})> _countFilesForSince(
+    DateTime since, {
+    required bool includeFiles,
+  }) async {
+    var fileCount = 0;
+    var totalBytes = 0;
+
+    Future<void> countDir(Directory dir, {required bool skipDot}) async {
+      if (!await dir.exists()) return;
+      try {
+        await for (final ent in dir.list(recursive: true, followLinks: false)) {
+          if (ent is! File) continue;
+          if (skipDot) {
+            final rel = p.relative(ent.path, from: dir.path);
+            if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
+              continue;
+            }
+          }
+          try {
+            final mod = await ent.lastModified();
+            if (mod.isBefore(since)) continue;
+          } catch (_) {
+            // Cannot read modification time — include conservatively
+          }
+          fileCount++;
+          try {
+            totalBytes += await ent.length();
+          } catch (_) {
+            // Cannot read size — counted with unknown size
+          }
+        }
+      } catch (e) {
+        // A preview stat walk must not fail the sync plan: log and skip the
+        // unreadable tree (the pack itself will surface a real error later).
+        debugPrint('countFilesForSince: failed to scan ${dir.path}: $e');
+      }
+    }
+
+    if (includeFiles) {
+      await countDir(await _getUploadDir(), skipDot: false);
+      await countDir(await _getAvatarsDir(), skipDot: false);
+      await countDir(await _getImagesDir(), skipDot: false);
+      await countDir(await _getFontsDir(), skipDot: false);
+      await countDir(await _getWorkspacesDir(), skipDot: true);
+    }
+    // skills/ is always exported independent of includeFiles (see
+    // _packZipSync), so count it unconditionally to match the actual ZIP.
+    await countDir(await _getSkillsDir(), skipDot: false);
+
+    return (fileCount: fileCount, totalBytes: totalBytes);
+  }
+
+  /// Builds this device's file manifest for LAN sync: zip-entry path →
+  /// (size, ms mtime). Keys exactly mirror the ZIP packer's entry names
+  /// (`<root>/<relPosix>`), so a delta computed against a peer's manifest
+  /// plugs straight into `_packZipSync(includeFilePaths:)`. Mirrors the
+  /// `_packZipSync` rules: `workspaces/` skips dot-prefixed entries, `skills/`
+  /// is always covered.
+  ///
+  /// Strict by design: an unreadable tree/file throws (with context) instead
+  /// of producing a partial manifest — a partial manifest would silently drop
+  /// the missing files from the delta and the peer would never receive them.
+  /// The pack path fails loudly on the same files, so this is consistent.
+  Future<Map<String, FileManifestEntry>> buildFileManifest() async {
+    final result = <String, FileManifestEntry>{};
+
+    Future<void> walk(
+      String dirPath,
+      String zipPrefix, {
+      required bool skipDot,
+    }) async {
+      // A tree that has never been created is legitimately empty — skip it.
+      // Any other failure while listing/stat-ing throws (strict manifest).
+      if (!await Directory(dirPath).exists()) return;
+      await for (final ent in Directory(
+        dirPath,
+      ).list(recursive: true, followLinks: false)) {
+        if (ent is! File) continue;
+        final rel = p.relative(ent.path, from: dirPath).replaceAll('\\', '/');
+        if (skipDot && rel.split('/').any((s) => s.startsWith('.'))) {
+          continue;
+        }
+        final stat = await ent.stat();
+        result['$zipPrefix/$rel'] = FileManifestEntry(
+          size: stat.size,
+          mtimeMs: stat.modified.millisecondsSinceEpoch,
+        );
+      }
+    }
+
+    await walk((await _getUploadDir()).path, 'upload', skipDot: false);
+    await walk((await _getAvatarsDir()).path, 'avatars', skipDot: false);
+    await walk((await _getImagesDir()).path, 'images', skipDot: false);
+    await walk((await _getFontsDir()).path, 'fonts', skipDot: false);
+    await walk((await _getWorkspacesDir()).path, 'workspaces', skipDot: true);
+    await walk((await _getSkillsDir()).path, 'skills', skipDot: false);
+
+    return result;
   }
 
   Future<String> _exportSettingsJson() async {
@@ -959,6 +1382,40 @@ class DataSync {
     // prefs never hold a mirror copy (no dual truth, no staleness).
     map.addAll(KelivoImageSettingsMapper.translateToUpstream(map));
     _retainCloudAsrForExport(map);
+
+    // Kelivo's business router validates search_services_v1 entries and
+    // requires `apiKeys` to be a plain List<String> (round-robin pool).
+    // Cuplivo persists structured ApiKeyConfig objects there, so on export
+    // we split the payload: full objects move to `keyConfigs` (Cuplivo reads
+    // them back losslessly) and `apiKeys` becomes the string list Kelivo
+    // accepts. `apiKey` stays as the primary key string both sides read.
+    final searchServicesRaw = map['search_services_v1'];
+    if (searchServicesRaw is String && searchServicesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(searchServicesRaw) as List;
+        final converted = <Map<String, dynamic>>[];
+        for (final entry in decoded) {
+          final service = (entry as Map).cast<String, dynamic>();
+          final rawKeys = service['apiKeys'];
+          if (rawKeys is List &&
+              rawKeys.isNotEmpty &&
+              rawKeys.every((e) => e is Map)) {
+            service['keyConfigs'] = rawKeys;
+            service['apiKeys'] = [
+              for (final k in rawKeys.cast<Map<String, dynamic>>())
+                if ((k['key'] as String? ?? '').trim().isNotEmpty)
+                  (k['key'] as String).trim(),
+            ];
+          }
+          converted.add(service);
+        }
+        map['search_services_v1'] = jsonEncode(converted);
+      } catch (e) {
+        debugPrint(
+          'prepareBackupFile: search_services_v1 conversion failed: $e',
+        );
+      }
+    }
     return jsonEncode(map);
   }
 
@@ -972,7 +1429,18 @@ class DataSync {
       await chatService.init();
     }
     var conversations = chatService.getAllCompleteConversations();
-    if (incremental != null) {
+    final perConvSince = incremental?.conversationSince;
+    if (incremental != null && perConvSince != null) {
+      // LAN-sync per-conversation mode: export exactly the conversations that
+      // have a delta on this device (presence in the map); conversations
+      // absent from the map are identical on both peers and skipped entirely.
+      // Each exported conversation is then scoped to its own fork-point
+      // timestamp in the messages loop below (null → one-sided conversation,
+      // exported in full). This removes the global-since over/under-inclusion.
+      conversations = conversations
+          .where((c) => perConvSince.containsKey(c.id))
+          .toList();
+    } else if (incremental != null) {
       final sinceCheck = incremental.sinceCheck;
       final since = incremental.since;
       // Message-level filtering with updatedAt pre-check optimization.
@@ -985,14 +1453,16 @@ class DataSync {
         }
         if (c.updatedAt.isBefore(since)) return false;
         final msgs = chatService.getMessages(c.id);
-        return msgs.any((m) => sinceCheck(m.timestamp));
+        // Edited versions keep the original message timestamp, so a
+        // timestamp-only check would miss edit-only activity.
+        return _incrementalQualifiedMessages(msgs, sinceCheck).isNotEmpty;
       }).toList();
     }
     final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
 
     try {
-      sink.write('{"version":2,');
+      sink.write('{"version":$_chatsJsonVersion,');
 
       // --- conversations ---
       sink.write('"conversations":[');
@@ -1013,12 +1483,22 @@ class DataSync {
         var msgs = chatService.getMessages(c.id);
         // Group transcripts are all-or-nothing: a partial message list would
         // corrupt member assistants' private context after restore.
-        if (incremental != null &&
-            !c.isGroup &&
-            c.createdAt.isBefore(incremental.since)) {
-          msgs = msgs
-              .where((m) => incremental.sinceCheck(m.timestamp))
-              .toList();
+        if (incremental != null && !c.isGroup) {
+          final perConv = incremental.conversationSince;
+          if (perConv != null) {
+            // Per-conversation window (LAN sync): null since = one-sided
+            // conversation whose whole transcript is the increment — export
+            // every message.
+            final convSince = perConv[c.id];
+            if (convSince != null) {
+              msgs = _incrementalQualifiedMessages(
+                msgs,
+                (t) => convSince.isBefore(t) || convSince.isAtSameMomentAs(t),
+              );
+            }
+          } else if (c.createdAt.isBefore(incremental.since)) {
+            msgs = _incrementalQualifiedMessages(msgs, incremental.sinceCheck);
+          }
         }
         for (final m in msgs) {
           if (!firstMsg) sink.write(',');
@@ -1046,7 +1526,7 @@ class DataSync {
       sink.write(jsonEncode(geminiThoughtSigs));
       sink.write(',');
 
-      // --- group chats (v2) ---
+      // --- group chats ---
       final groups = await chatService.repo.getAllGroupChats();
       final groupPayload = <Map<String, dynamic>>[];
       final memberPayload = <Map<String, dynamic>>[];
@@ -1084,6 +1564,7 @@ class DataSync {
     File file,
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
+    RestoreProgressCallback? onProgress,
   }) async {
     // Incremental backup detection: cuplivo_incr_ prefix forces merge mode
     if (mode == RestoreMode.overwrite &&
@@ -1101,10 +1582,18 @@ class DataSync {
     await extractDir.create(recursive: true);
 
     try {
+      onProgress?.call(const RestoreProgress(stage: RestoreStage.extracting));
       // Run ZIP extraction in an isolate to keep the UI responsive.
-      await Isolate.run(() {
-        _extractZipSync(file.path, extractDir.path);
-      });
+      await _runExtractInIsolate(file.path, extractDir.path);
+
+      // Kelivo v2 (upstream) backups carry a manifest.json + database/
+      // kelivo.db payload instead of chats.json. This build cannot import
+      // them — importing would silently restore nothing. Surface a typed
+      // error so the UI can redirect to the kelivo-helper compat page.
+      // Detected before ANY write, so nothing local is destroyed.
+      if (File(p.join(extractDir.path, 'manifest.json')).existsSync()) {
+        throw KelivoV2BackupException();
+      }
 
       // Restore settings
       Object? backupAssistantsRaw;
@@ -1171,7 +1660,12 @@ class DataSync {
               if (mergeableKeys.contains(key)) {
                 // Special handling for mergeable configurations
                 if (key == 'provider_configs_v1' && existing.containsKey(key)) {
-                  // Merge provider configs: combine both maps
+                  // Merge provider configs per provider key. The backup wins
+                  // for all fields EXCEPT the proxy block, which is
+                  // device-local: an existing provider's proxy is composed
+                  // from its local block over the no-proxy defaults — the
+                  // backup's proxy never lands on the device (issue #512).
+                  // Brand-new providers keep their backup proxy.
                   try {
                     final existingConfigs =
                         jsonDecode(existing[key] as String)
@@ -1179,8 +1673,34 @@ class DataSync {
                     final newConfigs =
                         jsonDecode(newValue as String) as Map<String, dynamic>;
 
-                    // Merge configs, new values override existing for same keys
-                    final mergedConfigs = {...existingConfigs, ...newConfigs};
+                    // Start from the local configs so providers absent from
+                    // the backup survive the merge untouched.
+                    final mergedConfigs = <String, dynamic>{...existingConfigs};
+                    for (final entry in newConfigs.entries) {
+                      final providerKey = entry.key;
+                      final incoming = entry.value;
+                      final local = existingConfigs[providerKey];
+                      if (incoming is! Map || local is! Map) {
+                        // Malformed entry: keep the prior verbatim behavior
+                        // for this entry and continue merging the rest.
+                        mergedConfigs[providerKey] = incoming;
+                        continue;
+                      }
+                      final localMap = local.cast<String, dynamic>();
+                      // The proxy fields of an existing provider are composed
+                      // from the local block (where present) over the
+                      // no-proxy defaults — the backup's proxy never lands on
+                      // the device, whether the local block is full, partial,
+                      // or absent entirely.
+                      final merged = <String, dynamic>{
+                        ...incoming.cast<String, dynamic>(),
+                        ..._noProxyProviderDefaults,
+                        for (final field in _providerProxyFields)
+                          if (localMap.containsKey(field))
+                            field: localMap[field],
+                      };
+                      mergedConfigs[providerKey] = merged;
+                    }
                     await prefs.restoreSingle(key, jsonEncode(mergedConfigs));
                   } catch (e) {
                     // If merge fails, keep existing
@@ -1399,6 +1919,31 @@ class DataSync {
         } catch (_) {}
       }
 
+      // Parse the backup's assistants BEFORE any destructive write so a
+      // malformed payload aborts cleanly instead of leaving a wiped-but-empty
+      // assistant table (issue #475). The overwrite path is fully parsed into
+      // [Assistant] objects here; the merge path only validates that the
+      // payload is a list of maps (field-level parse happens against the
+      // merged maps during the write phase, mirroring pre-refactor behavior).
+      List<Map<String, dynamic>>? rawIncomingAssistants;
+      List<Assistant>? parsedOverwriteAssistants;
+      if (backupAssistantsRaw is String) {
+        final decoded = jsonDecode(backupAssistantsRaw) as List;
+        rawIncomingAssistants = decoded
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        if (mode == RestoreMode.overwrite) {
+          parsedOverwriteAssistants = rawIncomingAssistants
+              .map(
+                (e) => Assistant.fromJson(
+                  _applyLegacyOcrModeToAssistantMap(e, backupLegacyOcrEnabled),
+                ),
+              )
+              .toList();
+        }
+      }
+
       // Restore chats
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
       if (cfg.includeChats && await chatsFile.exists()) {
@@ -1452,6 +1997,9 @@ class DataSync {
             );
           } else {
             // Merge mode: Add only non-existing conversations and messages
+            onProgress?.call(
+              const RestoreProgress(stage: RestoreStage.mergingChats),
+            );
             final existingConvs = chatService.getAllCompleteConversations();
             final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
@@ -1475,6 +2023,8 @@ class DataSync {
             final batchMsgs = <String, List<ChatMessage>>{};
             final batchToolEvents = <String, List<Map<String, dynamic>>>{};
             final batchGeminiSigs = <String, String>{};
+            var mergedConvs = 0;
+            final totalConvs = convs.length;
             for (final c in convs) {
               if (!existingConvIds.contains(c.id)) {
                 batchConvs.add(c);
@@ -1493,6 +2043,17 @@ class DataSync {
                 for (final msg in newMessages) {
                   await chatService.addMessageDirectly(c.id, msg);
                 }
+              }
+              mergedConvs++;
+              if (totalConvs > 0) {
+                onProgress?.call(
+                  RestoreProgress(
+                    stage: RestoreStage.mergingChats,
+                    fraction: mergedConvs / totalConvs,
+                    conversationsMerged: mergedConvs,
+                    conversationsTotal: totalConvs,
+                  ),
+                );
               }
             }
 
@@ -1533,7 +2094,9 @@ class DataSync {
             }
           }
 
-          // Restore group chat metadata (v2 keys; ignored on v1 backups).
+          // Restore group chat metadata. The groupChats/groupMembers keys are
+          // present on both v1 and v2 exports and are always restored when
+          // non-empty.
           final groupChatsRaw = obj['groupChats'] as List? ?? const [];
           final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
           if (groupChatsRaw.isNotEmpty) {
@@ -1579,7 +2142,41 @@ class DataSync {
               }
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('restoreData: chats restore failed: $e\n$st');
+        }
+      }
+
+      // Restore assistants to SQLite. Runs AFTER clearAllData + chats but
+      // BEFORE the fallible file/skill copying below, so a mid-restore file
+      // failure can never leave the assistant table wiped-but-empty (issue
+      // #475).
+      if (rawIncomingAssistants != null) {
+        if (!chatService.initialized) await chatService.init();
+        if (mode == RestoreMode.overwrite) {
+          final assistants = parsedOverwriteAssistants;
+          if (assistants == null) {
+            throw StateError('assistants_parse_incomplete');
+          }
+          await chatService.putAssistants(assistants);
+        } else {
+          final existing = await chatService.getAllAssistants();
+          final existingMaps = existing.map((a) => a.toJson()).toList();
+          final merged = _mergeAssistantMaps(
+            existingMaps,
+            rawIncomingAssistants,
+          );
+          // Local assistants always carry an explicit ocrMode; only
+          // brand-new incoming assistants can still lack it.
+          final assistants = merged
+              .map(
+                (m) => Assistant.fromJson(
+                  _applyLegacyOcrModeToAssistantMap(m, backupLegacyOcrEnabled),
+                ),
+              )
+              .toList();
+          await chatService.putAssistants(assistants);
+        }
       }
 
       // Restore deleted.json markers (merge mode only — overwrite wipes local)
@@ -1620,330 +2217,585 @@ class DataSync {
         }
       }
 
-      // Restore files
+      // LAN-sync file manifest: exact ms mtimes of the packed files, so a
+      // restored file's mtime matches the sender's and the next sync's delta
+      // comparison sees no drift. Absent in normal backups / old-peer zips —
+      // fall back to the zip's own (second-granularity) mtimes.
+      Map<String, ({int size, int mtimeMs})>? syncManifest;
+      final syncManifestFile = File(
+        p.join(extractDir.path, 'sync_manifest.json'),
+      );
+      if (await syncManifestFile.exists()) {
+        try {
+          final raw =
+              jsonDecode(await syncManifestFile.readAsString())
+                  as Map<String, dynamic>;
+          syncManifest = raw.map((key, value) {
+            final m = (value as Map).cast<String, dynamic>();
+            return MapEntry(key, (
+              size: m['size'] as int,
+              mtimeMs: m['mtime'] as int,
+            ));
+          });
+        } catch (e) {
+          debugPrint('restoreData: failed to parse sync_manifest.json: $e');
+        }
+      }
+
+      // Restore files. File copying is best-effort: a single locked or unusual
+      // file must not abort the whole restore — conversations and assistants
+      // are already committed at this point.
       if (cfg.includeFiles) {
-        if (mode == RestoreMode.overwrite) {
-          // Overwrite mode: Delete existing directories and copy all
-          // Restore upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-          if (await uploadSrc.exists()) {
-            final dst = await _getUploadDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in uploadSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: uploadSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
+        var totalFiles = 0;
+        var totalBytes = 0;
+        var copiedFiles = 0;
+        var copiedBytes = 0;
+        double? lastReportedFraction;
 
-          // Restore images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-          if (await imagesSrc.exists()) {
-            final dst = await _getImagesDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in imagesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: imagesSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
+        void reportFiles() {
+          // totalFiles jumps at directory boundaries (upload → images → …),
+          // so the raw fraction can regress after a directory completes; the
+          // progress bar must never move backwards. copiedFiles only grows,
+          // so clamping to the last reported fraction is the true lower bound.
+          var fraction = totalFiles == 0 ? null : copiedFiles / totalFiles;
+          if (fraction != null &&
+              lastReportedFraction != null &&
+              fraction < lastReportedFraction!) {
+            fraction = lastReportedFraction;
           }
-
-          // Restore avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-          if (await avatarsSrc.exists()) {
-            final dst = await _getAvatarsDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in avatarsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: avatarsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
-          if (await fontsSrc.exists()) {
-            final dst = await _getFontsDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in fontsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: fontsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-                try {
-                  await target.setLastModified(await ent.lastModified());
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore @workspaces sandbox directory (dot-prefixed entries are
-          // never exported, so none should appear here; skip them defensively)
-          final workspacesSrc = Directory(
-            p.join(extractDir.path, 'workspaces'),
+          if (fraction != null) lastReportedFraction = fraction;
+          onProgress?.call(
+            RestoreProgress(
+              stage: RestoreStage.copyingFiles,
+              fraction: fraction,
+              filesCopied: copiedFiles,
+              filesTotal: totalFiles,
+              bytesCopied: copiedBytes,
+              bytesTotal: totalBytes,
+            ),
           );
-          if (await workspacesSrc.exists()) {
-            final dst = await _getWorkspacesDir();
-            if (await dst.exists()) {
-              try {
-                await dst.delete(recursive: true);
-              } catch (_) {}
-            }
-            await dst.create(recursive: true);
-            for (final ent in workspacesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: workspacesSrc.path);
-                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-                  continue;
-                }
-                final target = File(p.join(dst.path, rel));
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
+        }
+
+        void bumpCopied(File file) {
+          // Progress counts *processed* entries — including ones kept local
+          // (copy-if-absent skips, newer-wins ties) — so the fraction tracks
+          // walk progress, which is what the progress bar needs.
+          copiedFiles++;
+          try {
+            copiedBytes += file.lengthSync();
+          } catch (_) {}
+          reportFiles();
+        }
+
+        try {
+          if (mode == RestoreMode.overwrite) {
+            // Overwrite mode: Delete existing directories and copy all
+            // Restore upload directory
+            final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+            if (await uploadSrc.exists()) {
+              final entries = _listFiles(uploadSrc);
+              final dst = await _getUploadDir();
+              if (await dst.exists()) {
                 try {
-                  await target.setLastModified(await ent.lastModified());
+                  await dst.delete(recursive: true);
                 } catch (_) {}
               }
-            }
-          }
-        } else {
-          // Merge mode: Only copy non-existing files
-          // Merge upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-          if (await uploadSrc.exists()) {
-            final dst = await _getUploadDir();
-            if (!await dst.exists()) {
               await dst.create(recursive: true);
-            }
-            for (final ent in uploadSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: uploadSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await target.parent.create(recursive: true);
-                  await ent.copy(target.path);
-                  try {
-                    await target.setLastModified(await ent.lastModified());
-                  } catch (_) {}
-                }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                await target.parent.create(recursive: true);
+                await e.file.copy(target.path);
+                try {
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
+                } catch (_) {}
+                bumpCopied(e.file);
               }
             }
-          }
 
-          // Merge images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-          if (await imagesSrc.exists()) {
-            final dst = await _getImagesDir();
-            if (!await dst.exists()) {
+            // Restore images directory
+            final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+            if (await imagesSrc.exists()) {
+              final entries = _listFiles(imagesSrc);
+              final dst = await _getImagesDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in imagesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: imagesSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await target.parent.create(recursive: true);
-                  await ent.copy(target.path);
-                  try {
-                    await target.setLastModified(await ent.lastModified());
-                  } catch (_) {}
-                }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                await target.parent.create(recursive: true);
+                await e.file.copy(target.path);
+                try {
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
+                } catch (_) {}
+                bumpCopied(e.file);
               }
             }
-          }
 
-          // Merge avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-          if (await avatarsSrc.exists()) {
-            final dst = await _getAvatarsDir();
-            if (!await dst.exists()) {
+            // Restore avatars directory
+            final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+            if (await avatarsSrc.exists()) {
+              final entries = _listFiles(avatarsSrc);
+              final dst = await _getAvatarsDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in avatarsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: avatarsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await target.parent.create(recursive: true);
-                  await ent.copy(target.path);
-                  try {
-                    await target.setLastModified(await ent.lastModified());
-                  } catch (_) {}
-                }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                await target.parent.create(recursive: true);
+                await e.file.copy(target.path);
+                try {
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
+                } catch (_) {}
+                bumpCopied(e.file);
               }
             }
-          }
 
-          // Merge managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
-          if (await fontsSrc.exists()) {
-            final dst = await _getFontsDir();
-            if (!await dst.exists()) {
+            // Restore managed local fonts directory
+            final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+            if (await fontsSrc.exists()) {
+              final entries = _listFiles(fontsSrc);
+              final dst = await _getFontsDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
-            }
-            for (final ent in fontsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: fontsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await target.parent.create(recursive: true);
-                  await ent.copy(target.path);
-                  try {
-                    await target.setLastModified(await ent.lastModified());
-                  } catch (_) {}
-                }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                await target.parent.create(recursive: true);
+                await e.file.copy(target.path);
+                try {
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
+                } catch (_) {}
+                bumpCopied(e.file);
               }
             }
-          }
 
-          // Merge @workspaces sandbox directory (skip dot-prefixed entries)
-          final workspacesSrc = Directory(
-            p.join(extractDir.path, 'workspaces'),
-          );
-          if (await workspacesSrc.exists()) {
-            final dst = await _getWorkspacesDir();
-            if (!await dst.exists()) {
+            // Restore @workspaces sandbox directory (dot-prefixed entries are
+            // never exported, so none should appear here; skip them defensively)
+            final workspacesSrc = Directory(
+              p.join(extractDir.path, 'workspaces'),
+            );
+            if (await workspacesSrc.exists()) {
+              final entries = _listFiles(workspacesSrc, skipDot: true);
+              final dst = await _getWorkspacesDir();
+              if (await dst.exists()) {
+                try {
+                  await dst.delete(recursive: true);
+                } catch (_) {}
+              }
               await dst.create(recursive: true);
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                await target.parent.create(recursive: true);
+                await e.file.copy(target.path);
+                try {
+                  await _setTargetMtime(
+                    target,
+                    e.file,
+                    extractDir.path,
+                    syncManifest,
+                  );
+                } catch (_) {}
+                bumpCopied(e.file);
+              }
             }
-            for (final ent in workspacesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: workspacesSrc.path);
-                if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-                  continue;
-                }
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await target.parent.create(recursive: true);
-                  await ent.copy(target.path);
+          } else {
+            // Merge mode: per-file newer-wins across every tree (see the
+            // per-tree blocks below) — a backup entry replaces the local copy
+            // only when strictly newer; ties/older keep local. This converges
+            // bidirectional sync; copy-if-absent (the old behavior) would keep
+            // a peer's stale copy forever.
+            // Merge upload directory
+            final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+            if (await uploadSrc.exists()) {
+              final entries = _listFiles(uploadSrc);
+              final dst = await _getUploadDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                // Merge semantics: newer-wins per file (same rule as
+                // workspaces/skills) — a backup entry replaces the local copy
+                // only when strictly newer. Copy-if-absent (the old behavior)
+                // would never propagate an updated upload file across LAN sync.
+                var keepLocal = false;
+                if (await target.exists()) {
                   try {
-                    await target.setLastModified(await ent.lastModified());
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
+                  await target.parent.create(recursive: true);
+                  await e.file.copy(target.path);
+                  try {
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
                   } catch (_) {}
                 }
+                bumpCopied(e.file);
+              }
+            }
+
+            // Merge images directory
+            final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+            if (await imagesSrc.exists()) {
+              final entries = _listFiles(imagesSrc);
+              final dst = await _getImagesDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
+                  await target.parent.create(recursive: true);
+                  await e.file.copy(target.path);
+                  try {
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                  } catch (_) {}
+                }
+                bumpCopied(e.file);
+              }
+            }
+
+            // Merge avatars directory
+            final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+            if (await avatarsSrc.exists()) {
+              final entries = _listFiles(avatarsSrc);
+              final dst = await _getAvatarsDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
+                  await target.parent.create(recursive: true);
+                  await e.file.copy(target.path);
+                  try {
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                  } catch (_) {}
+                }
+                bumpCopied(e.file);
+              }
+            }
+
+            // Merge managed local fonts directory
+            final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+            if (await fontsSrc.exists()) {
+              final entries = _listFiles(fontsSrc);
+              final dst = await _getFontsDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
+                  await target.parent.create(recursive: true);
+                  await e.file.copy(target.path);
+                  try {
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                  } catch (_) {}
+                }
+                bumpCopied(e.file);
+              }
+            }
+
+            // Merge @workspaces sandbox directory (skip dot-prefixed entries).
+            // Merge semantics: newer-wins per file (same as skills) — a backup
+            // entry replaces the local copy only when strictly newer. This
+            // converges bidirectional sync to the newest content; copy-if-absent
+            // (the old behavior) would keep a peer's stale copy forever.
+            final workspacesSrc = Directory(
+              p.join(extractDir.path, 'workspaces'),
+            );
+            if (await workspacesSrc.exists()) {
+              final entries = _listFiles(workspacesSrc, skipDot: true);
+              final dst = await _getWorkspacesDir();
+              if (!await dst.exists()) {
+                await dst.create(recursive: true);
+              }
+              totalFiles += entries.length;
+              for (final e in entries) {
+                try {
+                  totalBytes += e.file.lengthSync();
+                } catch (_) {}
+              }
+              for (final e in entries) {
+                final target = File(p.join(dst.path, e.rel));
+                var keepLocal = false;
+                if (await target.exists()) {
+                  try {
+                    final backupMod = await _backupFileMtime(
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                    final localMod = await target.lastModified();
+                    keepLocal = !backupMod.isAfter(localMod);
+                  } catch (_) {
+                    // Cannot compare mtimes — keep the local copy conservatively
+                    keepLocal = true;
+                  }
+                }
+                if (!keepLocal) {
+                  await target.parent.create(recursive: true);
+                  await e.file.copy(target.path);
+                  try {
+                    await _setTargetMtime(
+                      target,
+                      e.file,
+                      extractDir.path,
+                      syncManifest,
+                    );
+                  } catch (_) {}
+                }
+                bumpCopied(e.file);
               }
             }
           }
+        } catch (e, st) {
+          debugPrint('restoreData: files restore failed: $e\n$st');
         }
       }
 
       // Restore skills/ -- always exported independent of includeFiles (see
       // _packZipSync), so restore it symmetrically and unconditionally.
-      final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
-      if (await skillsSrc.exists()) {
-        final dst = await _getSkillsDir();
-        if (mode == RestoreMode.overwrite && await dst.exists()) {
-          try {
-            await dst.delete(recursive: true);
-          } catch (_) {}
-        }
-        if (!await dst.exists()) {
-          await dst.create(recursive: true);
-        }
-        for (final ent in skillsSrc.listSync(recursive: true)) {
-          if (ent is File) {
-            final rel = p.relative(ent.path, from: skillsSrc.path);
-            final target = File(p.join(dst.path, rel));
+      // Best-effort like files/: a skill-file failure must not abort the
+      // whole restore.
+      var skillTotalFiles = 0;
+      var skillTotalBytes = 0;
+      var skillCopiedFiles = 0;
+      var skillCopiedBytes = 0;
+
+      void reportSkills() {
+        onProgress?.call(
+          RestoreProgress(
+            stage: RestoreStage.restoringSkills,
+            fraction: skillTotalFiles == 0
+                ? null
+                : skillCopiedFiles / skillTotalFiles,
+            filesCopied: skillCopiedFiles,
+            filesTotal: skillTotalFiles,
+            bytesCopied: skillCopiedBytes,
+            bytesTotal: skillTotalBytes,
+          ),
+        );
+      }
+
+      try {
+        final skillsSrc = Directory(p.join(extractDir.path, 'skills'));
+        if (await skillsSrc.exists()) {
+          final entries = _listFiles(skillsSrc);
+          final dst = await _getSkillsDir();
+          if (mode == RestoreMode.overwrite && await dst.exists()) {
+            try {
+              await dst.delete(recursive: true);
+            } catch (_) {}
+          }
+          if (!await dst.exists()) {
+            await dst.create(recursive: true);
+          }
+          skillTotalFiles += entries.length;
+          for (final e in entries) {
+            try {
+              skillTotalBytes += e.file.lengthSync();
+            } catch (_) {}
+          }
+          for (final e in entries) {
+            final target = File(p.join(dst.path, e.rel));
+            var keepLocal = false;
             if (mode == RestoreMode.merge && await target.exists()) {
               // Newer-wins per file: replace a local copy only when the
               // backup entry is strictly newer; ties/older keep local.
               try {
-                final backupMod = await ent.lastModified();
+                final backupMod = await _backupFileMtime(
+                  e.file,
+                  extractDir.path,
+                  syncManifest,
+                );
                 final localMod = await target.lastModified();
-                if (!backupMod.isAfter(localMod)) continue;
+                keepLocal = !backupMod.isAfter(localMod);
               } catch (_) {
                 // Cannot compare mtimes — keep the local copy conservatively
-                continue;
+                keepLocal = true;
               }
             }
-            await target.parent.create(recursive: true);
-            await ent.copy(target.path);
+            if (!keepLocal) {
+              await target.parent.create(recursive: true);
+              await e.file.copy(target.path);
+              try {
+                await _setTargetMtime(
+                  target,
+                  e.file,
+                  extractDir.path,
+                  syncManifest,
+                );
+              } catch (_) {}
+            }
+            skillCopiedFiles++;
             try {
-              await target.setLastModified(await ent.lastModified());
+              skillCopiedBytes += e.file.lengthSync();
             } catch (_) {}
+            reportSkills();
           }
         }
-      }
-
-      // Restore assistants to SQLite (after clearAllData in chats block)
-      if (backupAssistantsRaw is String && chatService.initialized) {
-        try {
-          final decoded = jsonDecode(backupAssistantsRaw) as List;
-          if (mode == RestoreMode.overwrite) {
-            final assistants = decoded
-                .whereType<Map>()
-                .map(
-                  (e) => Assistant.fromJson(
-                    _applyLegacyOcrModeToAssistantMap(
-                      Map<String, dynamic>.from(e),
-                      backupLegacyOcrEnabled,
-                    ),
-                  ),
-                )
-                .toList();
-            await chatService.putAssistants(assistants);
-          } else {
-            final incoming = decoded
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-            final existing = await chatService.getAllAssistants();
-            final existingMaps = existing.map((a) => a.toJson()).toList();
-            final merged = _mergeAssistantMaps(existingMaps, incoming);
-            // Local assistants always carry an explicit ocrMode; only
-            // brand-new incoming assistants can still lack it.
-            final assistants = merged
-                .map(
-                  (m) => Assistant.fromJson(
-                    _applyLegacyOcrModeToAssistantMap(
-                      m,
-                      backupLegacyOcrEnabled,
-                    ),
-                  ),
-                )
-                .toList();
-            await chatService.putAssistants(assistants);
-          }
-        } catch (e, st) {
-          debugPrint('restoreData: assistants restore failed: $e\n$st');
-          rethrow;
-        }
+      } catch (e, st) {
+        debugPrint('restoreData: skills restore failed: $e\n$st');
       }
 
       // Always re-sync conversation cache from disk after restore so UI/providers
@@ -2200,10 +3052,19 @@ class _StreamingZipWriter {
     final modified = stat.modified;
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
+    // UT (0x5455) extended timestamp: DOS time rounds down to even seconds,
+    // which would bias the newer-wins merge comparison against odd-second
+    // mtimes. The UT field carries the true Unix-second mtime.
+    final utExtra = _utExtraField(modified);
     final nameBytes = utf8.encode(entryName);
     final localHeaderOffset = _output.length;
 
-    _writeLocalHeader(nameBytes: nameBytes, modTime: modTime, modDate: modDate);
+    _writeLocalHeader(
+      nameBytes: nameBytes,
+      modTime: modTime,
+      modDate: modDate,
+      utExtra: utExtra,
+    );
 
     final written = _writeDeflatedFile(file);
     _checkZip32(written.compressedSize, 'compressed size');
@@ -2216,11 +3077,57 @@ class _StreamingZipWriter {
         nameBytes: nameBytes,
         modTime: modTime,
         modDate: modDate,
+        utExtra: utExtra,
         crc32: written.crc32,
         compressedSize: written.compressedSize,
         uncompressedSize: written.uncompressedSize,
         localHeaderOffset: localHeaderOffset,
         mode: stat.mode,
+      ),
+    );
+  }
+
+  /// Adds an in-memory byte payload (e.g. the LAN-sync `sync_manifest.json`)
+  /// as a ZIP entry. [mtimeMs] defaults to now when null.
+  void addBytes(Uint8List bytes, String entryName, {int? mtimeMs}) {
+    if (_closed) {
+      throw StateError('Cannot add files after the ZIP writer is closed.');
+    }
+    if (entryName.isEmpty) return;
+
+    final modified = mtimeMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(mtimeMs)
+        : DateTime.now();
+    final modTime = _zipTime(modified);
+    final modDate = _zipDate(modified);
+    final utExtra = _utExtraField(modified);
+    final nameBytes = utf8.encode(entryName);
+    final localHeaderOffset = _output.length;
+
+    _writeLocalHeader(
+      nameBytes: nameBytes,
+      modTime: modTime,
+      modDate: modDate,
+      utExtra: utExtra,
+    );
+
+    final written = _writeDeflatedBytes(bytes);
+    _checkZip32(written.compressedSize, 'compressed size');
+    _checkZip32(written.uncompressedSize, 'uncompressed size');
+
+    _writeDataDescriptor(written);
+
+    _entries.add(
+      _StreamingZipEntry(
+        nameBytes: nameBytes,
+        modTime: modTime,
+        modDate: modDate,
+        utExtra: utExtra,
+        crc32: written.crc32,
+        compressedSize: written.compressedSize,
+        uncompressedSize: written.uncompressedSize,
+        localHeaderOffset: localHeaderOffset,
+        mode: 0,
       ),
     );
   }
@@ -2256,6 +3163,7 @@ class _StreamingZipWriter {
     required List<int> nameBytes,
     required int modTime,
     required int modDate,
+    required List<int> utExtra,
   }) {
     _output.writeUint32(_localFileHeaderSignature);
     _output.writeUint16(_versionNeeded);
@@ -2267,8 +3175,9 @@ class _StreamingZipWriter {
     _output.writeUint32(0);
     _output.writeUint32(0);
     _output.writeUint16(nameBytes.length);
-    _output.writeUint16(0);
+    _output.writeUint16(utExtra.length);
     _output.writeBytes(nameBytes);
+    _output.writeBytes(utExtra);
   }
 
   _StreamingZipWrittenFile _writeDeflatedFile(File file) {
@@ -2303,6 +3212,29 @@ class _StreamingZipWriter {
     );
   }
 
+  _StreamingZipWrittenFile _writeDeflatedBytes(Uint8List bytes) {
+    final compressedSink = _CountingOutputSink(_output);
+    final inputSink = ZLibCodec(
+      level: ZLibOption.defaultLevel,
+      raw: true,
+    ).encoder.startChunkedConversion(compressedSink);
+
+    var crc32 = 0;
+    for (var i = 0; i < bytes.length; i += _chunkSize) {
+      final end = i + _chunkSize < bytes.length ? i + _chunkSize : bytes.length;
+      final chunk = Uint8List.sublistView(bytes, i, end);
+      crc32 = getCrc32(chunk, crc32);
+      inputSink.add(chunk);
+    }
+    inputSink.close();
+
+    return _StreamingZipWrittenFile(
+      crc32: crc32,
+      compressedSize: compressedSink.bytesWritten,
+      uncompressedSize: bytes.length,
+    );
+  }
+
   void _writeDataDescriptor(_StreamingZipWrittenFile written) {
     _output.writeUint32(_dataDescriptorSignature);
     _output.writeUint32(written.crc32);
@@ -2322,13 +3254,14 @@ class _StreamingZipWriter {
     _output.writeUint32(entry.compressedSize);
     _output.writeUint32(entry.uncompressedSize);
     _output.writeUint16(entry.nameBytes.length);
-    _output.writeUint16(0);
-    _output.writeUint16(0);
-    _output.writeUint16(0);
-    _output.writeUint16(0);
-    _output.writeUint32(entry.mode << 16);
+    _output.writeUint16(entry.utExtra.length); // extra field length
+    _output.writeUint16(0); // comment length
+    _output.writeUint16(0); // disk number start
+    _output.writeUint16(0); // internal file attributes
+    _output.writeUint32(entry.mode << 16); // external file attributes
     _output.writeUint32(entry.localHeaderOffset);
     _output.writeBytes(entry.nameBytes);
+    _output.writeBytes(entry.utExtra);
   }
 
   void _writeEndOfCentralDirectory({
@@ -2356,6 +3289,23 @@ class _StreamingZipWriter {
     return (((year - 1980) & 0x7f) << 9) |
         ((value.month & 0x0f) << 5) |
         (value.day & 0x1f);
+  }
+
+  /// Extended Timestamp extra field (0x5455): flags (mtime present) + the
+  /// file's mtime in Unix seconds. Standard ZIP field — readers that do not
+  /// understand it (Kelivo, archive_io, OS tools) ignore it and fall back to
+  /// the DOS timestamp.
+  static List<int> _utExtraField(DateTime modified) {
+    final secs = modified.millisecondsSinceEpoch ~/ 1000;
+    return <int>[
+      0x55, 0x54, // id 0x5455 (little-endian)
+      0x05, 0x00, // data size = 5
+      0x01, // flags: mtime present
+      secs & 0xff,
+      (secs >> 8) & 0xff,
+      (secs >> 16) & 0xff,
+      (secs >> 24) & 0xff,
+    ];
   }
 
   static void _checkZip32(int value, String field) {
@@ -2393,6 +3343,7 @@ class _StreamingZipEntry {
     required this.nameBytes,
     required this.modTime,
     required this.modDate,
+    required this.utExtra,
     required this.crc32,
     required this.compressedSize,
     required this.uncompressedSize,
@@ -2403,6 +3354,9 @@ class _StreamingZipEntry {
   final List<int> nameBytes;
   final int modTime;
   final int modDate;
+
+  /// UT (0x5455) extended-timestamp extra field bytes (empty for none).
+  final List<int> utExtra;
   final int crc32;
   final int compressedSize;
   final int uncompressedSize;

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io' show File, Platform;
 import 'dart:math' as math;
 import 'dart:ui';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
@@ -17,7 +16,6 @@ import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:uuid/uuid.dart';
-
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../home/widgets/assistant_avatar.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
@@ -47,6 +45,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
@@ -54,8 +53,8 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import '../widgets/proactive_care_datetime_picker.dart';
+import '../../workspace/widgets/workspace_bind_sheet.dart';
 import 'assistant_regex_tab.dart';
-
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
 part 'assistant_settings_edit_memory_tab.dart';
@@ -76,7 +75,6 @@ class _AssistantEditTabSpec {
     required this.icon,
     required this.child,
   });
-
   final String id;
   final String label;
   final IconData icon;
@@ -186,7 +184,6 @@ List<_AssistantEditTabSpec> _visibleAssistantEditTabs(
 
 int _clampContextMessages(num value) =>
     value.clamp(_contextMessageMin, _contextMessageMax).toInt();
-
 Future<int?> _showContextMessageInputDialog(
   BuildContext context, {
   required int initialValue,
@@ -196,9 +193,7 @@ Future<int?> _showContextMessageInputDialog(
   final controller = TextEditingController(
     text: _clampContextMessages(initialValue).toString(),
   );
-
   int? parseValue() => int.tryParse(controller.text);
-
   try {
     return await showDialog<int>(
       context: context,
@@ -269,7 +264,6 @@ Future<int?> _showContextMessageInputDialog(
 class AssistantSettingsEditPage extends StatefulWidget {
   const AssistantSettingsEditPage({super.key, required this.assistantId});
   final String assistantId;
-
   @override
   State<AssistantSettingsEditPage> createState() =>
       _AssistantSettingsEditPageState();
@@ -278,7 +272,6 @@ class AssistantSettingsEditPage extends StatefulWidget {
 class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
@@ -319,7 +312,6 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
     final provider = context.watch<AssistantProvider>();
     final settings = context.watch<SettingsProvider>();
     final assistant = provider.getById(widget.assistantId);
-
     if (assistant == null) {
       return Scaffold(
         appBar: AppBar(
@@ -338,14 +330,12 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
         body: Center(child: Text(l10n.assistantEditPageNotFound)),
       );
     }
-
     final allTabs = _assistantEditTabSpecs(context, assistant.id);
     final visibleTabs = _visibleAssistantEditTabs(allTabs, settings);
     final useOutline = settings.mobileAssistantDetailOutlineEnabled;
     if (!useOutline) {
       _syncTabController(visibleTabs.length);
     }
-
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -423,14 +413,11 @@ class _AssistantDetailOutlinePage extends StatelessWidget {
     required this.assistant,
     required this.tabs,
   });
-
   final Assistant assistant;
   final List<_AssistantEditTabSpec> tabs;
-
   @override
   Widget build(BuildContext context) {
     final prompt = assistant.systemPrompt.trim();
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
       children: [
@@ -454,10 +441,8 @@ class _AssistantOutlineHeader extends StatelessWidget {
     required this.assistant,
     required this.prompt,
   });
-
   final Assistant assistant;
   final String prompt;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -467,11 +452,10 @@ class _AssistantOutlineHeader extends StatelessWidget {
     final name = assistant.name.trim().isNotEmpty
         ? assistant.name.trim()
         : l10n.assistantEditPageTitle;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
@@ -516,10 +500,8 @@ class _AssistantOutlineHeader extends StatelessWidget {
 
 class _AssistantOutlineItem extends StatelessWidget {
   const _AssistantOutlineItem({required this.tab, required this.assistantId});
-
   final _AssistantEditTabSpec tab;
   final String assistantId;
-
   @override
   Widget build(BuildContext context) {
     return _iosNavRow(
@@ -545,17 +527,14 @@ class _AssistantDetailSectionPage extends StatelessWidget {
     required this.assistantId,
     required this.tabId,
   });
-
   final String assistantId;
   final String tabId;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final provider = context.watch<AssistantProvider>();
     final assistant = provider.getById(assistantId);
-
     if (assistant == null) {
       return Scaffold(
         appBar: AppBar(
@@ -576,13 +555,11 @@ class _AssistantDetailSectionPage extends StatelessWidget {
         body: Center(child: Text(l10n.assistantEditPageNotFound)),
       );
     }
-
     final tabs = _assistantEditTabSpecs(context, assistant.id);
     final tab = tabs.firstWhere(
       (candidate) => candidate.id == tabId,
       orElse: () => tabs.first,
     );
-
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -610,7 +587,6 @@ class _AssistantDetailSectionPage extends StatelessWidget {
 
 class _AssistantTabLayoutPage extends StatelessWidget {
   const _AssistantTabLayoutPage();
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -622,7 +598,6 @@ class _AssistantTabLayoutPage extends StatelessWidget {
     );
     final hidden = settings.hiddenMobileAssistantEditTabs;
     final visibleCount = tabs.where((tab) => !hidden.contains(tab.id)).length;
-
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -747,9 +722,7 @@ class _AssistantTabLayoutPage extends StatelessWidget {
 
 class _AssistantOutlineModeSwitch extends StatelessWidget {
   const _AssistantOutlineModeSwitch({required this.settings});
-
   final SettingsProvider settings;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -790,23 +763,20 @@ class _AssistantTabLayoutTile extends StatelessWidget {
     required this.visible,
     required this.onVisibleChanged,
   });
-
   final _AssistantEditTabSpec tab;
   final int index;
   final bool visible;
   final ValueChanged<bool> onVisibleChanged;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final bg = context.appColors.surfaceCard;
     final fg = visible
         ? cs.onSurface.withValues(alpha: 0.9)
         : cs.onSurface.withValues(alpha: 0.42);
-
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -864,13 +834,11 @@ class _SegTabBar extends StatelessWidget {
   const _SegTabBar({required this.controller, required this.tabs});
   final TabController controller;
   final List<String> tabs;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-
     const double outerHeight = 44;
     const double innerPadding = 4; // gap between shell and selected block
     const double gap = 6; // spacing between segments
@@ -880,7 +848,6 @@ class _SegTabBar extends StatelessWidget {
       0.0,
       pillRadius,
     )).toDouble();
-
     return AnimatedBuilder(
       animation: controller.animation ?? controller,
       builder: (context, _) {
@@ -890,7 +857,6 @@ class _SegTabBar extends StatelessWidget {
           animationValue: rawIndex,
           tabCount: tabs.length,
         );
-
         return LayoutBuilder(
           builder: (context, constraints) {
             final double availWidth = constraints.maxWidth;
@@ -901,11 +867,9 @@ class _SegTabBar extends StatelessWidget {
             );
             final double rowWidth =
                 segWidth * tabs.length + gap * (tabs.length - 1);
-
             final Color shellBg = isDark
                 ? Colors.white.withValues(alpha: 0.08)
                 : Colors.white; // 白底胶囊，无边框阴影
-
             List<Widget> children = [];
             for (int index = 0; index < tabs.length; index++) {
               final bool selected = selectedIndex == index;
@@ -921,7 +885,6 @@ class _SegTabBar extends StatelessWidget {
                           ? cs.primary.withValues(alpha: 0.14)
                           : Colors.transparent;
                       final Color bg = baseBg; // 不叠加遮罩，不改变底色
-
                       // 仅文字在按压时变浅并有渐变
                       final Color baseTextColor = selected
                           ? cs
@@ -931,7 +894,6 @@ class _SegTabBar extends StatelessWidget {
                           ? Color.lerp(baseTextColor, Colors.white, 0.22) ??
                                 baseTextColor
                           : baseTextColor;
-
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOutCubic,
@@ -970,7 +932,6 @@ class _SegTabBar extends StatelessWidget {
                 children.add(const SizedBox(width: gap));
               }
             }
-
             return Container(
               height: outerHeight,
               decoration: BoxDecoration(
@@ -1009,11 +970,9 @@ class _InputRow extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1024,7 +983,7 @@ class _InputRow extends StatelessWidget {
         const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
-            color: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+            color: context.appColors.surfaceFill,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: 0.35),
@@ -1057,7 +1016,6 @@ class _BrandAvatarLike extends StatelessWidget {
   const _BrandAvatarLike({required this.name, this.size = 20});
   final String name;
   final double size;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1074,6 +1032,7 @@ class _BrandAvatarLike extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
+            // color-gate: ignore
             color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
@@ -1090,6 +1049,7 @@ class _BrandAvatarLike extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
+            // color-gate: ignore
             color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
@@ -1107,6 +1067,7 @@ class _BrandAvatarLike extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
@@ -1124,7 +1085,6 @@ class _BrandAvatarLike extends StatelessWidget {
 }
 
 // --- iOS-style helpers ---
-
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -1136,14 +1096,12 @@ class _TactileIconButton extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
   final double size;
-
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
 
 class _TactileIconButtonState extends State<_TactileIconButton> {
   bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
@@ -1181,9 +1139,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1223,7 +1179,6 @@ class _AnimatedPressColor extends StatelessWidget {
   final bool pressed;
   final Color base;
   final Widget Function(Color color) builder;
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1252,14 +1207,12 @@ class _TactileRow extends StatefulWidget {
   final bool haptics;
   final double pressedScale;
   final int releaseDelayMs;
-
   @override
   State<_TactileRow> createState() => _TactileRowState();
 }
 
 class _TactileRowState extends State<_TactileRow> {
   bool _pressed = false;
-
   void _setPressed(bool v) {
     if (_pressed != v) setState(() => _pressed = v);
   }
@@ -1412,37 +1365,29 @@ class _IosButton extends StatefulWidget {
   final bool filled;
   final bool neutral; // If true, use neutral colors instead of primary
   final bool dense;
-
   @override
   State<_IosButton> createState() => _IosButtonState();
 }
 
 class _IosButtonState extends State<_IosButton> {
   bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     // Determine if this is a Material icon (needs more spacing)
     final isMaterialIcon =
         widget.icon != null &&
         (widget.icon == Icons.image ||
             widget.icon.runtimeType.toString().contains('MaterialIcons'));
-
     final iconColor = widget.filled
         ? cs.onPrimary
         : (widget.neutral ? cs.onSurface.withValues(alpha: 0.75) : cs.primary);
-
     final textColor = widget.filled
         ? cs.onPrimary
         : (widget.neutral ? cs.onSurface.withValues(alpha: 0.9) : cs.primary);
-
     final borderColor = widget.neutral
         ? cs.outlineVariant.withValues(alpha: 0.35)
         : cs.primary.withValues(alpha: 0.45);
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -1458,9 +1403,7 @@ class _IosButtonState extends State<_IosButton> {
         curve: Curves.easeOutCubic,
         child: Container(
           decoration: BoxDecoration(
-            color: widget.filled
-                ? cs.primary
-                : (isDark ? Colors.white10 : const Color(0xFFF2F3F5)),
+            color: widget.filled ? cs.primary : context.appColors.surfaceFill,
             borderRadius: BorderRadius.circular(12),
             border: widget.filled ? null : Border.all(color: borderColor),
           ),
@@ -1496,7 +1439,6 @@ class _IosButtonState extends State<_IosButton> {
 }
 
 // ===== Desktop Assistant Dialog (reuses mobile tabs) =====
-
 enum _AssistantDesktopMenu {
   basic,
   prompts,
@@ -1542,7 +1484,6 @@ class _DesktopAssistantDialogShell extends StatefulWidget {
 class _DesktopAssistantDialogShellState
     extends State<_DesktopAssistantDialogShell> {
   _AssistantDesktopMenu _menu = _AssistantDesktopMenu.basic;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1686,9 +1627,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
           final bg = selected
               ? cs.primary.withValues(alpha: 0.10)
               : (_hover == i
-                    ? (isDark
-                          ? Colors.white.withValues(alpha: 0.06)
-                          : Colors.black.withValues(alpha: 0.04))
+                    ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
                     : Colors.transparent);
           final fg = selected
               ? cs.primary
@@ -1749,7 +1688,6 @@ class _DesktopAssistantBasicPaneState
   bool _hoverChatModel = false;
   bool _hoverBgChooser = false;
   final GlobalKey _avatarKey = GlobalKey();
-
   @override
   void initState() {
     super.initState();
@@ -1788,7 +1726,6 @@ class _DesktopAssistantBasicPaneState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
-
     Widget header() {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
@@ -1899,9 +1836,7 @@ class _DesktopAssistantBasicPaneState
                     labelText: l10n.assistantEditAssistantNameLabel,
                     isDense: true,
                     filled: true,
-                    fillColor: isDark
-                        ? Colors.white10
-                        : const Color(0xFFF7F7F9),
+                    fillColor: context.appColors.surfaceFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
@@ -1974,7 +1909,6 @@ class _DesktopAssistantBasicPaneState
         color: cs.outlineVariant.withValues(alpha: 0.12),
       ),
     );
-
     Widget headerWithSwitch({
       required Widget title,
       required bool value,
@@ -2235,9 +2169,7 @@ class _DesktopAssistantBasicPaneState
                           vertical: 20,
                         ),
                         filled: true,
-                        fillColor: isDark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(
@@ -2359,15 +2291,11 @@ class _DesktopAssistantBasicPaneState
                       },
                       pressedScale: 0.98,
                       builder: (pressed) {
-                        final base = isDark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5);
-                        final pressOv = isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : Colors.black.withValues(alpha: 0.05);
-                        final hoverOv = isDark
-                            ? Colors.white.withValues(alpha: 0.04)
-                            : Colors.black.withValues(alpha: 0.04);
+                        final base = context.appColors.surfaceFill;
+                        final pressOv = cs.onSurface.withValues(
+                          alpha: isDark ? 0.06 : 0.05,
+                        );
+                        final hoverOv = cs.onSurface.withValues(alpha: 0.04);
                         final bgColor = pressed
                             ? Color.alphaBlend(pressOv, base)
                             : (_hoverChatModel
@@ -2452,15 +2380,11 @@ class _DesktopAssistantBasicPaneState
                         onTap: () => _pickBackground(context, a),
                         pressedScale: 0.98,
                         builder: (pressed) {
-                          final base = isDark
-                              ? Colors.white10
-                              : const Color(0xFFF2F3F5);
-                          final pressOv = isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.black.withValues(alpha: 0.05);
-                          final hoverOv = isDark
-                              ? Colors.white.withValues(alpha: 0.04)
-                              : Colors.black.withValues(alpha: 0.04);
+                          final base = context.appColors.surfaceFill;
+                          final pressOv = cs.onSurface.withValues(
+                            alpha: isDark ? 0.06 : 0.05,
+                          );
+                          final hoverOv = cs.onSurface.withValues(alpha: 0.04);
                           final bg = pressed
                               ? Color.alphaBlend(pressOv, base)
                               : (_hoverBgChooser
@@ -2588,9 +2512,7 @@ class _DesktopAssistantBasicPaneState
                               hintText: 'research-bot',
                               errorText: _handoffIdError,
                               filled: true,
-                              fillColor: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: context.appColors.surfaceFill,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -2643,9 +2565,7 @@ class _DesktopAssistantBasicPaneState
                             decoration: InputDecoration(
                               hintText: l10n.assistantEditHandoffDescription,
                               filled: true,
-                              fillColor: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: context.appColors.surfaceFill,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
@@ -2796,9 +2716,7 @@ class _DesktopAssistantBasicPaneState
             decoration: InputDecoration(
               hintText: l10n.assistantEditImageUrlDialogHint,
               filled: true,
-              fillColor: Theme.of(ctx).brightness == Brightness.dark
-                  ? Colors.white10
-                  : const Color(0xFFF2F3F5),
+              fillColor: ctx.appColors.surfaceFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: Colors.transparent),
@@ -2903,9 +2821,7 @@ class _DesktopAssistantBasicPaneState
                 decoration: InputDecoration(
                   hintText: l10n.assistantEditQQAvatarDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.transparent),

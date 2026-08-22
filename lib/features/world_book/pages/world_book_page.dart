@@ -17,6 +17,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class WorldBookPage extends StatefulWidget {
   const WorldBookPage({super.key});
@@ -313,7 +314,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(
                 l10n.worldBookDelete,
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Theme.of(ctx).colorScheme.error),
               ),
             ),
           ],
@@ -967,7 +968,7 @@ class _IosSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final bg = context.appColors.surfaceCard;
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -1258,6 +1259,7 @@ class _WorldBookEntryEditSheet extends StatefulWidget {
 class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _keywordInputController;
+  final FocusNode _keywordFocusNode = FocusNode();
   late final TextEditingController _contentController;
   late final TextEditingController _priorityController;
   late final TextEditingController _scanDepthController;
@@ -1300,6 +1302,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   void dispose() {
     _nameController.dispose();
     _keywordInputController.dispose();
+    _keywordFocusNode.dispose();
     _contentController.dispose();
     _priorityController.dispose();
     _scanDepthController.dispose();
@@ -1808,9 +1811,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                       height: 40,
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: isDark
-                                              ? Colors.white12
-                                              : const Color(0xFFF2F3F5),
+                                          color: context.appColors.surfaceFill,
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
@@ -1822,10 +1823,13 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                         ),
                                         child: TextField(
                                           controller: _keywordInputController,
+                                          focusNode: _keywordFocusNode,
                                           onChanged: (_) => setState(() {}),
                                           textInputAction: TextInputAction.done,
-                                          onSubmitted: (_) =>
-                                              addKeywordsFromInput(),
+                                          onSubmitted: (_) {
+                                            addKeywordsFromInput();
+                                            _keywordFocusNode.requestFocus();
+                                          },
                                           textAlignVertical:
                                               TextAlignVertical.center,
                                           style: TextStyle(
@@ -1864,9 +1868,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                       message:
                                           l10n.worldBookEntryKeywordAddTooltip,
                                       child: IosCardPress(
-                                        baseColor: isDark
-                                            ? Colors.white12
-                                            : const Color(0xFFF2F3F5),
+                                        baseColor:
+                                            context.appColors.surfaceFill,
                                         borderRadius: BorderRadius.circular(12),
                                         pressedScale: 0.98,
                                         haptics: false,
@@ -2032,13 +2035,9 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white10
-        : const Color(0xFFF2F3F5);
+    final bg = context.appColors.surfaceFill;
     final overlay = _pressed
-        ? (Theme.of(context).brightness == Brightness.dark
-              ? Colors.white12
-              : Colors.black12)
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

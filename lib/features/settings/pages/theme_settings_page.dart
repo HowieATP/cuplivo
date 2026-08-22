@@ -7,8 +7,10 @@ import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
-import '../../../shared/widgets/hue_slider.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../../theme/custom_theme.dart';
+import '../widgets/custom_theme_widgets.dart';
 
 class ThemeSettingsPage extends StatelessWidget {
   const ThemeSettingsPage({super.key});
@@ -84,26 +86,184 @@ class ThemeSettingsPage extends StatelessWidget {
           _iosSectionCard(
             children: [
               for (int i = 0; i < ThemePalettes.all.length; i++) ...[
-                if (ThemePalettes.all[i].id == ThemePalettes.customDynamicId)
-                  _customDynamicRow(context)
-                else
-                  _paletteRow(
-                    context,
-                    palette: ThemePalettes.all[i],
-                    selected:
-                        settings.themePaletteId == ThemePalettes.all[i].id,
-                    onTap: () => context
-                        .read<SettingsProvider>()
-                        .setThemePalette(ThemePalettes.all[i].id),
+                _paletteRow(
+                  context,
+                  palette: ThemePalettes.all[i],
+                  selected: settings.themePaletteId == ThemePalettes.all[i].id,
+                  onTap: () => context.read<SettingsProvider>().setThemePalette(
+                    ThemePalettes.all[i].id,
                   ),
+                ),
                 if (i != ThemePalettes.all.length - 1) _iosDivider(context),
               ],
             ],
           ),
+          const SizedBox(height: 12),
+          _headerWithActions(
+            context,
+            l10n.themeSettingsPageCustomThemesSection,
+            actions: [
+              Tooltip(
+                message: l10n.customThemeNewTheme,
+                child: _TactileIconButton(
+                  icon: Lucide.Plus,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                  size: 18,
+                  onTap: () => showCustomThemeEditor(context),
+                ),
+              ),
+              Tooltip(
+                message: l10n.customThemeImportTheme,
+                child: _TactileIconButton(
+                  icon: Lucide.Download,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                  size: 18,
+                  onTap: () => showImportCustomThemeDialog(context),
+                ),
+              ),
+            ],
+          ),
+          _customThemesSection(context),
         ],
       ),
     );
   }
+}
+
+/// Section header with trailing action icons (e.g. new/import theme).
+Widget _headerWithActions(
+  BuildContext context,
+  String text, {
+  required List<Widget> actions,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(12, 18, 8, 6),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+        ...actions,
+      ],
+    ),
+  );
+}
+
+/// Saved custom themes list (create/import live in the section header).
+Widget _customThemesSection(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  final settings = context.watch<SettingsProvider>();
+  final themes = settings.customThemes;
+  final isCustomActive =
+      settings.themePaletteId == ThemePalettes.customPaletteId;
+
+  Future<void> confirmDelete(CustomTheme t) async {
+    final isActive = settings.selectedCustomThemeId == t.id;
+    final ok = await showCustomThemeConfirmDialog(
+      context,
+      message: isActive
+          ? l10n.customThemeDeleteConfirmActive
+          : l10n.customThemeDeleteConfirm,
+    );
+    if (ok && context.mounted) {
+      await context.read<SettingsProvider>().deleteCustomTheme(t.id);
+    }
+  }
+
+  if (themes.isEmpty) return const SizedBox.shrink();
+
+  return _iosSectionCard(
+    children: [
+      for (int i = 0; i < themes.length; i++) ...[
+        _customThemeRow(
+          context,
+          theme: themes[i],
+          selected:
+              isCustomActive && settings.selectedCustomThemeId == themes[i].id,
+          onTap: () =>
+              context.read<SettingsProvider>().selectCustomTheme(themes[i].id),
+          onCopy: () => exportCustomThemeToClipboard(context, themes[i]),
+          onEdit: () => showCustomThemeEditor(context, initial: themes[i]),
+          onDelete: () => confirmDelete(themes[i]),
+        ),
+        if (i != themes.length - 1) _iosDivider(context),
+      ],
+    ],
+  );
+}
+
+Widget _customThemeRow(
+  BuildContext context, {
+  required CustomTheme theme,
+  required bool selected,
+  required VoidCallback onTap,
+  required VoidCallback onCopy,
+  required VoidCallback onEdit,
+  required VoidCallback onDelete,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  return _TactileRow(
+    onTap: onTap,
+    builder: (pressed) {
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
+      return _AnimatedPressColor(
+        pressed: pressed,
+        base: baseColor,
+        builder: (c) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              CustomThemeDot(theme: theme, size: 28, selected: selected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  theme.name.isEmpty
+                      ? l10n.themeSettingsPageCustomPaletteName
+                      : theme.name,
+                  style: TextStyle(fontSize: 15, color: c),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
+              _rowAction(context, icon: Lucide.Copy, onTap: onCopy),
+              _rowAction(context, icon: Lucide.Pencil, onTap: onEdit),
+              _rowAction(
+                context,
+                icon: Lucide.Trash2,
+                onTap: onDelete,
+                color: cs.error,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _rowAction(
+  BuildContext context, {
+  required IconData icon,
+  required VoidCallback onTap,
+  Color? color,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  return _TactileIconButton(
+    icon: icon,
+    color: color ?? cs.onSurface.withValues(alpha: 0.7),
+    size: 16,
+    onTap: onTap,
+  );
 }
 
 // --- iOS-style helpers ---
@@ -117,7 +277,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final settings = context.watch<SettingsProvider>();
       final Color bg = settings.usePureBackground
           ? (isDark ? Colors.black : const Color(0xFFFFFFFF))
-          : (isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96));
+          : context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -351,163 +511,6 @@ Widget _paletteRow(
             ],
           ),
         ),
-      );
-    },
-  );
-}
-
-Widget _customDynamicRow(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  final settings = context.watch<SettingsProvider>();
-  final l10n = AppLocalizations.of(context)!;
-  final selected = settings.themePaletteId == ThemePalettes.customDynamicId;
-  final seed = settings.dynamicColorSeed;
-  final dotColor = seed != null
-      ? Color(seed)
-      : cs.onSurface.withValues(alpha: 0.3);
-
-  return _TactileRow(
-    onTap: () {
-      final sp = context.read<SettingsProvider>();
-      _showHuePickerSheet(context, sp, seed);
-    },
-    builder: (pressed) {
-      final baseColor = cs.onSurface.withValues(alpha: 0.9);
-      return _AnimatedPressColor(
-        pressed: pressed,
-        base: baseColor,
-        builder: (c) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: seed != null
-                      ? null
-                      : const SweepGradient(
-                          colors: [
-                            Color(0xFFFF0000),
-                            Color(0xFFFFFF00),
-                            Color(0xFF00FF00),
-                            Color(0xFF00FFFF),
-                            Color(0xFF0000FF),
-                            Color(0xFFFF00FF),
-                            Color(0xFFFF0000),
-                          ],
-                        ),
-                  color: seed != null ? dotColor : null,
-                  boxShadow: Theme.of(context).brightness == Brightness.dark
-                      ? []
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  l10n.themeSettingsPageCustomDynamicTitle,
-                  style: TextStyle(fontSize: 15, color: c),
-                ),
-              ),
-              if (selected)
-                Icon(Lucide.Check, size: 18, color: cs.primary)
-              else
-                const SizedBox(width: 18, height: 18),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Future<void> _showHuePickerSheet(
-  BuildContext context,
-  SettingsProvider settings,
-  int? currentSeed,
-) async {
-  final l10n = AppLocalizations.of(context)!;
-  double hue = currentSeed != null
-      ? HSVColor.fromColor(Color(currentSeed)).hue
-      : 260.0;
-
-  await showModalBottomSheet(
-    context: context,
-    builder: (sheetContext) {
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 20,
-              bottom: MediaQuery.of(context).padding.bottom + 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.themeSettingsPageSeedColorLabel,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Center(
-                  child: SizedBox(
-                    width: 260,
-                    child: HueSlider(
-                      hue: hue,
-                      onChanged: (v) {
-                        setSheetState(() => hue = v);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      final seedColor = HSVColor.fromAHSV(
-                        1.0,
-                        hue,
-                        0.85,
-                        0.90,
-                      ).toColor();
-                      settings.setDynamicColorSeed(seedColor.toARGB32());
-                      settings.setThemePalette(ThemePalettes.customDynamicId);
-                      Navigator.of(sheetContext).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text(
-                      l10n.assistantEditEmojiDialogSave,
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
       );
     },
   );

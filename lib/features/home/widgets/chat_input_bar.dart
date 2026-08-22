@@ -42,6 +42,7 @@ import '../../../shared/dialogs/image_compression_dialog.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import '../../group_chat/models/chat_input_mode.dart';
 
 class ChatInputBarController {
@@ -76,7 +77,7 @@ class ChatInputBar extends StatefulWidget {
     this.onStop,
     this.onSelectModel,
     this.onLongPressSelectModel,
-    this.onOpenMcp,
+    this.onOpenToolsHub,
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onMore,
@@ -94,8 +95,8 @@ class ChatInputBar extends StatefulWidget {
     this.reasoningActive = false,
     this.reasoningBudget,
     this.supportsReasoning = true,
-    this.showMcpButton = false,
-    this.mcpActive = false,
+    this.showToolsHubButton = false,
+    this.toolsHubActive = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -138,7 +139,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onLongPressSelectModel;
   final int? multiAIModelCount;
   final VoidCallback? onMultiSelectModel;
-  final VoidCallback? onOpenMcp;
+  final VoidCallback? onOpenToolsHub;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
@@ -156,8 +157,8 @@ class ChatInputBar extends StatefulWidget {
   final bool reasoningActive;
   final int? reasoningBudget;
   final bool supportsReasoning;
-  final bool showMcpButton;
-  final bool mcpActive;
+  final bool showToolsHubButton;
+  final bool toolsHubActive;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -2005,22 +2006,22 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // MCP button
-        if (widget.showMcpButton) {
+        // Tools Hub button
+        if (widget.showToolsHubButton) {
           actions.add(
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarMcpServersTooltip,
-                icon: Lucide.Hammer,
-                active: widget.mcpActive,
-                onTap: lockTap(widget.onOpenMcp),
+                tooltip: l10n.chatInputBarToolsTooltip,
+                icon: Lucide.Wrench,
+                active: widget.toolsHubActive,
+                onTap: lockTap(widget.onOpenToolsHub),
                 onLongPress: lockTap(widget.onLongPressMcp),
               ),
               menu: DesktopContextMenuItem(
-                icon: Lucide.Hammer,
-                label: l10n.chatInputBarMcpServersTooltip,
-                onTap: lockTap(widget.onOpenMcp),
+                icon: Lucide.Wrench,
+                label: l10n.chatInputBarToolsTooltip,
+                onTap: lockTap(widget.onOpenToolsHub),
               ),
             ),
           );
@@ -2433,10 +2434,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     final previewFill = isDark
-        ? Colors.white.withValues(alpha: 0.08)
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
         : theme.colorScheme.onSurface.withValues(alpha: 0.045);
     final previewBorder = isDark
-        ? Colors.white.withValues(alpha: 0.10)
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
         : theme.colorScheme.outline.withValues(alpha: 0.13);
 
     return Padding(
@@ -2688,7 +2689,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.10)
+                ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                 : theme.colorScheme.outline.withValues(alpha: 0.13),
             width: 1,
           ),
@@ -2706,7 +2707,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                   : theme.colorScheme.outline.withValues(alpha: 0.13),
               width: 1,
             ),
@@ -2745,7 +2746,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
+                  ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
                   : theme.colorScheme.outline.withValues(alpha: 0.13),
               width: 1,
             ),
@@ -2855,7 +2856,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                         // Use previous gray border for better contrast on white
                         border: Border.all(
                           color: isDark
-                              ? Colors.white.withValues(alpha: 0.10)
+                              ? theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.10,
+                                )
                               : theme.colorScheme.outline.withValues(
                                   alpha: 0.20,
                                 ),
@@ -3198,7 +3201,7 @@ class _QueuedInputBanner extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withValues(alpha: 0.08)
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
             : Colors.white.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
@@ -3309,10 +3312,9 @@ class _CompactIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final fgColor = active
         ? theme.colorScheme.primary
-        : (isDark ? Colors.white70 : Colors.black54);
+        : theme.colorScheme.onSurfaceVariant;
     final bool isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
@@ -3388,11 +3390,12 @@ class _CompactSendButton extends StatelessWidget {
     final bg = (enabled || loading)
         ? color
         : (isDark
-              ? Colors.white12
+              ? context.appColors.surfaceFill
+              // color-gate: ignore
               : Colors.grey.shade300.withValues(alpha: 0.84));
     final fg = (enabled || loading)
         ? (isDark ? Colors.black : Colors.white)
-        : (isDark ? Colors.white70 : Colors.grey.shade600);
+        : Theme.of(context).colorScheme.onSurfaceVariant;
 
     final button = Material(
       color: bg,

@@ -234,18 +234,14 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Row(
                             children: [
-                              Icon(
-                                Lucide.X,
-                                size: 20,
-                                color: Colors.red.shade600,
-                              ),
+                              Icon(Lucide.X, size: 20, color: cs.error),
                               const SizedBox(width: 10),
                               Text(
                                 l10n.languageSelectSheetClearButton,
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: AppFontWeights.medium,
-                                  color: Colors.red.shade600,
+                                  color: cs.error,
                                 ),
                               ),
                             ],

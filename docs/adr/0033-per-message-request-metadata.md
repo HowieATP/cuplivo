@@ -1,4 +1,4 @@
-# Per-Message Request Metadata (Image Options) Persisted on the User Message
+# ADR-0033: Per-Message Request Metadata (Image Options) Persisted on the User Message
 
 Port of upstream PR Chevey339/kelivo#599 (image generation options panel):
 the routing decision (`requestAllowImagesApiRouting`) and the effective

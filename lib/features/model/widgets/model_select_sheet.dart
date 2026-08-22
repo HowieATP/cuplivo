@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +20,7 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -39,7 +39,6 @@ class _ModelProcessingData {
   final List<String> providersOrder;
   final String? limitProviderKey;
   final bool disableResolverPlatformLogging;
-
   _ModelProcessingData({
     required this.providerConfigs,
     required this.pinnedModels,
@@ -54,7 +53,6 @@ class _ModelProcessingResult {
   final Map<String, _ProviderGroup> groups;
   final List<_ModelItem> favItems;
   final List<String> orderedKeys;
-
   _ModelProcessingResult({
     required this.groups,
     required this.favItems,
@@ -99,16 +97,13 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
             data.limitProviderKey!:
                 data.providerConfigs[data.limitProviderKey]!,
         };
-
   // Build data map: providerKey -> (displayName, models)
   final Map<String, _ProviderGroup> groups = {};
-
   providers.forEach((key, cfg) {
     // Skip disabled providers entirely so they can't be selected
     if (!(cfg['enabled'] as bool)) return;
     final models = cfg['models'] as List<dynamic>? ?? [];
     if (models.isEmpty) return;
-
     final name = (cfg['name'] as String?) ?? '';
     final overrides =
         (cfg['overrides'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
@@ -157,7 +152,6 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
       items: list,
     );
   });
-
   // Build favorites group (duplicate items)
   final favItems = <_ModelItem>[];
   for (final k in data.pinnedModels) {
@@ -180,7 +174,6 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     );
     favItems.add(found.copyWith(pinned: true));
   }
-
   // Provider sections ordered by ProvidersPage order
   final orderedKeys = <String>[];
   for (final k in data.providersOrder) {
@@ -189,7 +182,6 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
   for (final k in groups.keys) {
     if (!orderedKeys.contains(k)) orderedKeys.add(k);
   }
-
   return _ModelProcessingResult(
     groups: groups,
     favItems: favItems,
@@ -218,7 +210,9 @@ Future<List<ModelSelection>?> showMultiModelSelector(
         context: context,
         barrierDismissible: true,
         barrierLabel: 'multi-model-select-desktop',
-        barrierColor: Colors.black.withValues(alpha: 0.25),
+        barrierColor: Theme.of(
+          context,
+        ).colorScheme.scrim.withValues(alpha: 0.25),
         pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
           limitProviderKey: limitProviderKey,
           preselectedKeys: preselectedKeys,
@@ -391,7 +385,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
-
   // Flattened rows + index maps for precise jumps
   final List<_ListRow> _rows = <_ListRow>[];
   final Map<String, int> _headerIndexMap =
@@ -400,16 +393,13 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       <String, int>{}; // 'pk::modelId' in provider sections -> index
   final Map<String, int> _favModelIndexMap =
       <String, int>{}; // 'pk::modelId' in favorites -> index
-
   // Multi-select state
   final _multiSelect = ModelMultiSelectState();
-
   // Async loading state
   bool _isLoading = true;
   Map<String, _ProviderGroup> _groups = {};
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
-
   dynamic _sanitizeJsonValue(dynamic value) {
     if (value == null || value is num || value is bool || value is String) {
       return value;
@@ -498,9 +488,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       final settings = context.read<SettingsProvider>();
       final assistantProvider = context.read<AssistantProvider>();
       final providerConfigs = _buildProviderConfigsPayload(settings);
-
       final currentKey = _currentModelKey(settings, assistantProvider);
-
       // Prepare data for background processing
       final processingData = _ModelProcessingData(
         providerConfigs: providerConfigs,
@@ -513,10 +501,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         limitProviderKey: widget.limitProviderKey,
         disableResolverPlatformLogging: true,
       );
-
       // Process in background isolate
       final result = await compute(_processModelsInBackground, processingData);
-
       if (mounted) {
         setState(() {
           _groups = result.groups;
@@ -557,9 +543,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
     final providerConfigs = _buildProviderConfigsPayload(settings);
-
     final currentKey = _currentModelKey(settings, assistantProvider);
-
     final processingData = _ModelProcessingData(
       providerConfigs: providerConfigs,
       pinnedModels: settings.pinnedModels,
@@ -571,9 +555,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       limitProviderKey: widget.limitProviderKey,
       disableResolverPlatformLogging: false,
     );
-
     final result = _processModelsInBackground(processingData);
-
     setState(() {
       _groups = result.groups;
       _orderedKeys = result.orderedKeys;
@@ -600,13 +582,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       await _scrollToFirstSearchGroup(initial: true);
       return;
     }
-
     // Optionally expand a bit for better context
     await _expandSheetIfNeeded(
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
     );
-
     // Ensure the list is attached before attempting to scroll
     if (!_itemScrollController.isAttached) {
       // Try again shortly after the list attaches
@@ -617,9 +597,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       });
       return;
     }
-
     final targetIndex = _currentSelectionTargetIndex();
-
     if (targetIndex != null) {
       final alignment = _currentSelectionScrollAlignment(targetIndex);
       try {
@@ -650,21 +628,17 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   int? _currentSelectionTargetIndex() {
     if (_search.text.trim().isNotEmpty) return null;
-
     final settings = context.read<SettingsProvider>();
-
     final currentKey = _currentModelKey(
       settings,
       context.read<AssistantProvider>(),
     );
     if (currentKey.isEmpty) return null;
-
     if (widget.limitProviderKey == null &&
         settings.pinnedModels.contains(currentKey)) {
       final favIndex = _favModelIndexMap[currentKey];
       if (favIndex != null) return favIndex;
     }
-
     final separator = currentKey.indexOf('::');
     final pk = separator == -1
         ? currentKey
@@ -680,11 +654,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
         : 0.0;
     if (_rows.length <= 1) return topAlignment;
-
     final remainingExtent = _estimatedRemainingExtentFrom(targetIndex);
     final topAlignedRequiredExtent = _listViewportHeight * (1 - topAlignment);
     if (remainingExtent >= topAlignedRequiredExtent) return topAlignment;
-
     final tailAlignment = 1.0 - (remainingExtent / _listViewportHeight);
     return tailAlignment.clamp(topAlignment, 0.72);
   }
@@ -707,7 +679,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
     );
-
     if (!_itemScrollController.isAttached) {
       Future.delayed(const Duration(milliseconds: 60), () {
         if (mounted) {
@@ -716,7 +687,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       });
       return;
     }
-
     int? targetIndex;
     // Prefer favorites section when it exists in current filtered rows
     targetIndex = _headerIndexMap['__fav__'];
@@ -730,9 +700,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         }
       }
     }
-
     if (targetIndex == null) return;
-
     try {
       await _itemScrollController.scrollTo(
         index: targetIndex,
@@ -792,11 +760,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             .toList()
           ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
     if (positions.isEmpty || _rows.isEmpty) return null;
-
     final topIndex = positions.first.index;
     final directKey = _providerKeyForRow(topIndex);
     if (directKey != null) return directKey;
-
     for (var i = topIndex - 1; i >= 0; i--) {
       final key = _providerKeyForRow(i);
       if (key != null) return key;
@@ -844,16 +810,13 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         !_providerTabsController.hasClients) {
       return;
     }
-
     final tabBox = tabContext.findRenderObject();
     final viewportBox = viewportContext.findRenderObject();
     if (tabBox is! RenderBox || viewportBox is! RenderBox) return;
-
     final tabLeft = tabBox.localToGlobal(Offset.zero).dx;
     final tabRight = tabLeft + tabBox.size.width;
     final viewportLeft = viewportBox.localToGlobal(Offset.zero).dx;
     final viewportRight = viewportLeft + viewportBox.size.width;
-
     var targetOffset = _providerTabsController.offset;
     if (tabLeft < viewportLeft) {
       targetOffset += tabLeft - viewportLeft;
@@ -862,7 +825,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     } else {
       return;
     }
-
     targetOffset = targetOffset.clamp(
       _providerTabsController.position.minScrollExtent,
       _providerTabsController.position.maxScrollExtent,
@@ -880,7 +842,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-
     return SafeArea(
       top: false,
       child: AnimatedPadding(
@@ -945,12 +906,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             _lastQuery = q;
                           },
                           // Ensure high-contrast input text in both themes
-                          style: TextStyle(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
+                          style: TextStyle(color: cs.onSurface),
                           cursorColor: cs.primary,
                           decoration: InputDecoration(
                             hintText: l10n.modelSelectSheetSearchHint,
@@ -1145,9 +1101,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     _headerIndexMap.clear();
     _modelIndexMap.clear();
     _favModelIndexMap.clear();
-
     final Set<String> favMatchedKeys = <String>{};
-
     if (widget.limitProviderKey == null) {
       final pinned = context.watch<SettingsProvider>().pinnedModels;
       if (pinned.isNotEmpty) {
@@ -1190,7 +1144,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         }
       }
     }
-
     for (final pk in _orderedKeys) {
       final g = _groups[pk]!;
       List<_ModelItem> items;
@@ -1217,11 +1170,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         _rows.add(_ModelRow(m));
       }
     }
-
     if (_rows.isEmpty) return const SizedBox.shrink();
-
     _scheduleActiveProviderUpdate();
-
     return LayoutBuilder(
       builder: (context, constraints) {
         _listViewportHeight = constraints.maxHeight;
@@ -1345,9 +1295,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         }
       }
     }
-
     if (providerTabs.isEmpty) return const SizedBox.shrink();
-
     return Padding(
       // SafeArea already applies bottom inset; avoid doubling it here.
       padding: const EdgeInsets.only(left: 12, right: 12, top: 8, bottom: 10),
@@ -1366,7 +1314,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (providerKey == null) return const SizedBox.shrink();
     final group = _groups[providerKey];
     if (group == null) return const SizedBox.shrink();
-
     final cs = Theme.of(context).colorScheme;
     return Positioned(
       top: -1,
@@ -1658,7 +1605,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   Future<void> _jumpToProvider(String pk) async {
     // Expand sheet first if needed
     await _expandSheetIfNeeded(_maxSize);
-
     // Use precise index jump via ScrollablePositionedList
     final idx = _headerIndexMap[pk];
     if (idx != null) {
@@ -1685,13 +1631,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (widget.limitProviderKey != null) return;
     // Expand sheet first to reveal more content
     await _expandSheetIfNeeded(_maxSize);
-
     // If search text hides favorites section, clear it to ensure favorites are visible
     if (_search.text.isNotEmpty) {
       setState(() => _search.clear());
       await Future.delayed(const Duration(milliseconds: 150));
     }
-
     // Jump to favorites header index if present
     final idx = _headerIndexMap['__fav__'];
     if (idx != null) {
@@ -1728,7 +1672,6 @@ class _ProviderChip extends StatefulWidget {
   final VoidCallback? onLongPress;
   final Color? borderColor;
   final bool selected;
-
   @override
   State<_ProviderChip> createState() => _ProviderChipState();
 }
@@ -1746,9 +1689,7 @@ class _ProviderChipState extends State<_ProviderChip> {
               ? cs.primary.withValues(alpha: 0.08)
               : cs.primary.withValues(alpha: 0.05))
         : cs.surface;
-    final Color overlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final Color overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
     // Slightly stronger border when selected; keep label color unchanged for subtlety
     final Color borderColor =
@@ -1840,16 +1781,13 @@ class ModelMultiSelectState {
   bool isActive = false;
   final Set<String> _selected = {};
   Set<String> _locked = {};
-
   static String keyFor(String providerKey, String modelId) =>
       '$providerKey|$modelId';
-
   int get count => _selected.length;
   int get lockedCount => _locked.length;
   bool canConfirm(int minCount) => count >= minCount;
   bool contains(String key) => _selected.contains(key);
   bool isLocked(String key) => _locked.contains(key);
-
   void toggle(String key) {
     if (_locked.contains(key)) return;
     if (_selected.contains(key)) {
@@ -1913,7 +1851,6 @@ class _BrandAvatar extends StatelessWidget {
   final String name;
   final double size;
   final String? assetOverride;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1955,6 +1892,7 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
+        // color-gate: ignore
         color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
@@ -1965,7 +1903,6 @@ class _BrandAvatar extends StatelessWidget {
 }
 
 // ===== Desktop dialog implementation =====
-
 Future<ModelSelection?> _showDesktopModelSelector(
   BuildContext context, {
   String? limitProviderKey,
@@ -1977,7 +1914,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'model-select-desktop',
-    barrierColor: Colors.black.withValues(alpha: 0.25),
+    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
       limitProviderKey: limitProviderKey,
       initialProviderKey: initialProviderKey,
@@ -2037,7 +1974,6 @@ class _DesktopModelSelectDialogBodyState
   final Map<String, int> _favModelIndexMap =
       <String, int>{}; // 'pk::modelId' in favorites -> index
   bool _autoScrolled = false; // auto-scroll once when dialog opens
-
   @override
   void initState() {
     super.initState();
@@ -2125,7 +2061,6 @@ class _DesktopModelSelectDialogBodyState
     final assistantProvider = context.read<AssistantProvider>();
     final providerConfigs = _buildProviderConfigsPayload(settings);
     final currentKey = _currentModelKey(settings, assistantProvider);
-
     final data = _ModelProcessingData(
       providerConfigs: providerConfigs,
       pinnedModels: settings.pinnedModels,
@@ -2190,9 +2125,7 @@ class _DesktopModelSelectDialogBodyState
     _headerIndexMap.clear();
     _modelIndexMap.clear();
     _favModelIndexMap.clear();
-
     final Set<String> favMatchedKeys = <String>{};
-
     if (widget.limitProviderKey == null) {
       final pinned = settings.pinnedModels;
       if (pinned.isNotEmpty) {
@@ -2235,7 +2168,6 @@ class _DesktopModelSelectDialogBodyState
         }
       }
     }
-
     for (final pk in _orderedKeys) {
       final g = _groups[pk];
       if (g == null) continue;
@@ -2273,7 +2205,6 @@ class _DesktopModelSelectDialogBodyState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-
     final dialog = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -2315,9 +2246,7 @@ class _DesktopModelSelectDialogBodyState
                               hintText: l10n.modelSelectSheetSearchHint,
                               isDense: true,
                               filled: true,
-                              fillColor: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: context.appColors.surfaceFill,
                               prefixIcon: Icon(
                                 Lucide.Search,
                                 size: 16,
@@ -2467,7 +2396,6 @@ class _DesktopModelSelectDialogBodyState
         ),
       ),
     );
-
     return Material(type: MaterialType.transparency, child: dialog);
   }
 
@@ -2518,21 +2446,17 @@ class _DesktopModelSelectDialogBodyState
       });
       return;
     }
-
     final settings = context.read<SettingsProvider>();
     final currentKey = _currentModelKey(
       settings,
       context.read<AssistantProvider>(),
     );
     if (currentKey.isEmpty) return;
-
     // Rebuild to ensure index maps are current
     _rebuildRows();
-
     final bool showFavorites =
         widget.limitProviderKey == null && _searchCtrl.text.isEmpty;
     final bool isPinned = settings.pinnedModels.contains(currentKey);
-
     int? targetIndex;
     if (showFavorites && isPinned) {
       targetIndex = _favModelIndexMap[currentKey];
@@ -2546,9 +2470,7 @@ class _DesktopModelSelectDialogBodyState
           : currentKey.substring(0, separator);
       targetIndex ??= _headerIndexMap[pk];
     }
-
     if (targetIndex == null) return;
-
     try {
       await _itemScrollController.scrollTo(
         index: targetIndex,
@@ -2646,7 +2568,6 @@ class _DesktopModelSelectDialogBodyState
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
         : cs.surface;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: IosCardPress(
@@ -2854,5 +2775,4 @@ class _DesktopModelSelectDialogBodyState
     } catch (_) {}
   }
 }
-
 // (desktop tactile row removed in favor of IosCardPress for consistency)

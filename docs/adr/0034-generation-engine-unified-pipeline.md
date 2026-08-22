@@ -1,4 +1,4 @@
-# ADR-0028: GenerationEngine — the Unified Conversational Pipeline
+# ADR-0034: GenerationEngine — the Unified Conversational Pipeline
 
 The `GenerationEngine` (formerly `HeadlessGenerationService`) becomes the single
 deep module for every tool-bearing conversational generation path, replacing the

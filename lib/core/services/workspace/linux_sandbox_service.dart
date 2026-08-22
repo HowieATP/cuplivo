@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../models/workspace.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/utf16_safe_cut.dart';
 
 enum SandboxStatus {
   /// Not a supported mobile platform (or plugin missing entirely).
@@ -394,6 +395,8 @@ class LinuxSandboxService {
   static const Map<String, String> defaultRootfsUrls = {
     'arm64-v8a':
         'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
+    'armeabi-v7a':
+        'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
     'x86_64':
         'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-amd64.tar.gz',
   };
@@ -406,6 +409,14 @@ class LinuxSandboxService {
           'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
       'aliyun':
           'https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-arm64.tar.gz',
+    },
+    'armeabi-v7a': {
+      'official':
+          'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
+      'tuna':
+          'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
+      'aliyun':
+          'https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
     },
     'x86_64': {
       'official':
@@ -504,10 +515,18 @@ class LinuxSandboxService {
     return p.join(runtime.path, 'alpine-rootfs');
   }
 
-  /// Rootfs present? Android: guest shell binary under `.sandbox/linux` of
-  /// the workspace. iOS: shared fakefs tree (meta.db + busybox + arch tag).
+  /// Rootfs present? Android: guest shell under `.sandbox/linux` must match
+  /// the current process ABI. iOS: shared fakefs tree (meta.db + busybox +
+  /// arch tag).
   Future<bool> hasRootfs(String workspaceHostPath) async {
     try {
+      if (Platform.isAndroid) {
+        final compatible = await _channel.invokeMethod<bool>(
+          'hasCompatibleRootfs',
+          {'workspacePath': workspaceHostPath},
+        );
+        return compatible == true;
+      }
       if (Platform.isIOS) {
         final rootfs = await iosRootfsPath();
         final meta = File(p.join(rootfs, 'meta.db'));
@@ -1019,9 +1038,7 @@ class LinuxSandboxService {
             // diagnostics (dpkg lock held, missing package, network) reach
             // the user instead of a bare exit code.
             final stderrDetail = r.stderr.trim();
-            final excerpt = stderrDetail.length > 500
-                ? stderrDetail.substring(0, 500)
-                : stderrDetail;
+            final excerpt = truncateHeadUtf16Safe(stderrDetail, 500);
             throw StateError(
               '$label failed (${r.exitCode})'
               '${excerpt.isEmpty ? '' : ': $excerpt'}',
@@ -1111,8 +1128,8 @@ class LinuxSandboxService {
       }
       final rawStdout = (map['stdout'] ?? '').toString();
       final rawStderr = (map['stderr'] ?? '').toString();
-      final stdout = _boundOutput(rawStdout);
-      final stderr = _boundOutput(rawStderr);
+      final stdout = boundOutput(rawStdout);
+      final stderr = boundOutput(rawStderr);
       if (_cancelledRequestIds.remove(requestId)) {
         throw SandboxCancelledException(requestId);
       }
@@ -1197,15 +1214,16 @@ class LinuxSandboxService {
     );
   }
 
-  static String _boundOutput(String value) {
-    if (value.length <= maxOutputChars) return value;
-    const marker = '\n...[truncated]...\n';
-    final available = maxOutputChars - marker.length;
-    final head = available ~/ 2;
-    final tail = available - head;
-    return '${value.substring(0, head)}$marker'
-        '${value.substring(value.length - tail)}';
-  }
+  /// Bounds [value] to [maxOutputChars] characters, keeping a head/tail
+  /// preview. Cut points are adjusted so a UTF-16 surrogate pair is never
+  /// split: a lone surrogate would make the truncated string unencodable by
+  /// `jsonEncode` and would fail the whole shell tool result serialization.
+  @visibleForTesting
+  static String boundOutput(String value) => truncateHeadTailUtf16Safe(
+    value,
+    maxOutputChars,
+    marker: '\n...[truncated]...\n',
+  );
 
   /// Allow only plain http(s) mirror base URLs without shell metacharacters.
   static String? _sanitizeMirrorUrl(String raw) {

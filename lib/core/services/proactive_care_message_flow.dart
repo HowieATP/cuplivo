@@ -7,12 +7,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../utils/app_directories.dart';
+import '../../utils/assistant_regex.dart';
 import '../models/assistant.dart';
+import '../models/assistant_regex.dart';
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
 import 'api/plain_text_collector.dart';
+import 'chat/chat_context_transforms.dart';
 import 'chat/chat_service.dart';
 import 'chat/prompt_transformer.dart';
 import 'instruction_injection_store.dart';
@@ -20,6 +23,8 @@ import 'logging/flutter_logger.dart';
 import 'memory_store.dart';
 import 'proactive_care_decision_tools.dart';
 import 'proactive_care_service.dart';
+import 'world_book_prompt_injector.dart';
+import 'world_book_store.dart';
 
 const String _logTag = 'ProactiveCareFlow';
 
@@ -308,12 +313,15 @@ class ProactiveCareMessageFlow {
     return out;
   }
 
-  /// Builds the plain-text LLM history for [conversation]: collapsed
-  /// versions, truncateIndex applied, only completed non-empty user/assistant
-  /// turns (mirrors the decision flow in HomeViewModel).
+  /// Builds the plain-text LLM history for [conversation]: collapsed versions,
+  /// truncateIndex applied, and only completed non-empty user/assistant turns.
+  /// Smart-time timestamps follow [Assistant.enableTimeInjection]. Send-only
+  /// assistant regexes are applied only when [applySendRegexes] is true.
   static List<Map<String, dynamic>> buildHistory({
     required Conversation conversation,
     required List<ChatMessage> messages,
+    required Assistant assistant,
+    required bool applySendRegexes,
   }) {
     final collapsed = collapseMessageVersions(
       messages,
@@ -328,13 +336,42 @@ class ProactiveCareMessageFlow {
     final effective = collapsedSkip > 0
         ? collapsed.sublist(collapsedSkip)
         : collapsed;
-    return <Map<String, dynamic>>[
-      for (final m in effective)
-        if ((m.role == 'user' || m.role == 'assistant') &&
-            !m.isStreaming &&
-            m.content.trim().isNotEmpty)
-          {'role': m.role, 'content': m.content},
-    ];
+    final history = <Map<String, dynamic>>[];
+    for (final message in effective) {
+      if ((message.role != 'user' && message.role != 'assistant') ||
+          message.isStreaming ||
+          message.content.trim().isEmpty) {
+        continue;
+      }
+
+      var content = message.content;
+      if (applySendRegexes) {
+        String applyRegexes(String text) => applyAssistantRegexes(
+          text,
+          assistant: assistant,
+          scope: message.role == 'assistant'
+              ? AssistantRegexScope.assistant
+              : AssistantRegexScope.user,
+          target: AssistantRegexTransformTarget.send,
+        );
+        content = message.role == 'user'
+            ? ChatContextTransforms.transformTextPreservingAttachmentMarkers(
+                content,
+                applyRegexes,
+              )
+            : applyRegexes(content);
+      }
+      if (message.role == 'user' &&
+          assistant.enableTimeInjection &&
+          !message.isPreset) {
+        content = ChatContextTransforms.appendTimestamp(
+          content,
+          message.timestamp,
+        );
+      }
+      history.add({'role': message.role, 'content': content});
+    }
+    return history;
   }
 
   /// System prompt placeholders without a BuildContext: locale comes from
@@ -370,9 +407,10 @@ class ProactiveCareMessageFlow {
   }
 
   /// Assembles the full silent care request (Pipeline ②):
-  /// system prompt (placeholders replaced) + memories + instruction
-  /// injections + conversation history + the care prompt with the current
-  /// system time as the final user turn.
+  /// system prompt (placeholders replaced) + memories + recent chats +
+  /// instruction/world-book injections + conversation history + the care
+  /// prompt with the current system time as the final user turn. Smart-time
+  /// notes and the assistant's context limit are applied last.
   static Future<List<Map<String, dynamic>>> buildCareApiMessages({
     required Assistant assistant,
     required String userNickname,
@@ -380,6 +418,8 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> history,
     required String carePrompt,
     required DateTime now,
+    List<Conversation> recentChats = const <Conversation>[],
+    bool reloadWorldBooks = false,
   }) async {
     final apiMessages = <Map<String, dynamic>>[
       for (final m in history) Map<String, dynamic>.of(m),
@@ -424,6 +464,16 @@ class ProactiveCareMessageFlow {
       }
     }
 
+    // Recent chat references use the same block shape as normal chat, but the
+    // caller supplies the already selected conversations because foreground
+    // and killed-process paths have different storage access.
+    if (assistant.enableRecentChatsReference && recentChats.isNotEmpty) {
+      final block = ChatContextTransforms.buildRecentChatsBlock(recentChats);
+      if (block.isNotEmpty) {
+        _appendToSystemMessage(apiMessages, block);
+      }
+    }
+
     // Instruction injections.
     try {
       final actives = await InstructionInjectionStore.getActives(
@@ -439,6 +489,36 @@ class ProactiveCareMessageFlow {
     } catch (e) {
       FlutterLogger.log('Instruction injection failed: $e', tag: _logTag);
     }
+
+    // World book entries. Load from the persistent store so this works in
+    // both the main isolate and a headless alarm isolate.
+    try {
+      final selection = reloadWorldBooks
+          ? await WorldBookStore.loadFreshForAssistant(
+              assistantId: assistant.id,
+            )
+          : (
+              books: await WorldBookStore.getAll(),
+              activeBookIds: await WorldBookStore.getActiveIds(
+                assistantId: assistant.id,
+              ),
+            );
+      WorldBookPromptInjector.inject(
+        messages: apiMessages,
+        books: selection.books,
+        activeBookIds: selection.activeBookIds,
+      );
+    } catch (e) {
+      FlutterLogger.log('World book injection failed: $e', tag: _logTag);
+    }
+
+    if (assistant.enableTimeInjection) {
+      ChatContextTransforms.injectTimeNote(apiMessages);
+    }
+
+    // Unlike the decision request, care generation follows the assistant's
+    // ordinary context-message limit.
+    ChatContextTransforms.applyMessageLimit(apiMessages, assistant);
 
     return apiMessages;
   }
@@ -463,7 +543,7 @@ class ProactiveCareMessageFlow {
     required List<Map<String, dynamic>> apiMessages,
     int? fallbackThinkingBudget,
   }) async {
-    // Layer-① collector (ADR-0028): accumulate the silent no-tool stream.
+    // Layer-① collector (ADR-0034): accumulate the silent no-tool stream.
     final text = await PlainTextCollector().collect(
       config: config,
       modelId: modelId,
@@ -535,6 +615,9 @@ class ProactiveCareMessageFlow {
       personaPrompt: personaPrompt,
       memoriesBlock: memoriesBlock,
     );
+    if (assistant.enableTimeInjection) {
+      ChatContextTransforms.injectTimeNote(apiMessages);
+    }
     final tools = ProactiveCareDecisionTools.definitions();
     final baseRequestId =
         'proactive-care-decision-${assistant.id}-${DateTime.now().microsecondsSinceEpoch}';
@@ -841,10 +924,12 @@ class ProactiveCareHeadlessChatStore {
   loadRecentConversationFor(String assistantId) async {
     final db = await _ensureDb();
 
-    // Find the most recent conversation for this assistant
+    // Find the most recent non-group conversation for this assistant.
     final convRows = db.select(
-      'SELECT * FROM conversation_rows WHERE assistant_id = ? ORDER BY updated_at DESC LIMIT 1',
-      [assistantId],
+      'SELECT * FROM conversation_rows '
+      'WHERE assistant_id = ? AND conversation_kind != ? '
+      'ORDER BY updated_at DESC LIMIT 1',
+      [assistantId, Conversation.kindGroup],
     );
     if (convRows.isEmpty) {
       return (conversation: null, messages: const <ChatMessage>[]);
@@ -862,6 +947,12 @@ class ProactiveCareHeadlessChatStore {
       versionSelections: _parseVersionSelections(
         row['version_selections_json'] as String?,
       ),
+      summary: row['summary'] as String?,
+      lastSummarizedMessageCount:
+          row['last_summarized_message_count'] as int? ?? 0,
+      parentConversationId: row['parent_conversation_id'] as String?,
+      conversationKind:
+          row['conversation_kind'] as String? ?? Conversation.kindNormal,
     );
 
     // Load messages for this conversation
@@ -885,11 +976,48 @@ class ProactiveCareHeadlessChatStore {
           groupId: mRow['group_id'] as String?,
           subgroupId: mRow['subgroup_id'] as String?,
           version: mRow['version'] as int? ?? 0,
+          isPreset: (mRow['is_preset'] as int? ?? 0) != 0,
         ),
       );
     }
 
     return (conversation: conversation, messages: messages);
+  }
+
+  /// Loads the same recent-chat references used by the foreground builder.
+  static Future<List<Conversation>> loadRecentChatReferencesFor(
+    String assistantId, {
+    required String? currentConversationId,
+  }) async {
+    final db = await _ensureDb();
+    final exclusion = currentConversationId == null ? '' : 'AND id != ? ';
+    final parameters = <Object?>[
+      assistantId,
+      Conversation.kindGroup,
+      if (currentConversationId != null) currentConversationId,
+    ];
+    final rows = db.select(
+      'SELECT id, title, created_at, updated_at, assistant_id, summary, '
+      'conversation_kind FROM conversation_rows '
+      'WHERE assistant_id = ? AND conversation_kind != ? '
+      '${exclusion}AND TRIM(title) != \'\' '
+      'ORDER BY updated_at DESC LIMIT 10',
+      parameters,
+    );
+    return rows
+        .map(
+          (row) => Conversation(
+            id: row['id'] as String,
+            title: row['title'] as String,
+            createdAt: _dateTimeFromSql(row['created_at']),
+            updatedAt: _dateTimeFromSql(row['updated_at']),
+            assistantId: row['assistant_id'] as String?,
+            summary: row['summary'] as String?,
+            conversationKind:
+                row['conversation_kind'] as String? ?? Conversation.kindNormal,
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// Appends an assistant reply to [conversation], creating a new

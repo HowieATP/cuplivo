@@ -14,6 +14,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 import 'mcp_oauth_section_controller.dart';
 
 class _HeaderEntry {
@@ -242,7 +243,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
@@ -273,7 +274,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     required TextEditingController controller,
     String? hint,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,7 +292,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             hintText: hint,
             filled: true,
             // Match provider sheet input background
-            fillColor: isDark ? Colors.white10 : Colors.white,
+            fillColor: context.appColors.surfaceFill,
             // Match provider sheet border styles
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -502,9 +502,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white10
-                  : const Color(0xFFF7F7F9),
+              color: context.appColors.surfaceFill,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -700,7 +698,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                       ? Lucide.TriangleAlert
                       : Lucide.circleCheckBig,
                   size: 14,
-                  color: token == null || expired ? cs.error : Colors.green,
+                  color: token == null || expired
+                      ? cs.error
+                      : context.appColors.success,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -982,11 +982,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                       margin: const EdgeInsets.only(bottom: 10),
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color:
-                                            Theme.of(context).brightness ==
-                                                Brightness.dark
-                                            ? Colors.white10
-                                            : const Color(0xFFF7F7F9),
+                                        color: context.appColors.surfaceFill,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: cs.outlineVariant.withValues(
@@ -1323,7 +1319,7 @@ class _SegChoiceBar extends StatelessWidget {
             segWidth * labels.length + gap * (labels.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withValues(alpha: 0.08)
+            ? cs.onSurface.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -1446,7 +1442,7 @@ class _SegTabBar extends StatelessWidget {
             segWidth * tabs.length + gap * (tabs.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withValues(alpha: 0.08)
+            ? cs.onSurface.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];

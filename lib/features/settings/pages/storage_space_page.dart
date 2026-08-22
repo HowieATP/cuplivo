@@ -5,21 +5,27 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/file_reference.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_semantic_colors.dart';
 import '../../workspace/pages/workspace_detail_page.dart';
 import '../../workspace/pages/workspace_list_page.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/database_compact_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/pages/file_preview_page.dart';
+import '../../../shared/pages/html_file_preview_page.dart';
+import '../../../utils/file_kind.dart';
 import '../../../utils/format.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/app_directories.dart';
@@ -43,7 +49,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   StorageUsageReport? _report;
   bool _loading = false;
   bool _clearing = false;
+
+  /// Set when a refresh was requested while a scan was already running, so
+  /// the scan completion re-runs the report once (e.g. a compaction finishes
+  /// mid-scan — otherwise the page keeps stale sizes).
+  bool _pendingRefresh = false;
   StorageUsageCategoryKey _selected = StorageUsageCategoryKey.images;
+  final _scanProgress = ValueNotifier<({int files, int bytes})?>(null);
+  DateTime _lastProgressEmit = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -51,27 +64,108 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     _refreshReport();
   }
 
+  @override
+  void dispose() {
+    _scanProgress.dispose();
+    super.dispose();
+  }
+
+  /// Collects the effective host path of every workspace so customHostPath
+  /// workspaces (which live outside the managed roots) are scanned too.
+  List<String> _workspaceHostPaths() {
+    final wp = context.read<WorkspaceProvider>();
+    return [
+      for (final w in wp.workspaces)
+        if (wp.hostPathFor(w) case final host?) host,
+    ];
+  }
+
+  /// Throttled progress feed from the scan; loading UI renders the latest
+  /// running totals so huge trees do not look frozen.
+  void _onScanProgress(int files, int bytes) {
+    final now = DateTime.now();
+    if (now.difference(_lastProgressEmit).inMilliseconds < 250) return;
+    _lastProgressEmit = now;
+    _scanProgress.value = (files: files, bytes: bytes);
+  }
+
   Future<StorageUsageReport?> _refreshReport() async {
-    if (_loading) return _report;
+    if (_loading) {
+      _pendingRefresh = true;
+      return _report;
+    }
     setState(() => _loading = true);
+    _scanProgress.value = null;
     try {
-      final rep = await StorageUsageService.computeReport();
+      final rep = await StorageUsageService.computeReport(
+        workspaceHostPaths: _workspaceHostPaths(),
+        onProgress: _onScanProgress,
+      );
       if (!mounted) return rep;
       setState(() {
         _report = rep;
         _loading = false;
-        final keys = rep.categories.map((c) => c.key).toSet();
+        // Empty categories are hidden; keep the selection on a visible one
+        // (deletedRecords is always shown, so the set is never empty).
+        final keys = _visibleCategories(rep).map((c) => c.key).toSet();
         if (!keys.contains(_selected)) {
-          _selected = StorageUsageCategoryKey.images;
+          _selected = keys.first;
         }
       });
+      if (_pendingRefresh) {
+        _pendingRefresh = false;
+        await _refreshReport();
+      }
       return rep;
     } catch (_) {
       if (!mounted) return null;
       setState(() => _loading = false);
+      _pendingRefresh = false;
       return null;
     }
   }
+
+  /// Loading state while the full scan runs. Shows the throttled running
+  /// totals from the scan so huge trees (e.g. sandbox rootfs) do not look
+  /// like a frozen spinner.
+  Widget _buildLoading(AppLocalizations l10n) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
+          ValueListenableBuilder<({int files, int bytes})?>(
+            valueListenable: _scanProgress,
+            builder: (context, progress, _) {
+              final cs = Theme.of(context).colorScheme;
+              final style = TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.7),
+              );
+              final progressText = progress == null
+                  ? l10n.storageSpaceScanning
+                  : l10n.storageSpaceScanningProgress(
+                      progress.files,
+                      formatBytes(progress.bytes),
+                    );
+              return Text(progressText, style: style);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Categories shown in menus/legends: empty ones are hidden, except the
+  /// informational Trash entry which is always visible.
+  List<StorageUsageCategory> _visibleCategories(StorageUsageReport report) =>
+      report.categories
+          .where(
+            (c) =>
+                c.key == StorageUsageCategoryKey.deletedRecords ||
+                c.stats.bytes > 0,
+          )
+          .toList();
 
   Color _barColorFor(StorageUsageCategoryKey key, ColorScheme cs) {
     switch (key) {
@@ -83,6 +177,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return const Color(0xFF22C55E);
       case StorageUsageCategoryKey.assistantData:
         return const Color(0xFF3B82F6); // blue (distinct from chat green)
+      case StorageUsageCategoryKey.workspaces:
+        return const Color(0xFF14B8A6); // teal
+      case StorageUsageCategoryKey.skills:
+        return const Color(0xFFFB923C); // orange
+      case StorageUsageCategoryKey.fonts:
+        return const Color(0xFFEC4899); // pink
+      case StorageUsageCategoryKey.sandbox:
+        return const Color(0xFF78716C); // stone
       case StorageUsageCategoryKey.cache:
         return const Color(0xFFEF4444); // red
       case StorageUsageCategoryKey.logs:
@@ -104,6 +206,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.MessagesSquare;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
+      case StorageUsageCategoryKey.workspaces:
+        return Lucide.HardDrive;
+      case StorageUsageCategoryKey.skills:
+        return Lucide.Wand2;
+      case StorageUsageCategoryKey.fonts:
+        return Lucide.Type;
+      case StorageUsageCategoryKey.sandbox:
+        return Lucide.Layers;
       case StorageUsageCategoryKey.cache:
         return Lucide.Boxes;
       case StorageUsageCategoryKey.logs:
@@ -125,6 +235,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryChatData;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
+      case StorageUsageCategoryKey.workspaces:
+        return l10n.storageSpaceCategoryWorkspaces;
+      case StorageUsageCategoryKey.skills:
+        return l10n.storageSpaceCategorySkills;
+      case StorageUsageCategoryKey.fonts:
+        return l10n.storageSpaceCategoryFonts;
+      case StorageUsageCategoryKey.sandbox:
+        return l10n.storageSpaceCategorySandbox;
       case StorageUsageCategoryKey.cache:
         return l10n.storageSpaceCategoryCache;
       case StorageUsageCategoryKey.logs:
@@ -156,6 +274,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubAssistantImages;
       case 'avatar_cache':
         return l10n.storageSpaceSubCacheAvatars;
+      case 'sandbox_per_ws':
+        return l10n.storageSpaceSubSandboxPerWorkspace;
+      case 'sandbox_shared_runtime':
+        return l10n.storageSpaceSubSandboxSharedRuntime;
       case 'other_cache':
         return l10n.storageSpaceSubCacheOther;
       case 'system_cache':
@@ -177,6 +299,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     switch (id) {
       case 'avatar_cache':
         return l10n.storageSpaceSubDescAvatarCache;
+      case 'sandbox_per_ws':
+        return l10n.storageSpaceSubDescSandboxPerWorkspace;
+      case 'sandbox_shared_runtime':
+        return l10n.storageSpaceSubDescSandboxSharedRuntime;
       case 'other_cache':
         return l10n.storageSpaceSubDescOtherCache;
       case 'system_cache':
@@ -389,6 +515,45 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearSandbox() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategorySandbox;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      if (!mounted) return;
+      final keptRuntime = await StorageUsageService.clearSandbox(
+        workspaceHostPaths: _workspaceHostPaths(),
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: keptRuntime
+            ? l10n.storageSpaceSandboxClearPartialDone
+            : l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openWorkspaceHub() async {
     final navigator = Navigator.of(context);
     await navigator.push(
@@ -403,9 +568,11 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final l10n = AppLocalizations.of(context)!;
     final title = _titleFor(key, l10n);
     if (key == StorageUsageCategoryKey.deletedRecords) {
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const TrashDetailPage()));
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TrashDetailPage(onDataChanged: _refreshReport),
+        ),
+      );
       // Refresh report after potential trash changes.
       await _refreshReport();
       return;
@@ -432,7 +599,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final isDesktop = PlatformUtils.isDesktopTarget;
 
     final body = _loading && _report == null
-        ? const Center(child: CircularProgressIndicator())
+        ? _buildLoading(l10n)
         : _report == null
         ? Center(
             child: Text(
@@ -574,7 +741,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                           const SizedBox(height: 12),
                           Expanded(
                             child: _CategoryMenu(
-                              categories: report.categories,
+                              categories: _visibleCategories(report),
                               selected: _selected,
                               iconFor: _iconFor,
                               titleFor: (k) => _titleFor(k, l10n),
@@ -593,7 +760,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                       child:
                           selectedCat.key ==
                               StorageUsageCategoryKey.deletedRecords
-                          ? const TrashDetailPage(embedded: true)
+                          ? TrashDetailPage(
+                              embedded: true,
+                              onDataChanged: _refreshReport,
+                            )
                           : _CategoryDetail(
                               category: selectedCat,
                               title: _titleFor(selectedCat.key, l10n),
@@ -612,7 +782,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                                   ? null
                                   : _doClearTmpCache,
                               onClearLogs: _clearing ? null : _doClearLogs,
+                              onClearSandbox: _clearing
+                                  ? null
+                                  : _doClearSandbox,
                               refreshReport: _refreshReport,
+                              onCompactDb: () => context
+                                  .read<ChatService>()
+                                  .repo
+                                  .compactDatabase(),
                             ),
                     ),
                   ],
@@ -642,6 +819,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final cs = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final total = report.totalBytes;
+    final cats = _visibleCategories(report);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -700,19 +878,18 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         _iosSectionCard(
           child: Column(
             children: [
-              for (int i = 0; i < report.categories.length; i++) ...[
+              for (int i = 0; i < cats.length; i++) ...[
                 _iosNavRow(
                   context,
-                  icon: _iconFor(report.categories[i].key),
-                  label: _titleFor(report.categories[i].key, l10n),
+                  icon: _iconFor(cats[i].key),
+                  label: _titleFor(cats[i].key, l10n),
                   detailText:
-                      report.categories[i].key ==
-                          StorageUsageCategoryKey.deletedRecords
+                      cats[i].key == StorageUsageCategoryKey.deletedRecords
                       ? null
-                      : '${formatBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
-                  onTap: () => _openCategoryDetail(report.categories[i].key),
+                      : '${formatBytes(cats[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(cats[i].stats.fileCount)}',
+                  onTap: () => _openCategoryDetail(cats[i].key),
                 ),
-                if (i != report.categories.length - 1) _iosDivider(context),
+                if (i != cats.length - 1) _iosDivider(context),
               ],
             ],
           ),
@@ -750,11 +927,18 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
   bool _refreshing = false;
   bool _clearing = false;
 
+  /// Set when a refresh was requested while one was already running, so the
+  /// in-flight refresh re-runs once (see [_StorageSpacePageState._pendingRefresh]).
+  bool _pendingRefresh = false;
+
   StorageUsageCategory _cat(StorageUsageCategoryKey k) =>
       _report.categories.firstWhere((c) => c.key == k);
 
   Future<void> _refresh() async {
-    if (_refreshing) return;
+    if (_refreshing) {
+      _pendingRefresh = true;
+      return;
+    }
     setState(() => _refreshing = true);
     try {
       final next = await widget.refreshReport();
@@ -762,6 +946,10 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
       if (next != null) setState(() => _report = next);
     } finally {
       if (mounted) setState(() => _refreshing = false);
+    }
+    if (mounted && _pendingRefresh) {
+      _pendingRefresh = false;
+      await _refresh();
     }
   }
 
@@ -960,6 +1148,49 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearSandbox() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategorySandbox;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      if (!mounted) return;
+      final wp = context.read<WorkspaceProvider>();
+      final hostPaths = [
+        for (final w in wp.workspaces)
+          if (wp.hostPathFor(w) case final host?) host,
+      ];
+      final keptRuntime = await StorageUsageService.clearSandbox(
+        workspaceHostPaths: hostPaths,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: keptRuntime
+            ? l10n.storageSpaceSandboxClearPartialDone
+            : l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1012,7 +1243,11 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearLogs: (category.key == StorageUsageCategoryKey.logs)
               ? _clearLogs
               : null,
+          onClearSandbox: (category.key == StorageUsageCategoryKey.sandbox)
+              ? _clearSandbox
+              : null,
           refreshReport: _refresh,
+          onCompactDb: () => context.read<ChatService>().repo.compactDatabase(),
         ),
       ),
     );
@@ -1214,7 +1449,9 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearSystemCache,
     required this.onClearTmpCache,
     required this.onClearLogs,
+    required this.onClearSandbox,
     required this.refreshReport,
+    this.onCompactDb,
   });
 
   final StorageUsageCategory category;
@@ -1228,7 +1465,9 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearSystemCache;
   final Future<void> Function()? onClearTmpCache;
   final Future<void> Function()? onClearLogs;
+  final Future<void> Function()? onClearSandbox;
   final Future<void> Function() refreshReport;
+  final Future<DbCompactResult> Function()? onCompactDb;
 
   @override
   Widget build(BuildContext context) {
@@ -1239,13 +1478,26 @@ class _CategoryDetail extends StatelessWidget {
         '${fmtBytes(category.stats.bytes)} · ${l10n.storageSpaceFilesCount(category.stats.fileCount)}';
     final bool safeToClear =
         category.key == StorageUsageCategoryKey.cache ||
-        category.key == StorageUsageCategoryKey.logs;
+        category.key == StorageUsageCategoryKey.logs ||
+        category.key == StorageUsageCategoryKey.sandbox;
     final String hint = safeToClear
         ? l10n.storageSpaceSafeToClearHint
         : l10n.storageSpaceNotSafeToClearHint;
 
     Widget? actions;
-    if (category.key == StorageUsageCategoryKey.cache) {
+    if (category.key == StorageUsageCategoryKey.chatData &&
+        onCompactDb != null) {
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          DatabaseCompactButton(
+            compact: onCompactDb!,
+            onDone: () async => refreshReport(),
+          ),
+        ],
+      );
+    } else if (category.key == StorageUsageCategoryKey.cache) {
       actions = Wrap(
         spacing: 10,
         runSpacing: 10,
@@ -1287,6 +1539,20 @@ class _CategoryDetail extends StatelessWidget {
             backgroundColor: cs.primary,
             enabled: !clearing && onClearLogs != null,
             onTap: () => onClearLogs?.call(),
+          ),
+        ],
+      );
+    } else if (category.key == StorageUsageCategoryKey.sandbox) {
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          IosTileButton(
+            label: l10n.storageSpaceClearSandboxButton,
+            icon: Lucide.Layers,
+            backgroundColor: cs.primary,
+            enabled: !clearing && onClearSandbox != null,
+            onTap: () => onClearSandbox?.call(),
           ),
         ],
       );
@@ -1703,6 +1969,42 @@ class _UploadManagerState extends State<_UploadManager> {
 
   Future<void> _openFile(String path) async {
     final l10n = AppLocalizations.of(context)!;
+    // iOS/Android: route previewable kinds in-app — the system-open path
+    // (OpenFilex → UIDocumentInteractionController) cannot render html and
+    // shows an empty menu for types no app handles; OpenFilex also reports
+    // "done" as soon as the menu dismisses, lying about success. Desktop
+    // keeps the system default app.
+    if (PlatformUtils.isMobileTarget) {
+      final name = p.basename(path);
+      // SVG is excluded here: ImageViewerPage decodes with the built-in
+      // raster codec, which cannot render SVG — it falls through to
+      // FilePreviewPage, which renders SVG via SvgPicture.file.
+      if (FileKind.isImageFile(path) && !FileKind.isSvgFile(path)) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ImageViewerPage(images: [path], initialIndex: 0),
+          ),
+        );
+        return;
+      }
+      if (FileKind.isHtmlFile(path)) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                HtmlFilePreviewPage(hostPath: path, displayName: name),
+          ),
+        );
+        return;
+      }
+      if (!FileKind.isLikelyBinary(path)) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FilePreviewPage(hostPath: path, displayName: name),
+          ),
+        );
+        return;
+      }
+    }
     try {
       final res = await OpenFilex.open(path);
       if (res.type != ResultType.done) {
@@ -1842,7 +2144,7 @@ class _UploadManagerState extends State<_UploadManager> {
     final selBg = isDark
         ? cs.primary.withValues(alpha: 0.20)
         : cs.primary.withValues(alpha: 0.12);
-    final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final baseBg = context.appColors.surfaceFill;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -2501,9 +2803,7 @@ Widget _iosSectionCard({required Widget child}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,

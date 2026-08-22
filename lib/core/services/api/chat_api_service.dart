@@ -36,6 +36,7 @@ part 'providers/google_common.dart';
 part 'providers/google_gemini.dart';
 part 'providers/google_vertex.dart';
 part 'providers/claude_official.dart';
+part 'providers/zhipu_layout_parsing.dart';
 
 typedef ToolCallHandler =
     Future<String> Function(
@@ -644,10 +645,12 @@ class ChatApiService {
         kind == ProviderKind.openai &&
         allowImagesApiRouting &&
         _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
     final unicodeSafeMessages = _sanitizeMessages(messages);
     final stripUnsupportedImageInputs =
         !ocrActive &&
         !useOpenAIImagesApi &&
+        !useZhipuLayoutParsing &&
         !supportsImageInput(config, modelId);
     final safeMessages = stripUnsupportedImageInputs
         ? await _stripImageInputsFromMessages(unicodeSafeMessages)
@@ -658,7 +661,16 @@ class ChatApiService {
     final client = _clientFor(config, cancelToken);
 
     try {
-      if (kind == ProviderKind.openai) {
+      if (useZhipuLayoutParsing) {
+        yield* sendZhipuLayoutParsingStream(
+          client,
+          config,
+          modelId,
+          safeMessages,
+          userMediaPaths: safeUserMediaPaths,
+          extraHeaders: extraHeaders,
+        );
+      } else if (kind == ProviderKind.openai) {
         if (useOpenAIImagesApi) {
           yield* _sendOpenAIImagesStream(
             client,
@@ -1557,6 +1569,31 @@ class ChatApiService {
     }
 
     return result;
+  }
+
+  /// Recursively remove `additionalProperties` from every JSON Schema node.
+  ///
+  /// The Gemini API rejects this key with HTTP 400 (issue #425). Unlike
+  /// [_cleanSchemaForGemini], this walks every nested map/list (properties,
+  /// items, anyOf/oneOf/allOf, tuple-form items, $defs, ...) and only strips
+  /// that one key, leaving the rest of the schema byte-identical. MCP tool
+  /// schemas are already stripped by
+  /// `ToolHandlerService.sanitizeToolParametersForProvider`; this is
+  /// defense-in-depth for built-in tools (search/memory/workspace/local) that
+  /// bypass that sanitizer.
+  static dynamic _stripAdditionalProperties(dynamic node) {
+    if (node is Map) {
+      final m = <String, dynamic>{};
+      for (final entry in node.entries) {
+        if (entry.key == 'additionalProperties') continue;
+        m[entry.key] = _stripAdditionalProperties(entry.value);
+      }
+      return m;
+    }
+    if (node is List) {
+      return node.map(_stripAdditionalProperties).toList();
+    }
+    return node;
   }
 }
 

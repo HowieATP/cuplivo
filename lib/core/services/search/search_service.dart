@@ -19,6 +19,10 @@ import 'providers/duckduckgo_search_service.dart';
 import 'providers/serper_search_service.dart';
 import 'providers/grok_search_service.dart';
 import 'providers/querit_search_service.dart';
+import 'providers/stepfun_search_service.dart';
+import 'providers/firecrawl_search_service.dart';
+import 'providers/tinyfish_search_service.dart';
+import 'providers/doubao_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -92,6 +96,14 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return GrokSearchService() as SearchService;
       case QueritOptions _:
         return QueritSearchService() as SearchService;
+      case StepFunOptions _:
+        return StepFunSearchService() as SearchService;
+      case FirecrawlOptions _:
+        return FirecrawlSearchService() as SearchService;
+      case TinyFishOptions _:
+        return TinyFishSearchService() as SearchService;
+      case DoubaoOptions _:
+        return DoubaoSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -229,12 +241,30 @@ abstract class SearchServiceOptions {
 
   Map<String, dynamic> toJson();
 
-  /// Dual-read: prefers new `apiKeys` list, falls back to legacy `apiKey` string.
+  /// Dual-read: prefers the full `keyConfigs` objects written by Cuplivo
+  /// exports (lossless round-trip), then the `apiKeys` list, then the legacy
+  /// `apiKey` string. `apiKeys` may be either a list of ApiKeyConfig objects
+  /// (Cuplivo's native shape) or a list of plain key strings (Kelivo's
+  /// round-robin pool shape) when the backup originated from Kelivo.
   static List<ApiKeyConfig> readKeys(Map<String, dynamic> json) {
-    if (json['apiKeys'] != null) {
-      return (json['apiKeys'] as List)
+    final configs = json['keyConfigs'];
+    if (configs is List && configs.isNotEmpty) {
+      return configs
           .map((e) => ApiKeyConfig.fromJson(e as Map<String, dynamic>))
           .toList();
+    }
+    if (json['apiKeys'] != null) {
+      final rawKeys = json['apiKeys'] as List;
+      if (rawKeys.isNotEmpty && rawKeys.every((e) => e is Map)) {
+        return rawKeys
+            .map((e) => ApiKeyConfig.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      return [
+        for (final key in rawKeys)
+          if (key.toString().trim().isNotEmpty)
+            ApiKeyConfig.create(key.toString()),
+      ];
     }
     final legacy = json['apiKey'] as String?;
     if (legacy != null && legacy.isNotEmpty) {
@@ -304,6 +334,14 @@ abstract class SearchServiceOptions {
         return GrokOptions.fromJson(json);
       case 'querit':
         return QueritOptions.fromJson(json);
+      case 'stepfun':
+        return StepFunOptions.fromJson(json);
+      case 'firecrawl':
+        return FirecrawlOptions.fromJson(json);
+      case 'tinyfish':
+        return TinyFishOptions.fromJson(json);
+      case 'doubao':
+        return DoubaoOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -810,5 +848,178 @@ class QueritOptions extends SearchServiceOptions {
     timeRange: json['timeRange'] ?? '',
     countries: json['countries'] ?? '',
     languages: json['languages'] ?? '',
+  );
+}
+
+class StepFunOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.stepfun.com/v1/search';
+
+  final String url;
+  final String category;
+
+  StepFunOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.url = '',
+    this.category = '',
+  });
+
+  String get resolvedUrl {
+    final trimmed = url.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'stepfun',
+      'id': id,
+      'url': url.trim(),
+      'category': category.trim(),
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
+
+  factory StepFunOptions.fromJson(Map<String, dynamic> json) => StepFunOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
+    url: json['url'] ?? '',
+    category: json['category'] ?? '',
+  );
+}
+
+class FirecrawlOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.firecrawl.dev/v2/search';
+
+  final String url;
+  final List<String> sources;
+  final List<String> categories;
+  final String country;
+  final String location;
+
+  FirecrawlOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.url = '',
+    this.sources = const <String>['web'],
+    this.categories = const <String>[],
+    this.country = '',
+    this.location = '',
+  });
+
+  String get resolvedUrl {
+    final trimmed = url.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'firecrawl',
+      'id': id,
+      'url': url.trim(),
+      'sources': sources,
+      'categories': categories,
+      'country': country.trim(),
+      'location': location.trim(),
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
+
+  factory FirecrawlOptions.fromJson(Map<String, dynamic> json) =>
+      FirecrawlOptions(
+        id: json['id'],
+        apiKeys: SearchServiceOptions.readKeys(json),
+        keyManagement: SearchServiceOptions.readKeyManagement(json),
+        url: json['url'] ?? '',
+        sources:
+            (json['sources'] as List?)
+                ?.map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList() ??
+            const <String>['web'],
+        categories:
+            (json['categories'] as List?)
+                ?.map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList() ??
+            const <String>[],
+        country: json['country'] ?? '',
+        location: json['location'] ?? '',
+      );
+}
+
+class TinyFishOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.search.tinyfish.ai';
+
+  final String url;
+  final String location;
+  final String language;
+  final String includeDomains;
+  final String excludeDomains;
+
+  TinyFishOptions({
+    required super.id,
+    super.apiKeys,
+    super.keyManagement,
+    this.url = '',
+    this.location = '',
+    this.language = '',
+    this.includeDomains = '',
+    this.excludeDomains = '',
+  });
+
+  String get resolvedUrl {
+    final trimmed = url.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'tinyfish',
+      'id': id,
+      'url': url.trim(),
+      'location': location.trim(),
+      'language': language.trim(),
+      'includeDomains': includeDomains.trim(),
+      'excludeDomains': excludeDomains.trim(),
+    };
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
+
+  factory TinyFishOptions.fromJson(Map<String, dynamic> json) =>
+      TinyFishOptions(
+        id: json['id'],
+        apiKeys: SearchServiceOptions.readKeys(json),
+        keyManagement: SearchServiceOptions.readKeyManagement(json),
+        url: json['url'] ?? '',
+        location: json['location'] ?? '',
+        language: json['language'] ?? '',
+        includeDomains: json['includeDomains'] ?? '',
+        excludeDomains: json['excludeDomains'] ?? '',
+      );
+}
+
+class DoubaoOptions extends SearchServiceOptions {
+  DoubaoOptions({required super.id, super.apiKeys, super.keyManagement});
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'doubao', 'id': id};
+    SearchServiceOptions.writeKeys(json, apiKeys, keyManagement: keyManagement);
+    return json;
+  }
+
+  factory DoubaoOptions.fromJson(Map<String, dynamic> json) => DoubaoOptions(
+    id: json['id'],
+    apiKeys: SearchServiceOptions.readKeys(json),
+    keyManagement: SearchServiceOptions.readKeyManagement(json),
   );
 }

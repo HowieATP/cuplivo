@@ -33,6 +33,7 @@ import 'tabbed_preview_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import 'package:Cuplivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -458,9 +459,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         // Unmask dollar signs that were protected during preprocessing
         String unmasked = inline.replaceAll(_codeDollarMask, r'$');
         String softened = _softBreakInline(unmasked);
-        final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
         final csCtx = Theme.of(ctx).colorScheme;
-        final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
+        final bg = ctx.appColors.surfaceFill;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
@@ -2185,8 +2185,12 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
       );
     }
 
-    final Color bodyBg = cs.surfaceContainer;
-    final Color headerBg = cs.surfaceContainerHighest;
+    final Color bodyBg = cs.surfaceContainer.withValues(
+      alpha: kBlockFillAlphaContent,
+    );
+    final Color headerBg = cs.surfaceContainerHighest.withValues(
+      alpha: kBlockFillAlphaContent,
+    );
     final borderColor = _codeBlockBorderColor(cs, isDark);
     final isEffectivelyExpanded = _isEffectivelyExpanded(settings);
     final isCollapsed = !isEffectivelyExpanded;
@@ -2194,6 +2198,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
         isCollapsed && _hasCollapsedHiddenLines(settings);
 
     return Container(
+      key: const ValueKey('code-block-surface'),
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -2776,24 +2781,52 @@ bool _markdownMathTargetPlatformIsDesktop() {
 /// 8-bit straight-alpha RGBA and re-encodes with `image` instead of using
 /// `ImageByteFormat.png` directly: on wide-gamut backends (iOS Impeller) the
 /// latter embeds 10/16-bit bytes that downstream consumers misinterpret as sRGB.
-Future<Uint8List?> _captureRepaintBoundaryPng(GlobalKey boundaryKey) async {
+///
+/// [pixelRatio] is the output sampling ratio. When [maxPixels] or
+/// [maxLongSide] is given, the effective ratio is clamped so the capture stays
+/// inside the pixel budget (prevents OOM on very wide or tall content).
+Future<Uint8List?> _captureRepaintBoundaryPng(
+  GlobalKey boundaryKey, {
+  double pixelRatio = 3.0,
+  int? maxPixels,
+  int? maxLongSide,
+}) async {
   await WidgetsBinding.instance.endOfFrame;
   final boundary =
       boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
   if (boundary == null) return null;
-  final image = await boundary.toImage(pixelRatio: 3.0);
-  final data = await image.toByteData(
-    format: ui.ImageByteFormat.rawStraightRgba,
+  final logicalPixels = math.max(
+    1.0,
+    boundary.size.width * boundary.size.height,
   );
-  if (data == null) return null;
-  return image_lib.encodePng(
-    image_lib.Image.fromBytes(
-      width: image.width,
-      height: image.height,
-      bytes: data.buffer,
-      numChannels: 4,
-    ),
-  );
+  var ratio = pixelRatio;
+  if (maxPixels != null) {
+    ratio = math.min(ratio, math.sqrt(maxPixels / logicalPixels));
+  }
+  if (maxLongSide != null) {
+    final longSide = math.max(boundary.size.width, boundary.size.height);
+    if (longSide > 0) {
+      ratio = math.min(ratio, maxLongSide / longSide);
+    }
+  }
+  if (!ratio.isFinite || ratio <= 0) ratio = 1.0;
+  final image = await boundary.toImage(pixelRatio: ratio);
+  try {
+    final data = await image.toByteData(
+      format: ui.ImageByteFormat.rawStraightRgba,
+    );
+    if (data == null) return null;
+    return image_lib.encodePng(
+      image_lib.Image.fromBytes(
+        width: image.width,
+        height: image.height,
+        bytes: data.buffer,
+        numChannels: 4,
+      ),
+    );
+  } finally {
+    image.dispose();
+  }
 }
 
 Future<File> _writePngTempFile(Uint8List bytes, String stem) async {
@@ -2830,6 +2863,26 @@ Future<String?> _savePngFile({
     allowedExtensions: const ['png'],
     bytes: bytes,
   );
+}
+
+/// Saves raw PNG [bytes] to the system photo gallery (mobile).
+///
+/// Shared by the markdown table block and the math formula block.
+Future<bool> _savePngBytesToGallery(
+  Uint8List bytes, {
+  required String name,
+}) async {
+  final result = await ImageGallerySaverPlus.saveImage(
+    bytes,
+    quality: 100,
+    name: name,
+  );
+  if (result is Map) {
+    final isSuccess = result['isSuccess'] == true || result['isSuccess'] == 1;
+    final filePath = result['filePath'] ?? result['file_path'];
+    return isSuccess || (filePath is String && filePath.isNotEmpty);
+  }
+  return false;
 }
 
 Future<bool> _copyPngToClipboard(Uint8List bytes, String suggestedName) async {
@@ -2883,11 +2936,11 @@ class _MarkdownTableBlock extends StatelessWidget {
     final headerBg = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.15 : 0.07),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaTable);
     final bodyBg = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.04 : 0.015),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaTable);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2937,7 +2990,7 @@ class _MarkdownTableBlock extends StatelessWidget {
               color: Color.alphaBlend(
                 cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
                 cs.surface,
-              ),
+              ).withValues(alpha: kBlockFillAlphaTable),
               borderRadius: BorderRadius.circular(12),
             ),
             foregroundDecoration: BoxDecoration(
@@ -2985,7 +3038,7 @@ class _MarkdownTableBlock extends StatelessWidget {
               color: Color.alphaBlend(
                 cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
                 cs.surface,
-              ),
+              ).withValues(alpha: kBlockFillAlphaTable),
               borderRadius: BorderRadius.circular(12),
             ),
             foregroundDecoration: BoxDecoration(
@@ -3250,7 +3303,10 @@ class _MarkdownTableBlock extends StatelessWidget {
     try {
       final bytes = await _captureTablePngBytes();
       if (bytes == null) throw 'render error';
-      final ok = await _savePngBytesToGallery(bytes);
+      final ok = await _savePngBytesToGallery(
+        bytes,
+        name: 'cuplivo-table-${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (!context.mounted) return;
       showAppSnackBar(
         context,
@@ -3267,20 +3323,6 @@ class _MarkdownTableBlock extends StatelessWidget {
         type: NotificationType.error,
       );
     }
-  }
-
-  Future<bool> _savePngBytesToGallery(Uint8List bytes) async {
-    final result = await ImageGallerySaverPlus.saveImage(
-      bytes,
-      quality: 100,
-      name: 'cuplivo-table-${DateTime.now().millisecondsSinceEpoch}',
-    );
-    if (result is Map) {
-      final isSuccess = result['isSuccess'] == true || result['isSuccess'] == 1;
-      final filePath = result['filePath'] ?? result['file_path'];
-      return isSuccess || (filePath is String && filePath.isNotEmpty);
-    }
-    return false;
   }
 
   Future<void> _copyImage(BuildContext context) async {
@@ -3729,6 +3771,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   _MermaidTab _selectedTab = _MermaidTab.image;
   late final ScrollController _vMermaidScrollController;
   OverlayEntry? _renderOverlayEntry;
+  OverlayEntry? _saveOverlayEntry;
   bool _renderQueued = false;
   bool _renderingBitmap = false;
   String? _renderKey;
@@ -3736,6 +3779,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Timer? _streamingRenderDebounce;
   bool _bitmapRenderingUnsupported = false;
   bool _suppressBitmapLoading = false;
+  Map<String, String>? _lastThemeVars;
+  Uint8List? _opaqueCacheBytes;
+  String? _opaqueCacheKey;
   final Set<String> _failedBitmapRenderKeys = <String>{};
 
   @override
@@ -3744,7 +3790,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final mermaidColors = PreviewBlockColors.resolve(isDark);
+    final mermaidColors = PreviewBlockColors.resolve(isDark, cs);
 
     // Build theme variables mapping for Mermaid from Material ColorScheme
     String hex(Color c) {
@@ -3769,7 +3815,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       'tertiaryColor': hex(cs.tertiary),
       'tertiaryTextColor': hex(cs.onTertiary),
       'tertiaryBorderColor': hex(cs.tertiary),
-      'background': hex(cs.surface),
+      'background': 'transparent',
       'mainBkg': hex(cs.primaryContainer),
       'secondBkg': hex(cs.secondaryContainer),
       'lineColor': hex(cs.onSurface),
@@ -3790,6 +3836,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       'errorBkgColor': hex(cs.error),
       'errorTextColor': hex(cs.onError),
     };
+    _lastThemeVars = themeVars;
 
     final exporting = ExportCaptureScope.of(context);
     final cacheKey = _mermaidCacheKey(widget.code, isDark, themeVars);
@@ -3929,7 +3976,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               actionBytes != null && actionBytes.isNotEmpty,
                           onTap: actionBytes == null || actionBytes.isEmpty
                               ? null
-                              : () => _saveMermaidBytes(context, actionBytes),
+                              : () => _saveMermaid(context),
                         ),
                         const SizedBox(width: 4),
                         PreviewTextAction(
@@ -3942,7 +3989,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               ? null
                               : () => _openMermaidImageViewer(
                                   context,
-                                  actionBytes,
+                                  _currentOpaqueBytes ?? actionBytes,
                                 ),
                         ),
                       ],
@@ -4004,7 +4051,10 @@ class _MermaidBlockState extends State<_MermaidBlock> {
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _openMermaidImageViewer(context, displayBytes),
+            onTap: () => _openMermaidImageViewer(
+              context,
+              _currentOpaqueBytes ?? displayBytes,
+            ),
             child: Image(image: MemoryImage(displayBytes), fit: BoxFit.contain),
           ),
         ),
@@ -4100,6 +4150,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   void dispose() {
     _streamingRenderDebounce?.cancel();
     _removeRenderOverlay();
+    _removeSaveOverlay();
     _vMermaidScrollController.dispose();
     super.dispose();
   }
@@ -4126,6 +4177,8 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     final code = widget.code;
     final cacheKey = _mermaidCacheKey(code, isDark, themeVars);
     if (MermaidImageCache.get(cacheKey) != null) return;
+    _opaqueCacheBytes = null;
+    _opaqueCacheKey = null;
     final renderOverride = debugMermaidBitmapRenderOverride;
     final overlay = renderOverride == null ? Overlay.maybeOf(context) : null;
     if (renderOverride == null && overlay == null) {
@@ -4206,7 +4259,33 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     );
     overlay.insert(_renderOverlayEntry!);
 
-    return _captureMermaidBitmap(handle);
+    final result = await _captureMermaidBitmap(handle);
+    // The webview is still mounted here; also grab the opaque (fill-backed)
+    // bytes so the image viewer and Save can reuse them without re-mounting
+    // a fresh webview. Captured on every render pass (streaming chunks
+    // included) so a settled streamed message has opaque bytes ready.
+    if (result.status == MermaidBitmapRenderStatus.success &&
+        result.bytes != null &&
+        result.bytes!.isNotEmpty) {
+      final opaqueExport = handle.exportPngBytes;
+      if (opaqueExport != null) {
+        // Opaque bytes are an optimization (viewer/save reuse), not
+        // correctness — keep the budget short so it never stalls the next
+        // streaming chunk render behind _renderingBitmap.
+        final opaque = await _awaitMermaidExport(
+          opaqueExport,
+          retries: 2,
+          timeout: const Duration(milliseconds: 600),
+        );
+        if (opaque.status == MermaidBitmapRenderStatus.success &&
+            opaque.bytes != null &&
+            opaque.bytes!.isNotEmpty) {
+          _opaqueCacheBytes = opaque.bytes;
+          _opaqueCacheKey = _mermaidCacheKey(code, isDark, themeVars);
+        }
+      }
+    }
+    return result;
   }
 
   void _markBitmapRenderingUnsupported(String cacheKey) {
@@ -4248,14 +4327,25 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Future<MermaidBitmapRenderResult> _captureMermaidBitmap(
     MermaidViewHandle handle,
   ) async {
-    final exportBytes = handle.exportPngBytes;
+    // Display bitmap exports transparent (the block container provides the
+    // readability mask); saved PNGs re-export opaque via _saveMermaid.
+    final exportBytes =
+        handle.exportPngBytesTransparent ?? handle.exportPngBytes;
     if (exportBytes == null) return MermaidBitmapRenderResult.unsupported();
+    return _awaitMermaidExport(exportBytes);
+  }
+
+  Future<MermaidBitmapRenderResult> _awaitMermaidExport(
+    Future<Uint8List?> Function() exportBytes, {
+    int retries = 4,
+    Duration timeout = const Duration(milliseconds: 900),
+  }) async {
     await WidgetsBinding.instance.endOfFrame;
     await Future<void>.delayed(const Duration(milliseconds: 120));
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < retries; i++) {
       try {
         final bytes = await exportBytes().timeout(
-          const Duration(milliseconds: 900),
+          timeout,
           onTimeout: () => null,
         );
         if (bytes != null && bytes.isNotEmpty) {
@@ -4285,9 +4375,29 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     );
   }
 
-  Future<void> _saveMermaidBytes(BuildContext context, Uint8List bytes) async {
+  Future<void> _saveMermaid(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    final ok = await _saveCachedMermaidPng(bytes);
+    // Saved PNG keeps an opaque background: reuse the opaque bytes captured
+    // at render time, or re-export with the default (opaque) fill when the
+    // cache missed (legacy cache hit, interrupted render, capture failure).
+    final bytes = _currentOpaqueBytes ?? await _exportOpaqueMermaidBytes();
+    if (!context.mounted) return;
+    // If the opaque re-export failed (cold WebView2 can exceed the budget),
+    // fall back to the display bytes — a transparent PNG beats a hard fail,
+    // and the display bytes are guaranteed present (the Save button is
+    // disabled when no image is shown).
+    final saveBytes = (bytes != null && bytes.isNotEmpty)
+        ? bytes
+        : _fallbackDisplayBytes();
+    if (saveBytes == null || saveBytes.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: l10n.mermaidExportFailed,
+        type: NotificationType.error,
+      );
+      return;
+    }
+    final ok = await _saveMermaidPng(saveBytes);
     if (!context.mounted) return;
     if (!ok) {
       showAppSnackBar(
@@ -4301,6 +4411,67 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         message: l10n.imageViewerPageSaveSuccess,
         type: NotificationType.success,
       );
+    }
+  }
+
+  Uint8List? _fallbackDisplayBytes() {
+    final lastThemeVars = _lastThemeVars;
+    if (lastThemeVars == null) return null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cacheKey = _mermaidCacheKey(widget.code, isDark, lastThemeVars);
+    return MermaidImageCache.get(cacheKey) ??
+        MermaidImageCache.get(widget.code) ??
+        _lastRenderedBytes;
+  }
+
+  Uint8List? get _currentOpaqueBytes {
+    final lastThemeVars = _lastThemeVars;
+    if (lastThemeVars == null) return null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cacheKey = _mermaidCacheKey(widget.code, isDark, lastThemeVars);
+    if (_opaqueCacheKey == null || _opaqueCacheKey != cacheKey) return null;
+    return _opaqueCacheBytes;
+  }
+
+  Future<Uint8List?> _exportOpaqueMermaidBytes() async {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Uses its own overlay slot (_saveOverlayEntry) so it never races with
+    // the display render's _renderOverlayEntry — the two can coexist.
+    _removeSaveOverlay();
+    final renderKey = GlobalKey();
+    final handle = createMermaidView(
+      widget.code,
+      isDark,
+      themeVars: _lastThemeVars,
+      viewKey: renderKey,
+    );
+    if (handle == null) return null;
+    _saveOverlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: -10000,
+        top: -10000,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints.tightFor(width: 720, height: 600),
+          child: Material(color: Colors.transparent, child: handle.widget),
+        ),
+      ),
+    );
+    overlay.insert(_saveOverlayEntry!);
+    try {
+      final exportBytes = handle.exportPngBytes;
+      if (exportBytes == null) return null;
+      // Cold webview re-export is the slow fallback — fail fast so the
+      // caller can fall back to the display bytes instead of a long wait.
+      final result = await _awaitMermaidExport(
+        exportBytes,
+        retries: 2,
+        timeout: const Duration(milliseconds: 600),
+      );
+      return result.bytes;
+    } finally {
+      _removeSaveOverlay();
     }
   }
 
@@ -4328,11 +4499,22 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   void _removeRenderOverlay() {
     try {
       _renderOverlayEntry?.remove();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('mermaid render overlay removal failed: $e');
+    }
     _renderOverlayEntry = null;
   }
 
-  Future<bool> _saveCachedMermaidPng(Uint8List bytes) async {
+  void _removeSaveOverlay() {
+    try {
+      _saveOverlayEntry?.remove();
+    } catch (e) {
+      debugPrint('mermaid save overlay removal failed: $e');
+    }
+    _saveOverlayEntry = null;
+  }
+
+  Future<bool> _saveMermaidPng(Uint8List bytes) async {
     try {
       final l10n = AppLocalizations.of(context)!;
       final suggested = 'mermaid_${DateTime.now().millisecondsSinceEpoch}.png';
@@ -4559,7 +4741,8 @@ class LatexBlockScrollableMd extends BlockMd {
 }
 
 /// Display math block with an export gesture (long-press on mobile,
-/// right-click on desktop) and a capture boundary for PNG export.
+/// right-click on desktop). Export renders the formula off-screen so the PNG
+/// never inherits the chat background or display padding.
 class _LatexMathBlock extends StatefulWidget {
   const _LatexMathBlock({required this.body, required this.style});
 
@@ -4571,7 +4754,14 @@ class _LatexMathBlock extends StatefulWidget {
 }
 
 class _LatexMathBlockState extends State<_LatexMathBlock> {
-  final GlobalKey _boundaryKey = GlobalKey();
+  // Export-only pixel budget: keeps long matrices and very wide formulas from
+  // allocating unbounded image buffers at high pixelRatio.
+  static const double _exportPixelRatio = 4.0;
+  static const int _exportMaxPixels = 16 * 1000 * 1000;
+  static const int _exportMaxLongSide = 8000;
+
+  OverlayEntry? _exportOverlayEntry;
+  bool _exportInFlight = false;
 
   @override
   Widget build(BuildContext context) {
@@ -4583,23 +4773,71 @@ class _LatexMathBlockState extends State<_LatexMathBlock> {
       onSecondaryTapDown: isDesktop
           ? (details) => _showDesktopMenu(details.globalPosition)
           : null,
-      child: RepaintBoundary(
-        key: _boundaryKey,
-        child: Container(
-          // Matches the chat surface (cs.surface) so the box is invisible in
-          // the message; the color exists only so the captured PNG has a
-          // non-transparent, theme-matched background. Symmetric padding gives
-          // the PNG a small margin without shifting the formula's center.
-          color: cs.surface,
-          padding: const EdgeInsets.all(4),
-          child: _renderMath(
-            widget.body,
-            style: widget.style,
-            displayMode: true,
-          ),
-        ),
+      child: Container(
+        // Display-only: matches the chat surface so the box is invisible in
+        // the message. The background and padding intentionally live outside
+        // any capture boundary so they never leak into the exported PNG.
+        color: cs.surface,
+        padding: const EdgeInsets.all(4),
+        child: _renderMath(widget.body, style: widget.style, displayMode: true),
       ),
     );
+  }
+
+  void _removeExportOverlay() {
+    try {
+      _exportOverlayEntry?.remove();
+    } catch (e) {
+      debugPrint('math export overlay removal failed: $e');
+    }
+    _exportOverlayEntry = null;
+  }
+
+  /// Renders the formula in an off-screen overlay slot (transparent
+  /// background, no padding, unconstrained width so the export hugs the
+  /// formula's real bounds) and captures it at [_exportPixelRatio],
+  /// independent of the chat display size.
+  ///
+  /// Concurrent calls are ignored while a capture is in flight: the overlay
+  /// slot is shared and a second call would remove the first one's boundary.
+  Future<Uint8List?> _captureExportPng() async {
+    if (_exportInFlight) return null;
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return null;
+    _exportInFlight = true;
+    try {
+      _removeExportOverlay();
+      final boundaryKey = GlobalKey();
+      _exportOverlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+          left: -10000,
+          top: -10000,
+          child: Material(
+            color: Colors.transparent,
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: _renderMath(
+                widget.body,
+                style: widget.style,
+                displayMode: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      overlay.insert(_exportOverlayEntry!);
+      // _captureRepaintBoundaryPng awaits endOfFrame, which resolves after
+      // the frame that paints the freshly inserted overlay slot.
+      return await _captureRepaintBoundaryPng(
+        boundaryKey,
+        pixelRatio: _exportPixelRatio,
+        maxPixels: _exportMaxPixels,
+        maxLongSide: _exportMaxLongSide,
+      );
+    } finally {
+      _exportInFlight = false;
+      _removeExportOverlay();
+    }
   }
 
   void _showDesktopMenu(Offset globalPosition) {
@@ -4661,6 +4899,12 @@ class _LatexMathBlockState extends State<_LatexMathBlock> {
                   Lucide.Download,
                   l10n.markdownMathDownloadPngLabel,
                   _downloadPng,
+                ),
+                _menuItem(
+                  ctx,
+                  Lucide.ImageDown,
+                  l10n.markdownMathSavePngLabel,
+                  _savePngToGallery,
                 ),
               ],
             ),
@@ -4728,7 +4972,7 @@ class _LatexMathBlockState extends State<_LatexMathBlock> {
   Future<void> _copyPng() async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      final bytes = await _captureRepaintBoundaryPng(_boundaryKey);
+      final bytes = await _captureExportPng();
       if (bytes == null) throw 'render error';
       final ok = await _copyPngToClipboard(bytes, 'cuplivo-math.png');
       if (!mounted) return;
@@ -4757,7 +5001,7 @@ class _LatexMathBlockState extends State<_LatexMathBlock> {
     );
     final filename = '${l10n.markdownMathDefaultFileNameStem}_$timestamp.png';
     try {
-      final bytes = await _captureRepaintBoundaryPng(_boundaryKey);
+      final bytes = await _captureExportPng();
       if (bytes == null) throw 'render error';
       final savePath = await _savePngFile(
         dialogTitle: l10n.backupPageExportToFile,
@@ -4776,6 +5020,33 @@ class _LatexMathBlockState extends State<_LatexMathBlock> {
       showAppSnackBar(
         context,
         message: l10n.messageExportSheetExportFailed('$e'),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<void> _savePngToGallery() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final bytes = await _captureExportPng();
+      if (bytes == null) throw 'render error';
+      final ok = await _savePngBytesToGallery(
+        bytes,
+        name: 'cuplivo-math-${DateTime.now().millisecondsSinceEpoch}',
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: ok
+            ? l10n.imagePreviewSheetSaveSuccess
+            : l10n.imagePreviewSheetSaveFailed('unknown'),
+        type: ok ? NotificationType.success : NotificationType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.imagePreviewSheetSaveFailed('$e'),
         type: NotificationType.error,
       );
     }
@@ -5615,7 +5886,7 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final surface = Color.alphaBlend(
       cs.onSurface.withValues(alpha: isDark ? 0.05 : 0.025),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaDetails);
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.18 : 0.30,
     );
@@ -5629,6 +5900,7 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final bodyConfig = widget.config.copyWith(style: bodyStyle);
 
     return Container(
+      key: const ValueKey('details-surface'),
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(

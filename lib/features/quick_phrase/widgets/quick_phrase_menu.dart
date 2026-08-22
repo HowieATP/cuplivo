@@ -63,6 +63,7 @@ class QuickPhraseMenu extends StatelessWidget {
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
                     color: isDark
+                        // color-gate: ignore
                         ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
                         : Colors.white.withValues(alpha: 0.66),
                     borderRadius: BorderRadius.circular(16),

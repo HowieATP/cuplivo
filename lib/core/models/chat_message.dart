@@ -70,7 +70,7 @@ class ChatMessage {
   // Per-request routing/body metadata persisted on the originating user
   // message so regenerate/continue can replay how the request was sent
   // (image-mode routing + image generation options). See
-  // docs/adr/0018-per-message-request-metadata.md.
+  // docs/adr/0033-per-message-request-metadata.md.
   final bool? requestAllowImagesApiRouting;
 
   final String? requestExtraBodyJson;

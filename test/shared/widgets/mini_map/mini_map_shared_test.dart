@@ -77,6 +77,11 @@ void main() {
       expect(miniMapOneLine('<thought>t</thought>only'), 'only');
     });
 
+    test('strips long <thinking> blocks entirely', () {
+      expect(miniMapOneLine('hi <thinking>inner</thinking> x'), 'hi x');
+      expect(miniMapOneLine('<THINKING>t</THINKING>only'), 'only');
+    });
+
     test('strips image and file markers', () {
       expect(
         miniMapOneLine('see [image:foo.png] and [file:a.txt] done'),
@@ -160,6 +165,31 @@ void main() {
       expect(snippet, contains('needle'));
       expect(snippet, isNot(contains('<think>')));
       expect(snippet, isNot(contains('</think>')));
+    });
+
+    test('flattens long <thinking> tags but keeps inner text', () {
+      final snippet = miniMapHitSnippet(
+        'before <thinking>secret needle</thinking> after',
+        ['needle'],
+      );
+      expect(snippet, contains('needle'));
+      expect(snippet, isNot(contains('<thinking>')));
+      expect(snippet, isNot(contains('</thinking>')));
+    });
+
+    test('window cut mid-thinking-block leaves no stray thinking tags', () {
+      // Same mid-block cut as the <think> case, but with the longer
+      // `<thinking>` tag that PR #354 started parsing elsewhere.
+      final content =
+          '${List.filled(20, 'pad').join(' ')} <thinking>needle '
+          '${List.filled(60, 'x').join('')} </thinking> '
+          '${List.filled(20, 'tail').join(' ')}';
+      final snippet = miniMapHitSnippet(content, ['needle'], maxChars: 100);
+      expect(snippet, isNot(contains('<thinking>')));
+      expect(snippet, isNot(contains('</thinking>')));
+      expect(snippet, contains('needle'));
+      expect(snippet, startsWith('... '));
+      expect(snippet, endsWith(' ...'));
     });
 
     test('flattens image marker keeping inner text', () {

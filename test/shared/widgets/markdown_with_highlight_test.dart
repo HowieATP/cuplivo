@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:Cuplivo/shared/widgets/markdown_line_lexer.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:Cuplivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Cuplivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Cuplivo/shared/widgets/export_capture_scope.dart';
@@ -48,6 +50,27 @@ List<WidgetSpan> _collectWidgetSpans(InlineSpan span) {
     spans.addAll(_collectWidgetSpans(child));
   }
   return spans;
+}
+
+double? _spanFontSize(WidgetTester tester, String text) {
+  for (final span in _resolvedTextSpansFromRichText(tester)) {
+    if (span.text.contains(text)) return span.style.fontSize;
+  }
+  return null;
+}
+
+String _nestedDetailsHtml(int levels) {
+  final out = StringBuffer();
+  for (var i = 1; i <= levels; i++) {
+    out.writeln('<details>');
+    out.writeln('<summary>L$i</summary>');
+  }
+  out.write('deep-body');
+  for (var i = 0; i < levels; i++) {
+    out.write('</details>');
+    if (i < levels - 1) out.writeln();
+  }
+  return out.toString();
 }
 
 List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
@@ -974,7 +997,11 @@ Inline ***strong emphasis*** text.
       await tester.pump(const Duration(milliseconds: 50));
       text.value = '$baseLines\nframe-3';
       await tester.pump(const Duration(milliseconds: 50));
-      await tester.pump(const Duration(milliseconds: 40));
+      // The throttle publishes the text the last build saw, so the newest value
+      // lands one window later. Give it that window rather than pinning the
+      // test to the exact interval.
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump(const Duration(milliseconds: 60));
 
       expect(find.textContaining('frame-3'), findsOneWidget);
     },
@@ -4124,6 +4151,620 @@ void main() {
 
       expect(find.text('Copy LaTeX'), findsOneWidget);
       expect(find.text('SELECTION_TOOLBAR_MARKER'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'streaming text between 512 and 4096 uses incremental markdown blocks',
+    (tester) async {
+      final paragraph = 'Streaming markdown paragraph for block split. ' * 6;
+      final text = List<String>.generate(
+        4,
+        (index) => '$paragraph$index',
+      ).join('\n\n');
+      expect(text.length, greaterThanOrEqualTo(512));
+      expect(text.length, lessThan(4096));
+
+      await tester.pumpWidget(_markdownHarness(text, streaming: true));
+      await tester.pump();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_MarkdownBlockColumn',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_CachedMarkdownBlock',
+        ),
+        findsAtLeastNWidgets(2),
+      );
+    },
+  );
+
+  testWidgets('streaming markdown uses AtxHeadingMd and not the default HTag', (
+    tester,
+  ) async {
+    final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+    await tester.pumpWidget(
+      _markdownHarness('$pad\n\n# Real heading\n\nNext', streaming: true),
+    );
+    await tester.pump();
+
+    final markdown = tester.widget<GptMarkdown>(find.byType(GptMarkdown).first);
+    expect(markdown.components!.whereType<HTag>(), isEmpty);
+    expect(markdown.components!.whereType<AtxHeadingMd>(), hasLength(1));
+    expect(_spanFontSize(tester, 'Real heading'), 24);
+  });
+
+  testWidgets('a completed pipe row is not turned into a streaming table', (
+    tester,
+  ) async {
+    final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+    final text = '$pad\n\n| a | b |\n\nNext paragraph';
+    await tester.pumpWidget(_markdownHarness(text, streaming: true));
+    await tester.pump();
+    expect(find.byType(Table), findsNothing);
+    expect(find.byKey(const ValueKey('markdown-table-body')), findsNothing);
+
+    await tester.pumpWidget(_markdownHarness(text, streaming: false));
+    await tester.pump();
+    expect(find.byType(Table), findsNothing);
+  });
+
+  testWidgets('appending to the same tail keeps an expanded details open', (
+    tester,
+  ) async {
+    final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+    final text = ValueNotifier<String>(
+      '$pad\n\n<details><summary>s</summary>\n\nhidden\n</details>',
+    );
+    await tester.pumpWidget(_streamingMarkdownHarness(text));
+    await tester.pump();
+
+    await tester.tap(find.text('s'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+
+    text.value =
+        '$pad\n\n<details><summary>s</summary>\n\nhidden\n</details>\n'
+        'more from the same block';
+    await tester.pump();
+    expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+    expect(
+      find.textContaining('more from the same block', findRichText: true),
+      findsWidgets,
+    );
+  });
+
+  testWidgets(
+    'replacing a tail resets an expanded details instead of appending',
+    (tester) async {
+      final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+      final text = ValueNotifier<String>(
+        '$pad\n\n<details><summary>s</summary>\n\nhidden\n</details>',
+      );
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+
+      await tester.tap(find.text('s'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+
+      text.value =
+          '$pad\n\n<details><summary>other</summary>\n\nhidden\n</details>';
+      await tester.pump();
+      expect(find.text('other'), findsOneWidget);
+      expect(find.textContaining('hidden', findRichText: true), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'appending an image keeps an earlier expanded details open and shows the new image',
+    (tester) async {
+      final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+      const second = 'https://example.com/b.png';
+      final text = ValueNotifier<String>(
+        '<details><summary>s</summary>\n\nhidden\n</details>\n\n'
+        '![42x24]($_transparentPngDataUrl)\n\n$pad\n\n',
+      );
+      await tester.pumpWidget(_streamingMarkdownHarness(text, width: 360));
+      await tester.pump();
+
+      expect(find.textContaining('hidden', findRichText: true), findsNothing);
+      await tester.tap(find.text('s'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+
+      text.value =
+          '<details><summary>s</summary>\n\nhidden\n</details>\n\n'
+          '![42x24]($_transparentPngDataUrl)\n\n$pad\n\n\n![]($second)';
+      await tester.pump();
+      expect(find.textContaining('hidden', findRichText: true), findsWidgets);
+
+      await tester.tap(find.byType(Image).first);
+      await tester.pumpAndSettle();
+      final viewer = tester.widget<ImageViewerPage>(
+        find.byType(ImageViewerPage),
+      );
+      expect(viewer.images, hasLength(2));
+      expect(viewer.images.last, second);
+    },
+  );
+
+  testWidgets('details walker, DetailsHtmlMd, and the widget share tokenization', (
+    tester,
+  ) async {
+    Future<void> expectShared({
+      required String source,
+      required bool isDetails,
+      int depth = 0,
+      String? summary,
+      String? hiddenBody,
+      String? visibleText,
+    }) async {
+      final walker = MarkdownDetailsWalker()..consumeText(source);
+      expect(walker.depth, depth);
+      expect(walker.overflowed, isFalse);
+      expect(markdownDetailsExtent(source) >= 0, isDetails);
+      expect(markdownParseDetails(source) != null, isDetails);
+      final registry = MarkdownDetailsRegistry();
+      final rewritten = registry.rewrite(source);
+      expect(
+        registry.hasIssuedPlaceholders &&
+            DetailsHtmlMd(registry).exp.hasMatch(rewritten),
+        isDetails,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+      final details = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+      );
+      if (!isDetails) {
+        expect(details, findsNothing);
+        if (visibleText != null) {
+          expect(
+            find.textContaining(visibleText, findRichText: true),
+            findsWidgets,
+          );
+        }
+        return;
+      }
+      expect(details, findsOneWidget);
+      if (summary != null) {
+        expect(find.text(summary), findsOneWidget);
+      }
+      if (hiddenBody == null) return;
+      expect(find.textContaining(hiddenBody, findRichText: true), findsNothing);
+      await tester.tap(find.text(summary!));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(hiddenBody, findRichText: true), findsWidgets);
+    }
+
+    await expectShared(
+      source:
+          '<details>\n<summary>s</summary>\nUse `<details>` here\n\nmore\n</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source: '<details><summary>s</summary>body</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'body',
+    );
+    await expectShared(
+      source: '<details\nopen>\n<summary>s</summary>\n\nbody\n</details>',
+      isDetails: false,
+      visibleText: 'body',
+    );
+    await expectShared(
+      source:
+          '<details>\n<summary>outer</summary>\n'
+          'prefix <details>\n<summary>inner</summary>\n\n'
+          'inner body\n</details>\n\nouter body\n</details>',
+      isDetails: true,
+      summary: 'outer',
+      hiddenBody: 'outer body',
+    );
+    await expectShared(
+      source: '<details><summary>Use `<details>`</summary>\n\nbody\n</details>',
+      isDetails: true,
+    );
+    await expectShared(
+      source: _nestedDetailsHtml(6),
+      isDetails: true,
+      summary: 'L1',
+      hiddenBody: 'L2',
+    );
+    await expectShared(
+      source: '<DETAILS><SUMMARY>s</SUMMARY>more</DETAILS>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source: '<Details><Summary>s</Summary>more</Details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source:
+          '<details>\n<summary>s</summary>\n<details.foo>\n\nmore\n</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source: '<details>\n<summary>s</summary>\n<details/>\n\nmore\n</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source:
+          '<details>\n<summary>s</summary>\nsee <details\n\nmore\n</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source:
+          '<details>\n<summary>s</summary>\n'
+          'Use `<details.foo>` and `<DETAILS>` here\n\nmore\n</details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'more',
+    );
+    await expectShared(
+      source: r'<details><summary>s</summary>`x`<details>y`</details>',
+      isDetails: false,
+      depth: 1,
+    );
+    await expectShared(
+      source: r'<details><summary>s</summary>`x```<details>y`</details>',
+      isDetails: true,
+      summary: 's',
+    );
+    await expectShared(
+      source: r'<details><summary>s</summary>``x``<details>y``</details>',
+      isDetails: false,
+      depth: 1,
+    );
+    await expectShared(
+      source: '<details><summary>s</summary>before <details missing </details>',
+      isDetails: true,
+      summary: 's',
+      hiddenBody: 'before',
+    );
+  });
+
+  testWidgets('details registry keeps walker top-level and block boundaries', (
+    tester,
+  ) async {
+    Finder detailsFinder() => find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+    );
+
+    Future<String> pumpSource(String source) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+      return tester
+          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
+          .map((widget) => widget.data)
+          .join('\n');
+    }
+
+    const nestedUnclosed =
+        '<details>\n<summary>A</summary>\nunclosed\n'
+        '<details><summary>B</summary>body B</details>';
+    var data = await pumpSource(nestedUnclosed);
+    expect(detailsFinder(), findsNothing);
+    expect(data, isNot(contains('\uE010')));
+    expect(find.textContaining('body B', findRichText: true), findsWidgets);
+
+    data = await pumpSource(_nestedDetailsHtml(7));
+    expect(detailsFinder(), findsNothing);
+    expect(data, isNot(contains('\uE010')));
+    expect(find.text('L2'), findsNothing);
+
+    const tailed = '<details><summary>s</summary>body</details> tail';
+    data = await pumpSource(tailed);
+    expect(detailsFinder(), findsNothing);
+    expect(data, isNot(contains('\uE010')));
+    expect(find.textContaining('tail', findRichText: true), findsWidgets);
+
+    data = await pumpSource('<details><summary>s</summary>body</details>  ');
+    expect(detailsFinder(), findsOneWidget);
+    expect(find.text('s'), findsOneWidget);
+
+    const adjacent =
+        '<details><summary>A</summary>a</details>'
+        '<details><summary>B</summary>b</details>';
+    data = await pumpSource(adjacent);
+    expect(detailsFinder(), findsNothing);
+    expect(data, isNot(contains('\uE010')));
+
+    data = await pumpSource('  <details><summary>s</summary>body</details>');
+    expect(detailsFinder(), findsOneWidget);
+    expect(find.text('s'), findsOneWidget);
+
+    const literal = '\uE010DETAILS0\uE011';
+    data = await pumpSource(
+      '<details><summary>real</summary>body</details>\n\n$literal',
+    );
+    expect(detailsFinder(), findsOneWidget);
+    expect(find.text('real'), findsOneWidget);
+    expect(data, contains(literal));
+    expect(find.textContaining(literal, findRichText: true), findsWidgets);
+  });
+
+  testWidgets('details render inside list, quote, table, and details body', (
+    tester,
+  ) async {
+    Finder detailsFinder() => find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+    );
+
+    Future<void> expectFoldable(String source, String summary) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+      expect(detailsFinder(), findsWidgets);
+      expect(find.textContaining(summary, findRichText: true), findsWidgets);
+      expect(find.textContaining('body', findRichText: true), findsNothing);
+      await tester.tap(find.textContaining(summary, findRichText: true).first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('body', findRichText: true), findsWidgets);
+    }
+
+    await expectFoldable(
+      '- <details><summary>list</summary>body</details>',
+      'list',
+    );
+    await expectFoldable(
+      '> <details><summary>quote</summary>body</details>',
+      'quote',
+    );
+    await expectFoldable(
+      '| x |\n| --- |\n| <details><summary>cell</summary>body</details> |',
+      'cell',
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      _markdownHarness(
+        '<details><summary>outer</summary>\n\n'
+        '<details><summary>inner</summary>body</details>\n'
+        '</details>',
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('outer'));
+    await tester.pumpAndSettle();
+    expect(find.text('inner'), findsOneWidget);
+    expect(find.textContaining('body', findRichText: true), findsNothing);
+    await tester.tap(find.text('inner'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('body', findRichText: true), findsWidgets);
+  });
+
+  testWidgets('details inside display math follow the math-rendering flag', (
+    tester,
+  ) async {
+    Finder detailsFinder() => find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+    );
+    const source = '\$\$\n<details><summary>s</summary>body</details>\n\$\$';
+    late SettingsProvider settings;
+
+    await tester.pumpWidget(
+      _settingsHarness(
+        onSettingsReady: (value) => settings = value,
+        child: const MarkdownWithCodeHighlight(text: source),
+      ),
+    );
+    await tester.pump();
+    expect(detailsFinder(), findsNothing);
+    expect(_findMathWidget(), findsOneWidget);
+
+    await settings.setEnableMathRendering(false);
+    await tester.pumpAndSettle();
+    expect(detailsFinder(), findsOneWidget);
+    expect(_findMathWidget(), findsNothing);
+    expect(find.text('s'), findsOneWidget);
+  });
+
+  testWidgets(
+    'an unclosed dollar opener does not hide a following details block',
+    (tester) async {
+      Finder detailsFinder() => find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+      );
+      await tester.pumpWidget(
+        _markdownHarness('\$\$\n<details><summary>s</summary>body</details>'),
+      );
+      await tester.pump();
+      expect(detailsFinder(), findsOneWidget);
+      expect(find.text('s'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'four-space hashes are not rendered as a heading on either path',
+    (tester) async {
+      final pad = 'Body. ${'The rain kept falling on the quiet street. ' * 16}';
+      final text = '$pad\n\n    # Not a heading\n\nNext';
+      for (final streaming in const [true, false]) {
+        await tester.pumpWidget(_markdownHarness(text, streaming: streaming));
+        await tester.pump();
+        expect(
+          _spanFontSize(tester, 'Not a heading'),
+          isNot(24),
+          reason: streaming ? 'streaming' : 'finished',
+        );
+        final markdown = tester.widget<GptMarkdown>(
+          find.byType(GptMarkdown).first,
+        );
+        expect(markdown.components!.whereType<HTag>(), isEmpty);
+      }
+    },
+  );
+
+  testWidgets(
+    'image data URIs are not copied into the parsed markdown cache key',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('![42x24]($_transparentPngDataUrl)', width: 160),
+      );
+      await tester.pump();
+
+      final key = tester.widget<GptMarkdown>(find.byType(GptMarkdown)).key;
+      expect(key, isA<ValueKey<String>>());
+      final value = (key! as ValueKey<String>).value;
+      expect(value, startsWith('parsed-markdown-'));
+      expect(value.contains('data:image'), isFalse);
+      expect(value.contains('iVBORw0KGgo'), isFalse);
+    },
+  );
+
+  testWidgets(
+    'sibling list fragments do not collide on a literal placeholder token',
+    (tester) async {
+      const literal = '\uE0100:0\uE011';
+      await tester.pumpWidget(
+        _markdownHarness(
+          '- <details><summary>real</summary>body</details>\n- $literal',
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('real'), findsOneWidget);
+      expect(find.textContaining(literal, findRichText: true), findsWidgets);
+    },
+  );
+
+  testWidgets('inline code keeps a literal less-than and U+E002', (
+    tester,
+  ) async {
+    Future<void> expectUnmasked({
+      required String source,
+      required String visible,
+      bool expectDetails = false,
+    }) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+      final data = tester
+          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
+          .map((widget) => widget.data)
+          .join('\n');
+      expect(find.byType(GptMarkdown), findsWidgets);
+      expect(data, isNot(contains('\uE002')));
+      final details = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
+      );
+      expect(details, expectDetails ? findsOneWidget : findsNothing);
+      if (expectDetails) {
+        expect(find.textContaining(visible, findRichText: true), findsNothing);
+        await tester.tap(find.text('s'));
+        await tester.pumpAndSettle();
+      } else {
+        expect(data, contains(visible));
+      }
+      expect(find.textContaining(visible, findRichText: true), findsWidgets);
+    }
+
+    await expectUnmasked(source: 'Use `a < b` now', visible: 'a < b');
+    await expectUnmasked(source: r'Use ``a < b`` now', visible: 'a < b');
+    await expectUnmasked(source: r'Use `<details>` here', visible: '<details>');
+    await expectUnmasked(
+      source: '<details><summary>s</summary>`a < b` still open',
+      visible: 'a < b',
+    );
+    await expectUnmasked(
+      source: '<details><summary>s</summary>\n\nUse `a < b` now\n</details>',
+      visible: 'a < b',
+      expectDetails: true,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(_markdownHarness('hello \uE002 world'));
+    await tester.pump();
+    final privateData = tester
+        .widget<GptMarkdown>(find.byType(GptMarkdown))
+        .data;
+    expect(privateData, contains('\uE002'));
+    expect(privateData, isNot(contains('hello < world')));
+    expect(
+      find.textContaining('hello \uE002 world', findRichText: true),
+      findsWidgets,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(_markdownHarness('Use `a \uE002 b` now'));
+    await tester.pump();
+    expect(find.text('a \uE002 b'), findsWidgets);
+    expect(
+      tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data,
+      contains('\uE002'),
+    );
+  });
+
+  test('FencedCodeBlockMd does not close on an info-string fence line', () {
+    for (final item in const [
+      ('```', '```', '```dart\na\n``` not-a-closer\nfollowing\n```'),
+      ('~~~', '~~~', '~~~\na\n~~~ not-a-closer\nfollowing\n~~~'),
+      ('````', '````', '````dart\na\n```` not-a-closer\nfollowing\n````'),
+      ('~~~~', '~~~~', '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~'),
+      ('````', '```', '````dart\na\n``` not-a-closer\nfollowing\n````'),
+    ]) {
+      final match = FencedCodeBlockMd(streaming: false).exp.firstMatch(item.$3);
+      expect(match, isNotNull, reason: item.$3);
+      expect(match!.group(0), item.$3, reason: item.$3);
+      expect(match.group(4), contains('not-a-closer'), reason: item.$3);
+      expect(match.group(4), contains('following'), reason: item.$3);
+    }
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps an info-string fence line inside the code block',
+    (tester) async {
+      for (final source in const [
+        '```dart\na\n``` not-a-closer\nfollowing\n```',
+        '~~~\na\n~~~ not-a-closer\nfollowing\n~~~',
+        '````dart\na\n```` not-a-closer\nfollowing\n````',
+      ]) {
+        await tester.pumpWidget(_markdownHarness(source));
+        await tester.pump();
+        expect(
+          find.descendant(
+            of: find.byType(SelectableHighlightView),
+            matching: find.textContaining('not-a-closer'),
+          ),
+          findsOneWidget,
+          reason: source,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(SelectableHighlightView),
+            matching: find.textContaining('following'),
+          ),
+          findsOneWidget,
+          reason: source,
+        );
+      }
     },
   );
 }

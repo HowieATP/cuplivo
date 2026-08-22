@@ -102,50 +102,13 @@ A-->B''',
     },
   );
 
-  testWidgets('streaming thinking preview is truncated to the tail by default '
-      '(issue #232)', (tester) async {
-    const tailMarker = 'TAIL-MARKER-9876';
-    final longThinking = '${'x' * 5000}$tailMarker';
-    await tester.pumpWidget(
-      _buildHarness(
-        child: ChatMessageWidget(
-          message: ChatMessage(
-            id: 'streaming-thinking',
-            role: 'assistant',
-            content: '',
-            conversationId: 'conversation-1',
-            isStreaming: true,
-          ),
-          reasoningText: longThinking,
-          reasoningExpanded: false,
-          reasoningFinishedAt: null,
-          showModelIcon: false,
-        ),
-      ),
-    );
-    await tester.pump();
-
-    final previewMd = tester
-        .widgetList<MarkdownWithCodeHighlight>(
-          find.byType(MarkdownWithCodeHighlight),
-        )
-        .where((md) => md.text.length > 1)
-        .single;
-    expect(previewMd.text.length, lessThanOrEqualTo(2002));
-    expect(previewMd.text, startsWith('…'));
-    expect(previewMd.text, contains(tailMarker));
-  });
-
   testWidgets(
-    'streaming thinking preview renders full text when the truncation '
-    'setting is off',
+    'streaming thinking preview renders the full text while loading',
     (tester) async {
-      final longThinking = '${'x' * 5000}TAIL-MARKER-9876';
+      const tailMarker = 'TAIL-MARKER-9876';
+      final longThinking = '${'x' * 5000}$tailMarker';
       await tester.pumpWidget(
         _buildHarness(
-          initialPrefs: {
-            'display_streaming_thinking_preview_truncate_v1': false,
-          },
           child: ChatMessageWidget(
             message: ChatMessage(
               id: 'streaming-thinking-full',

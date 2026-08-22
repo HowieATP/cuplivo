@@ -3021,14 +3021,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Render reasoning (thinking) with Markdown';
 
   @override
-  String get displaySettingsPageStreamingThinkingPreviewTruncateTitle =>
-      'Limit streaming thinking preview';
-
-  @override
-  String get displaySettingsPageStreamingThinkingPreviewTruncateSubtitle =>
-      'While thinking streams, only the tail of the preview is rendered for speed. Turn off to restore the original full-length live preview.';
-
-  @override
   String get displaySettingsPageEnableAssistantMarkdownTitle =>
       'Render assistant messages with Markdown';
 

@@ -283,8 +283,16 @@ abstract final class StorageUsageService {
           }
         },
       );
-    } catch (_) {
-      // If listing fails for any reason, fall back to 0s; UI will show load failed.
+    } catch (e) {
+      // Last-resort guard. Nested failures are logged and skipped inside
+      // _scanFilesConcurrently, so reaching this only means the app data
+      // root itself (or one of its immediate entries) cannot be listed.
+      // Never swallow silently: a silent catch once left the storage page
+      // reporting 0 bytes for every category except the separately-scanned
+      // sandbox (real incident).
+      debugPrint(
+        'StorageUsageService: failed to scan app data root ${root.path}: $e',
+      );
     }
 
     // Desktop workspaces root can be relocated (workspaces_dir_v1) to a
@@ -309,7 +317,12 @@ abstract final class StorageUsageService {
             },
           );
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'StorageUsageService: failed to scan relocated workspaces root '
+          '${workspacesRoot.path}: $e',
+        );
+      }
     }
 
     // iOS shared Linux sandbox runtime (iSH rootfs) lives in Application
@@ -328,7 +341,12 @@ abstract final class StorageUsageService {
             },
           );
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'StorageUsageService: failed to scan sandbox runtime '
+          '${sandboxRuntime.path}: $e',
+        );
+      }
     }
 
     // Workspaces with a customHostPath live outside the managed roots. Their
@@ -364,7 +382,12 @@ abstract final class StorageUsageService {
             },
           );
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'StorageUsageService: failed to scan custom host workspace '
+          '$normHost: $e',
+        );
+      }
     }
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
@@ -394,7 +417,12 @@ abstract final class StorageUsageService {
           },
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'StorageUsageService: failed to scan system cache '
+        '${systemCacheDir.path}: $e',
+      );
+    }
 
     if (iosTmpPath != null) {
       final tmpDir = Directory(iosTmpPath);
@@ -409,8 +437,8 @@ abstract final class StorageUsageService {
             },
           );
         }
-      } catch (_) {
-        // If listing fails for any reason, fall back to 0s; UI will show load failed.
+      } catch (e) {
+        debugPrint('StorageUsageService: failed to scan iOS tmp dir: $e');
       }
     }
 
@@ -571,18 +599,35 @@ abstract final class StorageUsageService {
   /// requests. [onFile] is called once per file with its byte size (0 when
   /// stat fails); running totals are emitted after every batch through
   /// [progress].
+  ///
+  /// A single unreadable subdirectory used to fail the whole scan: the old
+  /// `list(recursive: true)` stream threw and the caller swallowed it, so the
+  /// storage page reported 0 bytes for every category except the separately
+  /// scanned sandbox (real incident). Each subdirectory is now recursed
+  /// individually, so a failing entry is logged and skipped instead of
+  /// zeroing the entire app data scan.
   static Future<void> _scanFilesConcurrently(
     Directory dir, {
     required void Function(File file, int bytes) onFile,
     required _ScanProgress progress,
   }) async {
     var batch = <File>[];
-    await for (final ent in dir.list(recursive: true, followLinks: false)) {
-      if (ent is! File) continue;
-      batch.add(ent);
-      if (batch.length >= _scanBatchSize) {
-        await _resolveScanBatch(batch, onFile, progress);
-        batch = <File>[];
+    await for (final ent in dir.list(followLinks: false)) {
+      if (ent is Directory) {
+        try {
+          await _scanFilesConcurrently(ent, onFile: onFile, progress: progress);
+        } catch (e) {
+          debugPrint(
+            'StorageUsageService: skipping unreadable directory '
+            '${ent.path}: $e',
+          );
+        }
+      } else if (ent is File) {
+        batch.add(ent);
+        if (batch.length >= _scanBatchSize) {
+          await _resolveScanBatch(batch, onFile, progress);
+          batch = <File>[];
+        }
       }
     }
     if (batch.isNotEmpty) {

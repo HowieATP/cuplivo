@@ -472,6 +472,48 @@ void main() {
   });
 
   test(
+    'unreadable subdirectory does not zero the rest of the scan',
+    () async {
+      await _writeSizedFile(appDataDir, AppDatabase.databaseFileName, 11);
+      await _writeSizedFile(appDataDir, 'notes.txt', 10);
+
+      final blocked = Directory(
+        p.join(appDataDir.path, 'workspaces', 'default', '.sandbox'),
+      );
+      await Directory(
+        p.join(blocked.path, 'linux', 'bin'),
+      ).create(recursive: true);
+      await _writeSizedFile(
+        Directory(p.join(blocked.path, 'linux', 'bin')),
+        'sh',
+        100,
+      );
+      final chmod = await Process.run('chmod', ['000', blocked.path]);
+      expect(chmod.exitCode, 0);
+      addTearDown(() async {
+        final restore = await Process.run('chmod', ['700', blocked.path]);
+        expect(restore.exitCode, 0);
+      });
+
+      final report = await StorageUsageService.computeReport();
+      final chat = report.categories.singleWhere(
+        (category) => category.key == StorageUsageCategoryKey.chatData,
+      );
+      final other = report.categories.singleWhere(
+        (category) => category.key == StorageUsageCategoryKey.other,
+      );
+
+      expect(chat.stats.bytes, 11);
+      expect(chat.stats.fileCount, 1);
+      expect(other.stats.bytes, 10);
+      expect(report.totalBytes, 21);
+    },
+    skip: Platform.isWindows
+        ? 'chmod cannot revoke permissions on Windows; covered on POSIX CI'
+        : false,
+  );
+
+  test(
     'relocated workspaces root inside app data keeps its category split',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.windows;

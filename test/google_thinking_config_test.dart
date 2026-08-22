@@ -81,6 +81,33 @@ Map<String, dynamic>? _thinkingConfig(Map<String, dynamic> body) {
   return thinkingConfig.cast<String, dynamic>();
 }
 
+// Runs one request against a throwaway local server and returns the body it saw.
+Future<Map<String, dynamic>> _capture({
+  required String modelId,
+  int? thinkingBudget,
+}) async {
+  late Map<String, dynamic> body;
+  final server = await _startGeminiServer((b) => body = b);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  final chunks = await ChatApiService.sendMessageStream(
+    config: _geminiConfig(
+      'http://${server.address.address}:${server.port}/v1beta',
+    ),
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    thinkingBudget: thinkingBudget,
+    stream: false,
+  ).toList();
+
+  expect(chunks.last.isDone, isTrue, reason: modelId);
+  return body;
+}
+
 void main() {
   group('Google Gemma 4 thinking config', () {
     test('non-stream request maps custom budget to thinking level', () async {
@@ -171,7 +198,7 @@ void main() {
     });
   });
 
-  group('latest Gemini Flash thinking config', () {
+  group('Gemini 3.x thinking config', () {
     test('Gemini 3.6 Flash defaults to medium with 64K output', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {
@@ -262,6 +289,141 @@ void main() {
       expect(
         (capturedBody['generationConfig'] as Map)['maxOutputTokens'],
         65536,
+      );
+    });
+
+    test('Gemini 3.7 Flash uses thinkingLevel, never thinkingBudget', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.7-flash',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'medium',
+      });
+      expect((body['generationConfig'] as Map)['maxOutputTokens'], 65536);
+    });
+
+    test('Gemini 3.1 Pro maps budget to medium thinkingLevel', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.1-pro-preview',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'medium',
+      });
+    });
+
+    // Gemini 3.0 pro has no 'medium'; 'off' hides thoughts at 'low'.
+    test('Gemini 3 Pro floors at low and hides thoughts when off', () async {
+      final body = await _capture(modelId: 'gemini-3-pro', thinkingBudget: 0);
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': false,
+        'thinkingLevel': 'low',
+      });
+    });
+
+    test('Gemini 3 Pro never maps to medium', () async {
+      final body = await _capture(
+        modelId: 'gemini-3-pro',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'high',
+      });
+      expect(_thinkingConfig(body)!.containsKey('thinkingBudget'), isFalse);
+    });
+
+    test(
+      'Gemini 3.7 Flash floors at low because minimal is unsupported',
+      () async {
+        final body = await _capture(
+          modelId: 'gemini-3.7-flash',
+          thinkingBudget: 0,
+        );
+
+        expect(_thinkingConfig(body), {
+          'includeThoughts': false,
+          'thinkingLevel': 'low',
+        });
+      },
+    );
+
+    test(
+      'Gemini 3.6 Flash still floors at minimal when thinking is off',
+      () async {
+        final body = await _capture(
+          modelId: 'gemini-3.6-flash',
+          thinkingBudget: 0,
+        );
+
+        expect(_thinkingConfig(body), {
+          'includeThoughts': false,
+          'thinkingLevel': 'minimal',
+        });
+      },
+    );
+
+    test('Gemini 3.7 Flash-Lite floors at low when thinking is off', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.7-flash-lite',
+        thinkingBudget: 0,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': false,
+        'thinkingLevel': 'low',
+      });
+    });
+
+    // Non-text flash ids fall through to the raw-budget branch and get no 64K
+    // default: maxOutputTokens stays unset and the API applies its own default.
+    test('image ids never get thinkingLevel or a 64K default', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.5-flash-image',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingBudget': 16000,
+      });
+      expect(
+        (body['generationConfig'] as Map).containsKey('maxOutputTokens'),
+        isFalse,
+      );
+    });
+
+    // Image ids fall through to the raw-budget branch; the off case is the only
+    // one that distinguishes that from the old dedicated image branch.
+    test('image ids hide thoughts when thinking is off', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.1-flash-image',
+        thinkingBudget: 0,
+      );
+
+      expect(_thinkingConfig(body), {'includeThoughts': false});
+    });
+
+    test('TTS ids never get a thinkingLevel', () async {
+      final body = await _capture(
+        modelId: 'gemini-3.1-flash-tts-preview',
+        thinkingBudget: 16000,
+      );
+
+      expect(
+        _thinkingConfig(body)?.containsKey('thinkingLevel'),
+        isNot(isTrue),
+      );
+      expect(
+        (body['generationConfig'] as Map).containsKey('maxOutputTokens'),
+        isFalse,
       );
     });
   });

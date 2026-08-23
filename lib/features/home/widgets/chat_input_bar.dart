@@ -1222,14 +1222,24 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (_ownsVoiceSession || _finishingVoice) return;
     final text = _controller.text.trim();
     if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+    final images = List.of(_images);
+    final docs = List.of(_docs);
+    final submittedValue = _controller.value;
+    // The content has moved into the conversation or the queue — clear the
+    // input before awaiting so the composer shrink and the message growth
+    // never land in separate frames (the cause of the visible send bounce).
     _isSubmitting = true;
+    setState(() {
+      _controller.clear();
+      _resetMedia(images: true, docs: true);
+    });
     try {
       final result =
           await widget.onSend?.call(
             ChatInputData(
               text: text,
-              imagePaths: List.of(_images),
-              documents: List.of(_docs),
+              imagePaths: images,
+              documents: docs,
               allowImagesApiRouting: _allowImagesApiRouting,
               extraBody: _imageGenerationExtraBody(),
             ),
@@ -1239,8 +1249,6 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (result == ChatInputSubmissionResult.sent ||
           result == ChatInputSubmissionResult.queued) {
         setState(() {
-          _controller.clear();
-          _resetMedia(images: true, docs: true);
           // The restored queued input has been consumed by this send — the
           // "restored input must not route" flag must not stick to unrelated
           // later sends on the same (non-image) model.
@@ -1248,8 +1256,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             widget.conversationId,
           );
         });
-        // The content has moved into the conversation or the queue — clear
-        // the draft immediately so a process death right after sending
+        // Clear the draft immediately so a process death right after sending
         // cannot resurrect it (best-effort: the underlying prefs write is
         // itself async fire-and-forget).
         _clearPersistedDraft();
@@ -1259,6 +1266,32 @@ class _ChatInputBarState extends State<ChatInputBar>
             widget.focusNode?.requestFocus();
           }
         } catch (_) {}
+      } else {
+        // The submit was rejected — the content is still the user's, so put
+        // the submitted text/media back into the bar and re-persist the
+        // draft. Newer user input typed during the flight is preserved.
+        if (_controller.text.isEmpty) {
+          setState(() {
+            _controller.value = TextEditingValue(
+              text: submittedValue.text,
+              selection: TextSelection.collapsed(
+                offset: submittedValue.text.length,
+              ),
+              composing: TextRange.empty,
+            );
+            _images
+              ..clear()
+              ..addAll(images);
+            _imageSizes.clear();
+            for (final p in images) {
+              _imageSizes[p] = _fileSize(p);
+            }
+            _docs
+              ..clear()
+              ..addAll(docs);
+          });
+          _scheduleDraftSave();
+        }
       }
     } finally {
       _isSubmitting = false;

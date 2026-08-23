@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -587,7 +587,7 @@ class _HomePageState extends State<HomePage>
   final ChatInputBarController _mediaController = ChatInputBarController();
   final ImageGenerationOptionsController _imageGenController =
       ImageGenerationOptionsController();
-  final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
+  scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
@@ -595,6 +595,8 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
   bool _presetsExpanded = false;
+  String? _scrollConversationId;
+  double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -632,6 +634,7 @@ class _HomePageState extends State<HomePage>
     _initProcessText();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastViewInsetBottom = View.of(context).viewInsets.bottom;
       _controller.measureInputBar();
       if (!mounted) return;
       context.read<WorldBookProvider>().initialize();
@@ -679,6 +682,16 @@ class _HomePageState extends State<HomePage>
   }
 
   @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final nextInset = View.of(context).viewInsets.bottom;
+    final keyboardOpening = nextInset > _lastViewInsetBottom + 0.5;
+    _lastViewInsetBottom = nextInset;
+    if (!keyboardOpening) return;
+    _controller.scrollCtrl.pinBottomDuringViewportResizeIfNeeded();
+  }
+
+  @override
   void didPushNext() {
     _controller.onDidPushNext();
   }
@@ -713,6 +726,15 @@ class _HomePageState extends State<HomePage>
   }
 
   void _onControllerChanged() {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId != null && conversationId != _scrollConversationId) {
+      _scrollConversationId = conversationId;
+      final previous = _scrollController;
+      final replacement = scroll_ctrl.ChatAutoFollowScrollController();
+      _scrollController = replacement;
+      _controller.replaceScrollController(replacement);
+      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    }
     if (mounted) setState(() {});
   }
 
@@ -1376,6 +1398,7 @@ class _HomePageState extends State<HomePage>
     }
 
     final settings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
@@ -1424,7 +1447,8 @@ class _HomePageState extends State<HomePage>
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
       scrollController: _scrollController,
-      observerController: _controller.scrollCtrl.observerController,
+      listController: _controller.scrollCtrl.messageListController,
+      onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
       messages: messages,
       headerWidget: presetHeaderWidget,
       byGroup: _controller.chatController.groupedMessages,
@@ -1444,6 +1468,20 @@ class _HomePageState extends State<HomePage>
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
+      chatFontScale: settings.chatFontScale,
+      collapseThinking: settings.autoCollapseThinking,
+      collapsedCodeLines: settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+      wrapCodeBlocks:
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      showModelIcon: settings.showModelIcon,
+      showUserAvatar: settings.showUserAvatar,
+      showTokenStats: settings.showTokenStats,
+      assistant: assistant,
       streamingContentNotifier: _controller.streamingContentNotifier,
       spotlightMessageId: _controller.spotlightMessageId,
       spotlightToken: _controller.spotlightToken,

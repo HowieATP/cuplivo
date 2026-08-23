@@ -15,7 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -26,9 +26,7 @@ void main() {
   testWidgets('macOS 消息列表滚动不主动清除文本选区焦点', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
     try {
@@ -37,7 +35,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: const [],
               byGroup: const {},
               versionSelections: const {},
@@ -55,7 +53,7 @@ void main() {
         ),
       );
 
-      final listView = tester.widget<ListView>(find.byType(ListView));
+      final listView = tester.widget<SuperListView>(find.byType(SuperListView));
       expect(
         listView.keyboardDismissBehavior,
         ScrollViewKeyboardDismissBehavior.manual,
@@ -70,9 +68,7 @@ void main() {
   testWidgets('Android 消息列表滚动仍然收起键盘', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
     try {
@@ -81,7 +77,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: const [],
               byGroup: const {},
               versionSelections: const {},
@@ -99,7 +95,7 @@ void main() {
         ),
       );
 
-      final listView = tester.widget<ListView>(find.byType(ListView));
+      final listView = tester.widget<SuperListView>(find.byType(SuperListView));
       expect(
         listView.keyboardDismissBehavior,
         ScrollViewKeyboardDismissBehavior.onDrag,
@@ -113,9 +109,7 @@ void main() {
 
   testWidgets('消息列表底部留白使用传入的输入框覆盖高度', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
     await tester.pumpWidget(
@@ -123,7 +117,7 @@ void main() {
         home: Scaffold(
           body: MessageListView(
             scrollController: scrollController,
-            observerController: observerController,
+            listController: listController,
             messages: const [],
             byGroup: const {},
             versionSelections: const {},
@@ -142,7 +136,7 @@ void main() {
       ),
     );
 
-    final listView = tester.widget<ListView>(find.byType(ListView));
+    final listView = tester.widget<SuperListView>(find.byType(SuperListView));
     expect((listView.padding as EdgeInsets).bottom, 144);
 
     scrollController.dispose();
@@ -151,9 +145,7 @@ void main() {
 
   testWidgets('消息列表顶部留白使用传入的导航栏覆盖高度', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
     await tester.pumpWidget(
@@ -161,7 +153,7 @@ void main() {
         home: Scaffold(
           body: MessageListView(
             scrollController: scrollController,
-            observerController: observerController,
+            listController: listController,
             messages: const [],
             byGroup: const {},
             versionSelections: const {},
@@ -181,7 +173,7 @@ void main() {
       ),
     );
 
-    final listView = tester.widget<ListView>(find.byType(ListView));
+    final listView = tester.widget<SuperListView>(find.byType(SuperListView));
     expect((listView.padding as EdgeInsets).top, 88);
     expect((listView.padding as EdgeInsets).bottom, 144);
 
@@ -191,9 +183,7 @@ void main() {
 
   testWidgets('置顶流式指示器激活时保留额外底部空间', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
     await tester.pumpWidget(
@@ -201,7 +191,7 @@ void main() {
         home: Scaffold(
           body: MessageListView(
             scrollController: scrollController,
-            observerController: observerController,
+            listController: listController,
             messages: const [],
             byGroup: const {},
             versionSelections: const {},
@@ -221,7 +211,7 @@ void main() {
       ),
     );
 
-    final listView = tester.widget<ListView>(find.byType(ListView));
+    final listView = tester.widget<SuperListView>(find.byType(SuperListView));
     expect((listView.padding as EdgeInsets).bottom, 156);
 
     scrollController.dispose();
@@ -230,9 +220,7 @@ void main() {
 
   testWidgets('流式思考更新缺少起始时间时保留已有计时起点', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
     final streamingNotifier = StreamingContentNotifier();
     const messageId = 'reasoning-streaming-message';
@@ -269,7 +257,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: messages,
               byGroup: const {},
               versionSelections: const {},
@@ -305,9 +293,7 @@ void main() {
 
   testWidgets('思考卡内部滚动不暂停流式正文更新', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
     final streamingNotifier = StreamingContentNotifier();
     const messageId = 'nested-reasoning-scroll-message';
@@ -344,7 +330,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: messages,
               byGroup: const {},
               versionSelections: const {},
@@ -387,9 +373,7 @@ void main() {
 
   testWidgets('用户拖动离开底部时暂停应用流式内容更新', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
@@ -425,7 +409,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: messages,
               byGroup: const {},
               versionSelections: const {},
@@ -450,7 +434,7 @@ void main() {
     await tester.pump();
 
     final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(ListView)),
+      tester.getCenter(find.byType(SuperListView)),
     );
     await gesture.moveBy(const Offset(0, 96));
     await tester.pump();
@@ -475,11 +459,10 @@ void main() {
     streamingNotifier.dispose();
   });
 
-  testWidgets('贴近底部时用户滚动不暂停应用流式内容更新', (tester) async {
+  testWidgets('贴近底部时用户滚动仍登记意图并在松手后恢复流式内容', (tester) async {
+    var userIntentCalls = 0;
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
@@ -515,7 +498,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: messages,
               byGroup: const {},
               versionSelections: const {},
@@ -530,6 +513,7 @@ void main() {
               isProcessingFiles: isProcessingFiles,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
+              onUserScrollIntent: () => userIntentCalls++,
             ),
           ),
         ),
@@ -540,10 +524,14 @@ void main() {
     await tester.pump();
 
     final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(ListView)),
+      tester.getCenter(find.byType(SuperListView)),
     );
     await gesture.moveBy(const Offset(0, 8));
     await tester.pump();
+    await gesture.moveBy(const Offset(0, -4));
+    await tester.pump();
+
+    expect(userIntentCalls, 0);
 
     streamingNotifier.updateContent(
       'bottom-streaming-message',
@@ -551,21 +539,23 @@ void main() {
       3,
     );
     await tester.pump();
-
-    expect(find.text('updated while still near bottom'), findsOneWidget);
+    expect(find.text('updated while still near bottom'), findsNothing);
 
     await gesture.up();
+    await tester.pump(const Duration(milliseconds: 220));
+
+    expect(userIntentCalls, 1);
+    expect(find.text('updated while still near bottom'), findsOneWidget);
 
     scrollController.dispose();
+    listController.dispose();
     isProcessingFiles.dispose();
     streamingNotifier.dispose();
   });
 
   testWidgets('滚轮滚动时暂停应用流式内容更新', (tester) async {
     final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
+    final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
@@ -601,7 +591,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: observerController,
+              listController: listController,
               messages: messages,
               byGroup: const {},
               versionSelections: const {},
@@ -627,7 +617,7 @@ void main() {
 
     final pointer = TestPointer(1, PointerDeviceKind.mouse);
     await tester.sendEventToBinding(
-      pointer.hover(tester.getCenter(find.byType(ListView))),
+      pointer.hover(tester.getCenter(find.byType(SuperListView))),
     );
     await tester.sendEventToBinding(pointer.scroll(const Offset(0, -96)));
     await tester.pump();
@@ -647,6 +637,134 @@ void main() {
     expect(find.text('updated while wheel scrolling'), findsOneWidget);
 
     scrollController.dispose();
+    isProcessingFiles.dispose();
+    streamingNotifier.dispose();
+  });
+
+  testWidgets('流式生成期间点击消息不登记滚动意图', (tester) async {
+    var userIntentCalls = 0;
+    final scrollController = ScrollController();
+    final listController = ListController();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'tap-streaming-message',
+        role: 'assistant',
+        content: 'initial tap stream content',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    ];
+    streamingNotifier.getNotifier('tap-streaming-message');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              listController: listController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              streamingContentNotifier: streamingNotifier,
+              onUserScrollIntent: () => userIntentCalls++,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(SuperListView));
+    await tester.pump();
+
+    expect(userIntentCalls, 0);
+
+    scrollController.dispose();
+    listController.dispose();
+    isProcessingFiles.dispose();
+    streamingNotifier.dispose();
+  });
+
+  testWidgets('已完成消息翻译期间部分译文立即可见', (tester) async {
+    final scrollController = ScrollController();
+    final listController = ListController();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'translate-finished-message',
+        role: 'assistant',
+        content: 'initial finished content',
+        conversationId: 'conversation-1',
+      ),
+    ];
+    streamingNotifier.getNotifier('translate-finished-message');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              listController: listController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              streamingContentNotifier: streamingNotifier,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    streamingNotifier.updateTranslation(
+      'translate-finished-message',
+      'partial translation',
+    );
+    await tester.pump();
+
+    expect(find.text('partial translation'), findsOneWidget);
+
+    scrollController.dispose();
+    listController.dispose();
     isProcessingFiles.dispose();
     streamingNotifier.dispose();
   });

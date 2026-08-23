@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -52,7 +52,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
   final _isProcessingFiles = ValueNotifier<bool>(false);
   final _translations = <String, TranslationUiState>{};
 
-  late ListObserverController _observerController;
+  late ListController _listController;
   late ChatService _chatService;
   late stream_ctrl.StreamController _streamController;
   late ChatController _chatController;
@@ -75,7 +75,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    _observerController = ListObserverController(controller: _scrollController);
+    _listController = ListController();
     _chatService = context.read<ChatService>();
     _streamController = stream_ctrl.StreamController(
       chatService: _chatService,
@@ -213,6 +213,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     _isProcessingFiles.dispose();
     _inputController.dispose();
     _scrollController.dispose();
+    _listController.dispose();
     _inputFocus.dispose();
     super.dispose();
   }
@@ -387,6 +388,10 @@ class _GroupChatPageState extends State<GroupChatPage> {
 
     final messages = _chatController.collapsedMessages;
     final byGroup = _chatController.groupedMessages;
+    final settings = context.watch<SettingsProvider>();
+    final currentAssistant = context
+        .watch<AssistantProvider>()
+        .currentAssistant;
 
     return Scaffold(
       appBar: AppBar(
@@ -428,7 +433,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
                   )
                 : MessageListView(
                     scrollController: _scrollController,
-                    observerController: _observerController,
+                    listController: _listController,
                     messages: messages,
                     byGroup: byGroup,
                     versionSelections: _chatController.versionSelections,
@@ -441,6 +446,15 @@ class _GroupChatPageState extends State<GroupChatPage> {
                     selectedItems: const <String>{},
                     dividerPadding: EdgeInsets.zero,
                     isProcessingFiles: _isProcessingFiles,
+                    chatFontScale: settings.chatFontScale,
+                    collapseThinking: settings.autoCollapseThinking,
+                    collapsedCodeLines: settings.autoCollapseCodeBlock
+                        ? settings.autoCollapseCodeBlockLines
+                        : null,
+                    showModelIcon: settings.showModelIcon,
+                    showUserAvatar: settings.showUserAvatar,
+                    showTokenStats: settings.showTokenStats,
+                    assistant: currentAssistant,
                     streamingContentNotifier:
                         _streamController.streamingContentNotifier,
                     resolveSpeaker: _resolveSpeaker,

@@ -1,7 +1,7 @@
 import 'package:Cuplivo/features/home/controllers/scroll_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
@@ -56,6 +56,7 @@ void main() {
         onStateChanged: () {},
         getAutoScrollEnabled: () => autoScrollEnabled,
         getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
       );
 
       await tester.pumpWidget(
@@ -104,7 +105,7 @@ void main() {
       await tester.pumpWidget(
         _ObservedScrollHarness(
           scrollController: scrollController,
-          observerController: chatScrollController.observerController,
+          listController: chatScrollController.messageListController,
           messages: messages,
         ),
       );
@@ -118,7 +119,7 @@ void main() {
       await tester.pumpAndSettle();
       await navigation;
 
-      expect(chatScrollController.lastJumpUserMessageId, 'message-15');
+      expect(chatScrollController.lastJumpUserMessageId, 'message-10');
 
       chatScrollController.dispose();
       scrollController.dispose();
@@ -143,7 +144,7 @@ void main() {
       await tester.pumpWidget(
         _ObservedScrollHarness(
           scrollController: scrollController,
-          observerController: chatScrollController.observerController,
+          listController: chatScrollController.messageListController,
           messages: messages,
         ),
       );
@@ -157,7 +158,7 @@ void main() {
       await tester.pumpAndSettle();
       await navigation;
 
-      expect(chatScrollController.lastJumpUserMessageId, 'message-15');
+      expect(chatScrollController.lastJumpUserMessageId, 'message-12');
 
       chatScrollController.dispose();
       scrollController.dispose();
@@ -194,12 +195,12 @@ class _ScrollHarness extends StatelessWidget {
 class _ObservedScrollHarness extends StatelessWidget {
   const _ObservedScrollHarness({
     required this.scrollController,
-    required this.observerController,
+    required this.listController,
     required this.messages,
   });
 
   final ScrollController scrollController;
-  final ListObserverController observerController;
+  final ListController listController;
   final List<_NavMessage> messages;
 
   @override
@@ -207,19 +208,17 @@ class _ObservedScrollHarness extends StatelessWidget {
     return MaterialApp(
       home: SizedBox(
         height: 600,
-        child: ListViewObserver(
-          controller: observerController,
-          child: ListView.builder(
-            controller: scrollController,
-            itemCount: messages.length,
-            itemBuilder: (context, index) {
-              final message = messages[index];
-              return SizedBox(
-                height: 80,
-                child: Text('${message.role} ${message.id}'),
-              );
-            },
-          ),
+        child: SuperListView.builder(
+          controller: scrollController,
+          listController: listController,
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final message = messages[index];
+            return SizedBox(
+              height: 80,
+              child: Text('${message.role} ${message.id}'),
+            );
+          },
         ),
       ),
     );

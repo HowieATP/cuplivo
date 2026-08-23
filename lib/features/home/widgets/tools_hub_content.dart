@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -69,6 +71,54 @@ class _ToolsHubContentState extends State<ToolsHubContent>
       ids.remove(toolId);
     }
     _updateAssistant(a.copyWith(localToolIds: ids.toList(growable: false)));
+  }
+
+  Future<void> _toggleDeviceTool(Assistant a, String toolId, bool value) async {
+    if (!value) {
+      _toggleLocalTool(a, toolId, false);
+      return;
+    }
+    final outcome = await DeviceLocalTools.requestToggleEnable(toolId);
+    if (!mounted) {
+      // The permission flow (system settings page / dialog) may have closed
+      // the hub sheet/popover; writing through a stale context would silently
+      // drop the toggle (review finding: stale snapshot round trip).
+      return;
+    }
+    // Re-read the assistant at write time: the permission round trip may have
+    // changed other tools, and the captured snapshot can be stale.
+    final fresh = context.read<AssistantProvider>().getById(a.id);
+    if (fresh == null) {
+      debugPrint('ToolsHubContent: assistant vanished during toggle: ${a.id}');
+      return;
+    }
+    switch (outcome) {
+      case DeviceToolToggleOutcome.canEnable:
+        _toggleLocalTool(fresh, toolId, true);
+      case DeviceToolToggleOutcome.canEnableUsageAccessMissing:
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetScreenTimePermissionRequired,
+          type: NotificationType.warning,
+        );
+        // Upstream parity: still enable even when Usage Access is not
+        // granted yet — the tool error guides the user to the page.
+        _toggleLocalTool(fresh, toolId, true);
+      case DeviceToolToggleOutcome.blocked:
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetCalendarPermissionDenied,
+          type: NotificationType.warning,
+        );
+      case DeviceToolToggleOutcome.notSupported:
+        // The row should not be visible on unsupported platforms; if it is,
+        // keep the tool off.
+        break;
+    }
   }
 
   void _toggleMcpServer(Assistant a, String id, bool value) {
@@ -173,21 +223,30 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     required IconData icon,
     required String title,
     required String toolId,
+    bool deviceTool = false,
   }) {
     final enabled = a.localToolIds.contains(toolId);
+    void toggle(bool v) {
+      if (deviceTool) {
+        unawaited(_toggleDeviceTool(a, toolId, v));
+      } else {
+        _toggleLocalTool(a, toolId, v);
+      }
+    }
+
     if (_isMobileStyle) {
       return _SheetToolRow(
         icon: icon,
         title: title,
         enabled: enabled,
-        onChanged: (v) => _toggleLocalTool(a, toolId, v),
+        onChanged: toggle,
       );
     }
     return _DesktopToolRow(
       icon: icon,
       label: title,
       selected: enabled,
-      onTap: () => _toggleLocalTool(a, toolId, !enabled),
+      onTap: () => toggle(!enabled),
     );
   }
 
@@ -239,6 +298,30 @@ class _ToolsHubContentState extends State<ToolsHubContent>
         title: l10n.assistantEditLocalToolHandoffSyncTitle,
         toolId: LocalToolNames.handoffSync,
       ),
+      if (DeviceLocalTools.screenTimeSupported)
+        _localToolRow(
+          a,
+          icon: Lucide.Smartphone,
+          title: l10n.assistantEditLocalToolScreenTimeTitle,
+          toolId: LocalToolNames.screenTime,
+          deviceTool: true,
+        ),
+      if (DeviceLocalTools.calendarSupported) ...[
+        _localToolRow(
+          a,
+          icon: Lucide.Calendar,
+          title: l10n.assistantEditLocalToolCalendarQueryTitle,
+          toolId: LocalToolNames.calendarQuery,
+          deviceTool: true,
+        ),
+        _localToolRow(
+          a,
+          icon: Lucide.CalendarPlus,
+          title: l10n.assistantEditLocalToolCalendarCreateTitle,
+          toolId: LocalToolNames.calendarCreate,
+          deviceTool: true,
+        ),
+      ],
     ];
     return _buildGroup(
       keyName: _localToolsKey,

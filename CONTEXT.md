@@ -35,6 +35,16 @@
 └──────────────────────────────────┘
 ```
 
+## Append Current Time (追加当前时间) — issue #308
+
+- **Field**: `Assistant.enableTimeInjection` (bool, default `false`). Internal name deliberately NOT renamed to upstream's `appendCurrentTimeToUserMessage`; DB column `enable_time_injection` unchanged — zero schema migration, zero healer/mirror impact.
+- **Wire compatibility (导出 ZIP 兼容)** at the model JSON boundary only (`Assistant.toJson`/`fromJson`): `toJson` writes BOTH keys with the same value (`appendCurrentTimeToUserMessage`, `enableTimeInjection`); `fromJson` reads the new key first, then legacy `enableTimeInjection`, then `false`. Single point covers backup `settings.json` (`assistants_v1`), LAN sync, cherry/chatbox importers, trash recovery, and provider recoveryJson — an old ZIP restored on a new build works, and a new-build ZIP stays readable by an old build.
+- **Injection format**: `(Mon 25-07-26 14:03:22)` — ADR-0006 format retained (NOT upstream's `<current_time>` tag). Tail-appended to every non-preset user message in `apiMessages` only, never persisted; `<time-note>` stays in the system message while enabled. Time is read from the stored `ChatMessage.timestamp` (cache-stable).
+- **Template bypass**: message template is bypassed while append-time is ON (ADR-0006 contract kept). Upstream's coexistence relies on memory-v2 template-freeze (not ported); UI keeps the disabled template field + static hint.
+- **Volatile-variable warning (易变变量警告, badge set B')**: ⚠ badges on `{cur_date}` `{cur_time}` `{cur_datetime}` `{battery_level}` in the system prompt var list; `{current_hour}` `{current_date}` `{current_datetime}` in the memory tab var list; tooltip = full warning text. Dynamic banner in the system prompt card when any of `{cur_date}` `{cur_time}` `{cur_datetime}` is present; memory tab keeps its existing static hint (no second banner).
+- **Enable gate dialog**: toggling ON while time vars are in the system prompt shows "系统提示词含时间变量" — [去移除] (close + focus system prompt input, no auto-removal) / [仍要启用] (the only path that enables); the body also mentions memory-prompt time variables should be removed too (informational only, no jump).
+- **Appended-time format dialog**: the row's info icon shows the example `(Mon 26-08-08 14:30:05)` (fork format, not upstream's `<current_time>` text).
+
 ## Title Generation Prompts
 
 - **emojiTitlePrompt**: A preset variant of the title generation system prompt that allows ONE relevant emoji at the beginning of the title (followed by a space). No other punctuation or special characters are permitted elsewhere. The character limit (≤10) excludes the emoji.

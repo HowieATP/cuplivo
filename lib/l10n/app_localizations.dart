@@ -3349,44 +3349,80 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditMemoryVariableHint.
   ///
   /// In en, this message translates to:
-  /// **'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.'**
+  /// **'Including time variables reduces cache hit rate. If the model needs to know the current time, remove these variables and use \"Append current time\" in the Prompt tab instead.'**
   String get assistantEditMemoryVariableHint;
 
-  /// No description provided for @assistantEditTimeInjectionTitle.
+  /// No description provided for @assistantEditPromptTimeVarWarning.
   ///
   /// In en, this message translates to:
-  /// **'Smart Time Injection'**
-  String get assistantEditTimeInjectionTitle;
+  /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \'Append current time\' toggle below instead.'**
+  String get assistantEditPromptTimeVarWarning;
 
-  /// No description provided for @assistantEditTimeInjectionDescription.
+  /// No description provided for @assistantEditPromptAppendTimeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Append timestamp after each user message. Cache-friendly. Bypasses message template.'**
-  String get assistantEditTimeInjectionDescription;
+  /// **'Append current time'**
+  String get assistantEditPromptAppendTimeTitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningTitle.
+  /// No description provided for @assistantEditPromptAppendTimeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Volatile Variables Detected'**
-  String get assistantEditTimeInjectionWarningTitle;
+  /// **'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.'**
+  String get assistantEditPromptAppendTimeSubtitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningContent.
+  /// No description provided for @assistantEditPromptAppendTimeInfoTitle.
   ///
   /// In en, this message translates to:
-  /// **'For optimal cache results, consider removing the following volatile variables:'**
-  String get assistantEditTimeInjectionWarningContent;
+  /// **'Appended time format'**
+  String get assistantEditPromptAppendTimeInfoTitle;
 
-  /// No description provided for @assistantEditTimeInjectionTemplateDisabled.
+  /// No description provided for @assistantEditPromptAppendTimeInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'Message template is disabled when Smart Time Injection is active.'**
-  String get assistantEditTimeInjectionTemplateDisabled;
+  /// **'When enabled, a blank line and then the following line are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message\'s own send time, so it stays stable when you retry.'**
+  String assistantEditPromptAppendTimeInfoBody(Object example);
 
-  /// No description provided for @assistantEditMemoryRecordPromptLabel.
+  /// No description provided for @assistantEditPromptAppendTimeInfoClose.
   ///
   /// In en, this message translates to:
-  /// **'Memory Record Prompt'**
-  String get assistantEditMemoryRecordPromptLabel;
+  /// **'Got it'**
+  String get assistantEditPromptAppendTimeInfoClose;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt contains time variables'**
+  String get assistantEditPromptTimeVarDialogTitle;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using Append current time instead - it puts the time at the end of the request, off the cached prefix.'**
+  String assistantEditPromptTimeVarDialogBody(Object variables);
+
+  /// No description provided for @assistantEditPromptTimeVarDialogRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Go remove'**
+  String get assistantEditPromptTimeVarDialogRemove;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable anyway'**
+  String get assistantEditPromptTimeVarDialogKeep;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogMemoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Time variables in the memory record prompt (e.g. current_hour, current_datetime) hurt cache hits the same way - consider removing them too.'**
+  String get assistantEditPromptTimeVarDialogMemoryHint;
+
+  /// No description provided for @assistantEditPromptAppendTimeTemplateDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Message template is disabled while Append current time is active.'**
+  String get assistantEditPromptAppendTimeTemplateDisabled;
 
   /// No description provided for @assistantEditMessageTemplateTitle.
   ///

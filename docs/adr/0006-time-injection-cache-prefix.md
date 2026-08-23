@@ -12,3 +12,7 @@ LLM providers (Anthropic, OpenAI, etc.) cache the longest stable prefix of the m
 
 - The message template is bypassed entirely when time injection is enabled. Users who rely on non-time template features (e.g. XML wrapping) must choose one or the other. Accepted: the feature is opt-in and defaults to off.
 - Toggling the feature on/off changes the system message (adds/removes `<time-note>`), causing a one-time cache invalidation. Accepted as unavoidable.
+
+## Sync note (issue #308, 2026-08)
+
+Upstream (Kelivo, memory-v2 refactor) renamed the toggle to `appendCurrentTimeToUserMessage`, dropped the `<time-note>` system note, switched to a `<current_time>` tail tag, and allowed the message template to coexist. Cuplivo explicitly keeps the original runtime design: tail `(Mon …)` format, `<time-note>`, template bypass. Wire compatibility is provided ONLY at the model JSON boundary (`Assistant.toJson` dual-writes both keys, `fromJson` reads new-key-first with a legacy fallback) so old ZIPs restore on new builds and vice versa. No field rename, no DB migration.

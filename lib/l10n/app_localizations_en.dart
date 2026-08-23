@@ -1820,29 +1820,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditMemoryVariableHint =>
-      'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.';
+      'Including time variables reduces cache hit rate. If the model needs to know the current time, remove these variables and use \"Append current time\" in the Prompt tab instead.';
 
   @override
-  String get assistantEditTimeInjectionTitle => 'Smart Time Injection';
+  String get assistantEditPromptTimeVarWarning =>
+      'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \'Append current time\' toggle below instead.';
 
   @override
-  String get assistantEditTimeInjectionDescription =>
-      'Append timestamp after each user message. Cache-friendly. Bypasses message template.';
+  String get assistantEditPromptAppendTimeTitle => 'Append current time';
 
   @override
-  String get assistantEditTimeInjectionWarningTitle =>
-      'Volatile Variables Detected';
+  String get assistantEditPromptAppendTimeSubtitle =>
+      'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.';
 
   @override
-  String get assistantEditTimeInjectionWarningContent =>
-      'For optimal cache results, consider removing the following volatile variables:';
+  String get assistantEditPromptAppendTimeInfoTitle => 'Appended time format';
 
   @override
-  String get assistantEditTimeInjectionTemplateDisabled =>
-      'Message template is disabled when Smart Time Injection is active.';
+  String assistantEditPromptAppendTimeInfoBody(Object example) {
+    return 'When enabled, a blank line and then the following line are appended at the end of each user message:\n\n$example\n\nThe timestamp is that message\'s own send time, so it stays stable when you retry.';
+  }
 
   @override
-  String get assistantEditMemoryRecordPromptLabel => 'Memory Record Prompt';
+  String get assistantEditPromptAppendTimeInfoClose => 'Got it';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle =>
+      'System prompt contains time variables';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(Object variables) {
+    return 'Your system prompt uses $variables. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using Append current time instead - it puts the time at the end of the request, off the cached prefix.';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => 'Go remove';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => 'Enable anyway';
+
+  @override
+  String get assistantEditPromptTimeVarDialogMemoryHint =>
+      'Time variables in the memory record prompt (e.g. current_hour, current_datetime) hurt cache hits the same way - consider removing them too.';
+
+  @override
+  String get assistantEditPromptAppendTimeTemplateDisabled =>
+      'Message template is disabled while Append current time is active.';
 
   @override
   String get assistantEditMessageTemplateTitle => 'Message Template';

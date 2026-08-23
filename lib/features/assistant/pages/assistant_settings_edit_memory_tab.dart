@@ -521,6 +521,12 @@ class _MemoryTabState extends State<_MemoryTab> {
                     (l10n.assistantEditVariableDate, '{current_date}'),
                     (l10n.assistantEditVariableDatetime, '{current_datetime}'),
                   ],
+                  cacheWarningVars: const {
+                    '{current_hour}',
+                    '{current_date}',
+                    '{current_datetime}',
+                  },
+                  cacheWarningTooltip: l10n.assistantEditMemoryVariableHint,
                   onTapVar: (v) {
                     _insertAtCursor(_memoryRecordCtrl, v);
                     Future.microtask(() => _memoryRecordFocus.requestFocus());

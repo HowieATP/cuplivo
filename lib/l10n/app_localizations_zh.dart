@@ -1751,28 +1751,51 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditMemoryVariableHint =>
-      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
+      '包含时间变量会降低缓存命中率。若需要让模型知道当前时间，请删除这些变量，改用「提示词」页的「追加当前时间」开关。';
 
   @override
-  String get assistantEditTimeInjectionTitle => '智能时间注入';
+  String get assistantEditPromptTimeVarWarning =>
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
 
   @override
-  String get assistantEditTimeInjectionDescription =>
-      '在每条用户消息后追加时间戳。缓存友好。自动绕过聊天内容模板。';
+  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
 
   @override
-  String get assistantEditTimeInjectionWarningTitle => '检测到易变变量';
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
 
   @override
-  String get assistantEditTimeInjectionWarningContent =>
-      '为获得最佳缓存效果，建议移除以下易变变量：';
+  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
 
   @override
-  String get assistantEditTimeInjectionTemplateDisabled =>
-      '智能时间注入开启时自动禁用聊天内容模板。';
+  String assistantEditPromptAppendTimeInfoBody(Object example) {
+    return '开启后，会在每条用户消息末尾先空一行，再追加如下内容：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
+  }
 
   @override
-  String get assistantEditMemoryRecordPromptLabel => '记忆提示词';
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(Object variables) {
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+
+  @override
+  String get assistantEditPromptTimeVarDialogMemoryHint =>
+      '记忆提示词中的时间变量（如 current_hour、current_datetime）同样会降低缓存命中率，建议一并删除。';
+
+  @override
+  String get assistantEditPromptAppendTimeTemplateDisabled =>
+      '「追加当前时间」开启时自动禁用聊天内容模板。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
@@ -10252,28 +10275,51 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemoryVariableHint =>
-      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
+      '包含时间变量会降低缓存命中率。若需要让模型知道当前时间，请删除这些变量，改用「提示词」页的「追加当前时间」开关。';
 
   @override
-  String get assistantEditTimeInjectionTitle => '智能时间注入';
+  String get assistantEditPromptTimeVarWarning =>
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
 
   @override
-  String get assistantEditTimeInjectionDescription =>
-      '在每条用户消息后追加时间戳。缓存友好。自动绕过聊天内容模板。';
+  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
 
   @override
-  String get assistantEditTimeInjectionWarningTitle => '检测到易变变量';
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
 
   @override
-  String get assistantEditTimeInjectionWarningContent =>
-      '为获得最佳缓存效果，建议移除以下易变变量：';
+  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
 
   @override
-  String get assistantEditTimeInjectionTemplateDisabled =>
-      '智能时间注入开启时自动禁用聊天内容模板。';
+  String assistantEditPromptAppendTimeInfoBody(Object example) {
+    return '开启后，会在每条用户消息末尾先空一行，再追加如下内容：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
+  }
 
   @override
-  String get assistantEditMemoryRecordPromptLabel => '记忆提示词';
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(Object variables) {
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+
+  @override
+  String get assistantEditPromptTimeVarDialogMemoryHint =>
+      '记忆提示词中的时间变量（如 current_hour、current_datetime）同样会降低缓存命中率，建议一并删除。';
+
+  @override
+  String get assistantEditPromptAppendTimeTemplateDisabled =>
+      '「追加当前时间」开启时自动禁用聊天内容模板。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
@@ -18753,28 +18799,51 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemoryVariableHint =>
-      '包含時間變數會降低快取命中率。請根據需求平衡時間精度，也可以刪去變數，在訊息範本中插入訊息發送時間。';
+      '包含時間變數會降低快取命中率。若需要讓模型知道當前時間，請刪除這些變數，改用「提示詞」頁的「追加當前時間」開關。';
 
   @override
-  String get assistantEditTimeInjectionTitle => '智能時間注入';
+  String get assistantEditPromptTimeVarWarning =>
+      '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
 
   @override
-  String get assistantEditTimeInjectionDescription =>
-      '在每條使用者訊息後追加時間戳記。快取友好。自動繞過聊天內容範本。';
+  String get assistantEditPromptAppendTimeTitle => '追加當前時間';
 
   @override
-  String get assistantEditTimeInjectionWarningTitle => '偵測到易變變數';
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每條使用者訊息末尾追加傳送時刻。時間在請求末尾，不影響 Prompt 快取。';
 
   @override
-  String get assistantEditTimeInjectionWarningContent =>
-      '為獲得最佳快取效果，建議移除以下易變變數：';
+  String get assistantEditPromptAppendTimeInfoTitle => '追加時間格式';
 
   @override
-  String get assistantEditTimeInjectionTemplateDisabled =>
-      '智能時間注入開啟時自動停用聊天內容範本。';
+  String assistantEditPromptAppendTimeInfoBody(Object example) {
+    return '開啟後，會在每條使用者訊息末尾先空一行，再追加如下內容：\n\n$example\n\n時間取該訊息自己的傳送時刻，重試時保持不變。';
+  }
 
   @override
-  String get assistantEditMemoryRecordPromptLabel => '記憶提示詞';
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系統提示詞中含時間變數';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(Object variables) {
+    return '你的系統提示詞裡用了 $variables。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用「追加當前時間」——它把時間放在請求末尾，不影響前綴。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然開啟';
+
+  @override
+  String get assistantEditPromptTimeVarDialogMemoryHint =>
+      '記憶提示詞中的時間變數（如 current_hour、current_datetime）同樣會降低快取命中率，建議一併刪除。';
+
+  @override
+  String get assistantEditPromptAppendTimeTemplateDisabled =>
+      '「追加當前時間」開啟時自動停用聊天內容模板。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天內容範本';

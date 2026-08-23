@@ -315,6 +315,7 @@ Do **not** store sensitive information, including:
     'otherOfficeMode': otherOfficeMode,
     'ocrMode': ocrMode,
     'enableTimeInjection': enableTimeInjection,
+    'appendCurrentTimeToUserMessage': enableTimeInjection,
     'discoverable': discoverable,
     'handoffId': handoffId,
     'handoffDescription': handoffDescription,
@@ -421,7 +422,10 @@ Do **not** store sensitive information, including:
     pdfMode: (json['pdfMode'] as String?) ?? 'extract',
     otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',
     ocrMode: (json['ocrMode'] as String?) ?? 'auto',
-    enableTimeInjection: json['enableTimeInjection'] as bool? ?? false,
+    enableTimeInjection:
+        json['appendCurrentTimeToUserMessage'] as bool? ??
+        json['enableTimeInjection'] as bool? ??
+        false,
     discoverable: json['discoverable'] as bool? ?? false,
     handoffId: json['handoffId'] as String?,
     handoffDescription: json['handoffDescription'] as String?,

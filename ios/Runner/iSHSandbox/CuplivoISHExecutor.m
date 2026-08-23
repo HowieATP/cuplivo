@@ -37,12 +37,18 @@ enum {
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 /// Grace period for the exit notification to arrive after a timeout kill.
 static const NSTimeInterval kKillGraceSeconds = 2.0;
+/// Bounded wait for readers to honour the abort request and exit. A reader
+/// notices the flag within one 500 ms poll cycle; the extra headroom covers
+/// final drain work and scheduler delays under load.
+static const NSTimeInterval kReaderJoinSeconds = 1.5;
 
 #pragma mark - Execution context
 
 @class CuplivoISHBoundedData;
 
 @interface CuplivoISHExecutionContext : NSObject {
+    int _stdoutReadEnd;  // owned by the stdout reader task once adopted
+    int _stderrReadEnd;  // owned by the stderr reader task once adopted
     int _stdoutPipe[2];
     int _stderrPipe[2];
 }
@@ -57,9 +63,22 @@ static const NSTimeInterval kKillGraceSeconds = 2.0;
 @property (atomic) BOOL cancelled;
 @property (atomic) BOOL stdoutReaderDone;
 @property (atomic) BOOL stderrReaderDone;
+/// Owned by the reader task: the exec thread asks readers to stop via these
+/// flags instead of closing descriptors out from under them (issue #397).
+/// Readers poll with a 500 ms timeout, so a flag is honoured within one
+/// poll cycle; the reader then closes its own read end before reporting
+/// done.
+@property (atomic) BOOL stdoutAbort;
+@property (atomic) BOOL stderrAbort;
 
 - (int *)stdoutPipe;
 - (int *)stderrPipe;
+/// Ownership transfer of a pipe read end from runCommand to its reader task.
+/// After this call only the owning reader may close that descriptor.
+- (void)adoptReadEnd:(int)fd isStdErr:(BOOL)isStdErr;
+/// Close the reader-owned read end exactly once. Must only be called by the
+/// reader that adopted the end, after it left its poll/read loop.
+- (void)closeOwnedReadEnd:(BOOL)isStdErr;
 @end
 
 @interface CuplivoISHBoundedData : NSObject
@@ -242,11 +261,58 @@ toCircularOffset:(NSUInteger)offset {
         _waitSemaphore = dispatch_semaphore_create(0);
         _stdoutPipe[0] = _stdoutPipe[1] = -1;
         _stderrPipe[0] = _stderrPipe[1] = -1;
+        _stdoutReadEnd = _stderrReadEnd = -1;
         _exitCode = -1;
     }
     return self;
 }
 
+- (void)adoptReadEnd:(int)fd isStdErr:(BOOL)isStdErr {
+    // Exec thread only, before the owning reader has been enqueued: no
+    // concurrent access to the slots yet. Moving the descriptor out of the
+    // generic pipe array and into the dedicated read-end slot makes the
+    // ownership change explicit in state — after adoption closePipeEnds
+    // cannot even see this fd.
+    @synchronized (self) {
+        if (isStdErr) {
+            _stderrReadEnd = fd;
+            _stderrPipe[0] = -1;
+        } else {
+            _stdoutReadEnd = fd;
+            _stdoutPipe[0] = -1;
+        }
+    }
+}
+
+- (void)closeOwnedReadEnd:(BOOL)isStdErr {
+    // Reader-side only: runs on the reader's dispatch queue after its
+    // poll/read loop has ended. The exec thread never touches this fd once
+    // it was adopted, so this close cannot race another thread's use of the
+    // descriptor. Resetting the slot under the same lock keeps every
+    // mutation of the ownership slots serialized.
+    int fd;
+    @synchronized (self) {
+        fd = isStdErr ? _stderrReadEnd : _stdoutReadEnd;
+        if (isStdErr) {
+            _stderrReadEnd = -1;
+        } else {
+            _stdoutReadEnd = -1;
+        }
+    }
+    if (fd >= 0) {
+        close(fd);
+    }
+}
+
+/// Close every pipe endpoint still recorded on this context.
+///
+/// Callers must guarantee that no concurrent reader owns one of the listed
+/// descriptors. That holds on the early setup-failure paths in runCommand
+/// (before any reader is started) and in dealloc (the last strong reference
+/// is gone, which includes the reader blocks). Adopted read ends are moved
+/// out of the generic arrays into reader-owned slots and are cleared by the
+/// owning reader itself, so this method never closes a descriptor that
+/// another thread is still polling, reading, or about to close (issue #397).
 - (void)closePipeEnds {
     @synchronized (self) {
         if (_stdoutPipe[0] >= 0) close(_stdoutPipe[0]);
@@ -255,6 +321,9 @@ toCircularOffset:(NSUInteger)offset {
         if (_stderrPipe[1] >= 0) close(_stderrPipe[1]);
         _stdoutPipe[0] = _stdoutPipe[1] = -1;
         _stderrPipe[0] = _stderrPipe[1] = -1;
+        // Reader-owned read-end slots are deliberately not touched here:
+        // they are either already -1 (the reader closed its own end) or
+        // still owned by a live reader that will close them.
     }
 }
 
@@ -455,6 +524,10 @@ static dispatch_queue_t _readerQueue;
     }
     close([ctx stdoutPipe][1]);
     close([ctx stderrPipe][1]);
+    // Write-end ownership: after this point the guest task (via the dup'ed
+    // real fds in files[1]/files[2]) holds the only write ends; this thread
+    // tracks neither end anymore. The read ends stay open here and are
+    // handed to the reader tasks below.
     [ctx stdoutPipe][1] = -1;
     [ctx stderrPipe][1] = -1;
 
@@ -572,8 +645,17 @@ static dispatch_queue_t _readerQueue;
     task_start(task);
     current = saved_current;
 
-    [self startReaderForPipe:[ctx stdoutPipe][0] context:ctx isStdErr:NO];
-    [self startReaderForPipe:[ctx stderrPipe][0] context:ctx isStdErr:YES];
+    // Hand ownership of both read ends to the reader tasks. From here on the
+    // exec thread must not close these descriptors: each reader closes its
+    // own read end when its poll/read loop ends (issue #397). adoptReadEnd:
+    // also moves the fd out of the generic pipe arrays, so closePipeEnds
+    // cannot reach an adopted descriptor even defensively.
+    int stdoutReadFd = [ctx stdoutPipe][0];
+    int stderrReadFd = [ctx stderrPipe][0];
+    [ctx adoptReadEnd:stdoutReadFd isStdErr:NO];
+    [self startReaderForPipe:stdoutReadFd context:ctx isStdErr:NO];
+    [ctx adoptReadEnd:stderrReadFd isStdErr:YES];
+    [self startReaderForPipe:stderrReadFd context:ctx isStdErr:YES];
 
     // Wait for exit or timeout.
     dispatch_time_t waitTime = timeout > 0
@@ -610,13 +692,20 @@ static dispatch_queue_t _readerQueue;
         // PID disappears.
         [self killProcessGroup:ctx.guestPid groupId:ctx.guestPgid];
     }
-    // Last resort: closing the read ends unblocks the poll() loops (kqueue
-    // based on Darwin). Only then join the readers.
+    // Last resort: ask the readers to stop instead of closing descriptors
+    // under them. Cross-thread close() neither safely cancels another
+    // thread's poll()/read() nor prevents the fd number from being reopened
+    // and misread by a still-running reader (issue #397). The abort flags
+    // are honoured within one 500 ms poll cycle; kReaderJoinSeconds bounds
+    // the join wait. If a reader somehow misses it (stuck in read(2) on a
+    // guest pipe that stays open), its own read end stays valid because only
+    // that reader ever closes it — final cleanup below leaves the slot alone.
     if (!ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
-        [ctx closePipeEnds];
-        NSDate *closeDeadline = [NSDate dateWithTimeIntervalSinceNow:1.0];
+        ctx.stdoutAbort = YES;
+        ctx.stderrAbort = YES;
+        NSDate *joinDeadline = [NSDate dateWithTimeIntervalSinceNow:kReaderJoinSeconds];
         while ((!ctx.stdoutReaderDone || !ctx.stderrReaderDone) &&
-               [closeDeadline timeIntervalSinceNow] > 0) {
+               [joinDeadline timeIntervalSinceNow] > 0) {
             [NSThread sleepForTimeInterval:0.05];
         }
     }
@@ -630,8 +719,16 @@ static dispatch_queue_t _readerQueue;
         [_activeExecutions removeObjectForKey:@(ctx.guestPid)];
         [_activeExecutionsByRequest removeObjectForKey:requestId];
     }
-    [ctx closePipeEnds];
-
+    // No explicit close of reader-owned read ends here: each reader closes
+    // (or has already closed) its own read end, so closing again from this
+    // thread would either be a double close or — for a reader that missed
+    // the abort window — a close of an fd that thread is still using. The
+    // host write ends were already closed right after dup'ing into the
+    // guest task, and every earlier failure path returns while no reader
+    // exists, leaving cleanup to dealloc's closePipeEnds. ctx drops out of
+    // the registries here; ARC releases it once the last strong reference
+    // (including the reader blocks) is gone, and dealloc runs closePipeEnds
+    // as the single final sweep.
     return @{
         @"exitCode": @(timedOut || cancelled ? -1 : ctx.exitCode),
         @"stdout": [self decodeStream:ctx.stdoutData],
@@ -708,12 +805,24 @@ static dispatch_queue_t _readerQueue;
     });
 }
 
+/// Drain one pipe read end until EOF, an error, or an abort request.
+///
+/// The reader owns the descriptor passed in (ownership was handed over via
+/// adoptReadEnd:isStdErr: right before startReaderForPipe:) and is the only
+/// thread that may close it. It does so after leaving the poll/read loop and
+/// before marking the stream done, so ReaderDone implies "read end closed"
+/// and no other code path can close this fd concurrently or after a number
+/// reuse (issue #397).
 + (void)readPipe:(int)fd context:(CuplivoISHExecutionContext *)ctx isStdErr:(BOOL)isStdErr {
     char buffer[4096];
     CuplivoISHBoundedData *out = isStdErr ? ctx.stderrData : ctx.stdoutData;
     struct pollfd pfd = {.fd = fd, .events = POLLIN};
 
     for (;;) {
+        // Abort is checked once per 500 ms poll cycle; the exec thread sets
+        // it only after the normal drain grace elapsed, so latency here does
+        // not affect output capture in the common case.
+        if (isStdErr ? ctx.stderrAbort : ctx.stdoutAbort) break;
         int pr = poll(&pfd, 1, 500);
         if (pr < 0) {
             if (errno == EINTR) continue;
@@ -738,6 +847,10 @@ static dispatch_queue_t _readerQueue;
             break;
         }
     }
+    // Close our own read end first, then publish done-ness: once
+    // stdout/stderrReaderDone is observed, the descriptor is guaranteed to
+    // be closed by us already, and nobody else will touch it.
+    [ctx closeOwnedReadEnd:isStdErr];
     if (isStdErr) {
         ctx.stderrReaderDone = YES;
     } else {

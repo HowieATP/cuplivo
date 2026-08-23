@@ -215,4 +215,199 @@ void main() {
     expect(bottomClip.top, 420);
     expect(bottomClip.height, 180);
   });
+
+  group('键盘弹出（底部 viewInsets）时', () {
+    Future<void> pumpLayout(
+      WidgetTester tester, {
+      Widget? background,
+      required Key contentKey,
+      required Key inputKey,
+      Key? backgroundKey,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              viewInsets: EdgeInsets.only(bottom: 200),
+            ),
+            child: Scaffold(
+              resizeToAvoidBottomInset: true,
+              body: ChatInputOverlayLayout(
+                topInset: 100,
+                background: background,
+                content: ColoredBox(key: contentKey, color: Colors.blue),
+                bottomOverlay: SizedBox(key: inputKey, width: 800, height: 50),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('内容区域随键盘缩小，输入框仍贴住缩小的底部', (tester) async {
+      const contentKey = Key('content');
+      const inputKey = Key('input');
+
+      await pumpLayout(
+        tester,
+        contentKey: contentKey,
+        inputKey: inputKey,
+      );
+
+      // 默认测试窗口为 800x600，键盘 inset 200 -> body 高度 400。
+      expect(tester.getBottomLeft(find.byKey(contentKey)).dy, 400);
+      expect(tester.getTopLeft(find.byKey(inputKey)).dy, 350);
+      expect(tester.getBottomLeft(find.byKey(inputKey)).dy, 400);
+    });
+
+    testWidgets('背景图层覆盖完整窗口高度，不随键盘上移', (tester) async {
+      const contentKey = Key('content');
+      const inputKey = Key('input');
+      const backgroundKey = Key('background');
+      double backgroundSeenInsets = -1;
+
+      await pumpLayout(
+        tester,
+        backgroundKey: backgroundKey,
+        background: Builder(
+          builder: (context) {
+            backgroundSeenInsets = MediaQuery.viewInsetsOf(
+              context,
+            ).bottom;
+            return ColoredBox(key: backgroundKey, color: Colors.green);
+          },
+        ),
+        contentKey: contentKey,
+        inputKey: inputKey,
+      );
+
+      final bgRect = find.byKey(backgroundKey);
+      // 背景保持完整窗口几何：顶部不动、底边延伸到窗口底（键盘下方不可见区域被裁掉）。
+      expect(tester.getTopLeft(bgRect).dy, 0);
+      expect(tester.getBottomLeft(bgRect).dy, 600);
+      expect(tester.getSize(bgRect).height, 600);
+
+      // 背景子树不应再感知键盘 inset（几何已手动补偿）。
+      expect(backgroundSeenInsets, 0.0);
+
+      // 内容仍只铺满缩小的 body。
+      expect(tester.getBottomLeft(find.byKey(contentKey)).dy, 400);
+    });
+
+    testWidgets('渐变条内的背景副本与底层背景保持同一完整窗口几何', (tester) async {
+      const baseKey = Key('bg-base');
+      const stripKey = Key('bg-strip');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              viewInsets: EdgeInsets.only(bottom: 200),
+            ),
+            child: Scaffold(
+              resizeToAvoidBottomInset: true,
+              body: ChatInputOverlayLayout(
+                topInset: 100,
+                backgroundImageActive: true,
+                background: const ColoredBox(
+                  key: baseKey,
+                  color: Colors.green,
+                ),
+                topBackground: const ColoredBox(
+                  key: stripKey,
+                  color: Colors.green,
+                ),
+                content: const ColoredBox(color: Colors.blue),
+                bottomOverlay: const SizedBox(width: 800, height: 50),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // 底层背景铺满整个窗口（800x600），顶部固定。
+      expect(
+        tester.getRect(find.byKey(baseKey)),
+        const Rect.fromLTWH(0, 0, 800, 600),
+      );
+
+      // 顶部/底部渐变条内各有一份背景副本，几何必须与底层完全一致，
+      // 否则渐变区域会出现随键盘动画错位的重影。
+      expect(find.byKey(stripKey), findsNWidgets(2));
+      expect(
+        tester.getRect(find.byKey(stripKey).first),
+        const Rect.fromLTWH(0, 0, 800, 600),
+      );
+      expect(
+        tester.getRect(find.byKey(stripKey).at(1)),
+        const Rect.fromLTWH(0, 0, 800, 600),
+      );
+    });
+
+    testWidgets('无背景图时布局不受影响', (tester) async {
+      const contentKey = Key('content');
+      const inputKey = Key('input');
+
+      await pumpLayout(
+        tester,
+        contentKey: contentKey,
+        inputKey: inputKey,
+      );
+
+      expect(find.byKey(const Key('background')), findsNothing);
+      expect(tester.getBottomLeft(find.byKey(contentKey)).dy, 400);
+      expect(tester.getTopLeft(find.byKey(inputKey)).dy, 350);
+    });
+
+    testWidgets('顶部/底部渐变遮罩仍跟随缩小的 body 而非窗口', (tester) async {
+      const contentKey = Key('content');
+      const inputKey = Key('input');
+      const topBackgroundKey = Key('chat-input-overlay-top-background');
+      const bottomBackgroundKey = Key('chat-input-overlay-bottom-background');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              viewInsets: EdgeInsets.only(bottom: 200),
+            ),
+            child: Scaffold(
+              resizeToAvoidBottomInset: true,
+              body: ChatInputOverlayLayout(
+                topInset: 100,
+                backgroundImageActive: true,
+                topBackground: const ColoredBox(color: Colors.green),
+                content: const ColoredBox(
+                  key: contentKey,
+                  color: Colors.blue,
+                ),
+                bottomOverlay: const SizedBox(
+                  key: inputKey,
+                  width: 800,
+                  height: 50,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // 内层覆盖层栈随键盘缩小为 400 高，两个背景裁剪层都铺满该栈，
+      // 不再延伸到窗口底（600）。
+      expect(tester.getTopLeft(find.byKey(topBackgroundKey)).dy, 0);
+      expect(tester.getBottomLeft(find.byKey(topBackgroundKey)).dy, 400);
+      expect(tester.getBottomLeft(find.byKey(bottomBackgroundKey)).dy, 400);
+
+      // 底部渐变裁剪窗口贴住缩小的 body 底部（高度 180）。
+      final bottomClipRect = tester.widget<ClipRect>(
+        find.ancestor(
+          of: find.byKey(bottomBackgroundKey),
+          matching: find.byType(ClipRect),
+        ),
+      );
+      final bottomClip = bottomClipRect.clipper!.getClip(const Size(800, 400));
+      expect(bottomClip.top, 220);
+      expect(bottomClip.height, 180);
+    });
+  });
 }

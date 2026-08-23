@@ -25,9 +25,15 @@ class ChatInputOverlayLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final background = _insetCompensatedBackground(context, this.background);
+    final topBackground = _insetCompensatedBackground(
+      context,
+      this.topBackground,
+    );
+
     return Stack(
       children: [
-        if (background != null) Positioned.fill(child: background!),
+        if (background != null) Positioned.fill(child: background),
         Positioned.fill(
           child: Stack(
             children: [
@@ -42,7 +48,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
                       height: topInset + _topOverlayTailHeight,
                       child: IgnorePointer(
                         key: const Key('chat-input-overlay-top-background'),
-                        child: topBackground!,
+                        child: topBackground,
                       ),
                     ),
                   ),
@@ -65,7 +71,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
                       height: _bottomOverlayFadeHeight,
                       child: IgnorePointer(
                         key: const Key('chat-input-overlay-bottom-background'),
-                        child: topBackground!,
+                        child: topBackground,
                       ),
                     ),
                   ),
@@ -91,6 +97,46 @@ class ChatInputOverlayLayout extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// When the keyboard opens, the surrounding Scaffold resizes its body by
+  /// the bottom view inset, which squeezes (and visually shifts upward) the
+  /// chat background image. The background layers must keep the same
+  /// full-window geometry as when the keyboard is closed, so they opt out of
+  /// the inset via [MediaQuery.removeViewInsets] and manually re-extend their
+  /// height by the inset. The extra height is hidden behind the keyboard while
+  /// the top edge (the only visible part) stays fixed. Both the base
+  /// [background] layer and the [topBackground] strips (extra copies of the
+  /// same image used for the gradient fades) are compensated together so all
+  /// copies keep pixel-identical geometry while the keyboard animates.
+  Widget? _insetCompensatedBackground(
+    BuildContext context,
+    Widget? background,
+  ) {
+    if (background == null) return null;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset <= 0) return background;
+
+    return MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Unbounded height means no inset-driven resize to undo.
+          if (!constraints.maxHeight.isFinite) return background;
+          final fullWidth = constraints.maxWidth;
+          final fullHeight = constraints.maxHeight + bottomInset;
+          return OverflowBox(
+            alignment: Alignment.topCenter,
+            minWidth: fullWidth,
+            maxWidth: fullWidth,
+            minHeight: fullHeight,
+            maxHeight: fullHeight,
+            child: background,
+          );
+        },
+      ),
     );
   }
 }

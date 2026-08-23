@@ -1,5 +1,30 @@
 # Changelog
 
+## [3.0.3] - 2026-08-22
+
+### Added
+
+- **Android SAF external-directory mounts**: mount Android external directories into the workspace via SAF with scheduled syncing (#316 by @cup113, @Pheobe-Southwood)
+- **Search services sync**: synced upstream search services (new providers, account usage) (#510, #511 by @cup113, @Chevey339)
+- **Custom themes**: ported upstream custom theme system (#516, #300 by @cup113, @Chevey339)
+- **Markdown performance**: ported upstream incremental streaming Markdown block renderer for smoother live rendering of long answers (#334 by @cup113, @Chevey339, @banana4432, #527 by @Pheobe-Southwood)
+- New model support: deepseek-v4-flash-vision, Qwen3.8 series, muse spark series, grok-4.6, gemini-3.7-flash, dots3-note (#513 by @cup113, #524 by @cup113, @VictorSun92)
+- Pin a startup assistant: a chosen assistant is auto-selected when the app restarts (#517 by @cup113)
+- Keep screen on while generating: mobile keeps the screen on during AI generation (#520 by @cup113)
+- GLM-OCR support: official GLM-OCR service and empty prompts (#519 by @cup113, @Chevey339)
+- Manual database compaction: one-click compact the SQLite database to reclaim freelist holes (#508 by @cup113)
+- Live panel visual unification: live entries unified inside the input bar card with a unified rounded-border style (#523 by @cup113, @getpaseo)
+
+### Fixed
+
+- **LAN sync**: added restore progress display; no longer uploads unnecessary files; blocked sync sessions are closed, fixing long-duration syncs and weak signals (#509, #515 by @cup113)
+- **Gemini compatibility**: stripped `additionalProperties` from tool schemas, fixing tool call failures (#425 by @cup113)
+- Android 32-bit ARM sandbox: sandbox runtime now supports 32-bit ARM devices (#496 by @Pheobe-Southwood)
+- iOS sandbox: uses the system DNS to prevent network unavailability; rootfs is installed atomically to prevent mid-install corruption; fixed sandbox commands escaping the working directory (#463 by @cup113, #471 by @HowieATP, #456 by @HowieATP)
+- World-book keywords: the input keeps focus after adding a keyword, so the keyboard stays open for quick additions (#514 by @cup113, @xuanxuan9929)
+- Storage scan: tolerates unreadable subdirectories, no longer interrupting usage scans (#525 by @cup113)
+- Backup merge: restore merge no longer syncs proxy settings (#512 by @cup113)
+
 ## [3.0.2] - 2026-08-18
 
 ### Added

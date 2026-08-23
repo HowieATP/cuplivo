@@ -1,5 +1,30 @@
 # 更新日志
 
+## [3.0.3] - 2026-08-22
+
+### 新增
+
+- **安卓 SAF 外部目录挂载**: 通过 SAF + 定时同步将安卓外部目录挂载到工作区 (#316 by @cup113, @Pheobe-Southwood)
+- **搜索服务同步**: 同步上游搜索服务（新供应商、账号用量） (#510, #511 by @cup113, @Chevey339)
+- **自定义主题**: 移植上游自定义主题体系 (#516, #300 by @cup113, @Chevey339)
+- **Markdown 性能优化**: 移植上游增量流式 Markdown 分块渲染器，长回答流式渲染更流畅 (#334 by @cup113, @Chevey339, @banana4432, #527 by @Pheobe-Southwood)
+- 新模型支持: 支持 deepseek-v4-flash-vision、Qwen3.8 系列、muse spark 系列、grok-4.6、gemini-3.7-flash、dots3-note (#513 by @cup113, #524 @cup113, @VictorSun92)
+- 启动时固定助手: 可指定一个助手在应用重启后自动选中 (#517 by @cup113)
+- 生成时保持亮屏: 移动端 AI 生成期间自动保持屏幕常亮 (#520 by @cup113)
+- GLM-OCR 支持: 支持官方 GLM-OCR 服务与空提示词 (#519 by @cup113, @Chevey339)
+- 数据库手动压缩: 一键压缩 SQLite 数据库，回收 freelist 空洞 (#508 by @cup113)
+- 实时面板视觉统一: 实时条目整合进输入栏卡片，圆角边框视觉效果统一 (#523 by @cup113, @getpaseo)
+
+### 修复
+
+- **局域网同步**: 新增恢复进度显示；不再上传无关文件；阻塞同步期间关闭，解决耗时长、信号少的问题 (#509, #515 by @cup113)
+- **Gemini 兼容**: 工具 schema 去掉 additionalProperties，修复工具调用失败 (#425 by @cup113)
+- 安卓 32-bit ARM 沙箱: 沙箱运行时支持 32 位 ARM 设备 (#496 by @Pheobe-Southwood)
+- iOS 沙箱: 使用系统 DNS 防止网络不可访问；rootfs 改为原子安装防止中途损坏；修复沙箱命令逃出工作目录的限制问题 (#463 by @cup113, #471 by @HowieATP, #456 by @HowieATP)
+- 世界书关键词: 添加关键词后输入框保持焦点，键盘不再被收起，便于快速添加 (#514 by @cup113, @xuanxuan9929)
+- 存储扫描: 容忍不可读子目录，不再导致用量扫描中断 (#525 by @cup113)
+- 备份合并: 恢复合并时不再同步代理设置 (#512 by @cup113)
+
 ## [3.0.2] - 2026-08-18
 
 ### 新增

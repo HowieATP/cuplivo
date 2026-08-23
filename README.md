@@ -39,7 +39,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 ### Signature Chat Experience
 
-1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools. Android can also open a Termux-like interactive terminal from workspace settings, independent of the model shell tool.
+1. **Linux sandbox** — Run a full Linux sandbox: **Android** can select a distribution in-app, **iOS** runs the sandbox via iSH; users who complete the setup can execute command-line tools. Android can also open a Termux-like interactive terminal from workspace settings, independent of the model shell tool. Android can additionally mount external directories (SAF) into the workspace with scheduled syncing.
 
 2. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
    - *Android-only*: background alarm + notification channel; alarm persists through force-stop
@@ -81,6 +81,10 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 4. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI.
 
 5. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat.
+
+6. **Startup assistant pin** — Choose an assistant that gets auto-selected when the app restarts, keeping your preferred assistant across sessions.
+
+7. **Screen awake during generation** — Mobile keeps the screen on while the AI is generating, so long streaming responses never interrupt you.
 
 ### UI & Rendering
 

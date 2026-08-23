@@ -254,6 +254,9 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
       'mobile_assistant_edit_tab_hidden_v1';
+  // Input bar buttons customization (order + More bucket)
+  static const String _chatInputButtonsOrderKey = 'chat_input_buttons_v1';
+  static const String _chatInputMoreButtonsKey = 'chat_input_more_buttons_v1';
   static const String _mobileAssistantDetailOutlineEnabledKey =
       'mobile_assistant_detail_outline_enabled_v1';
   // Network request logging (debug)
@@ -1369,6 +1372,12 @@ class SettingsProvider extends ChangeNotifier {
     );
     _hiddenMobileAssistantEditTabs = Set.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabHiddenKey) ?? const <String>[],
+    );
+    _chatInputButtonOrder = List.unmodifiable(
+      prefs.getStringList(_chatInputButtonsOrderKey) ?? const <String>[],
+    );
+    _chatInputMoreButtonIds = List.unmodifiable(
+      prefs.getStringList(_chatInputMoreButtonsKey) ?? const <String>[],
     );
     _mobileAssistantDetailOutlineEnabled =
         prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
@@ -2856,6 +2865,44 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_mobileAssistantEditTabHiddenKey, sorted);
+  }
+
+  List<String> _chatInputButtonOrder = const <String>[];
+  List<String> get chatInputButtonOrder => _chatInputButtonOrder;
+  Future<void> setChatInputButtonOrder(List<String> order) async {
+    final next = List<String>.unmodifiable(LinkedHashSet<String>.from(order));
+    if (listEquals(_chatInputButtonOrder, next)) return;
+    _chatInputButtonOrder = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_chatInputButtonsOrderKey, next);
+  }
+
+  List<String> _chatInputMoreButtonIds = const <String>[];
+  List<String> get chatInputMoreButtonIds => _chatInputMoreButtonIds;
+  Future<void> setChatInputMoreButtonIds(List<String> ids) async {
+    final sorted = LinkedHashSet<String>.from(ids).toList()..sort();
+    final next = List<String>.unmodifiable(sorted);
+    if (listEquals(_chatInputMoreButtonIds, next)) return;
+    _chatInputMoreButtonIds = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_chatInputMoreButtonsKey, next);
+  }
+
+  /// True once the user saved an explicit customization. While false (sentinel
+  /// unset), every platform keeps its legacy button split.
+  bool get chatInputButtonsCustomized =>
+      _chatInputButtonOrder.isNotEmpty || _chatInputMoreButtonIds.isNotEmpty;
+
+  Future<void> resetChatInputButtons() async {
+    if (!chatInputButtonsCustomized) return;
+    _chatInputButtonOrder = const <String>[];
+    _chatInputMoreButtonIds = const <String>[];
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_chatInputButtonsOrderKey);
+    await prefs.remove(_chatInputMoreButtonsKey);
   }
 
   bool _mobileAssistantDetailOutlineEnabled = false;
@@ -5194,6 +5241,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
+    copy._chatInputButtonOrder = _chatInputButtonOrder;
+    copy._chatInputMoreButtonIds = _chatInputMoreButtonIds;
     copy._mobileAssistantDetailOutlineEnabled =
         _mobileAssistantDetailOutlineEnabled;
     return copy;

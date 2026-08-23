@@ -3528,6 +3528,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarMoreTooltip => 'Add';
 
   @override
+  String get chatInputBarCustomizeTitle => 'Customize Input Bar Buttons';
+
+  @override
+  String get chatInputBarCustomizeSubtitle =>
+      'Drag to reorder. Turn off a switch to tuck a button into \"+ More\"; it stays reachable from there.';
+
+  @override
+  String get chatInputBarCustomizeAtLeastOneVisible =>
+      'Keep at least one button directly visible';
+
+  @override
+  String get chatInputBarCustomizeResetTooltip => 'Reset to default';
+
+  @override
+  String get chatInputBarCustomizeMenuAction => 'Customize';
+
+  @override
   String get chatInputBarVoiceCancelTooltip => 'Discard recording';
 
   @override

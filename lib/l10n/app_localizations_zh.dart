@@ -3398,6 +3398,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarCustomizeTitle => '自定义输入区按钮';
+
+  @override
+  String get chatInputBarCustomizeSubtitle =>
+      '拖拽调整顺序；关闭开关可将按钮收纳到「更多」，按钮仍可在「更多」里使用。';
+
+  @override
+  String get chatInputBarCustomizeAtLeastOneVisible => '至少保留一个按钮直接显示';
+
+  @override
+  String get chatInputBarCustomizeResetTooltip => '恢复默认';
+
+  @override
+  String get chatInputBarCustomizeMenuAction => '自定义';
+
+  @override
   String get chatInputBarVoiceCancelTooltip => '取消录音';
 
   @override
@@ -11899,6 +11915,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarCustomizeTitle => '自定义输入区按钮';
+
+  @override
+  String get chatInputBarCustomizeSubtitle =>
+      '拖拽调整顺序；关闭开关可将按钮收纳到「更多」，按钮仍可在「更多」里使用。';
+
+  @override
+  String get chatInputBarCustomizeAtLeastOneVisible => '至少保留一个按钮直接显示';
+
+  @override
+  String get chatInputBarCustomizeResetTooltip => '恢复默认';
+
+  @override
+  String get chatInputBarCustomizeMenuAction => '自定义';
+
+  @override
   String get chatInputBarVoiceCancelTooltip => '取消录音';
 
   @override
@@ -20397,6 +20429,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMoreTooltip => '更多';
+
+  @override
+  String get chatInputBarCustomizeTitle => '自訂輸入區按鈕';
+
+  @override
+  String get chatInputBarCustomizeSubtitle =>
+      '拖曳調整順序；關閉開關可將按鈕收納到「更多」，按鈕仍可在「更多」中使用。';
+
+  @override
+  String get chatInputBarCustomizeAtLeastOneVisible => '至少保留一個按鈕直接顯示';
+
+  @override
+  String get chatInputBarCustomizeResetTooltip => '恢復預設';
+
+  @override
+  String get chatInputBarCustomizeMenuAction => '自訂';
 
   @override
   String get chatInputBarVoiceCancelTooltip => '取消錄音';

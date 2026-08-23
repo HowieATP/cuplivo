@@ -139,6 +139,7 @@ private let backgroundProcessingIdentifier = "com.cup11.cuplivo.background-gener
   override func applicationDidBecomeActive(_ application: UIApplication) {
     super.applicationDidBecomeActive(application)
     backgroundGenerationHandler.dismissFinishedLiveActivityIfNeeded()
+    backgroundGenerationHandler.endOrphanedLiveActivities(reason: "applicationDidBecomeActive")
   }
 }
 
@@ -368,9 +369,82 @@ private final class IosBackgroundGenerationHandler {
     return false
   }
 
+  /// Ends every live instance of `CuplivoGenerationActivityAttributes` that
+  /// this process does not own. The owning reference lives only in memory,
+  /// so instances created by a previous process (killed, crashed, or force-
+  /// quit) would otherwise linger on the Lock Screen / Dynamic Island until
+  /// system expiry. Enumerating by attributes type needs no persistence.
+  ///
+  /// Internal (not private) because AppDelegate calls it from
+  /// applicationDidBecomeActive, mirroring dismissFinishedLiveActivityIfNeeded.
+  ///
+  /// Safe to call while a generation is running: the in-process owner is
+  /// skipped, and each end task captures its own activity object, so it can
+  /// never tear down an instance created afterwards.
+  func endOrphanedLiveActivities(reason: String) {
+    if #available(iOS 16.1, *) {
+      guard !isLiveActivityActive() else { return }
+      let activities = Activity<CuplivoGenerationActivityAttributes>.activities
+      for activity in activities where activity.activityState == .active || activity.activityState == .stale {
+        NSLog("Cuplivo live activity orphan cleanup (\(reason)): ending \(activity.id)")
+        endOrphanedLiveActivity(activity)
+      }
+    }
+  }
+
+  @available(iOS 16.1, *)
+  private func endOrphanedLiveActivity(_ activity: Activity<CuplivoGenerationActivityAttributes>) {
+    // Reuse the exact final content state shape of finishLiveActivity's
+    // active-app path (endLiveActivity): finished card with elapsed time.
+    // Keep the orphan's own start time / wave phase so the tombstone shows
+    // truthful data. Both accessors are optional: prefer the non-deprecated
+    // content.state on iOS 16.2+, fall back to contentState on 16.1, and to
+    // a clean finished card if the system reports no prior content at all.
+    let finishedAt = Date()
+    let fallbackState = CuplivoGenerationActivityAttributes.ContentState(
+      displayTitle: activity.attributes.title,
+      detail: "",
+      tokenCount: 0,
+      tokenLabel: "",
+      startedAt: finishedAt,
+      finishedAt: finishedAt,
+      elapsedSeconds: 0,
+      wavePhase: 0,
+      isFinished: true
+    )
+    let priorState: CuplivoGenerationActivityAttributes.ContentState
+    if #available(iOS 16.2, *) {
+      priorState = activity.content?.state ?? fallbackState
+    } else {
+      priorState = activity.contentState ?? fallbackState
+    }
+    let state = CuplivoGenerationActivityAttributes.ContentState(
+      displayTitle: activity.attributes.title,
+      detail: priorState.detail,
+      tokenCount: priorState.tokenCount,
+      tokenLabel: priorState.tokenLabel,
+      startedAt: priorState.startedAt,
+      finishedAt: finishedAt,
+      elapsedSeconds: elapsedSeconds(from: priorState.startedAt, to: finishedAt),
+      wavePhase: priorState.wavePhase,
+      isFinished: true
+    )
+    Task {
+      if #available(iOS 16.2, *) {
+        await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .immediate)
+      } else {
+        await activity.end(using: state, dismissalPolicy: .immediate)
+      }
+    }
+  }
+
   private func startLiveActivity(title: String, detail: String, tokenCount: Int, tokenLabel: String) {
     if #available(iOS 16.1, *) {
       guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+      // Defensive: reclaim any leftover instance (e.g. from a previous
+      // process) before creating a new one, so at most one generation card
+      // is ever on screen.
+      endOrphanedLiveActivities(reason: "beforeStart")
       liveActivityDisplayTitle = title
       liveActivityDetail = detail
       liveActivityStartedAt = Date()

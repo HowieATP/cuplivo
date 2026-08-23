@@ -1017,7 +1017,37 @@ String _preprocessFences(
   // Skips $$...$$ blocks, which are handled separately.
   // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
   if (enableMath && enableDollarLatex) {
-    out = _replaceInlineDollarMath(out);
+    // Renderable display math is masked too: _replaceInlineDollarMath is
+    // line-agnostic and cannot tell a literal dollar inside a $$...$$ body
+    // from an inline delimiter, so a body like "\text{ costs }$5$" had its
+    // dollars rewritten to "\( ... \)" — corrupting both the rendered formula
+    // and the Copy LaTeX export (issue #500). Only spans the shared scanner
+    // accepts are masked, so "$$" kept literally in prose (pinned by the
+    // $a$$b$$c$ tests) is never swallowed.
+    final mathScan = markdownScanDisplayMath(out);
+    if (mathScan.spans.isNotEmpty) {
+      final Map<String, String> displayMathMap = {};
+      int displayMathCount = 0;
+      final buf = StringBuffer();
+      var cursor = 0;
+      for (final span in mathScan.spans) {
+        buf.write(out.substring(cursor, span.start));
+        final key = '__DISPLAY_MATH_MASK_${displayMathCount++}__';
+        displayMathMap[key] = out.substring(span.start, span.end);
+        buf.write(key);
+        cursor = span.end;
+      }
+      buf.write(out.substring(cursor));
+      out = _replaceInlineDollarMath(buf.toString());
+      out = out.replaceAllMapped(RegExp(r'__DISPLAY_MATH_MASK_\d+__'), (
+        match,
+      ) {
+        final key = match.group(0)!;
+        return displayMathMap[key] ?? key;
+      });
+    } else {
+      out = _replaceInlineDollarMath(out);
+    }
   }
 
   // Ensure display-math blocks stay as standalone blocks even when generated inline.
@@ -5010,21 +5040,28 @@ class LatexBlockScrollableMd extends BlockMd {
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _LatexMathBlock(body: body, style: config.style);
-    // Wrap in horizontal scroll to avoid overflow and center within available width
+    // Wrap in horizontal scroll to avoid overflow and center within available
+    // width. A static capture (message image export via ExportCaptureScope)
+    // has no way to scroll: a formula wider than the export canvas would be
+    // clipped, so the capture instead scales the whole formula down to fit.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          return SelectionContainer.disabled(
-            child: SingleChildScrollView(
+          final Widget content;
+          if (ExportCaptureScope.of(context)) {
+            content = FittedBox(fit: BoxFit.scaleDown, child: math);
+          } else {
+            content = SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               primary: false,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
                 child: Center(child: math),
               ),
-            ),
-          );
+            );
+          }
+          return SelectionContainer.disabled(child: content);
         },
       ),
     );

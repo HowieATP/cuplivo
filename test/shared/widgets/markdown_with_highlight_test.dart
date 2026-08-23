@@ -3971,7 +3971,7 @@ void main() {
   );
 
   testWidgets(
-    'MarkdownWithCodeHighlight keeps single-$ literals inside display math '
+    'MarkdownWithCodeHighlight keeps single-\$ literals inside display math '
     'export',
     (tester) async {
       markdownMathTargetPlatformOverride = TargetPlatform.android;
@@ -3993,7 +3993,7 @@ void main() {
 
       const source = r'''
 $$
-\\text{total } $x+y$ \\text{ yuan}
+\text{total } $x+y$ \text{ yuan}
 $$
 ''';
       await tester.pumpWidget(_markdownHarness(source, width: 360));
@@ -4047,10 +4047,10 @@ $$
 
       const source = r'''
 $$
-\\begin{aligned}
-E &= mc^2 \\\\
+\begin{aligned}
+E &= mc^2 \\
 p &= mv
-\\end{aligned}
+\end{aligned}
 $$
 ''';
       await tester.pumpWidget(_markdownHarness(source, width: 360));

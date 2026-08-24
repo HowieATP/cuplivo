@@ -6291,6 +6291,37 @@ class AppLocalizationsZh extends AppLocalizations {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolScreenTimeTitle => '屏幕使用时间';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查询本机应用的屏幕使用情况，需要\"使用情况访问\"特殊权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查询日历';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle => '读取本机日历事件，需要日历权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '创建日程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '经你确认后在本机创建日历事件，需要日历权限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '屏幕使用总时长';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '尚未授予使用情况访问权限。请在系统设置中开启后重试。';
+
+  @override
+  String get chatMessageWidgetCalendarPermissionDenied =>
+      '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
+
+  @override
   String get assistantEditLocalToolHandoffTitle => '任务交接';
 
   @override
@@ -14831,6 +14862,37 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolScreenTimeTitle => '屏幕使用时间';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查询本机应用的屏幕使用情况，需要\"使用情况访问\"特殊权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查询日历';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle => '读取本机日历事件，需要日历权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '创建日程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '经你确认后在本机创建日历事件，需要日历权限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '屏幕使用总时长';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '尚未授予使用情况访问权限。请在系统设置中开启后重试。';
+
+  @override
+  String get chatMessageWidgetCalendarPermissionDenied =>
+      '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
+
+  @override
   String get assistantEditLocalToolHandoffTitle => '任务交接';
 
   @override
@@ -23369,6 +23431,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
       '計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolScreenTimeTitle => '螢幕使用時間';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查詢本機應用程式螢幕使用情況，需要「使用情況存取」特殊權限。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查詢行事曆';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle =>
+      '讀取本機行事曆事件，需要行事曆權限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '建立行程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '經你確認後在本機建立行事曆事件，需要行事曆權限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '螢幕使用總時長';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '尚未授予使用情況存取權限。請在系統設定中開啟後重試。';
+
+  @override
+  String get chatMessageWidgetCalendarPermissionDenied =>
+      '行事曆權限已被拒絕。請在系統設定中開啟行事曆權限，然後重新開啟該工具。';
 
   @override
   String get assistantEditLocalToolHandoffTitle => '任務交接';

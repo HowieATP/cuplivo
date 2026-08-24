@@ -24,11 +24,15 @@ class MainActivity : FlutterActivity() {
     private var pendingSaveResult: MethodChannel.Result? = null
     private var pendingSaveSourcePath: String? = null
     var volumeCtrlPlugin: LinuxSandboxPlugin? = null
+    private var deviceLocalToolsHandler: DeviceLocalToolsHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(LinuxSandboxPlugin())
         flutterEngine.plugins.add(SafMountPlugin())
+        deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {
+            it.configure(flutterEngine.dartExecutor.binaryMessenger)
+        }
         processTextChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processTextChannelName)
         processTextChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -89,6 +93,17 @@ class MainActivity : FlutterActivity() {
 
         val destUri = if (resultCode == Activity.RESULT_OK) data?.data else null
         handleSaveDestination(destUri)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        if (deviceLocalToolsHandler?.onRequestPermissionsResult(requestCode, grantResults) == true) {
+            return
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     private fun extractProcessText(intent: Intent?): String? {

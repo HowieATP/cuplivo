@@ -6434,6 +6434,36 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get chatInputBarMoreTooltip;
 
+  /// No description provided for @chatInputBarCustomizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize Input Bar'**
+  String get chatInputBarCustomizeTitle;
+
+  /// No description provided for @chatInputBarCustomizeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder. Turn off a switch to tuck a button into \"+ More\"; it stays reachable from there.'**
+  String get chatInputBarCustomizeSubtitle;
+
+  /// No description provided for @chatInputBarCustomizeAtLeastOneVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one button directly visible'**
+  String get chatInputBarCustomizeAtLeastOneVisible;
+
+  /// No description provided for @chatInputBarCustomizeResetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get chatInputBarCustomizeResetTooltip;
+
+  /// No description provided for @chatInputBarCustomizeMenuAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize'**
+  String get chatInputBarCustomizeMenuAction;
+
   /// No description provided for @chatInputBarVoiceCancelTooltip.
   ///
   /// In en, this message translates to:

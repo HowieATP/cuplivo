@@ -18,6 +18,7 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
@@ -25,6 +26,7 @@ import '../../settings/pages/trash_detail_page.dart';
 import '../widgets/live_panel.dart';
 import '../widgets/image_generation_options.dart';
 import '../../../core/models/quick_phrase.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/chat/external_chat_draft_handoff.dart';
@@ -73,6 +75,8 @@ import '../widgets/chat_selection_export_bar.dart';
 import '../widgets/user_message_edit_overlay.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
+import '../utils/input_bar_button_layout.dart';
+import 'input_bar_buttons_customization_page.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
@@ -1601,22 +1605,7 @@ class _HomePageState extends State<HomePage>
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));
       },
       onOpenSearch: _openSearchSettings,
-      onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant != null) {
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
-      },
+      onConfigureReasoning: () => _configureReasoning(),
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1834,6 +1823,22 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _configureReasoning() async {
+    final assistantProvider = context.read<AssistantProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant == null) return;
+    if (assistant.thinkingBudget != null) {
+      settingsProvider.setThinkingBudget(assistant.thinkingBudget);
+    }
+    await _openReasoningSettings();
+    if (!mounted) return;
+    final chosen = settingsProvider.thinkingBudget;
+    await assistantProvider.updateAssistant(
+      assistant.copyWith(thinkingBudget: chosen),
+    );
+  }
+
   Future<void> _openReasoningSettings() async {
     if (PlatformUtils.isDesktop) {
       await showDesktopReasoningBudgetPopover(context, anchorKey: _inputBarKey);
@@ -1930,6 +1935,29 @@ class _HomePageState extends State<HomePage>
     _controller.dismissKeyboard();
     final cs = Theme.of(context).colorScheme;
     final assistantId = context.read<AssistantProvider>().currentAssistantId;
+    final settings = context.read<SettingsProvider>();
+    final ap = context.read<AssistantProvider>();
+    final a = ap.currentAssistant;
+    final layout = resolveInputBarButtonLayout(
+      savedOrder: settings.chatInputButtonOrder,
+      savedMoreIds: settings.chatInputMoreButtonIds,
+      tabletLayout: false,
+    );
+    // Phone bucket = configured in-more ids (in config order) + row overflow.
+    final bucket = <String>[
+      for (final id in layout.orderedIds)
+        if (layout.moreIds.contains(id)) id,
+      ..._mediaController.nonFittedDirectIds,
+    ];
+    // Capability gates mirror ChatInputSection: rows are only offered when
+    // the current model/assistant actually supports them.
+    final modelIds = getActiveModelIds(settings, assistant: a);
+    final pk = modelIds.providerKey;
+    final mid = modelIds.modelId;
+    final supportsReasoning = pk != null && mid != null;
+    final toolsGate =
+        supportsReasoning && _toolsHubAvailable(settings, a, pk, mid);
+    final quickPhraseGate = _hasQuickPhrases(a);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1941,6 +1969,15 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: BottomToolsSheet(
+            moreIds: bucket,
+            onCustomize: () {
+              Navigator.of(ctx).maybePop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InputBarButtonsCustomizationPage(),
+                ),
+              );
+            },
             onPhotos: () {
               Navigator.of(ctx).maybePop();
               _controller.onPickPhotos();
@@ -1966,10 +2003,65 @@ class _HomePageState extends State<HomePage>
               Navigator.of(ctx).maybePop();
               _openSkillsPopover();
             },
+            onSelectModel: () async {
+              Navigator.of(ctx).maybePop();
+              showModelSelectSheet(
+                context,
+                onMultiSelectConfirm:
+                    _controller.multiAIEngine.mode == MultiAIMode.synthesize
+                    ? null
+                    : _controller.enterMultiAIMode,
+              );
+            },
+            onOpenSearch: () {
+              Navigator.of(ctx).maybePop();
+              _openSearchSettings();
+            },
+            onConfigureReasoning: !supportsReasoning
+                ? null
+                : () async {
+                    Navigator.of(ctx).maybePop();
+                    await _configureReasoning();
+                  },
+            onQuickPhrase: !quickPhraseGate
+                ? null
+                : () {
+                    Navigator.of(ctx).maybePop();
+                    _showQuickPhraseMenu();
+                  },
+            onOpenToolsHub: !toolsGate
+                ? null
+                : () {
+                    Navigator.of(ctx).maybePop();
+                    if (a != null) {
+                      showToolsHubSheet(context, assistantId: a.id);
+                    }
+                  },
           ),
         );
       },
     );
+  }
+
+  bool _toolsHubAvailable(
+    SettingsProvider settings,
+    Assistant? a,
+    String? pk,
+    String? mid,
+  ) {
+    if (pk == null || mid == null) return false;
+    if (!_controller.isToolModel(pk, mid)) return false;
+    final hasEnabledMcp = context.read<McpProvider>().hasAnyEnabled;
+    final hasLocalTools = a?.localToolIds.isNotEmpty ?? false;
+    final workspaceOn = a?.workspaceEnabled ?? false;
+    return hasEnabledMcp || hasLocalTools || workspaceOn;
+  }
+
+  bool _hasQuickPhrases(Assistant? a) {
+    final quickPhraseProvider = context.read<QuickPhraseProvider>();
+    if (quickPhraseProvider.globalPhrases.isNotEmpty) return true;
+    if (a == null) return false;
+    return quickPhraseProvider.getForAssistant(a.id).isNotEmpty;
   }
 
   void _showContextManagementSheet() async {

@@ -44,6 +44,8 @@ import '../../../desktop/desktop_context_menu.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 import 'package:Cuplivo/theme/app_semantic_colors.dart';
 import '../../group_chat/models/chat_input_mode.dart';
+import '../utils/input_bar_button_layout.dart';
+import '../pages/input_bar_buttons_customization_page.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -63,6 +65,12 @@ class ChatInputBarController {
   ChatInputData snapshotInput(String text) =>
       _state?._snapshotInput(text) ?? ChatInputData(text: text.trim());
   void clearDraft() => _state?._clearDraft();
+
+  /// Ids of direct buttons the narrow row could not fit. They land in the
+  /// right "+" sheet (phone bucket merge). Stale-safe: updated on every bar
+  /// build, so the value is fresh whenever the sheet opens.
+  List<String> get nonFittedDirectIds =>
+      _state?._nonFittedDirectIds ?? const <String>[];
 
   /// Re-syncs the persisted draft with programmatic text changes made
   /// outside the bar (suggestion insert, quick phrase, quote, synthesize
@@ -129,6 +137,9 @@ class ChatInputBar extends StatefulWidget {
     this.mode = ChatInputMode.normal,
     this.imageGenController,
     this.livePanel,
+    this.inputBarButtonOrder = defaultInputBarButtonIds,
+    this.inputBarMoreIds = const <String>{},
+    this.inputBarCustomized = false,
   });
 
   /// When [ChatInputMode.groupChat], hide model/search/reasoning/MCP/multi-AI.
@@ -197,6 +208,16 @@ class ChatInputBar extends StatefulWidget {
   /// height (driving the message list bottom padding) covers the panel.
   final Widget? livePanel;
 
+  /// Resolved button order (/lib/features/home/utils/input_bar_button_layout.dart).
+  /// Unavailable buttons are skipped. Group chat can omit these (defaults).
+  final List<String> inputBarButtonOrder;
+
+  /// Ids (of the resolved order) tucked into the platform More bucket.
+  final Set<String> inputBarMoreIds;
+
+  /// True once the user saved an explicit customization (sentinel semantics).
+  final bool inputBarCustomized;
+
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
@@ -237,6 +258,10 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool _isSubmitting = false;
   bool _oneClickCompressing = false;
   bool _oneClickCompressDone = false;
+
+  /// Direct ids the narrow row could not fit (phone bucket merge input).
+  /// Derived during build; see ChatInputBarController.nonFittedDirectIds.
+  List<String> _nonFittedDirectIds = const <String>[];
   bool _oneClickConfirming = false;
   Timer? _confirmTimer;
   String? _lastImageDefaultsSignature;
@@ -1863,7 +1888,20 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final List<_OverflowAction> actions = [];
+        final Map<String, _OverflowAction> available = {};
+        void addAction(
+          String id,
+          double width, {
+          required Widget Function() builder,
+          required DesktopContextMenuItem menu,
+        }) {
+          available[id] = _OverflowAction(
+            id: id,
+            width: width,
+            builder: builder,
+            menu: menu,
+          );
+        }
 
         final isGroupChat = widget.mode == ChatInputMode.groupChat;
 
@@ -1871,35 +1909,34 @@ class _ChatInputBarState extends State<ChatInputBar>
         final modelCount = widget.multiAIModelCount;
         final isMultiAILocked = modelCount != null && modelCount >= 2;
         if (!isGroupChat) {
-          actions.add(
-            _OverflowAction(
-              width: isMultiAILocked
-                  ? modelButtonW + 32
-                  : (widget.modelIcon != null)
-                  ? modelButtonW
-                  : normalButtonW,
-              builder: () => isMultiAILocked
-                  ? _buildMultiAIBadge(context, modelCount)
-                  : _CompactIconButton(
-                      tooltip: l10n.chatInputBarSelectModelTooltip,
-                      icon: Lucide.Boxes,
-                      modelIcon: true,
-                      onTap: lockTap(widget.onSelectModel),
-                      onLongPress: lockTap(widget.onLongPressSelectModel),
-                      child: widget.modelIcon,
-                    ),
-              menu: isMultiAILocked
-                  ? DesktopContextMenuItem(
-                      icon: Lucide.Boxes,
-                      label: l10n.multiAIModelsBadge(modelCount),
-                      onTap: widget.onMultiSelectModel,
-                    )
-                  : DesktopContextMenuItem(
-                      icon: Lucide.Boxes,
-                      label: l10n.chatInputBarSelectModelTooltip,
-                      onTap: lockTap(widget.onSelectModel),
-                    ),
-            ),
+          addAction(
+            inputBarButtonModel,
+            isMultiAILocked
+                ? modelButtonW + 32
+                : (widget.modelIcon != null)
+                ? modelButtonW
+                : normalButtonW,
+            builder: () => isMultiAILocked
+                ? _buildMultiAIBadge(context, modelCount)
+                : _CompactIconButton(
+                    tooltip: l10n.chatInputBarSelectModelTooltip,
+                    icon: Lucide.Boxes,
+                    modelIcon: true,
+                    onTap: lockTap(widget.onSelectModel),
+                    onLongPress: lockTap(widget.onLongPressSelectModel),
+                    child: widget.modelIcon,
+                  ),
+            menu: isMultiAILocked
+                ? DesktopContextMenuItem(
+                    icon: Lucide.Boxes,
+                    label: l10n.multiAIModelsBadge(modelCount),
+                    onTap: widget.onMultiSelectModel,
+                  )
+                : DesktopContextMenuItem(
+                    icon: Lucide.Boxes,
+                    label: l10n.chatInputBarSelectModelTooltip,
+                    onTap: lockTap(widget.onSelectModel),
+                  ),
           );
         }
 
@@ -1936,264 +1973,254 @@ class _ChatInputBarState extends State<ChatInputBar>
 
         // Search button (hidden in group chat)
         if (!isGroupChat) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () {
-                // Not enabled at all -> default globe
-                if (!appSearchEnabled && !builtinSearchActive) {
-                  return _CompactIconButton(
-                    tooltip: l10n.chatInputBarOnlineSearchTooltip,
-                    icon: Lucide.Globe,
-                    active: false,
-                    onTap: lockTap(widget.onOpenSearch),
-                  );
-                }
-                // Built-in search -> magnifier icon in theme color
-                if (builtinSearchActive) {
-                  return _CompactIconButton(
-                    tooltip: l10n.chatInputBarOnlineSearchTooltip,
-                    icon: Lucide.Search,
-                    active: true,
-                    onTap: lockTap(widget.onOpenSearch),
-                  );
-                }
-                // External provider search -> brand icon
+          addAction(
+            inputBarButtonSearch,
+            normalButtonW,
+            builder: () {
+              // Not enabled at all -> default globe
+              if (!appSearchEnabled && !builtinSearchActive) {
                 return _CompactIconButton(
                   tooltip: l10n.chatInputBarOnlineSearchTooltip,
                   icon: Lucide.Globe,
+                  active: false,
+                  onTap: lockTap(widget.onOpenSearch),
+                );
+              }
+              // Built-in search -> magnifier icon in theme color
+              if (builtinSearchActive) {
+                return _CompactIconButton(
+                  tooltip: l10n.chatInputBarOnlineSearchTooltip,
+                  icon: Lucide.Search,
                   active: true,
                   onTap: lockTap(widget.onOpenSearch),
-                  childBuilder: (c) {
-                    final asset = brandAsset;
-                    if (asset != null) {
-                      if (asset.endsWith('.svg')) {
-                        return SvgPicture.asset(
-                          asset,
-                          width: 20,
-                          height: 20,
-                          colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
-                        );
-                      } else {
-                        return Image.asset(
-                          asset,
-                          width: 20,
-                          height: 20,
-                          color: c,
-                          colorBlendMode: BlendMode.srcIn,
-                        );
-                      }
-                    } else {
-                      return Icon(Lucide.Globe, size: 20, color: c);
-                    }
-                  },
                 );
-              },
-              menu: () {
-                // Prefer vector icon if brandAsset is svg, otherwise pick reasonable default
-                if (!appSearchEnabled && !builtinSearchActive) {
-                  return DesktopContextMenuItem(
-                    icon: Lucide.Globe,
-                    label: l10n.chatInputBarOnlineSearchTooltip,
-                    onTap: lockTap(widget.onOpenSearch),
-                  );
-                }
-                if (builtinSearchActive) {
-                  return DesktopContextMenuItem(
-                    icon: Lucide.Search,
-                    label: l10n.chatInputBarOnlineSearchTooltip,
-                    onTap: lockTap(widget.onOpenSearch),
-                  );
-                }
-                if (brandAsset != null && brandAsset.endsWith('.svg')) {
-                  return DesktopContextMenuItem(
-                    svgAsset: brandAsset,
-                    label: l10n.chatInputBarOnlineSearchTooltip,
-                    onTap: lockTap(widget.onOpenSearch),
-                  );
-                }
+              }
+              // External provider search -> brand icon
+              return _CompactIconButton(
+                tooltip: l10n.chatInputBarOnlineSearchTooltip,
+                icon: Lucide.Globe,
+                active: true,
+                onTap: lockTap(widget.onOpenSearch),
+                childBuilder: (c) {
+                  final asset = brandAsset;
+                  if (asset != null) {
+                    if (asset.endsWith('.svg')) {
+                      return SvgPicture.asset(
+                        asset,
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
+                      );
+                    } else {
+                      return Image.asset(
+                        asset,
+                        width: 20,
+                        height: 20,
+                        color: c,
+                        colorBlendMode: BlendMode.srcIn,
+                      );
+                    }
+                  } else {
+                    return Icon(Lucide.Globe, size: 20, color: c);
+                  }
+                },
+              );
+            },
+            menu: () {
+              // Prefer vector icon if brandAsset is svg, otherwise pick reasonable default
+              if (!appSearchEnabled && !builtinSearchActive) {
                 return DesktopContextMenuItem(
                   icon: Lucide.Globe,
                   label: l10n.chatInputBarOnlineSearchTooltip,
                   onTap: lockTap(widget.onOpenSearch),
                 );
-              }(),
-            ),
+              }
+              if (builtinSearchActive) {
+                return DesktopContextMenuItem(
+                  icon: Lucide.Search,
+                  label: l10n.chatInputBarOnlineSearchTooltip,
+                  onTap: lockTap(widget.onOpenSearch),
+                );
+              }
+              if (brandAsset != null && brandAsset.endsWith('.svg')) {
+                return DesktopContextMenuItem(
+                  svgAsset: brandAsset,
+                  label: l10n.chatInputBarOnlineSearchTooltip,
+                  onTap: lockTap(widget.onOpenSearch),
+                );
+              }
+              return DesktopContextMenuItem(
+                icon: Lucide.Globe,
+                label: l10n.chatInputBarOnlineSearchTooltip,
+                onTap: lockTap(widget.onOpenSearch),
+              );
+            }(),
           );
         }
 
         if (widget.supportsReasoning && !isGroupChat) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarReasoningStrengthTooltip,
-                icon: Lucide.Brain,
-                active: widget.reasoningActive,
-                onTap: lockTap(widget.onConfigureReasoning),
-                childBuilder: (c) => ReasoningIcons.budgetIcon(
-                  widget.reasoningBudget,
-                  size: 20,
-                  color: c,
-                ),
+          addAction(
+            inputBarButtonReasoning,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.chatInputBarReasoningStrengthTooltip,
+              icon: Lucide.Brain,
+              active: widget.reasoningActive,
+              onTap: lockTap(widget.onConfigureReasoning),
+              childBuilder: (c) => ReasoningIcons.budgetIcon(
+                widget.reasoningBudget,
+                size: 20,
+                color: c,
               ),
-              menu: DesktopContextMenuItem(
-                svgAsset: ReasoningIcons.assetForBudget(widget.reasoningBudget),
-                label: l10n.chatInputBarReasoningStrengthTooltip,
-                onTap: lockTap(widget.onConfigureReasoning),
-              ),
+            ),
+            menu: DesktopContextMenuItem(
+              svgAsset: ReasoningIcons.assetForBudget(widget.reasoningBudget),
+              label: l10n.chatInputBarReasoningStrengthTooltip,
+              onTap: lockTap(widget.onConfigureReasoning),
             ),
           );
         }
 
         // Tools Hub button
         if (widget.showToolsHubButton) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarToolsTooltip,
-                icon: Lucide.Wrench,
-                active: widget.toolsHubActive,
-                onTap: lockTap(widget.onOpenToolsHub),
-                onLongPress: lockTap(widget.onLongPressMcp),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Wrench,
-                label: l10n.chatInputBarToolsTooltip,
-                onTap: lockTap(widget.onOpenToolsHub),
-              ),
+          addAction(
+            inputBarButtonTools,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.chatInputBarToolsTooltip,
+              icon: Lucide.Wrench,
+              active: widget.toolsHubActive,
+              onTap: lockTap(widget.onOpenToolsHub),
+              onLongPress: lockTap(widget.onLongPressMcp),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Wrench,
+              label: l10n.chatInputBarToolsTooltip,
+              onTap: lockTap(widget.onOpenToolsHub),
             ),
           );
         }
 
         if (widget.showQuickPhraseButton && widget.onQuickPhrase != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarQuickPhraseTooltip,
-                icon: Lucide.Zap,
-                onTap: lockTap(widget.onQuickPhrase),
-                onLongPress: lockTap(widget.onLongPressQuickPhrase),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Zap,
-                label: l10n.chatInputBarQuickPhraseTooltip,
-                onTap: lockTap(widget.onQuickPhrase),
-              ),
+          addAction(
+            inputBarButtonQuickPhrase,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.chatInputBarQuickPhraseTooltip,
+              icon: Lucide.Zap,
+              onTap: lockTap(widget.onQuickPhrase),
+              onLongPress: lockTap(widget.onLongPressQuickPhrase),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Zap,
+              label: l10n.chatInputBarQuickPhraseTooltip,
+              onTap: lockTap(widget.onQuickPhrase),
             ),
           );
         }
 
         if (widget.onPickCamera != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.bottomToolsSheetCamera,
-                icon: Lucide.Camera,
-                onTap: lockTap(widget.onPickCamera),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Camera,
-                label: l10n.bottomToolsSheetCamera,
-                onTap: lockTap(widget.onPickCamera),
-              ),
+          addAction(
+            inputBarButtonCamera,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.bottomToolsSheetCamera,
+              icon: Lucide.Camera,
+              onTap: lockTap(widget.onPickCamera),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Camera,
+              label: l10n.bottomToolsSheetCamera,
+              onTap: lockTap(widget.onPickCamera),
             ),
           );
         }
 
         if (widget.onPickPhotos != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.bottomToolsSheetPhotos,
-                icon: Lucide.Image,
-                onTap: lockTap(widget.onPickPhotos),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Image,
-                label: l10n.bottomToolsSheetPhotos,
-                onTap: lockTap(widget.onPickPhotos),
-              ),
+          addAction(
+            inputBarButtonPhotos,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.bottomToolsSheetPhotos,
+              icon: Lucide.Image,
+              onTap: lockTap(widget.onPickPhotos),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Image,
+              label: l10n.bottomToolsSheetPhotos,
+              onTap: lockTap(widget.onPickPhotos),
             ),
           );
         }
 
         if (widget.onUploadFiles != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.bottomToolsSheetUpload,
-                icon: Lucide.Paperclip,
-                onTap: lockTap(widget.onUploadFiles),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Paperclip,
-                label: l10n.bottomToolsSheetUpload,
-                onTap: lockTap(widget.onUploadFiles),
-              ),
+          addAction(
+            inputBarButtonUpload,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.bottomToolsSheetUpload,
+              icon: Lucide.Paperclip,
+              onTap: lockTap(widget.onUploadFiles),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Paperclip,
+              label: l10n.bottomToolsSheetUpload,
+              onTap: lockTap(widget.onUploadFiles),
             ),
           );
         }
 
         if (widget.onToggleLearningMode != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.instructionInjectionTitle,
-                icon: Lucide.Layers,
-                active: widget.learningModeActive,
-                onTap: lockTap(widget.onToggleLearningMode),
-                onLongPress: lockTap(widget.onLongPressLearning),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Layers,
-                label: l10n.instructionInjectionTitle,
-                onTap: lockTap(widget.onToggleLearningMode),
-              ),
+          addAction(
+            inputBarButtonLearning,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.instructionInjectionTitle,
+              icon: Lucide.Layers,
+              active: widget.learningModeActive,
+              onTap: lockTap(widget.onToggleLearningMode),
+              onLongPress: lockTap(widget.onLongPressLearning),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Layers,
+              label: l10n.instructionInjectionTitle,
+              onTap: lockTap(widget.onToggleLearningMode),
             ),
           );
         }
 
         if (widget.onOpenWorldBook != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.worldBookTitle,
-                icon: Lucide.BookOpen,
-                active: widget.worldBookActive,
-                onTap: lockTap(widget.onOpenWorldBook),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.BookOpen,
-                label: l10n.worldBookTitle,
-                onTap: lockTap(widget.onOpenWorldBook),
-              ),
+          addAction(
+            inputBarButtonWorldBook,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.worldBookTitle,
+              icon: Lucide.BookOpen,
+              active: widget.worldBookActive,
+              onTap: lockTap(widget.onOpenWorldBook),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.BookOpen,
+              label: l10n.worldBookTitle,
+              onTap: lockTap(widget.onOpenWorldBook),
             ),
           );
         }
 
         if (widget.onOpenSkills != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.skillsTitle,
-                icon: Lucide.Sparkles,
-                active: widget.skillsActive,
-                onTap: lockTap(widget.onOpenSkills),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Sparkles,
-                label: l10n.skillsTitle,
-                onTap: lockTap(widget.onOpenSkills),
-              ),
+          addAction(
+            inputBarButtonSkills,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.skillsTitle,
+              icon: Lucide.Sparkles,
+              active: widget.skillsActive,
+              onTap: lockTap(widget.onOpenSkills),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Sparkles,
+              label: l10n.skillsTitle,
+              onTap: lockTap(widget.onOpenSkills),
             ),
           );
         }
@@ -2219,96 +2246,129 @@ class _ChatInputBarState extends State<ChatInputBar>
             );
           }
 
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => Container(
-                key: _contextMgmtAnchorKey,
-                child: _CompactIconButton(
-                  tooltip: l10n.contextManagement,
-                  icon: Lucide.Eraser,
-                  onTap: _composerLocked ? null : showContextMenu,
-                ),
-              ),
-              menu: DesktopContextMenuItem(
+          addAction(
+            inputBarButtonContext,
+            normalButtonW,
+            builder: () => Container(
+              key: _contextMgmtAnchorKey,
+              child: _CompactIconButton(
+                tooltip: l10n.contextManagement,
                 icon: Lucide.Eraser,
-                label: l10n.contextManagement,
                 onTap: _composerLocked ? null : showContextMenu,
               ),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Eraser,
+              label: l10n.contextManagement,
+              onTap: _composerLocked ? null : showContextMenu,
             ),
           );
         }
 
         if (widget.showMiniMapButton) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.miniMapTooltip,
-                icon: Lucide.Map,
-                onTap: lockTap(widget.onOpenMiniMap),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.Map,
-                label: l10n.miniMapTooltip,
-                onTap: lockTap(widget.onOpenMiniMap),
-              ),
+          addAction(
+            inputBarButtonMiniMap,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.miniMapTooltip,
+              icon: Lucide.Map,
+              onTap: lockTap(widget.onOpenMiniMap),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Map,
+              label: l10n.miniMapTooltip,
+              onTap: lockTap(widget.onOpenMiniMap),
             ),
           );
         }
 
         if (widget.showDocumentProcessingButton &&
             widget.onDocumentProcessing != null) {
-          actions.add(
-            _OverflowAction(
-              width: normalButtonW,
-              builder: () => _CompactIconButton(
-                tooltip: l10n.documentProcessingTitle,
-                icon: Lucide.FileText,
-                active: false,
-                onTap: lockTap(widget.onDocumentProcessing),
-              ),
-              menu: DesktopContextMenuItem(
-                icon: Lucide.FileText,
-                label: l10n.documentProcessingTitle,
-                onTap: lockTap(widget.onDocumentProcessing),
-              ),
+          addAction(
+            inputBarButtonDocument,
+            normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.documentProcessingTitle,
+              icon: Lucide.FileText,
+              active: false,
+              onTap: lockTap(widget.onDocumentProcessing),
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.FileText,
+              label: l10n.documentProcessingTitle,
+              onTap: lockTap(widget.onDocumentProcessing),
             ),
           );
         }
 
+        // Entry point to the customization UI (always available; by default
+        // tucked into the More bucket).
+        addAction(
+          inputBarButtonCustomize,
+          normalButtonW,
+          builder: () => _CompactIconButton(
+            tooltip: l10n.chatInputBarCustomizeTitle,
+            icon: Lucide.Settings2,
+            onTap: _composerLocked ? null : () => _openCustomization(context),
+          ),
+          menu: DesktopContextMenuItem(
+            icon: Lucide.Settings2,
+            label: l10n.chatInputBarCustomizeTitle,
+            onTap: () => showInputBarButtonsCustomizationDialog(context),
+          ),
+        );
+
         // Compute total width with spacing to see if overflow is needed
-        double full = 0;
-        for (var i = 0; i < actions.length; i++) {
-          if (i > 0) full += spacing;
-          full += actions[i].width;
-        }
+        final orderedKeys = widget.inputBarButtonOrder.where(
+          available.containsKey,
+        );
+        final rowKeys = orderedKeys
+            .where((id) => !widget.inputBarMoreIds.contains(id))
+            .toList();
+        final moreKeys = orderedKeys
+            .where((id) => widget.inputBarMoreIds.contains(id))
+            .toList();
+        final actions = [for (final id in rowKeys) available[id]!];
+        final moreActions = [
+          for (final id in moreKeys) available[id]!,
+        ].toList();
+
+        // The row-end "+" (bucket menu) occupies a slot of its own: its width
+        // must be reserved up front, or it gets appended past maxW and the Row
+        // overflows (0..(spacing+plusButtonW) px) in debug mode.
+        final useRightSheetBucket = widget.showMoreButton;
+        final needsPlusSlot = !useRightSheetBucket && moreActions.isNotEmpty;
 
         final maxW = constraints.maxWidth;
-        int visibleCount = actions.length;
-        if (full > maxW) {
-          // First pass: include as many as possible ignoring the +
-          double used = 0;
-          visibleCount = 0;
-          for (var i = 0; i < actions.length; i++) {
-            final add = (visibleCount > 0 ? spacing : 0) + actions[i].width;
-            if (used + add <= maxW) {
-              used += add;
-              visibleCount++;
-            } else {
-              break;
-            }
-          }
-          // Ensure + button fits; remove items until it does
-          while (visibleCount > 0 && used + spacing + plusButtonW > maxW) {
-            // remove last
-            used -= actions[visibleCount - 1].width;
-            if (visibleCount - 1 > 0) used -= spacing;
-            visibleCount--;
+        // Fit as many direct items as possible while keeping room for the "+"
+        // slot (spacing before the "+" applies only when an item stays visible).
+        int visibleCount = 0;
+        double used = 0;
+        for (var i = 0; i < actions.length; i++) {
+          final add = (visibleCount > 0 ? spacing : 0) + actions[i].width;
+          final plusSlot = needsPlusSlot
+              ? ((visibleCount > 0 ? spacing : 0) + plusButtonW)
+              : 0.0;
+          if (used + add + plusSlot <= maxW) {
+            used += add;
+            visibleCount++;
+          } else {
+            break;
           }
         }
 
         final overflowItems = actions.sublist(visibleCount);
+
+        // Phone (right sheet) layout: overflow direct ids hand off to the
+        // right "+" sheet; tablet/desktop: they merge into the row "+" menu.
+        if (useRightSheetBucket) {
+          _nonFittedDirectIds = List.unmodifiable(
+            overflowItems.map((a) => a.id),
+          );
+        } else {
+          _nonFittedDirectIds = const <String>[];
+          moreActions.addAll(overflowItems);
+        }
 
         final children = <Widget>[];
         for (var i = 0; i < visibleCount; i++) {
@@ -2316,11 +2376,9 @@ class _ChatInputBarState extends State<ChatInputBar>
           children.add(actions[i].builder());
         }
 
-        if (overflowItems.isNotEmpty) {
+        if (!useRightSheetBucket && moreActions.isNotEmpty) {
           if (children.isNotEmpty) children.add(const SizedBox(width: spacing));
-          final menuItems = overflowItems
-              .map((e) => e.menu)
-              .toList(growable: false);
+          final menuItems = moreActions.map((e) => e.menu).toList();
           children.add(
             Container(
               key: _leftOverflowAnchorKey,
@@ -2339,16 +2397,34 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        return Row(children: children);
+        // Safety net: declared widths can drift a few px from the rendered
+        // ones; scale down (imperceptible in the 0..8px pathological widths)
+        // instead of overflowing or pushing an item off screen.
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(mainAxisSize: MainAxisSize.min, children: children),
+        );
       },
     );
+  }
+
+  void _openCustomization(BuildContext context) {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      showInputBarButtonsCustomizationDialog(context);
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const InputBarButtonsCustomizationPage(),
+        ),
+      );
+    }
   }
 
   String _inferMimeByExtension(String name) {
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
-    final lower = name.toLowerCase();
-    // Documents / text
+    final lower = name.toLowerCase(); // Documents / text
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -3120,7 +3196,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         ),
                                         Row(
                                           children: [
-                                            if (widget.showMoreButton) ...[
+                                            if (widget.showMoreButton &&
+                                                (widget
+                                                        .inputBarMoreIds
+                                                        .isNotEmpty ||
+                                                    _nonFittedDirectIds
+                                                        .isNotEmpty)) ...[
                                               _CompactIconButton(
                                                 tooltip: AppLocalizations.of(
                                                   context,
@@ -3318,10 +3399,12 @@ class _QueuedInputBanner extends StatelessWidget {
 
 // Internal data model for responsive overflow actions on desktop
 class _OverflowAction {
+  final String id;
   final double width;
   final Widget Function() builder;
   final DesktopContextMenuItem menu;
   const _OverflowAction({
+    required this.id,
     required this.width,
     required this.builder,
     required this.menu,

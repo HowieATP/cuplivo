@@ -6401,7 +6401,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatInputBarCustomizeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Customize Input Bar Buttons'**
+  /// **'Customize Input Bar'**
   String get chatInputBarCustomizeTitle;
 
   /// No description provided for @chatInputBarCustomizeSubtitle.

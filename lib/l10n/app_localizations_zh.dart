@@ -3398,7 +3398,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
-  String get chatInputBarCustomizeTitle => '自定义输入区按钮';
+  String get chatInputBarCustomizeTitle => '自定义输入区';
 
   @override
   String get chatInputBarCustomizeSubtitle =>
@@ -11915,7 +11915,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
-  String get chatInputBarCustomizeTitle => '自定义输入区按钮';
+  String get chatInputBarCustomizeTitle => '自定义输入区';
 
   @override
   String get chatInputBarCustomizeSubtitle =>
@@ -20431,7 +20431,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
-  String get chatInputBarCustomizeTitle => '自訂輸入區按鈕';
+  String get chatInputBarCustomizeTitle => '自訂輸入區';
 
   @override
   String get chatInputBarCustomizeSubtitle =>

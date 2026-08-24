@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/responsive/breakpoints.dart';
 import '../utils/input_bar_button_layout.dart';
 
 /// Mobile full-page editing surface for input bar buttons (order + direct /
@@ -66,7 +67,7 @@ Future<void> showInputBarButtonsCustomizationDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'input-bar-buttons-customize',
-    barrierColor: cs.scrim.withValues(alpha: 0.15),
+    barrierColor: cs.scrim.withValues(alpha: 0.25),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, _, __) {
       final dialog = Material(
@@ -158,7 +159,7 @@ Future<void> showInputBarButtonsCustomizationDialog(
 }
 
 /// Shared editing body: explanatory subtitle + reorderable rows with a direct
-/// visibility switch. Drag = long-press on mobile, drag on desktop.
+/// visibility switch. Drag = the grip handle only (tap-safe switches).
 class InputBarButtonsCustomizationContent extends StatelessWidget {
   const InputBarButtonsCustomizationContent({super.key});
 
@@ -166,10 +167,18 @@ class InputBarButtonsCustomizationContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
-    final ordered = orderedInputBarButtonIds(
+    // Boot from the resolved layout (single source of truth): while the user
+    // never customized, the switches reflect the platform's effective
+    // placement — e.g. the customize entry is OFF (in the More bucket) by
+    // default on every platform. A first toggle/reorder persists the resolved
+    // state explicitly.
+    final resolved = resolveInputBarButtonLayout(
       savedOrder: settings.chatInputButtonOrder,
+      savedMoreIds: settings.chatInputMoreButtonIds,
+      tabletLayout: MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet,
     );
-    final moreIds = settings.chatInputMoreButtonIds.toSet();
+    final ordered = resolved.orderedIds;
+    final moreIds = resolved.moreIds;
     final visibleCount = ordered.where((id) => !moreIds.contains(id)).length;
 
     return Column(
@@ -190,6 +199,7 @@ class InputBarButtonsCustomizationContent extends StatelessWidget {
         ),
         Expanded(
           child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
             padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
             itemCount: ordered.length,
             onReorderItem: (oldIndex, newIndex) async {

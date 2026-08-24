@@ -1146,7 +1146,7 @@
   "toolsHubTerminalDisabledHint": "需先綁定並開啟工作區",
   "toolsHubWorkspaceManage": "管理工作區",
   "chatInputBarMoreTooltip": "更多",
-  "chatInputBarCustomizeTitle": "自訂輸入區按鈕",
+  "chatInputBarCustomizeTitle": "自訂輸入區",
   "chatInputBarCustomizeSubtitle": "拖曳調整順序；關閉開關可將按鈕收納到「更多」，按鈕仍可在「更多」中使用。",
   "chatInputBarCustomizeAtLeastOneVisible": "至少保留一個按鈕直接顯示",
   "chatInputBarCustomizeResetTooltip": "恢復預設",

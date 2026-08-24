@@ -276,4 +276,47 @@ void main() {
     await tester.pump();
     expect(customizeTapped, isTrue);
   });
+
+  testWidgets(
+    'bucket "+" slot is reserved up front — no overflow, no clipping',
+    (tester) async {
+      final mediaController = ChatInputBarController();
+      tester.view.physicalSize = const Size(220, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        buildBar(
+          mediaController: mediaController,
+          bar: ChatInputBar(
+            controller: TextEditingController(),
+            focusNode: FocusNode(),
+            mediaController: mediaController,
+            showMoreButton: false,
+            inputBarCustomized: true,
+            inputBarButtonOrder: const [
+              inputBarButtonModel,
+              inputBarButtonSearch,
+              inputBarButtonReasoning,
+              inputBarButtonTools,
+              inputBarButtonQuickPhrase,
+            ],
+            // Bucket non-empty → the row-end "+" must fit inside maxW.
+            inputBarMoreIds: const {inputBarButtonCustomize},
+            onSelectModel: () {},
+            onOpenSearch: () {},
+            onConfigureReasoning: () {},
+            showQuickPhraseButton: true,
+            onQuickPhrase: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Old behavior overflowed by a few px here and clipped an item; the
+      // fitted row keeps the direct items + the "+" inside the slot.
+      expect(tester.takeException(), isNull);
+      expect(find.byIcon(Lucide.Plus), findsOneWidget);
+    },
+  );
 }

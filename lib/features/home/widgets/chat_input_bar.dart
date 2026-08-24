@@ -2300,33 +2300,27 @@ class _ChatInputBarState extends State<ChatInputBar>
           for (final id in moreKeys) available[id]!,
         ].toList();
 
-        double full = 0;
-        for (var i = 0; i < actions.length; i++) {
-          if (i > 0) full += spacing;
-          full += actions[i].width;
-        }
+        // The row-end "+" (bucket menu) occupies a slot of its own: its width
+        // must be reserved up front, or it gets appended past maxW and the Row
+        // overflows (0..(spacing+plusButtonW) px) in debug mode.
+        final useRightSheetBucket = widget.showMoreButton;
+        final needsPlusSlot = !useRightSheetBucket && moreActions.isNotEmpty;
 
         final maxW = constraints.maxWidth;
-        int visibleCount = actions.length;
-        if (full > maxW) {
-          // First pass: include as many as possible ignoring the +
-          double used = 0;
-          visibleCount = 0;
-          for (var i = 0; i < actions.length; i++) {
-            final add = (visibleCount > 0 ? spacing : 0) + actions[i].width;
-            if (used + add <= maxW) {
-              used += add;
-              visibleCount++;
-            } else {
-              break;
-            }
-          }
-          // Ensure + button fits; remove items until it does
-          while (visibleCount > 0 && used + spacing + plusButtonW > maxW) {
-            // remove last
-            used -= actions[visibleCount - 1].width;
-            if (visibleCount - 1 > 0) used -= spacing;
-            visibleCount--;
+        // Fit as many direct items as possible while keeping room for the "+"
+        // slot (spacing before the "+" applies only when an item stays visible).
+        int visibleCount = 0;
+        double used = 0;
+        for (var i = 0; i < actions.length; i++) {
+          final add = (visibleCount > 0 ? spacing : 0) + actions[i].width;
+          final plusSlot = needsPlusSlot
+              ? ((visibleCount > 0 ? spacing : 0) + plusButtonW)
+              : 0.0;
+          if (used + add + plusSlot <= maxW) {
+            used += add;
+            visibleCount++;
+          } else {
+            break;
           }
         }
 
@@ -2334,7 +2328,6 @@ class _ChatInputBarState extends State<ChatInputBar>
 
         // Phone (right sheet) layout: overflow direct ids hand off to the
         // right "+" sheet; tablet/desktop: they merge into the row "+" menu.
-        final useRightSheetBucket = widget.showMoreButton;
         if (useRightSheetBucket) {
           _nonFittedDirectIds = List.unmodifiable(
             overflowItems.map((a) => a.id),
@@ -2371,7 +2364,14 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        return Row(children: children);
+        // Safety net: declared widths can drift a few px from the rendered
+        // ones; scale down (imperceptible in the 0..8px pathological widths)
+        // instead of overflowing or pushing an item off screen.
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(mainAxisSize: MainAxisSize.min, children: children),
+        );
       },
     );
   }

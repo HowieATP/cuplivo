@@ -1513,7 +1513,7 @@
   "toolsHubTerminalDisabledHint": "Bind and enable a workspace first",
   "toolsHubWorkspaceManage": "Manage Workspaces",
   "chatInputBarMoreTooltip": "Add",
-  "chatInputBarCustomizeTitle": "Customize Input Bar Buttons",
+  "chatInputBarCustomizeTitle": "Customize Input Bar",
   "chatInputBarCustomizeSubtitle": "Drag to reorder. Turn off a switch to tuck a button into \"+ More\"; it stays reachable from there.",
   "chatInputBarCustomizeAtLeastOneVisible": "Keep at least one button directly visible",
   "chatInputBarCustomizeResetTooltip": "Reset to default",

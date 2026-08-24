@@ -3528,7 +3528,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarMoreTooltip => 'Add';
 
   @override
-  String get chatInputBarCustomizeTitle => 'Customize Input Bar Buttons';
+  String get chatInputBarCustomizeTitle => 'Customize Input Bar';
 
   @override
   String get chatInputBarCustomizeSubtitle =>

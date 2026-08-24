@@ -11,23 +11,35 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/ios_switch.dart';
 
 void main() {
-  testWidgets(
-    'content: grip-only drag zone, tap-safe switch, localized labels',
-    (tester) async {
-      SharedPreferences.setMockInitialValues(const <String, Object>{});
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [ChangeNotifierProvider.value(value: SettingsProvider())],
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const Scaffold(body: InputBarButtonsCustomizationContent()),
-          ),
+  Future<void> pumpContent(
+    WidgetTester tester, {
+    Size size = const Size(800, 600),
+  }) async {
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [ChangeNotifierProvider.value(value: SettingsProvider())],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: InputBarButtonsCustomizationContent()),
         ),
-      );
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
+  }
 
-      // One visible grip per tile (lazy list: viewport-built subset only).
+  testWidgets(
+    'content: grip-only drag zone, switch tap-safe, customized explicitly on first toggle',
+    (tester) async {
+      await pumpContent(tester);
+
+      // No default Flutter drag handles next to our grip (the '=' + 'dots'
+      // overlap bug) — GripVertical is the only drag affordance.
+      expect(find.byIcon(Icons.drag_handle), findsNothing);
       expect(find.byIcon(Lucide.GripVertical), findsWidgets);
       final firstSwitch = tester.widget<IosSwitch>(
         find.byType(IosSwitch).first,
@@ -59,4 +71,16 @@ void main() {
       expect(find.text('customize'), findsNothing);
     },
   );
+
+  testWidgets('customize entry defaults OFF (in More bucket) at every width', (
+    tester,
+  ) async {
+    await pumpContent(tester, size: const Size(400, 800));
+
+    // Phone layout, unset: customize is the last row and OFF.
+    await tester.drag(find.byType(ReorderableListView), const Offset(0, -1200));
+    await tester.pump();
+    final switches = tester.widgetList<IosSwitch>(find.byType(IosSwitch));
+    expect(switches.last.value, isFalse);
+  });
 }

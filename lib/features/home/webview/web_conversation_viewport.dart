@@ -18,6 +18,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../controllers/conversation_viewport_port.dart';
+import 'android_web_chat_view.dart';
 import 'web_chat_protocol.dart';
 
 typedef WebChatActionHandler =
@@ -69,6 +70,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   ];
 
   WebViewController? _flutterController;
+  AndroidWebChatController? _androidController;
   winweb.WebviewController? _windowsController;
   StreamSubscription<dynamic>? _windowsMessageSubscription;
   final Map<String, VoidCallback> _streamListeners = <String, VoidCallback>{};
@@ -140,6 +142,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         }),
       );
     }
+    _androidController?.dispose();
+    _androidController = null;
     _flutterController = null;
     super.dispose();
   }
@@ -165,6 +169,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     try {
       if (Platform.isWindows) {
         await _initializeWindows(generation);
+      } else if (Platform.isAndroid) {
+        // The Android platform view loads the shell once it is attached.
       } else {
         await _initializeFlutterWebView(generation);
       }
@@ -250,6 +256,46 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     if (_isStale(generation)) return;
     _flutterController = controller;
     await controller.loadFlutterAsset('assets/web_chat/index.html');
+  }
+
+  Future<void> _handleAndroidViewCreated(int viewId, int generation) async {
+    if (_isStale(generation)) return;
+    final oldController = _androidController;
+    final controller = AndroidWebChatController.attach(
+      viewId: viewId,
+      onMessage: _handleBridgeMessage,
+      onResourceError: (errorCode) {
+        debugPrint(
+          'WebConversationViewport: Android shell resource failed: '
+          '$errorCode',
+        );
+        _fail(generation, 'resource_$errorCode');
+      },
+      onNavigationRequest: (url) => unawaited(_openExternalUrl(url)),
+      onDiagnostic: (code) {
+        debugPrint('WebConversationViewport: Android diagnostic $code');
+        if (code == 'render_process_gone') {
+          _fail(generation, code);
+        }
+      },
+    );
+    _androidController = controller;
+    oldController?.dispose();
+    try {
+      await controller.loadShell();
+    } on PlatformException catch (error) {
+      debugPrint(
+        'WebConversationViewport: Android shell initialization failed: '
+        '${error.code}',
+      );
+      _fail(generation, 'platform_${error.code}');
+    } catch (error) {
+      debugPrint(
+        'WebConversationViewport: Android shell initialization failed '
+        '(${error.runtimeType})',
+      );
+      _fail(generation, 'initialization_failed');
+    }
   }
 
   bool _isLocalShellUrl(String url) =>
@@ -463,6 +509,10 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     try {
       if (Platform.isWindows) {
         await _windowsController?.postWebMessage(encoded);
+      } else if (Platform.isAndroid) {
+        await _androidController?.runJavaScript(
+          'window.CuplivoWeb.receive(${jsonEncode(encoded)});',
+        );
       } else {
         await _flutterController?.runJavaScript(
           'window.CuplivoWeb.receive(${jsonEncode(encoded)});',
@@ -564,6 +614,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     final windowsController = _windowsController;
     _windowsController = null;
     if (windowsController != null) unawaited(windowsController.dispose());
+    _androidController?.dispose();
+    _androidController = null;
     _flutterController = null;
     unawaited(_initialize());
   }
@@ -571,17 +623,27 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   @override
   Widget build(BuildContext context) {
     if (_errorCode != null) return _buildError(context);
-    final child = Platform.isWindows
-        ? (_windowsController == null
-              ? const SizedBox.shrink()
-              : winweb.Webview(
-                  _windowsController!,
-                  permissionRequested: (_, _, _) =>
-                      winweb.WebviewPermissionDecision.deny,
-                ))
-        : (_flutterController == null
-              ? const SizedBox.shrink()
-              : WebViewWidget(controller: _flutterController!));
+    final Widget child;
+    if (Platform.isWindows) {
+      child = _windowsController == null
+          ? const SizedBox.shrink()
+          : winweb.Webview(
+              _windowsController!,
+              permissionRequested: (_, _, _) =>
+                  winweb.WebviewPermissionDecision.deny,
+            );
+    } else if (Platform.isAndroid) {
+      final generation = _generation;
+      child = AndroidWebChatView(
+        key: ValueKey<int>(generation),
+        onPlatformViewCreated: (viewId) =>
+            unawaited(_handleAndroidViewCreated(viewId, generation)),
+      );
+    } else {
+      child = _flutterController == null
+          ? const SizedBox.shrink()
+          : WebViewWidget(controller: _flutterController!);
+    }
     return Stack(
       fit: StackFit.expand,
       children: [

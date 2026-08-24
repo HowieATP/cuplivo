@@ -24,6 +24,7 @@ class SafMountInternalPathTest {
 
   private fun pluginRoots(): List<File> =
     listOf(File(filesDir), File(appFlutterDir), File(cacheDir))
+      .map { it.canonicalFile }
 
   private fun allowed(path: String): Boolean =
     SafMountPlugin.isInsideInternalRoots(File(path).canonicalFile, pluginRoots())

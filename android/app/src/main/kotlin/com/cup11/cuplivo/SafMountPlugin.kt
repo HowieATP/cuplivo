@@ -214,6 +214,7 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
       } catch (e: FileNotFoundException) {
         mainHandler.post { result.error("uri_not_found", e.message, null) }
       } catch (e: Exception) {
+        android.util.Log.e(TAG, "saf_mount background operation failed", e)
         mainHandler.post { result.error("access_failed", e.message ?: e.javaClass.simpleName, null) }
       }
     }.start()
@@ -301,16 +302,17 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
   }
 
-  private fun copyToPath(uri: Uri, target: File) {
+  private fun copyToPath(uri: Uri, target: File): Boolean {
     val input = appContext.contentResolver.openInputStream(uri)
       ?: throw FileNotFoundException("Cannot open: $uri")
     target.parentFile?.mkdirs()
     input.use { source ->
       FileOutputStream(target).use { destination -> source.copyTo(destination) }
     }
+    return true
   }
 
-  private fun copyFromPath(uri: Uri, source: File) {
+  private fun copyFromPath(uri: Uri, source: File): Boolean {
     if (!source.isFile) throw FileNotFoundException("Cannot open: $source")
     // "rwt": read, write, truncate — overwrite in place without recreating
     // the document (keeps its identity and mtime behavior provider-side).
@@ -321,6 +323,7 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         FileOutputStream(descriptor.fileDescriptor).use { output -> input.copyTo(output) }
       }
     }
+    return true
   }
 
   private fun createFile(parentUri: Uri, name: String): String {

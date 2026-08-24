@@ -54,6 +54,9 @@ import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
+import '../models/tool_ui_part.dart';
+
+export '../models/tool_ui_part.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -3513,22 +3516,6 @@ class _DocRef {
   final String fileName;
   final String mime;
   _DocRef({required this.path, required this.fileName, required this.mime});
-}
-
-// UI data for MCP tool calls/results
-class ToolUIPart {
-  final String id;
-  final String toolName;
-  final Map<String, dynamic> arguments;
-  final String? content; // null means still loading/result not yet available
-  final bool loading;
-  const ToolUIPart({
-    required this.id,
-    required this.toolName,
-    required this.arguments,
-    this.content,
-    this.loading = false,
-  });
 }
 
 // Data for a reasoning segment (for mixed display)

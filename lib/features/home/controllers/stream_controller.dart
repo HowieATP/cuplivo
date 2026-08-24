@@ -8,7 +8,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/generation_engine.dart';
 import '../../../core/services/streaming_content_notifier.dart';
-import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/models/tool_ui_part.dart';
 
 export '../../../core/models/reasoning_payload.dart';
 export '../../../core/services/streaming_content_notifier.dart';

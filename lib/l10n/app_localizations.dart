@@ -12173,6 +12173,192 @@ abstract class AppLocalizations {
   /// **'Rendering settings'**
   String get displaySettingsPageRenderingSettingsTitle;
 
+  /// No description provided for @displaySettingsPageExperimentalWebViewRenderingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental: WebView rendering'**
+  String get displaySettingsPageExperimentalWebViewRenderingTitle;
+
+  /// No description provided for @displaySettingsPageExperimentalWebViewRenderingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Render one-to-one conversation content in an isolated local WebView. Restarting the app clears per-conversation fallbacks.'**
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle;
+
+  /// No description provided for @webChatLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading Web conversation view…'**
+  String get webChatLoading;
+
+  /// No description provided for @webChatInitializationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Web conversation view could not start.'**
+  String get webChatInitializationFailed;
+
+  /// No description provided for @webChatRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get webChatRetry;
+
+  /// No description provided for @webChatUseFlutterThisConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Flutter for this conversation'**
+  String get webChatUseFlutterThisConversation;
+
+  /// No description provided for @webChatCopyDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get webChatCopyDiagnostics;
+
+  /// No description provided for @webChatDiagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics copied'**
+  String get webChatDiagnosticsCopied;
+
+  /// No description provided for @webChatWebView2Missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Microsoft Edge WebView2 Runtime is required.'**
+  String get webChatWebView2Missing;
+
+  /// No description provided for @webChatInstallWebView2.
+  ///
+  /// In en, this message translates to:
+  /// **'Install WebView2 Runtime'**
+  String get webChatInstallWebView2;
+
+  /// No description provided for @webChatUnsupportedBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'This content block could not be rendered.'**
+  String get webChatUnsupportedBlock;
+
+  /// No description provided for @webChatEmptyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a conversation to see messages here.'**
+  String get webChatEmptyConversation;
+
+  /// No description provided for @webChatMultiAIFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch this conversation to Flutter?'**
+  String get webChatMultiAIFallbackTitle;
+
+  /// No description provided for @webChatMultiAIFallbackBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MultiAI is currently rendered by Flutter. This conversation will use Flutter until the app restarts or WebView rendering is turned off.'**
+  String get webChatMultiAIFallbackBody;
+
+  /// No description provided for @webChatMultiAIFallbackConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch and continue'**
+  String get webChatMultiAIFallbackConfirm;
+
+  /// No description provided for @webChatTimelineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation messages'**
+  String get webChatTimelineLabel;
+
+  /// No description provided for @webChatUser.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get webChatUser;
+
+  /// No description provided for @webChatAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get webChatAssistant;
+
+  /// No description provided for @webChatTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'tokens'**
+  String get webChatTokens;
+
+  /// No description provided for @webChatCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get webChatCopyCode;
+
+  /// No description provided for @webChatHtmlPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML preview'**
+  String get webChatHtmlPreview;
+
+  /// No description provided for @webChatReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning'**
+  String get webChatReasoning;
+
+  /// No description provided for @webChatToolCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool call:'**
+  String get webChatToolCall;
+
+  /// No description provided for @webChatToolResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool result:'**
+  String get webChatToolResult;
+
+  /// No description provided for @webChatTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get webChatTranslation;
+
+  /// No description provided for @webChatTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get webChatTop;
+
+  /// No description provided for @webChatBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get webChatBottom;
+
+  /// No description provided for @webChatPreviousVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous version'**
+  String get webChatPreviousVersion;
+
+  /// No description provided for @webChatNextVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Next version'**
+  String get webChatNextVersion;
+
+  /// No description provided for @webChatAssistantInitial.
+  ///
+  /// In en, this message translates to:
+  /// **'A'**
+  String get webChatAssistantInitial;
+
+  /// No description provided for @webChatUserInitial.
+  ///
+  /// In en, this message translates to:
+  /// **'U'**
+  String get webChatUserInitial;
+
   /// No description provided for @displaySettingsPageBehaviorStartupTitle.
   ///
   /// In en, this message translates to:

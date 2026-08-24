@@ -1,0 +1,12 @@
+# Web chat third-party notices
+
+The browser distributions in `vendor/` are committed for offline rendering;
+Cuplivo does not fetch them from a CDN at runtime.
+
+- Marked 14.1.3 — MIT License — https://github.com/markedjs/marked
+- DOMPurify 3.1.7 — Apache-2.0 or MPL-2.0 — https://github.com/cure53/DOMPurify
+- highlight.js 11.10.0 — BSD-3-Clause — https://github.com/highlightjs/highlight.js
+- KaTeX 0.16.11 — MIT License — https://github.com/KaTeX/KaTeX
+
+Mermaid uses the existing repository-wide `assets/mermaid.min.js` bundle and
+is not duplicated in this directory.

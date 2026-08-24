@@ -213,6 +213,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_dollar_latex_v1';
   static const String _displayEnableMathRenderingKey =
       'display_enable_math_rendering_v1';
+  static const String _experimentalWebViewRenderingKey =
+      'experimental_webview_rendering_v1';
   static const String _displayEnableUserMarkdownKey =
       'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey =
@@ -1284,6 +1286,8 @@ class SettingsProvider extends ChangeNotifier {
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
+    _experimentalWebViewRendering =
+        prefs.getBool(_experimentalWebViewRenderingKey) ?? false;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -4615,6 +4619,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
+  // Device-local experimental Web conversation viewport.
+  bool _experimentalWebViewRendering = false;
+  bool get experimentalWebViewRendering => _experimentalWebViewRendering;
+  Future<void> setExperimentalWebViewRendering(bool value) async {
+    if (_experimentalWebViewRendering == value) return;
+    _experimentalWebViewRendering = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_experimentalWebViewRenderingKey, value);
+  }
+
   // Display: render user messages with Markdown
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
@@ -5224,6 +5239,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._autoScrollIdleSeconds = _autoScrollIdleSeconds;
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
+    copy._experimentalWebViewRendering = _experimentalWebViewRendering;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;

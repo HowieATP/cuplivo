@@ -38,8 +38,8 @@ import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
 import '../../home/controllers/chat_controller.dart';
 import '../utils/thinking_tag_parser.dart';
-import 'chat_message_widget.dart'
-    show ChatMessageWidget, ToolUIPart, ReasoningSegment;
+import '../models/tool_ui_part.dart';
+import 'chat_message_widget.dart' show ChatMessageWidget, ReasoningSegment;
 
 // Shared helpers
 String _guessImageMime(String path) {

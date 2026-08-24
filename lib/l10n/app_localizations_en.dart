@@ -6722,6 +6722,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageRenderingSettingsTitle => 'Rendering settings';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      'Experimental: WebView rendering';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      'Render one-to-one conversation content in an isolated local WebView. Restarting the app clears per-conversation fallbacks.';
+
+  @override
+  String get webChatLoading => 'Loading Web conversation view…';
+
+  @override
+  String get webChatInitializationFailed =>
+      'The Web conversation view could not start.';
+
+  @override
+  String get webChatRetry => 'Retry';
+
+  @override
+  String get webChatUseFlutterThisConversation =>
+      'Use Flutter for this conversation';
+
+  @override
+  String get webChatCopyDiagnostics => 'Copy diagnostics';
+
+  @override
+  String get webChatDiagnosticsCopied => 'Diagnostics copied';
+
+  @override
+  String get webChatWebView2Missing =>
+      'Microsoft Edge WebView2 Runtime is required.';
+
+  @override
+  String get webChatInstallWebView2 => 'Install WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock =>
+      'This content block could not be rendered.';
+
+  @override
+  String get webChatEmptyConversation =>
+      'Start a conversation to see messages here.';
+
+  @override
+  String get webChatMultiAIFallbackTitle =>
+      'Switch this conversation to Flutter?';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI is currently rendered by Flutter. This conversation will use Flutter until the app restarts or WebView rendering is turned off.';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => 'Switch and continue';
+
+  @override
+  String get webChatTimelineLabel => 'Conversation messages';
+
+  @override
+  String get webChatUser => 'You';
+
+  @override
+  String get webChatAssistant => 'Assistant';
+
+  @override
+  String get webChatTokens => 'tokens';
+
+  @override
+  String get webChatCopyCode => 'Copy code';
+
+  @override
+  String get webChatHtmlPreview => 'HTML preview';
+
+  @override
+  String get webChatReasoning => 'Reasoning';
+
+  @override
+  String get webChatToolCall => 'Tool call:';
+
+  @override
+  String get webChatToolResult => 'Tool result:';
+
+  @override
+  String get webChatTranslation => 'Translation';
+
+  @override
+  String get webChatTop => 'Top';
+
+  @override
+  String get webChatBottom => 'Bottom';
+
+  @override
+  String get webChatPreviousVersion => 'Previous version';
+
+  @override
+  String get webChatNextVersion => 'Next version';
+
+  @override
+  String get webChatAssistantInitial => 'A';
+
+  @override
+  String get webChatUserInitial => 'U';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => 'Behavior & startup';
 
   @override

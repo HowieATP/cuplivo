@@ -32,6 +32,11 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -90,6 +95,9 @@ jobs:
 
       - name: flutter test
         run: flutter test
+
+      - name: Web chat protocol tests
+        run: node --test assets/web_chat/test/*.test.mjs
 
       - name: Android Kotlin unit tests
         run: |

@@ -172,6 +172,11 @@ flutter:
     - assets/app_icon.ico
     - assets/icon_mac.png
     - assets/mermaid.min.js
+    - assets/web_chat/index.html
+    - assets/web_chat/styles.css
+    - assets/web_chat/app.mjs
+    - assets/web_chat/protocol.mjs
+    - assets/web_chat/vendor/
     - assets/html/mark.html
   #   - images/a_dot_ham.jpeg
 

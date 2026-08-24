@@ -81,7 +81,14 @@ class _DisplaySettingsBody extends StatelessWidget {
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.displaySettingsPageRenderingSettingsTitle,
-                children: const [
+                children: [
+                  if (supportsWebConversationViewport(
+                    isWeb: kIsWeb,
+                    platform: defaultTargetPlatform,
+                  )) ...[
+                    const _ToggleRowExperimentalWebViewRendering(),
+                    const _RowDivider(),
+                  ],
                   _ToggleRowDollarLatex(),
                   _RowDivider(),
                   _ToggleRowMathRendering(),
@@ -2324,6 +2331,24 @@ class _ToggleRowMathRendering extends StatelessWidget {
   }
 }
 
+class _ToggleRowExperimentalWebViewRendering extends StatelessWidget {
+  const _ToggleRowExperimentalWebViewRendering();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
+      subtitle: l10n.displaySettingsPageExperimentalWebViewRenderingSubtitle,
+      value: settings.experimentalWebViewRendering,
+      onChanged: (value) => context
+          .read<SettingsProvider>()
+          .setExperimentalWebViewRendering(value),
+    );
+  }
+}
+
 class _ToggleRowUserMarkdown extends StatelessWidget {
   const _ToggleRowUserMarkdown();
   @override
@@ -2900,10 +2925,12 @@ class _StartupAssistantPickerRow extends StatelessWidget {
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
+    this.subtitle,
     required this.value,
     required this.onChanged,
   });
   final String label;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool>? onChanged;
   @override
@@ -2927,6 +2954,17 @@ class _ToggleRow extends StatelessWidget {
                     decoration: TextDecoration.none,
                   ),
                 ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.56),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

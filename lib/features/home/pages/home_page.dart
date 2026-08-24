@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +24,7 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
+import '../../../core/services/streaming_content_notifier.dart';
 import '../../settings/pages/trash_detail_page.dart';
 import '../widgets/live_panel.dart';
 import '../widgets/image_generation_options.dart';
@@ -47,6 +50,8 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/models/tool_ui_part.dart';
+import '../../chat/utils/message_visual_content.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -67,6 +72,8 @@ import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/multi_ai_comparison_view.dart';
 import '../services/multi_ai_engine.dart' show MultiAIMode;
+import '../services/ask_user_interaction_service.dart';
+import '../services/tool_approval_service.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
@@ -79,7 +86,12 @@ import '../utils/input_bar_button_layout.dart';
 import 'input_bar_buttons_customization_page.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
+import '../controllers/conversation_viewport_port.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
+import '../webview/web_chat_protocol.dart';
+import '../webview/web_chat_platform.dart';
+import '../webview/web_chat_snapshot.dart';
+import '../webview/web_conversation_viewport.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
@@ -600,6 +612,14 @@ class _HomePageState extends State<HomePage>
   bool _scrollNavHovering = false;
   bool _presetsExpanded = false;
   String? _scrollConversationId;
+  final Set<String> _webFlutterConversationOverrides = <String>{};
+  final Set<String> _webMultiAIPromptedConversations = <String>{};
+  final WebConversationViewportPort _webViewportPort =
+      WebConversationViewportPort();
+  String? _webRenderConversationId;
+  String _webRenderSessionId = '';
+  int _webRenderRevision = 0;
+  int _webActionEpoch = 0;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
@@ -1393,16 +1413,23 @@ class _HomePageState extends State<HomePage>
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
+    final settings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final conversationId =
+        _controller.currentConversation?.id ??
+        'temporary:${assistant?.id ?? 'unbound'}';
+    var useWebViewport = _webViewportRequested(settings, conversationId);
+
     if (_controller.isTemporaryConversation &&
-        _controller.chatController.collapsedMessages.isEmpty) {
+        _controller.chatController.collapsedMessages.isEmpty &&
+        !useWebViewport) {
+      _controller.attachConversationViewportPort(null);
       return _TemporaryConversationEmptyState(
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
       );
     }
 
-    final settings = context.watch<SettingsProvider>();
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
@@ -1441,12 +1468,60 @@ class _HomePageState extends State<HomePage>
       );
     }
 
+    if (useWebViewport && afterMessageWidgets.isNotEmpty) {
+      useWebViewport = false;
+      _scheduleMultiAIFallbackPrompt(conversationId);
+    }
+
     final truncIndex = HomeViewModel.adjustTruncIndexForPresetFolding(
       truncIndex: _computeTruncCollapsedIndex(),
       presetCount: presetCount,
       showPresetToggle: showPresetToggle,
       presetsExpanded: _presetsExpanded,
     );
+
+    final suggestions = suggestionsEnabled
+        ? (_controller.currentConversation?.chatSuggestions ?? const <String>[])
+        : const <String>[];
+
+    if (useWebViewport) {
+      context.watch<ToolApprovalService>();
+      context.watch<AskUserInteractionService>();
+      _controller.attachConversationViewportPort(_webViewportPort);
+      _ensureWebRenderSession(conversationId);
+      final snapshot = _buildWebChatSnapshot(
+        context: context,
+        conversationId: conversationId,
+        messages: messages,
+        assistant: assistant,
+        settings: settings,
+        truncIndex: truncIndex,
+        suggestions: suggestions,
+        presetCount: presetCount,
+        showPresetToggle: showPresetToggle,
+      );
+      return WebConversationViewport(
+        key: const ValueKey<String>('web-conversation-viewport'),
+        snapshot: snapshot,
+        localMediaPaths: buildWebChatLocalMediaRegistry(
+          messages,
+          assistant: assistant,
+        ),
+        viewportPort: _webViewportPort,
+        streamingContentNotifier: _controller.streamingContentNotifier,
+        buildStreamingPatch: (messageId, data) =>
+            _buildWebStreamingPatch(messageId, data, assistant),
+        onAction: (request) =>
+            _handleWebChatAction(request, visibleMessages: messages),
+        onUseFlutter: () {
+          setState(() {
+            _webFlutterConversationOverrides.add(conversationId);
+          });
+        },
+      );
+    }
+
+    _controller.attachConversationViewportPort(null);
 
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
@@ -1465,10 +1540,7 @@ class _HomePageState extends State<HomePage>
       translations: _buildTranslationUiStates(),
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
-      suggestions: suggestionsEnabled
-          ? (_controller.currentConversation?.chatSuggestions ??
-                const <String>[])
-          : const <String>[],
+      suggestions: suggestions,
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
@@ -1549,6 +1621,545 @@ class _HomePageState extends State<HomePage>
       backdropKey: _messageListBackdropKey,
       child: messageList,
     );
+  }
+
+  bool _webViewportRequested(SettingsProvider settings, String conversationId) {
+    if (!settings.experimentalWebViewRendering) {
+      _webFlutterConversationOverrides.clear();
+      _webMultiAIPromptedConversations.clear();
+      return false;
+    }
+    return supportsWebConversationViewport(
+          isWeb: kIsWeb,
+          platform: defaultTargetPlatform,
+        ) &&
+        !_webFlutterConversationOverrides.contains(conversationId);
+  }
+
+  void _ensureWebRenderSession(String conversationId) {
+    if (_webRenderConversationId == conversationId) return;
+    _webRenderConversationId = conversationId;
+    _webRenderSessionId =
+        '$conversationId:${DateTime.now().microsecondsSinceEpoch}';
+    _webRenderRevision = 0;
+    _webActionEpoch++;
+  }
+
+  Map<String, dynamic> _buildWebChatSnapshot({
+    required BuildContext context,
+    required String conversationId,
+    required List<ChatMessage> messages,
+    required Assistant? assistant,
+    required SettingsProvider settings,
+    required int truncIndex,
+    required List<String> suggestions,
+    required int presetCount,
+    required bool showPresetToggle,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    final semantic = context.appColors;
+    final snapshot = const WebChatSnapshotBuilder().build(
+      renderSessionId: _webRenderSessionId,
+      conversationId: conversationId,
+      renderRevision: ++_webRenderRevision,
+      actionEpoch: _webActionEpoch,
+      messages: messages,
+      byGroup: _controller.chatController.groupedMessages,
+      versionSelections: _controller.versionSelections,
+      reasoning: _controller.reasoning,
+      reasoningSegments: _controller.reasoningSegments,
+      contentSplits: _controller.contentSplits,
+      toolParts: _controller.toolParts,
+      selectedItems: _controller.selectedItems,
+      selecting: _controller.selecting,
+      truncCollapsedIndex: truncIndex,
+      suggestions: suggestions,
+      hasMoreBefore: _controller.chatController.hasMoreBefore,
+      hasMoreAfter: _controller.chatController.hasMoreAfter,
+      strings: <String, String>{
+        'timeline': l10n.webChatTimelineLabel,
+        'empty': l10n.webChatEmptyConversation,
+        'user': l10n.webChatUser,
+        'assistant': l10n.webChatAssistant,
+        'tokens': l10n.webChatTokens,
+        'copyCode': l10n.webChatCopyCode,
+        'expandCode': l10n.codeBlockExpandButton,
+        'collapseCode': l10n.codeBlockCollapseButton,
+        'htmlPreview': l10n.webChatHtmlPreview,
+        'thinking': l10n.chatMessageWidgetThinking,
+        'reasoning': l10n.webChatReasoning,
+        'toolCall': l10n.webChatToolCall,
+        'toolResult': l10n.webChatToolResult,
+        'translation': l10n.webChatTranslation,
+        'contextDivider': l10n.homePageClearContext,
+        'unsupportedBlock': l10n.webChatUnsupportedBlock,
+        'copy': l10n.chatMessageWidgetCopyAsMarkdown,
+        'edit': l10n.messageMoreSheetEdit,
+        'resend': l10n.chatMessageWidgetResendTooltip,
+        'regenerate': l10n.chatMessageWidgetRegenerateTooltip,
+        'quote': l10n.chatMessageWidgetQuote,
+        'translate': l10n.chatMessageWidgetTranslateTooltip,
+        'speak': l10n.chatMessageWidgetSpeakTooltip,
+        'share': l10n.messageMoreSheetShare,
+        'fork': l10n.messageMoreSheetCreateBranch,
+        'select': l10n.messageMoreSheetSelectMessages,
+        'delete': l10n.messageMoreSheetDelete,
+        'multiAI': l10n.messageMoreSheetMultiAI,
+        'approve': l10n.toolApprovalApprove,
+        'deny': l10n.toolApprovalDeny,
+        'submit': l10n.askUserCardSubmit,
+        'customAnswer': l10n.askUserCardCustomHint,
+        'skip': l10n.askUserCardSkip,
+        'skipped': l10n.askUserCardSkipped,
+        'top': l10n.webChatTop,
+        'bottom': l10n.webChatBottom,
+        'previousVersion': l10n.webChatPreviousVersion,
+        'nextVersion': l10n.webChatNextVersion,
+        'assistantInitial': l10n.webChatAssistantInitial,
+        'userInitial': l10n.webChatUserInitial,
+      },
+      theme: <String, String>{
+        'surface': _webCssColor(colors.surface),
+        'on-surface': _webCssColor(colors.onSurface),
+        'primary': _webCssColor(colors.primary),
+        'on-primary': _webCssColor(colors.onPrimary),
+        'card': _webCssColor(semantic.surfaceCard),
+        'outline': _webCssColor(colors.outlineVariant),
+        'user': _webCssColor(colors.primaryContainer),
+        'background-mask': _webCssColor(colors.surface),
+        'background-mask-opacity': settings.chatBackgroundMaskStrength
+            .clamp(0, 1)
+            .toString(),
+      },
+      assistant: assistant,
+      fontScale: settings.chatFontScale,
+      canStartMultiAI: _controller.canStartMultiAIComparison,
+    );
+    if (showPresetToggle) {
+      snapshot['preset'] = <String, dynamic>{
+        'count': presetCount,
+        'expanded': _presetsExpanded,
+        'label': l10n.homePagePresetMessagesCount(presetCount),
+      };
+    }
+    snapshot['display'] = <String, dynamic>{
+      'userMarkdown': settings.enableUserMarkdown,
+      'assistantMarkdown': settings.enableAssistantMarkdown,
+      'reasoningMarkdown': settings.enableReasoningMarkdown,
+      'math': settings.enableMathRendering,
+      'dollarMath': settings.enableDollarLatex,
+      'wrapCode':
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      'collapsedCodeLines': settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+    };
+    final approvalService = context.read<ToolApprovalService>();
+    final askUserService = context.read<AskUserInteractionService>();
+    for (final message in snapshot['messages'] as List<dynamic>) {
+      final map = message as Map<String, dynamic>;
+      for (final tool in map['tools'] as List<dynamic>) {
+        final toolMap = tool as Map<String, dynamic>;
+        final toolId = toolMap['id']?.toString() ?? '';
+        final arguments = Map<String, dynamic>.of(
+          (toolMap['arguments'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{},
+        );
+        if (approvalService.isPending(toolId)) {
+          arguments['approvalRequired'] = true;
+        }
+        if (askUserService.isPending(toolId)) {
+          arguments['askUserActive'] = true;
+        }
+        toolMap['arguments'] = arguments;
+      }
+    }
+    return snapshot;
+  }
+
+  Map<String, dynamic>? _buildWebStreamingPatch(
+    String messageId,
+    StreamingContentData data,
+    Assistant? assistant,
+  ) {
+    ChatMessage? message;
+    for (final candidate in _controller.chatController.collapsedMessages) {
+      if (candidate.id == messageId) {
+        message = candidate;
+        break;
+      }
+    }
+    if (message == null) return null;
+    final visual = messageVisualContent(
+      message.copyWith(content: data.content),
+      assistant: assistant,
+    );
+    return <String, dynamic>{
+      'id': messageId,
+      'content': visual,
+      'isStreaming': true,
+      'tokens': data.totalTokens,
+      'reasoning': _webStreamingReasoning(messageId, data),
+      'contentSplits': <String, dynamic>{
+        'offsets': data.contentSplitOffsets ?? const <int>[],
+        'reasoningCounts': data.reasoningCountAtSplit ?? const <int>[],
+        'toolCounts': data.toolCountAtSplit ?? const <int>[],
+      },
+      'tools': _webStreamingToolParts(messageId),
+      'translation': data.translation,
+    };
+  }
+
+  List<Map<String, dynamic>> _webStreamingToolParts(String messageId) {
+    final approvalService = context.read<ToolApprovalService>();
+    final askUserService = context.read<AskUserInteractionService>();
+    return (_controller.toolParts[messageId] ?? const <ToolUIPart>[])
+        .map((part) {
+          final json = part.toJson();
+          final arguments = Map<String, dynamic>.of(part.arguments);
+          if (approvalService.isPending(part.id)) {
+            arguments['approvalRequired'] = true;
+          }
+          if (askUserService.isPending(part.id)) {
+            arguments['askUserActive'] = true;
+          }
+          json['arguments'] = arguments;
+          return json;
+        })
+        .toList(growable: false);
+  }
+
+  List<Map<String, dynamic>> _webStreamingReasoning(
+    String messageId,
+    StreamingContentData data,
+  ) {
+    final segments = _controller.reasoningSegments[messageId];
+    if (segments != null && segments.isNotEmpty) {
+      return segments
+          .map(
+            (segment) => <String, dynamic>{
+              'text': segment.text,
+              'expanded': segment.expanded,
+              'loading': segment.finishedAt == null,
+              'startAt': segment.startAt?.toIso8601String(),
+              'finishedAt': segment.finishedAt?.toIso8601String(),
+              'toolStartIndex': segment.toolStartIndex,
+            },
+          )
+          .toList(growable: false);
+    }
+    if (data.reasoningText?.isNotEmpty != true) {
+      return const <Map<String, dynamic>>[];
+    }
+    return <Map<String, dynamic>>[
+      <String, dynamic>{
+        'text': data.reasoningText,
+        'expanded': _controller.reasoning[messageId]?.expanded ?? true,
+        'loading': data.reasoningFinishedAt == null,
+        'startAt': data.reasoningStartAt?.toIso8601String(),
+        'finishedAt': data.reasoningFinishedAt?.toIso8601String(),
+        'toolStartIndex': 0,
+      },
+    ];
+  }
+
+  Future<void> _handleWebChatAction(
+    WebChatActionRequest request, {
+    required List<ChatMessage> visibleMessages,
+  }) async {
+    final message = request.messageId == null
+        ? null
+        : _findWebActionMessage(request.messageId!, visibleMessages);
+    switch (request.action) {
+      case 'loadMoreBefore':
+        _controller.loadMoreBefore();
+        return;
+      case 'loadMoreAfter':
+        _controller.loadMoreAfter();
+        return;
+      case 'suggestion':
+        await _controller.sendSuggestion(
+          request.payload['text']?.toString() ?? '',
+        );
+        return;
+      case 'togglePresets':
+        setState(() => _presetsExpanded = !_presetsExpanded);
+        return;
+      case 'copyText':
+        final text = request.payload['text']?.toString() ?? '';
+        if (text.length > 1024 * 1024) {
+          throw const WebChatProtocolException(
+            'copy payload exceeds size limit',
+          );
+        }
+        await Clipboard.setData(ClipboardData(text: text));
+        return;
+    }
+    if (message == null) {
+      throw const WebChatProtocolException('message target is not active');
+    }
+    if (!_webMessageActionAllowed(request.action, message)) {
+      throw const WebChatProtocolException('message action is not allowed');
+    }
+    switch (request.action) {
+      case 'copy':
+        await Clipboard.setData(
+          ClipboardData(text: messageVisualContent(message)),
+        );
+        return;
+      case 'edit':
+        await _controller.editMessage(message);
+        return;
+      case 'resend':
+      case 'regenerate':
+        await _controller.regenerateAtMessage(message);
+        return;
+      case 'quote':
+        _controller.insertQuote(messageVisualContent(message));
+        return;
+      case 'translate':
+        await _controller.translateMessage(message);
+        return;
+      case 'speak':
+        await _controller.speakMessage(message);
+        return;
+      case 'share':
+        _controller.shareMessage(
+          visibleMessages.indexOf(message),
+          visibleMessages,
+        );
+        return;
+      case 'fork':
+        await _controller.forkConversation(message);
+        return;
+      case 'select':
+        if (_controller.selecting) {
+          _controller.toggleSelection(
+            message.id,
+            !_controller.selectedItems.contains(message.id),
+          );
+          return;
+        }
+        _controller.startMessageSelection(
+          messageIndex: visibleMessages.indexOf(message),
+          messageList: visibleMessages,
+          mode: ChatSelectionMode.delete,
+        );
+        return;
+      case 'delete':
+        if (!mounted) return;
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+        );
+        return;
+      case 'version':
+        final versions = List<ChatMessage>.of(
+          _controller.chatController.groupedMessages[message.groupId] ??
+              <ChatMessage>[message],
+        )..sort((a, b) => a.version.compareTo(b.version));
+        final current = versions.indexWhere(
+          (item) =>
+              item.version ==
+              (_controller.versionSelections[message.groupId] ??
+                  message.version),
+        );
+        final delta = (request.payload['delta'] as num?)?.toInt() ?? 0;
+        final next = (current + delta).clamp(0, versions.length - 1);
+        await _controller.setSelectedVersion(
+          message.groupId ?? message.id,
+          versions[next].version,
+        );
+        return;
+      case 'toggleReasoningSegment':
+        _controller.toggleReasoningSegment(
+          message.id,
+          (request.payload['index'] as num?)?.toInt() ?? 0,
+        );
+        return;
+      case 'approveTool':
+        if (!mounted) return;
+        final toolId = request.payload['toolId']?.toString() ?? '';
+        final service = context.read<ToolApprovalService>();
+        if (!service.isPending(toolId) ||
+            !_webMessageHasTool(message.id, toolId)) {
+          throw const WebChatProtocolException('tool approval is stale');
+        }
+        service.approve(toolId);
+        return;
+      case 'denyTool':
+        if (!mounted) return;
+        final toolId = request.payload['toolId']?.toString() ?? '';
+        final service = context.read<ToolApprovalService>();
+        if (!service.isPending(toolId) ||
+            !_webMessageHasTool(message.id, toolId)) {
+          throw const WebChatProtocolException('tool approval is stale');
+        }
+        service.deny(toolId);
+        return;
+      case 'answerTool':
+        _submitWebAskUserAnswer(message, request.payload);
+        return;
+      case 'multiAI':
+        if (await _confirmWebMultiAIFallback()) {
+          if (!mounted) return;
+          final conversationId =
+              _controller.currentConversation?.id ?? message.conversationId;
+          setState(() {
+            _webFlutterConversationOverrides.add(conversationId);
+          });
+          await _controller.handleMultiAIAction(message);
+        }
+        return;
+      default:
+        throw WebChatProtocolException('unsupported action ${request.action}');
+    }
+  }
+
+  ChatMessage? _findWebActionMessage(
+    String messageId,
+    List<ChatMessage> visibleMessages,
+  ) {
+    for (final message in visibleMessages) {
+      if (message.id == messageId) return message;
+    }
+    for (final versions in _controller.chatController.groupedMessages.values) {
+      for (final message in versions) {
+        if (message.id == messageId) return message;
+      }
+    }
+    return null;
+  }
+
+  bool _webMessageActionAllowed(String action, ChatMessage message) {
+    const common = <String>{
+      'copy',
+      'quote',
+      'translate',
+      'speak',
+      'share',
+      'fork',
+      'select',
+      'delete',
+      'version',
+      'toggleReasoningSegment',
+      'approveTool',
+      'denyTool',
+      'answerTool',
+    };
+    if (common.contains(action)) return true;
+    if (action == 'edit' || action == 'resend') return message.role == 'user';
+    if (action == 'regenerate') return message.role == 'assistant';
+    if (action == 'multiAI') {
+      return message.role == 'assistant' &&
+          _controller.canStartMultiAIComparison;
+    }
+    return false;
+  }
+
+  bool _webMessageHasTool(String messageId, String toolId) {
+    return (_controller.toolParts[messageId] ?? const []).any(
+      (part) => part.id == toolId,
+    );
+  }
+
+  void _submitWebAskUserAnswer(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+  ) {
+    final toolId = payload['toolId']?.toString() ?? '';
+    final service = context.read<AskUserInteractionService>();
+    final request = service.pendingRequests[toolId];
+    if (request == null || !_webMessageHasTool(message.id, toolId)) {
+      throw const WebChatProtocolException(
+        'ask user request is no longer active',
+      );
+    }
+    final rawAnswers = payload['answers'] is Map
+        ? (payload['answers'] as Map).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is List
+                  ? value.map((item) => item.toString()).toList()
+                  : <String>[value.toString()],
+            ),
+          )
+        : const <String, List<String>>{};
+    final skipped = (payload['skipped'] as List? ?? const <dynamic>[])
+        .map((value) => value.toString())
+        .toSet();
+    final custom = (payload['custom'] as List? ?? const <dynamic>[])
+        .map((value) => value.toString())
+        .toSet();
+    final answers = <String, AskUserAnswerValue>{};
+    for (final question in request.questions) {
+      if (skipped.contains(question.id)) {
+        answers[question.id] = AskUserAnswerValue.skipped(kind: question.kind);
+        continue;
+      }
+      final values = rawAnswers[question.id] ?? const <String>[];
+      if (values.isEmpty ||
+          values.length > 50 ||
+          values.any((value) => value.trim().isEmpty || value.length > 4000) ||
+          (question.kind == AskUserQuestionKind.single && values.length != 1) ||
+          (!custom.contains(question.id) &&
+              question.options.isNotEmpty &&
+              values.any((value) => !question.options.contains(value)))) {
+        throw const WebChatProtocolException('invalid ask user answer');
+      }
+      answers[question.id] = question.kind == AskUserQuestionKind.multi
+          ? AskUserAnswerValue.multi(
+              value: values,
+              custom: custom.contains(question.id),
+            )
+          : AskUserAnswerValue.single(
+              value: values.isEmpty ? '' : values.first,
+              custom: custom.contains(question.id),
+            );
+    }
+    service.answer(toolId, answers);
+  }
+
+  void _scheduleMultiAIFallbackPrompt(String conversationId) {
+    if (!_webMultiAIPromptedConversations.add(conversationId)) return;
+    _webFlutterConversationOverrides.add(conversationId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _confirmWebMultiAIFallback();
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<bool> _confirmWebMultiAIFallback() async {
+    final l10n = AppLocalizations.of(context)!;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.webChatMultiAIFallbackTitle),
+            content: Text(l10n.webChatMultiAIFallbackBody),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.homePageCancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(l10n.webChatMultiAIFallbackConfirm),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  String _webCssColor(Color color) {
+    final value = color.toARGB32() & 0x00ffffff;
+    return '#${value.toRadixString(16).padLeft(6, '0')}';
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {
@@ -1655,6 +2266,12 @@ class _HomePageState extends State<HomePage>
     return Builder(
       builder: (context) {
         final settings = context.watch<SettingsProvider>();
+        final conversationId =
+            _controller.currentConversation?.id ??
+            'temporary:${context.read<AssistantProvider>().currentAssistant?.id ?? 'unbound'}';
+        if (_webViewportRequested(settings, conversationId)) {
+          return const SizedBox.shrink();
+        }
         if (_controller.selecting) return const SizedBox.shrink();
         if (_controller.messages.isEmpty) {
           return const SizedBox.shrink();

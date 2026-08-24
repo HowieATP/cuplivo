@@ -6436,6 +6436,102 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageRenderingSettingsTitle => '渲染设置';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '实验性功能：WebView 渲染';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔离的本地 WebView 中渲染一对一对话内容。重启应用会清除按会话设置的回退。';
+
+  @override
+  String get webChatLoading => '正在加载 Web 对话视图…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 对话视图无法启动。';
+
+  @override
+  String get webChatRetry => '重试';
+
+  @override
+  String get webChatUseFlutterThisConversation => '当前会话使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '复制诊断信息';
+
+  @override
+  String get webChatDiagnosticsCopied => '诊断信息已复制';
+
+  @override
+  String get webChatWebView2Missing => '需要安装 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安装 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '无法渲染此内容块。';
+
+  @override
+  String get webChatEmptyConversation => '开始对话后，消息会显示在这里。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '将当前会话切换到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 渲染。当前会话将使用 Flutter，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切换并继续';
+
+  @override
+  String get webChatTimelineLabel => '对话消息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCopyCode => '复制代码';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 预览';
+
+  @override
+  String get webChatReasoning => '思维链';
+
+  @override
+  String get webChatToolCall => '工具调用：';
+
+  @override
+  String get webChatToolResult => '工具结果：';
+
+  @override
+  String get webChatTranslation => '翻译';
+
+  @override
+  String get webChatTop => '顶部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一个版本';
+
+  @override
+  String get webChatNextVersion => '下一个版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => '行为与启动';
 
   @override
@@ -15005,6 +15101,102 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageRenderingSettingsTitle => '渲染设置';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '实验性功能：WebView 渲染';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔离的本地 WebView 中渲染一对一对话内容。重启应用会清除按会话设置的回退。';
+
+  @override
+  String get webChatLoading => '正在加载 Web 对话视图…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 对话视图无法启动。';
+
+  @override
+  String get webChatRetry => '重试';
+
+  @override
+  String get webChatUseFlutterThisConversation => '当前会话使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '复制诊断信息';
+
+  @override
+  String get webChatDiagnosticsCopied => '诊断信息已复制';
+
+  @override
+  String get webChatWebView2Missing => '需要安装 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安装 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '无法渲染此内容块。';
+
+  @override
+  String get webChatEmptyConversation => '开始对话后，消息会显示在这里。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '将当前会话切换到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 渲染。当前会话将使用 Flutter，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切换并继续';
+
+  @override
+  String get webChatTimelineLabel => '对话消息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCopyCode => '复制代码';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 预览';
+
+  @override
+  String get webChatReasoning => '思维链';
+
+  @override
+  String get webChatToolCall => '工具调用：';
+
+  @override
+  String get webChatToolResult => '工具结果：';
+
+  @override
+  String get webChatTranslation => '翻译';
+
+  @override
+  String get webChatTop => '顶部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一个版本';
+
+  @override
+  String get webChatNextVersion => '下一个版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
 
   @override
   String get displaySettingsPageBehaviorStartupTitle => '行为与启动';
@@ -23577,6 +23769,102 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageRenderingSettingsTitle => '渲染設定';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '實驗性功能：WebView 算繪';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔離的本機 WebView 中算繪一對一對話內容。重新啟動應用程式會清除按對話設定的回退。';
+
+  @override
+  String get webChatLoading => '正在載入 Web 對話檢視…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 對話檢視無法啟動。';
+
+  @override
+  String get webChatRetry => '重試';
+
+  @override
+  String get webChatUseFlutterThisConversation => '目前對話使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '複製診斷資訊';
+
+  @override
+  String get webChatDiagnosticsCopied => '診斷資訊已複製';
+
+  @override
+  String get webChatWebView2Missing => '需要安裝 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安裝 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '無法算繪此內容區塊。';
+
+  @override
+  String get webChatEmptyConversation => '開始對話後，訊息會顯示在這裡。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '將目前對話切換到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 算繪。目前對話將使用 Flutter，直到應用程式重新啟動或關閉 WebView 算繪。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切換並繼續';
+
+  @override
+  String get webChatTimelineLabel => '對話訊息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCopyCode => '複製程式碼';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 預覽';
+
+  @override
+  String get webChatReasoning => '思維鏈';
+
+  @override
+  String get webChatToolCall => '工具呼叫：';
+
+  @override
+  String get webChatToolResult => '工具結果：';
+
+  @override
+  String get webChatTranslation => '翻譯';
+
+  @override
+  String get webChatTop => '頂部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一個版本';
+
+  @override
+  String get webChatNextVersion => '下一個版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
 
   @override
   String get displaySettingsPageBehaviorStartupTitle => '行為與啟動';

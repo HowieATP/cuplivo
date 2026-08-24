@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -35,6 +36,7 @@ import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../features/home/pages/input_bar_buttons_customization_page.dart'
     show showInputBarButtonsCustomizationDialog;
+import '../features/home/webview/web_chat_platform.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/group_chat_provider.dart';
 import '../features/assistant/widgets/assistant_select_sheet.dart';

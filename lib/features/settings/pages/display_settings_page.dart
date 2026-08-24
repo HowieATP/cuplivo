@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../../../core/services/android_background.dart';
@@ -21,6 +22,7 @@ import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
 import '../../../features/assistant/widgets/assistant_select_sheet.dart';
 import '../../home/pages/input_bar_buttons_customization_page.dart';
+import '../../home/webview/web_chat_platform.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
@@ -1753,6 +1755,24 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
+              if (supportsWebConversationViewport(
+                isWeb: kIsWeb,
+                platform: defaultTargetPlatform,
+              )) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Globe,
+                  label:
+                      l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
+                  subtitle: l10n
+                      .displaySettingsPageExperimentalWebViewRenderingSubtitle,
+                  value: sp.experimentalWebViewRendering,
+                  onChanged: (value) => context
+                      .read<SettingsProvider>()
+                      .setExperimentalWebViewRendering(value),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.User,

@@ -18,6 +18,7 @@ import {
   reduceEnvelope,
   restoreAnchor,
   restoreViewport,
+  viewportForSavedAnchor,
   visibleRange,
 } from '../protocol.mjs';
 
@@ -85,14 +86,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v9', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v10', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v9',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v10',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -315,6 +316,33 @@ test('a new render session starts with a fresh viewport', () => {
   assert.equal(queried, false);
 });
 
+test('a returning conversation seeds its new render session from a message anchor', () => {
+  const viewport = viewportForSavedAnchor({
+    messageIds: ['m1', 'm2', 'm3', 'm4'],
+    heights: [100, 120, 140, 160],
+    anchor: { messageId: 'm3', offset: -18 },
+    viewportHeight: 700,
+  });
+
+  assert.deepEqual(viewport, {
+    scrollTop: 238,
+    viewportHeight: 700,
+    anchor: { id: 'm3', offset: -18 },
+  });
+  assert.equal(viewportForSavedAnchor({
+    messageIds: ['m1'],
+    heights: [100],
+    anchor: { messageId: 'missing', offset: 0 },
+    viewportHeight: 700,
+  }), null);
+  assert.equal(viewportForSavedAnchor({
+    messageIds: ['m1'],
+    heights: [100],
+    anchor: { messageId: 'm1', offset: Number.NaN },
+    viewportHeight: 700,
+  }), null);
+});
+
 test('mobile shell owns vertical gestures and uses controlled disclosures', () => {
   assert.match(styleSource, /touch-action:\s*pan-y/);
   assert.match(styleSource, /-webkit-overflow-scrolling:\s*touch/);
@@ -439,6 +467,20 @@ test('touch and inertial scrolling defer every virtual DOM replacement', () => {
   assert.match(appSource, /messagePatches[\s\S]*?requestRender\(\)/);
   assert.doesNotMatch(appSource, /messagePatches[^\n]*scheduleRender\(\)/);
   assert.match(appSource, /function handleMeasuredHeights[\s\S]*?if \(touchActive \|\| userScrolling\)[\s\S]*?requestRender\(\)/);
+});
+
+test('viewport commands release the stop lock and render gate before navigating', () => {
+  const commandStart = appSource.indexOf('function handleViewportCommand');
+  const commandBody = appSource.slice(commandStart, commandStart + 1400);
+  const prepareIndex = commandBody.indexOf('prepareProgrammaticNavigation()');
+  const topIndex = commandBody.indexOf("command === 'top'");
+  assert.ok(prepareIndex >= 0 && topIndex > prepareIndex);
+  assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?releaseScrollStopLock\(\)/);
+  assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?userScrolling = false/);
+  assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?setRenderBlocked\(false\)/);
+  assert.match(appSource, /type: 'viewportMetrics'[\s\S]*?conversationId: renderedConversationId/);
+  assert.match(appSource, /const missingSavedAnchor[\s\S]*?messages\.reduce\(\(sum, message\)/);
+  assert.doesNotMatch(appSource, /filter\(\(message\) => message\.role === 'user'\)/);
 });
 
 test('assistant background uses a dedicated fixed layer and Flutter mask gradient', () => {

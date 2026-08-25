@@ -19,6 +19,36 @@ void main() {
   );
 
   test(
+    'viewport navigation cancels native momentum before sending commands',
+    () {
+      final source = File(
+        'lib/features/home/webview/web_conversation_viewport.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('_sendViewportCommand'));
+      final methodStart = source.indexOf('Future<void> _sendViewportCommand');
+      final methodBody = source.substring(methodStart, methodStart + 500);
+      expect(methodBody.indexOf('_stopWebScrolling()'), isNonNegative);
+      expect(
+        methodBody.indexOf('_sendEnvelope(command)'),
+        greaterThan(methodBody.indexOf('_stopWebScrolling()')),
+      );
+    },
+  );
+
+  test(
+    'conversation switching restores a saved Web viewport before bottoming',
+    () {
+      final source = File(
+        'lib/features/home/controllers/home_page_controller.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('savedAnchorForConversation(id)'));
+      expect(source, contains('restoreAnchor(savedAnchor)'));
+    },
+  );
+
+  test(
     'HomePage assigns the Flutter-owned background mode to Web snapshots',
     () {
       final source = File(

@@ -15,6 +15,7 @@ import {
   reduceEnvelope,
   restoreAnchor,
   restoreViewport,
+  viewportForSavedAnchor,
   verticalGestureIntent,
   visibleRange,
 } from './protocol.mjs';
@@ -47,6 +48,7 @@ let scrollStopLeft = 0;
 let gestureActive = false;
 let gestureIntent = 'idle';
 let renderedSessionId = null;
+let renderedConversationId = null;
 let reasoningElapsedTimer = null;
 
 const bridge = {
@@ -998,13 +1000,28 @@ function renderMessage(message, isLast = false) {
 
 function render() {
   if (!state) return;
-  const viewport = captureViewport(timeline, {
-    preserve: renderedSessionId === state.renderSessionId,
-  });
+  const sameSession = renderedSessionId === state.renderSessionId;
+  const savedViewport = sameSession
+    ? null
+    : viewportForSavedAnchor({
+      messageIds: (state.messages ?? []).map((message) => message.id),
+      heights: (state.messages ?? []).map(messageHeight),
+      anchor: state.initialViewportAnchor,
+      viewportHeight: timeline.clientHeight,
+    });
+  const messages = state.messages ?? [];
+  const missingSavedAnchor = !sameSession &&
+    state.initialViewportAnchor != null && savedViewport == null;
+  const viewport = savedViewport ?? (missingSavedAnchor
+    ? {
+      scrollTop: messages.reduce((sum, message) => sum + messageHeight(message), 0),
+      viewportHeight: timeline.clientHeight,
+      anchor: null,
+    }
+    : captureViewport(timeline, { preserve: sameSession }));
   applyTheme();
   resizeObserver?.disconnect();
   resizeObserver ??= new ResizeObserver(handleMeasuredHeights);
-  const messages = state.messages ?? [];
   const fragment = document.createDocumentFragment();
   const observedSlots = [];
   if (messages.length === 0) {
@@ -1017,8 +1034,10 @@ function render() {
     fragment.append(empty);
     timeline.replaceChildren(fragment);
     renderedSessionId = state.renderSessionId;
+    renderedConversationId = state.conversationId;
     ensureReasoningElapsedTimer();
     restoreViewport(timeline, viewport);
+    sendViewportMetrics();
     return;
   }
   const range = visibleRange({
@@ -1060,8 +1079,10 @@ function render() {
   timeline.replaceChildren(fragment);
   for (const slot of observedSlots) resizeObserver.observe(slot);
   renderedSessionId = state.renderSessionId;
+  renderedConversationId = state.conversationId;
   ensureReasoningElapsedTimer();
   restoreViewport(timeline, viewport);
+  sendViewportMetrics();
 }
 
 function handleMeasuredHeights(entries) {
@@ -1110,6 +1131,8 @@ const sendViewportMetrics = createFrameCoalescer(() => {
     pixels: timeline.scrollTop,
     maxExtent: Math.max(0, timeline.scrollHeight - timeline.clientHeight),
     isUserScrolling: userScrolling,
+    renderSessionId: renderedSessionId,
+    conversationId: renderedConversationId,
     anchorMessageId: anchor?.id ?? null,
     anchorOffset: anchor?.offset ?? 0,
   });
@@ -1289,19 +1312,43 @@ timeline.addEventListener('keydown', (event) => {
 });
 window.addEventListener('resize', requestRender);
 
+function prepareProgrammaticNavigation() {
+  releaseScrollStopLock();
+  clearTimeout(userScrollTimer);
+  userScrollTimer = null;
+  userScrolling = false;
+  setRenderBlocked(false);
+}
+
 function handleViewportCommand(envelope) {
   const command = envelope.command;
   const payload = envelope.payload ?? {};
   const behavior = payload.animate === false ? 'auto' : 'smooth';
+  prepareProgrammaticNavigation();
   if (command === 'top') timeline.scrollTo({ top: 0, behavior });
   else if (command === 'bottom') timeline.scrollTo({ top: timeline.scrollHeight, behavior });
   else if (command === 'message') scrollToMessage(payload.messageId, behavior);
   else if (command === 'previousQuestion') jumpQuestion(-1);
   else if (command === 'nextQuestion') jumpQuestion(1);
-  else if (command === 'restoreAnchor') {
-    requestRender();
-    requestAnimationFrame(() => restoreAnchor(timeline, { id: payload.messageId, offset: payload.offset ?? 0 }));
-  }
+  else if (command === 'restoreAnchor') restoreMessageAnchor(payload);
+  sendViewportMetrics();
+}
+
+function restoreMessageAnchor(anchor) {
+  const viewport = viewportForSavedAnchor({
+    messageIds: (state?.messages ?? []).map((message) => message.id),
+    heights: (state?.messages ?? []).map(messageHeight),
+    anchor,
+    viewportHeight: timeline.clientHeight,
+  });
+  if (!viewport) return false;
+  timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
+  requestRender();
+  requestAnimationFrame(() => {
+    restoreAnchor(timeline, viewport.anchor);
+    sendViewportMetrics();
+  });
+  return true;
 }
 
 function scrollToMessage(messageId, behavior = 'smooth') {
@@ -1314,13 +1361,14 @@ function scrollToMessage(messageId, behavior = 'smooth') {
 }
 
 function jumpQuestion(delta) {
-  const questions = (state?.messages ?? []).filter((message) => message.role === 'user');
-  if (!questions.length) return;
+  const messages = state?.messages ?? [];
+  if (!messages.length) return;
   const anchor = captureAnchor(timeline);
-  let index = questions.findIndex((message) => message.id === anchor?.id);
-  if (index < 0) index = delta > 0 ? -1 : questions.length;
-  const next = Math.max(0, Math.min(questions.length - 1, index + delta));
-  scrollToMessage(questions[next].id);
+  let index = messages.findIndex((message) => message.id === anchor?.id);
+  if (index < 0) index = delta > 0 ? 0 : messages.length - 1;
+  const next = index + delta;
+  if (next < 0 || next >= messages.length) return;
+  scrollToMessage(messages[next].id);
 }
 
 window.CuplivoWeb = {

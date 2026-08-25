@@ -44,6 +44,7 @@ class WebChatSnapshotBuilder {
     required double fontScale,
     required bool canStartMultiAI,
     required bool autoCollapseThinking,
+    Map<String, dynamic>? initialViewportAnchor,
   }) {
     final snapshotDisplay = <String, dynamic>{
       ...display,
@@ -60,6 +61,8 @@ class WebChatSnapshotBuilder {
       'conversationId': conversationId,
       'renderRevision': renderRevision,
       'actionEpoch': actionEpoch,
+      if (initialViewportAnchor != null)
+        'initialViewportAnchor': initialViewportAnchor,
       'messages': <Map<String, dynamic>>[
         for (var index = 0; index < messages.length; index++)
           _message(

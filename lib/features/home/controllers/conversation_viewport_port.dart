@@ -39,6 +39,7 @@ abstract interface class ConversationViewportPort {
   });
   Future<ConversationViewportAnchor?> captureAnchor();
   Future<void> restoreAnchor(ConversationViewportAnchor anchor);
+  ConversationViewportAnchor? savedAnchorForConversation(String conversationId);
 }
 
 class FlutterConversationViewportPort implements ConversationViewportPort {
@@ -117,6 +118,11 @@ class FlutterConversationViewportPort implements ConversationViewportPort {
       ),
     );
   }
+
+  @override
+  ConversationViewportAnchor? savedAnchorForConversation(
+    String conversationId,
+  ) => null;
 }
 
 typedef WebViewportCommandSender =
@@ -128,6 +134,9 @@ class WebConversationViewportPort implements ConversationViewportPort {
   double _pixels = 0;
   double _maxExtent = 0;
   ConversationViewportAnchor? _anchor;
+  String? _activeConversationId;
+  final Map<String, ConversationViewportAnchor> _savedAnchors =
+      <String, ConversationViewportAnchor>{};
 
   void attach(WebViewportCommandSender sender) => _sender = sender;
 
@@ -135,17 +144,44 @@ class WebConversationViewportPort implements ConversationViewportPort {
     if (identical(_sender, sender)) _sender = null;
   }
 
+  void activateConversation(String conversationId) {
+    if (_activeConversationId == conversationId) return;
+    _activeConversationId = conversationId;
+    _isUserScrolling = false;
+    _pixels = 0;
+    _maxExtent = 0;
+    _anchor = _savedAnchors[conversationId];
+  }
+
   void updateMetrics(Map<String, dynamic> metrics) {
-    _isUserScrolling = metrics['isUserScrolling'] == true;
-    _pixels = (metrics['pixels'] as num?)?.toDouble() ?? _pixels;
-    _maxExtent = (metrics['maxExtent'] as num?)?.toDouble() ?? _maxExtent;
+    final conversationId = metrics['conversationId']?.toString();
     final messageId = metrics['anchorMessageId']?.toString();
+    ConversationViewportAnchor? measuredAnchor;
     if (messageId != null && messageId.isNotEmpty) {
-      _anchor = ConversationViewportAnchor(
+      measuredAnchor = ConversationViewportAnchor(
         messageId: messageId,
         offset: (metrics['anchorOffset'] as num?)?.toDouble() ?? 0,
       );
+      if (conversationId != null && conversationId.isNotEmpty) {
+        _savedAnchors[conversationId] = measuredAnchor;
+      }
+    } else if (conversationId != null && conversationId.isNotEmpty) {
+      _savedAnchors.remove(conversationId);
     }
+    if (_activeConversationId == null &&
+        conversationId != null &&
+        conversationId.isNotEmpty) {
+      _activeConversationId = conversationId;
+    }
+    if (conversationId != null &&
+        conversationId.isNotEmpty &&
+        conversationId != _activeConversationId) {
+      return;
+    }
+    _isUserScrolling = metrics['isUserScrolling'] == true;
+    _pixels = (metrics['pixels'] as num?)?.toDouble() ?? _pixels;
+    _maxExtent = (metrics['maxExtent'] as num?)?.toDouble() ?? _maxExtent;
+    _anchor = measuredAnchor;
   }
 
   Future<void> _command(String command, [Map<String, dynamic>? payload]) async {
@@ -219,6 +255,13 @@ class WebConversationViewportPort implements ConversationViewportPort {
   Future<ConversationViewportAnchor?> captureAnchor() async => _anchor;
 
   @override
-  Future<void> restoreAnchor(ConversationViewportAnchor anchor) =>
-      _command('restoreAnchor', anchor.toJson());
+  Future<void> restoreAnchor(ConversationViewportAnchor anchor) {
+    _anchor = anchor;
+    return _command('restoreAnchor', anchor.toJson());
+  }
+
+  @override
+  ConversationViewportAnchor? savedAnchorForConversation(
+    String conversationId,
+  ) => _savedAnchors[conversationId];
 }

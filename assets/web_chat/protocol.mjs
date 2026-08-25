@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v9';
+export const ASSET_VERSION = 'web-chat-v10';
 
 const transfers = new Map();
 
@@ -279,6 +279,32 @@ export function restoreViewport(container, viewport) {
     ? Math.max(0, rawClientHeight)
     : 0;
   container.scrollTop = Math.min(scrollTop, Math.max(0, scrollHeight - clientHeight));
+}
+
+export function viewportForSavedAnchor({
+  messageIds,
+  heights,
+  anchor,
+  viewportHeight,
+}) {
+  const messageId = anchor?.messageId;
+  const offset = Number(anchor?.offset);
+  if (typeof messageId !== 'string' || messageId.length === 0 ||
+      !Number.isFinite(offset) || !Array.isArray(messageIds) ||
+      !Array.isArray(heights) || messageIds.length !== heights.length) {
+    return null;
+  }
+  const index = messageIds.indexOf(messageId);
+  if (index < 0) return null;
+  const scrollTop = heights.slice(0, index).reduce((sum, value) => {
+    const height = Number(value);
+    return sum + (Number.isFinite(height) && height > 0 ? height : 0);
+  }, 0) - offset;
+  return {
+    scrollTop: Math.max(0, scrollTop),
+    viewportHeight: normalizeContentInset(viewportHeight, 0),
+    anchor: { id: messageId, offset },
+  };
 }
 
 export function createFrameCoalescer(callback, schedule = requestAnimationFrame) {

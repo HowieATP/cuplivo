@@ -88,7 +88,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   String? _errorCode;
   late final String _capabilityToken = _randomCapabilityToken();
   late WebChatActionGate _actionGate = _newActionGate();
-  late final WebViewportCommandSender _viewportCommandSender = _sendEnvelope;
+  late final WebViewportCommandSender _viewportCommandSender =
+      _sendViewportCommand;
 
   String get _renderSessionId =>
       widget.snapshot['renderSessionId']?.toString() ?? '';
@@ -555,6 +556,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       );
       _fail(_generation, 'bridge_send_failed');
     }
+  }
+
+  Future<void> _sendViewportCommand(Map<String, dynamic> command) async {
+    await _stopWebScrolling();
+    await _sendEnvelope(command);
   }
 
   Future<void> _runWebJavaScript(String source) async {

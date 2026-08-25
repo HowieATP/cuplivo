@@ -1494,6 +1494,7 @@ class _HomePageState extends State<HomePage>
       final ttsActive = context.select<TtsProvider, bool>(
         (provider) => provider.playbackState.isActive,
       );
+      _webViewportPort.activateConversation(conversationId);
       _controller.attachConversationViewportPort(_webViewportPort);
       _ensureWebRenderSession(conversationId);
       final snapshot = _buildWebChatSnapshot(
@@ -1847,6 +1848,9 @@ class _HomePageState extends State<HomePage>
       fontScale: settings.chatFontScale,
       canStartMultiAI: _controller.canStartMultiAIComparison,
       autoCollapseThinking: settings.autoCollapseThinking,
+      initialViewportAnchor: _webViewportPort
+          .savedAnchorForConversation(conversationId)
+          ?.toJson(),
     );
     if (showPresetToggle) {
       snapshot['preset'] = <String, dynamic>{

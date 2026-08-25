@@ -77,11 +77,19 @@ void main() {
       fontScale: 1,
       canStartMultiAI: true,
       autoCollapseThinking: true,
+      initialViewportAnchor: const <String, dynamic>{
+        'messageId': 'm1',
+        'offset': -16.0,
+      },
     );
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 2);
-    expect(snapshot['assetVersion'], 'web-chat-v9');
+    expect(snapshot['assetVersion'], 'web-chat-v10');
+    expect(snapshot['initialViewportAnchor'], <String, dynamic>{
+      'messageId': 'm1',
+      'offset': -16.0,
+    });
     expect((snapshot['user'] as Map)['name'], 'Ada');
     expect((snapshot['display'] as Map)['backgroundStyle'], 'frosted');
     expect((snapshot['display'] as Map)['backgroundOwner'], 'flutter');

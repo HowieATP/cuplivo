@@ -1226,7 +1226,13 @@ class HomePageController extends ChangeNotifier {
     try {
       await WidgetsBinding.instance.endOfFrame;
     } catch (_) {}
-    _scrollToBottom(animate: false);
+    final savedAnchor = _activeViewportPort.savedAnchorForConversation(id);
+    if (savedAnchor != null &&
+        _chatController.indexOfCollapsedMessageId(savedAnchor.messageId) >= 0) {
+      await _activeViewportPort.restoreAnchor(savedAnchor);
+    } else {
+      _scrollToBottom(animate: false);
+    }
 
     if (!isDesktopPlatform) {
       try {

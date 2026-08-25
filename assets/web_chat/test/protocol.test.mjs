@@ -280,6 +280,19 @@ test('mobile shell owns vertical gestures and uses controlled disclosures', () =
   assert.match(appSource, /touchstart/);
 });
 
+test('pointer down cancels momentum before release while preserving a new drag', () => {
+  assert.match(appSource, /let scrollStopLock = false/);
+  assert.match(appSource, /function stopScrolling[\s\S]*?scrollStopLock = true/);
+  assert.match(appSource, /function releaseScrollStopLock/);
+  assert.match(appSource, /scrollStopLock[\s\S]*?requestAnimationFrame/);
+  assert.match(appSource, /touchmove[\s\S]*?releaseScrollStopLock\(\)/);
+  assert.match(appSource, /touchend[\s\S]*?releaseScrollStopLock\(\)/);
+  assert.match(appSource, /touchcancel[\s\S]*?releaseScrollStopLock\(\)/);
+  const touchStart = appSource.indexOf("timeline.addEventListener('touchstart'");
+  const touchStartBody = appSource.slice(touchStart, touchStart + 500);
+  assert.match(touchStartBody, /touchActive = true[\s\S]*?stopScrolling\(\)/);
+});
+
 test('virtual DOM replacement captures scroll state first and applies Flutter insets', () => {
   const captureIndex = appSource.indexOf('captureViewport(timeline');
   const themeIndex = appSource.indexOf('applyTheme();', captureIndex);

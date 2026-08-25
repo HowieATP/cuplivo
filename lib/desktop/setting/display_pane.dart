@@ -55,13 +55,6 @@ class _DisplaySettingsBody extends StatelessWidget {
               _SettingsCard(
                 title: l10n.displaySettingsPageChatItemDisplayTitle,
                 children: [
-                  if (supportsWebConversationViewport(
-                    isWeb: kIsWeb,
-                    platform: defaultTargetPlatform,
-                  )) ...[
-                    const _ToggleRowExperimentalWebViewRendering(),
-                    const _RowDivider(),
-                  ],
                   const _ToggleRowShowProviderInCapsule(),
                   const _RowDivider(),
                   const _ToggleRowShowUserAvatar(),
@@ -88,18 +81,25 @@ class _DisplaySettingsBody extends StatelessWidget {
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.displaySettingsPageRenderingSettingsTitle,
-                children: const [
-                  _ToggleRowDollarLatex(),
-                  _RowDivider(),
-                  _ToggleRowMathRendering(),
-                  _RowDivider(),
-                  _ToggleRowUserMarkdown(),
-                  _RowDivider(),
-                  _ToggleRowReasoningMarkdown(),
-                  _RowDivider(),
-                  _ToggleRowAssistantMarkdown(),
-                  _RowDivider(),
-                  _AutoCollapseCodeBlocksSection(),
+                children: [
+                  if (supportsWebConversationViewport(
+                    isWeb: kIsWeb,
+                    platform: defaultTargetPlatform,
+                  )) ...[
+                    const _ToggleRowExperimentalWebViewRendering(),
+                    const _RowDivider(),
+                  ],
+                  const _ToggleRowDollarLatex(),
+                  const _RowDivider(),
+                  const _ToggleRowMathRendering(),
+                  const _RowDivider(),
+                  const _ToggleRowUserMarkdown(),
+                  const _RowDivider(),
+                  const _ToggleRowReasoningMarkdown(),
+                  const _RowDivider(),
+                  const _ToggleRowAssistantMarkdown(),
+                  const _RowDivider(),
+                  const _AutoCollapseCodeBlocksSection(),
                 ],
               ),
               const SizedBox(height: 16),

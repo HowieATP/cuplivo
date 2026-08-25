@@ -1755,24 +1755,6 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
-              if (supportsWebConversationViewport(
-                isWeb: kIsWeb,
-                platform: defaultTargetPlatform,
-              )) ...[
-                _iosSwitchRow(
-                  context,
-                  icon: Lucide.Globe,
-                  label:
-                      l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
-                  subtitle: l10n
-                      .displaySettingsPageExperimentalWebViewRenderingSubtitle,
-                  value: sp.experimentalWebViewRendering,
-                  onChanged: (value) => context
-                      .read<SettingsProvider>()
-                      .setExperimentalWebViewRendering(value),
-                ),
-                _iosDivider(context),
-              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.User,
@@ -1898,6 +1880,24 @@ class RenderingSettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
+              if (supportsWebConversationViewport(
+                isWeb: kIsWeb,
+                platform: defaultTargetPlatform,
+              )) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Globe,
+                  label:
+                      l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
+                  subtitle: l10n
+                      .displaySettingsPageExperimentalWebViewRenderingSubtitle,
+                  value: sp.experimentalWebViewRendering,
+                  onChanged: (value) => context
+                      .read<SettingsProvider>()
+                      .setExperimentalWebViewRendering(value),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Hash,

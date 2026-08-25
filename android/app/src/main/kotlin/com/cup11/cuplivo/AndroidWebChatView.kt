@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
@@ -34,6 +35,8 @@ private const val FLUTTER_ASSET_PREFIX = "flutter_assets/assets/"
 private const val WEB_CHAT_ASSET_PREFIX = "${FLUTTER_ASSET_PREFIX}web_chat/"
 private const val MERMAID_ASSET_PATH = "${FLUTTER_ASSET_PREFIX}mermaid.min.js"
 private const val LOG_TAG = "CuplivoWebChat"
+private const val STOP_WEB_SCROLLING_SCRIPT =
+  "window.CuplivoWeb?.stopScrolling?.();"
 
 internal fun isAllowedWebChatAssetPath(path: String): Boolean {
   if (path.contains("..") || path.startsWith('/')) return false
@@ -135,6 +138,12 @@ private class AndroidWebChatPlatformView(
       setSupportMultipleWindows(false)
       mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
       mediaPlaybackRequiresUserGesture = true
+    }
+    webView.setOnTouchListener { _, event ->
+      if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+        webView.evaluateJavascript(STOP_WEB_SCROLLING_SCRIPT, null)
+      }
+      false
     }
     if (supportsSecureBridge) {
       WebViewCompat.addWebMessageListener(

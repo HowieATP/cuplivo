@@ -35,6 +35,11 @@ let topSpacer = null;
 let bottomSpacer = null;
 let touchStartY = null;
 let touchActive = false;
+let pointerStartY = null;
+let scrollStopLock = false;
+let scrollStopFrame = 0;
+let scrollStopTop = 0;
+let scrollStopLeft = 0;
 let renderedSessionId = null;
 let reasoningElapsedTimer = null;
 
@@ -1036,13 +1041,32 @@ const sendViewportMetrics = createFrameCoalescer(() => {
     anchorOffset: anchor?.offset ?? 0,
   });
 });
+function releaseScrollStopLock() {
+  scrollStopLock = false;
+  if (scrollStopFrame) {
+    cancelAnimationFrame(scrollStopFrame);
+    scrollStopFrame = 0;
+  }
+}
+function enforceScrollStop() {
+  if (!scrollStopLock) {
+    scrollStopFrame = 0;
+    return;
+  }
+  if (timeline.scrollTop !== scrollStopTop || timeline.scrollLeft !== scrollStopLeft) {
+    timeline.scrollTo({ left: scrollStopLeft, top: scrollStopTop, behavior: 'auto' });
+  }
+  scrollStopFrame = requestAnimationFrame(enforceScrollStop);
+}
 function stopScrolling() {
-  const top = timeline.scrollTop;
-  const left = timeline.scrollLeft;
+  scrollStopLock = true;
+  scrollStopTop = timeline.scrollTop;
+  scrollStopLeft = timeline.scrollLeft;
   timeline.style.scrollBehavior = 'auto';
-  timeline.scrollTo({ left, top, behavior: 'auto' });
-  timeline.scrollLeft = left;
-  timeline.scrollTop = top;
+  timeline.scrollTo({ left: scrollStopLeft, top: scrollStopTop, behavior: 'auto' });
+  timeline.scrollLeft = scrollStopLeft;
+  timeline.scrollTop = scrollStopTop;
+  if (!scrollStopFrame) scrollStopFrame = requestAnimationFrame(enforceScrollStop);
 }
 function markUserScroll() {
   const firstIntent = !userScrolling;
@@ -1057,10 +1081,27 @@ function markUserScroll() {
   }, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
-timeline.addEventListener('pointerdown', stopScrolling, { passive: true });
-timeline.addEventListener('touchstart', (event) => {
+timeline.addEventListener('pointerdown', (event) => {
+  pointerStartY = event.clientY;
   stopScrolling();
+}, { passive: true });
+timeline.addEventListener('pointermove', (event) => {
+  if (pointerStartY != null && Math.abs(event.clientY - pointerStartY) >= 3) {
+    releaseScrollStopLock();
+    pointerStartY = event.clientY;
+  }
+}, { passive: true });
+timeline.addEventListener('pointerup', () => {
+  pointerStartY = null;
+  releaseScrollStopLock();
+}, { passive: true });
+timeline.addEventListener('pointercancel', () => {
+  pointerStartY = null;
+  releaseScrollStopLock();
+}, { passive: true });
+timeline.addEventListener('touchstart', (event) => {
   touchActive = true;
+  stopScrolling();
   setRenderBlocked(true);
   touchStartY = event.touches[0]?.clientY ?? null;
 }, { passive: true });
@@ -1068,16 +1109,19 @@ timeline.addEventListener('touchmove', (event) => {
   const current = event.touches[0]?.clientY;
   if (touchStartY != null && current != null &&
       Math.abs(current - touchStartY) >= 3) {
+    releaseScrollStopLock();
     markUserScroll();
     touchStartY = current;
   }
 }, { passive: true });
 timeline.addEventListener('touchend', () => {
+  releaseScrollStopLock();
   touchActive = false;
   touchStartY = null;
   if (!userScrolling) setRenderBlocked(false);
 }, { passive: true });
 timeline.addEventListener('touchcancel', () => {
+  releaseScrollStopLock();
   touchActive = false;
   touchStartY = null;
   if (!userScrolling) setRenderBlocked(false);

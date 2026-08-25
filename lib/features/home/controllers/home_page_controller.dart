@@ -133,7 +133,7 @@ class HomePageController extends ChangeNotifier {
   final FocusNode _inputFocus;
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
-  final ScrollController _scrollController;
+  ScrollController _scrollController;
 
   // ============================================================================
   // Services & Controllers (created internally)
@@ -501,7 +501,12 @@ class HomePageController extends ChangeNotifier {
         );
       }
     };
-    _viewModel.onScrollToBottom = () => _scrollToBottomSoon();
+    _viewModel.onScrollToBottom = () {
+      _scrollCtrl.resetUserScrolling();
+      _scrollCtrl.scrollToBottom(
+        animate: !_chatController.isCurrentConversationLoading,
+      );
+    };
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -510,11 +515,12 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollToBottom(animate: false);
+      _scrollCtrl.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
       notifyListeners();
+      _scrollCtrl.stickToBottomAfterGeneration();
     };
     _viewModel.onAssistantMessageFinished = _handleAssistantMessageFinished;
   }
@@ -536,7 +542,19 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
+      getTopRevealInset: () =>
+          kToolbarHeight + MediaQuery.paddingOf(_context).top,
+      isGenerating: () => _chatController.isCurrentConversationLoading,
     );
+  }
+
+  /// Give a newly opened conversation its own scroll state.
+  void replaceScrollController(ScrollController controller) {
+    if (identical(_scrollController, controller)) return;
+    _scrollCtrl.dispose();
+    _scrollController = controller;
+    _initializeScrollController();
+    _scrollCtrl.positionAtBottomOnNextLayout();
   }
 
   void _initializeProviders() {
@@ -1191,7 +1209,6 @@ class HomePageController extends ChangeNotifier {
     }
 
     await _viewModel.switchConversation(id);
-    _scrollCtrl.clearObserverCache();
     recoverMultiAIState();
     _syncHeadlessChunks();
     notifyListeners();
@@ -1255,7 +1272,6 @@ class HomePageController extends ChangeNotifier {
       _mediaController.restoreInput(initialDraft);
       notifyListeners();
     }
-    _scrollCtrl.clearObserverCache();
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.forward();
@@ -2591,10 +2607,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> scrollToMessageId(String targetId) async {
     if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
-      final loaded = _viewModel.loadUntilMessageVisible(targetId);
-      if (loaded) {
-        _scrollCtrl.clearObserverCache();
-      }
+      _viewModel.loadUntilMessageVisible(targetId);
       try {
         await WidgetsBinding.instance.endOfFrame;
       } catch (_) {}
@@ -2623,7 +2636,6 @@ class HomePageController extends ChangeNotifier {
       final loaded = _chatController.loadStartWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
     _scrollCtrl.scrollToTop(animate: animate);
@@ -2634,7 +2646,6 @@ class HomePageController extends ChangeNotifier {
       final loaded = _chatController.loadEndWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
     _scrollToBottom(animate: animate);

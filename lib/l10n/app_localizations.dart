@@ -3349,44 +3349,80 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditMemoryVariableHint.
   ///
   /// In en, this message translates to:
-  /// **'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.'**
+  /// **'Including time variables reduces cache hit rate. If the model needs to know the current time, remove these variables and use \"Append current time\" in the Prompt tab instead.'**
   String get assistantEditMemoryVariableHint;
 
-  /// No description provided for @assistantEditTimeInjectionTitle.
+  /// No description provided for @assistantEditPromptTimeVarWarning.
   ///
   /// In en, this message translates to:
-  /// **'Smart Time Injection'**
-  String get assistantEditTimeInjectionTitle;
+  /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \'Append current time\' toggle below instead.'**
+  String get assistantEditPromptTimeVarWarning;
 
-  /// No description provided for @assistantEditTimeInjectionDescription.
+  /// No description provided for @assistantEditPromptAppendTimeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Append timestamp after each user message. Cache-friendly. Bypasses message template.'**
-  String get assistantEditTimeInjectionDescription;
+  /// **'Append current time'**
+  String get assistantEditPromptAppendTimeTitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningTitle.
+  /// No description provided for @assistantEditPromptAppendTimeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Volatile Variables Detected'**
-  String get assistantEditTimeInjectionWarningTitle;
+  /// **'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.'**
+  String get assistantEditPromptAppendTimeSubtitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningContent.
+  /// No description provided for @assistantEditPromptAppendTimeInfoTitle.
   ///
   /// In en, this message translates to:
-  /// **'For optimal cache results, consider removing the following volatile variables:'**
-  String get assistantEditTimeInjectionWarningContent;
+  /// **'Appended time format'**
+  String get assistantEditPromptAppendTimeInfoTitle;
 
-  /// No description provided for @assistantEditTimeInjectionTemplateDisabled.
+  /// No description provided for @assistantEditPromptAppendTimeInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'Message template is disabled when Smart Time Injection is active.'**
-  String get assistantEditTimeInjectionTemplateDisabled;
+  /// **'When enabled, a blank line and then the following line are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message\'s own send time, so it stays stable when you retry.'**
+  String assistantEditPromptAppendTimeInfoBody(Object example);
 
-  /// No description provided for @assistantEditMemoryRecordPromptLabel.
+  /// No description provided for @assistantEditPromptAppendTimeInfoClose.
   ///
   /// In en, this message translates to:
-  /// **'Memory Record Prompt'**
-  String get assistantEditMemoryRecordPromptLabel;
+  /// **'Got it'**
+  String get assistantEditPromptAppendTimeInfoClose;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt contains time variables'**
+  String get assistantEditPromptTimeVarDialogTitle;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using Append current time instead - it puts the time at the end of the request, off the cached prefix.'**
+  String assistantEditPromptTimeVarDialogBody(Object variables);
+
+  /// No description provided for @assistantEditPromptTimeVarDialogRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Go remove'**
+  String get assistantEditPromptTimeVarDialogRemove;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable anyway'**
+  String get assistantEditPromptTimeVarDialogKeep;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogMemoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Time variables in the memory record prompt (e.g. current_hour, current_datetime) hurt cache hits the same way - consider removing them too.'**
+  String get assistantEditPromptTimeVarDialogMemoryHint;
+
+  /// No description provided for @assistantEditPromptAppendTimeTemplateDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Message template is disabled while Append current time is active.'**
+  String get assistantEditPromptAppendTimeTemplateDisabled;
 
   /// No description provided for @assistantEditMessageTemplateTitle.
   ///
@@ -6397,6 +6433,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add'**
   String get chatInputBarMoreTooltip;
+
+  /// No description provided for @chatInputBarCustomizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize Input Bar'**
+  String get chatInputBarCustomizeTitle;
+
+  /// No description provided for @chatInputBarCustomizeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder. Turn off a switch to tuck a button into \"+ More\"; it stays reachable from there.'**
+  String get chatInputBarCustomizeSubtitle;
+
+  /// No description provided for @chatInputBarCustomizeAtLeastOneVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one button directly visible'**
+  String get chatInputBarCustomizeAtLeastOneVisible;
+
+  /// No description provided for @chatInputBarCustomizeResetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get chatInputBarCustomizeResetTooltip;
+
+  /// No description provided for @chatInputBarCustomizeMenuAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize'**
+  String get chatInputBarCustomizeMenuAction;
 
   /// No description provided for @chatInputBarVoiceCancelTooltip.
   ///
@@ -11848,6 +11914,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
+
+  /// No description provided for @assistantEditLocalToolScreenTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen Time'**
+  String get assistantEditLocalToolScreenTimeTitle;
+
+  /// No description provided for @assistantEditLocalToolScreenTimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query app screen usage on this device, requires the Usage access permission.'**
+  String get assistantEditLocalToolScreenTimeSubtitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarQueryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query Calendar'**
+  String get assistantEditLocalToolCalendarQueryTitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarQuerySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read calendar events on this device, requires the calendar permission.'**
+  String get assistantEditLocalToolCalendarQuerySubtitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Event'**
+  String get assistantEditLocalToolCalendarCreateTitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create calendar events on this device with your confirmation, requires the calendar permission.'**
+  String get assistantEditLocalToolCalendarCreateSubtitle;
+
+  /// No description provided for @chatMessageWidgetScreenTimeTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total screen time'**
+  String get chatMessageWidgetScreenTimeTotal;
+
+  /// No description provided for @chatMessageWidgetScreenTimePermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage access permission is not granted. Please enable it in system settings and try again.'**
+  String get chatMessageWidgetScreenTimePermissionRequired;
+
+  /// No description provided for @chatMessageWidgetCalendarPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar permission was denied. Enable calendar access in system settings, then toggle the tool again.'**
+  String get chatMessageWidgetCalendarPermissionDenied;
 
   /// No description provided for @assistantEditLocalToolHandoffTitle.
   ///

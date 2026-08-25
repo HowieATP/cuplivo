@@ -12,11 +12,13 @@ import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
-import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/cherry_importer.dart';
+import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/restore_refresher.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/loading_dialog_card.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../shared/dialogs/restart_required_dialog.dart';
@@ -36,6 +38,39 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
+  /// Runs a backup task behind a modal dialog with a live stage label
+  /// (生成文件 → 整合压缩 → 上传) and an elapsed-seconds ticker. Throws
+  /// propagate to the caller after the dialog pops.
+  Future<T> _runStageTask<T>(
+    BuildContext context,
+    Future<T> Function(BackupStageCallback onStage) task, {
+    String? label,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final stageLabel = ValueNotifier<String>(l10n.backupStageGenerating);
+    try {
+      return await runWithLoadingDialog(
+        context,
+        () => task((stage) => stageLabel.value = backupStageLabel(l10n, stage)),
+        label: label ?? l10n.backupPageExporting,
+        elapsedTextBuilder: l10n.backupPageExportElapsed,
+        labelListenable: stageLabel,
+      );
+    } finally {
+      stageLabel.dispose();
+    }
+  }
+
+  /// Best-effort: recording the backup reminder is a non-critical side effect
+  /// after a success — its failure must not surface as an error snackbar.
+  Future<void> _recordReminderQuietly(BuildContext context) async {
+    try {
+      await context.read<BackupReminderProvider>().recordBackupCompleted();
+    } catch (e) {
+      debugPrint('BackupExport: recordBackupCompleted failed: $e');
+    }
+  }
+
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -521,16 +556,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 : () async {
                                     final backupProvider = context
                                         .read<BackupProvider>();
-                                    final reminderProvider = context
-                                        .read<BackupReminderProvider>();
                                     await _saveConfig();
-                                    final success = await backupProvider
-                                        .backup();
+                                    if (!context.mounted) return;
+                                    final success = await _runStageTask(
+                                      context,
+                                      (onStage) => backupProvider.backup(
+                                        onStage: onStage,
+                                      ),
+                                    );
                                     if (!context.mounted) return;
                                     final rawMessage = backupProvider.message;
                                     if (success) {
-                                      await reminderProvider
-                                          .recordBackupCompleted();
+                                      await _recordReminderQuietly(context);
                                       if (!context.mounted) return;
                                     }
                                     final message =
@@ -567,8 +604,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     if (config == null || !context.mounted) {
                                       return;
                                     }
-                                    final success = await backupProvider
-                                        .incrementalBackup(config);
+                                    final success = await _runStageTask(
+                                      context,
+                                      (onStage) =>
+                                          backupProvider.incrementalBackup(
+                                            config,
+                                            onStage: onStage,
+                                          ),
+                                    );
                                     if (!context.mounted) return;
                                     if (success && config.updateBackupTime) {
                                       await context
@@ -822,16 +865,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 : () async {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
-                                    final reminderProvider = context
-                                        .read<BackupReminderProvider>();
                                     await _saveS3Config();
-                                    final success = await s3BackupProvider
-                                        .backup();
+                                    if (!context.mounted) return;
+                                    final success = await _runStageTask(
+                                      context,
+                                      (onStage) => s3BackupProvider.backup(
+                                        onStage: onStage,
+                                      ),
+                                    );
                                     if (!context.mounted) return;
                                     final rawMessage = s3BackupProvider.message;
                                     if (success) {
-                                      await reminderProvider
-                                          .recordBackupCompleted();
+                                      await _recordReminderQuietly(context);
                                       if (!context.mounted) return;
                                     }
                                     final message =
@@ -868,8 +913,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     if (config == null || !context.mounted) {
                                       return;
                                     }
-                                    final success = await s3BackupProvider
-                                        .incrementalBackup(config);
+                                    final success = await _runStageTask(
+                                      context,
+                                      (onStage) =>
+                                          s3BackupProvider.incrementalBackup(
+                                            config,
+                                            onStage: onStage,
+                                          ),
+                                    );
                                     if (!context.mounted) return;
                                     if (success && config.updateBackupTime) {
                                       await context
@@ -935,23 +986,83 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     : () async {
                         final backupProvider = context.read<BackupProvider>();
                         await _saveConfig();
-                        final file = await backupProvider.exportToFile();
-                        String? savePath = await FilePicker.platform.saveFile(
-                          dialogTitle: l10n.backupPageExportToFile,
-                          fileName: file.uri.pathSegments.last,
-                          type: FileType.custom,
-                          allowedExtensions: ['zip'],
-                        );
-                        if (savePath != null) {
+                        if (!context.mounted) return;
+                        final File file;
+                        final stopwatch = Stopwatch()..start();
+                        try {
+                          debugPrint('BackupExport: pack begin');
+                          file = await _runStageTask(
+                            context,
+                            (onStage) =>
+                                backupProvider.exportToFile(onStage: onStage),
+                          );
+                          stopwatch.stop();
+                          debugPrint(
+                            'BackupExport: pack done in '
+                            '${stopwatch.elapsedMilliseconds} ms -> '
+                            '${file.path}',
+                          );
+                        } catch (e) {
+                          debugPrint(
+                            'BackupExport: pack failed after '
+                            '${stopwatch.elapsedMilliseconds} ms: $e',
+                          );
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            message: l10n.backupPageExportFailed(e.toString()),
+                            type: NotificationType.error,
+                          );
+                          return;
+                        }
+                        try {
+                          final String? savePath;
                           try {
-                            await File(savePath).parent.create(recursive: true);
-                            await file.copy(savePath);
-                            if (context.mounted) {
-                              await context
-                                  .read<BackupReminderProvider>()
-                                  .recordBackupCompleted();
+                            savePath = await FilePicker.platform.saveFile(
+                              dialogTitle: l10n.backupPageExportToFile,
+                              fileName: file.uri.pathSegments.last,
+                              type: FileType.custom,
+                              allowedExtensions: ['zip'],
+                            );
+                            debugPrint(
+                              'BackupExport: FilePicker result=$savePath',
+                            );
+                          } catch (e) {
+                            debugPrint('BackupExport: picker failed: $e');
+                            if (!context.mounted) return;
+                            showAppSnackBar(
+                              context,
+                              message: l10n.backupPageExportFailed(
+                                e.toString(),
+                              ),
+                              type: NotificationType.error,
+                            );
+                            return;
+                          }
+                          if (savePath != null) {
+                            try {
+                              await File(
+                                savePath,
+                              ).parent.create(recursive: true);
+                              await file.copy(savePath);
+                              debugPrint('BackupExport: copied to $savePath');
+                              if (context.mounted) {
+                                await _recordReminderQuietly(context);
+                              }
+                            } catch (e) {
+                              debugPrint('BackupExport: copy failed: $e');
+                              if (!context.mounted) return;
+                              showAppSnackBar(
+                                context,
+                                message: l10n.backupPageExportFailed(
+                                  e.toString(),
+                                ),
+                                type: NotificationType.error,
+                              );
                             }
-                          } catch (_) {}
+                          }
+                        } finally {
+                          await DataSync.cleanupTemporaryBackupFile(file);
                         }
                       },
               ),

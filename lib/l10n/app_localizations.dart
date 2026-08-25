@@ -3988,6 +3988,36 @@ abstract class AppLocalizations {
   /// **'Exporting...'**
   String get backupPageExporting;
 
+  /// No description provided for @backupPageExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String backupPageExportFailed(Object error);
+
+  /// No description provided for @backupPageExportElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed {seconds}s'**
+  String backupPageExportElapsed(Object seconds);
+
+  /// No description provided for @backupStageGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing files...'**
+  String get backupStageGenerating;
+
+  /// No description provided for @backupStagePacking.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing backup...'**
+  String get backupStagePacking;
+
+  /// No description provided for @backupStageUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading...'**
+  String get backupStageUploading;
+
   /// No description provided for @backupPageExportToFile.
   ///
   /// In en, this message translates to:

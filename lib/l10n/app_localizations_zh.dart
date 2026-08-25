@@ -2084,6 +2084,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExporting => '正在导出...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗时 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在生成文件...';
+
+  @override
+  String get backupStagePacking => '正在整合压缩...';
+
+  @override
+  String get backupStageUploading => '正在上传...';
+
+  @override
   String get backupPageExportToFile => '导出为文件';
 
   @override
@@ -10655,6 +10674,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExporting => '正在导出...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗时 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在生成文件...';
+
+  @override
+  String get backupStagePacking => '正在整合压缩...';
+
+  @override
+  String get backupStageUploading => '正在上传...';
+
+  @override
   String get backupPageExportToFile => '导出为文件';
 
   @override
@@ -19224,6 +19262,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageExporting => '正在匯出...';
+
+  @override
+  String backupPageExportFailed(Object error) {
+    return '匯出失敗：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗時 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在產生檔案...';
+
+  @override
+  String get backupStagePacking => '正在整合壓縮...';
+
+  @override
+  String get backupStageUploading => '正在上傳...';
 
   @override
   String get backupPageExportToFile => '匯出為檔案';

@@ -1,17 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../animations/widgets.dart';
 
-class LoadingDialogCard extends StatelessWidget {
-  const LoadingDialogCard({super.key, this.label});
+class LoadingDialogCard extends StatefulWidget {
+  const LoadingDialogCard({super.key, this.label, this.elapsedTextBuilder});
 
   final String? label;
+
+  /// When non-null, the card shows a live "elapsed seconds" line that ticks
+  /// every second. Null keeps the card static (no timer).
+  final String Function(int seconds)? elapsedTextBuilder;
+
+  @override
+  State<LoadingDialogCard> createState() => _LoadingDialogCardState();
+}
+
+class _LoadingDialogCardState extends State<LoadingDialogCard> {
+  Timer? _timer;
+  int _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.elapsedTextBuilder != null) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _seconds++);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasLabel = label != null && label!.trim().isNotEmpty;
+    final label = widget.label;
+    final hasLabel = label != null && label.trim().isNotEmpty;
 
     return Center(
       child: TweenAnimationBuilder<double>(
@@ -51,11 +82,22 @@ class LoadingDialogCard extends StatelessWidget {
                     if (hasLabel) ...[
                       const SizedBox(height: 12),
                       Text(
-                        label!,
+                        label,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
                           color: cs.onSurface.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                    if (widget.elapsedTextBuilder != null) ...[
+                      SizedBox(height: hasLabel ? 4 : 12),
+                      Text(
+                        widget.elapsedTextBuilder!(_seconds),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],

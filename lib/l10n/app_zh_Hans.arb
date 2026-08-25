@@ -697,6 +697,8 @@
   "backupPageBackupUploaded": "已上传备份",
   "backupPageBackup": "立即备份",
   "backupPageExporting": "正在导出...",
+  "backupPageExportFailed": "导出失败：{error}",
+  "backupPageExportElapsed": "已耗时 {seconds} 秒",
   "backupPageExportToFile": "导出为文件",
   "backupPageExportToFileSubtitle": "导出APP数据为文件",
   "backupPageImportBackupFile": "备份文件导入",

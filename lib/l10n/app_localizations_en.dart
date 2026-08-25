@@ -2162,6 +2162,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExporting => 'Exporting...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return 'Elapsed ${seconds}s';
+  }
+
+  @override
   String get backupPageExportToFile => 'Export to File';
 
   @override

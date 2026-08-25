@@ -181,13 +181,15 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<T> _runWithExportingOverlay<T>(
     BuildContext context,
-    Future<T> Function() task,
-  ) async {
+    Future<T> Function() task, {
+    String Function(int seconds)? elapsedTextBuilder,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     return _runWithLoadingOverlay(
       context,
       task,
       label: l10n.backupPageExporting,
+      elapsedTextBuilder: elapsedTextBuilder,
     );
   }
 
@@ -195,11 +197,15 @@ class _BackupPageState extends State<BackupPage> {
     BuildContext context,
     Future<T> Function() task, {
     String? label,
+    String Function(int seconds)? elapsedTextBuilder,
   }) async {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => LoadingDialogCard(label: label),
+      builder: (ctx) => LoadingDialogCard(
+        label: label,
+        elapsedTextBuilder: elapsedTextBuilder,
+      ),
     );
     try {
       final res = await task();
@@ -1360,30 +1366,53 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<void> _doExport(BuildContext context, BackupProvider vm) async {
     final l10n = AppLocalizations.of(context)!;
-    final file = await _runWithExportingOverlay(
-      context,
-      () => vm.exportToFile(),
-    );
+    final stopwatch = Stopwatch()..start();
+    final File file;
+    try {
+      debugPrint('BackupExport: pack begin');
+      file = await _runWithExportingOverlay(
+        context,
+        () => vm.exportToFile(),
+        elapsedTextBuilder: l10n.backupPageExportElapsed,
+      );
+      stopwatch.stop();
+      debugPrint(
+        'BackupExport: pack done in ${stopwatch.elapsedMilliseconds} ms -> '
+        '${file.path}',
+      );
+    } catch (e) {
+      debugPrint('BackupExport: pack failed: $e');
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageExportFailed(e.toString()),
+        type: NotificationType.error,
+      );
+      return;
+    }
 
     try {
       if (!context.mounted) return;
       final isMobile = Platform.isAndroid || Platform.isIOS;
       if (isMobile) {
         try {
+          debugPrint('BackupExport: opening system save dialog');
           final saved = await NativeFileSave.saveFileFromPath(
             sourcePath: file.path,
             fileName: file.uri.pathSegments.last,
           );
+          debugPrint('BackupExport: system save result=$saved');
           if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
                 .recordBackupCompleted();
           }
         } catch (e) {
+          debugPrint('BackupExport: system save failed: $e');
           if (!context.mounted) return;
           showAppSnackBar(
             context,
-            message: e.toString(),
+            message: l10n.backupPageExportFailed(e.toString()),
             type: NotificationType.error,
           );
         }
@@ -1398,12 +1427,21 @@ class _BackupPageState extends State<BackupPage> {
           try {
             await File(savePath).parent.create(recursive: true);
             await file.copy(savePath);
+            debugPrint('BackupExport: copied to $savePath');
             if (context.mounted) {
               await context
                   .read<BackupReminderProvider>()
                   .recordBackupCompleted();
             }
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('BackupExport: copy failed: $e');
+            if (!context.mounted) return;
+            showAppSnackBar(
+              context,
+              message: l10n.backupPageExportFailed(e.toString()),
+              type: NotificationType.error,
+            );
+          }
         }
       }
     } finally {

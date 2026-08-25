@@ -12,8 +12,9 @@ import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
-import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/cherry_importer.dart';
+import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/restore_refresher.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
@@ -935,23 +936,59 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     : () async {
                         final backupProvider = context.read<BackupProvider>();
                         await _saveConfig();
-                        final file = await backupProvider.exportToFile();
-                        String? savePath = await FilePicker.platform.saveFile(
-                          dialogTitle: l10n.backupPageExportToFile,
-                          fileName: file.uri.pathSegments.last,
-                          type: FileType.custom,
-                          allowedExtensions: ['zip'],
-                        );
-                        if (savePath != null) {
-                          try {
-                            await File(savePath).parent.create(recursive: true);
-                            await file.copy(savePath);
-                            if (context.mounted) {
-                              await context
-                                  .read<BackupReminderProvider>()
-                                  .recordBackupCompleted();
+                        final File file;
+                        final stopwatch = Stopwatch()..start();
+                        try {
+                          debugPrint('BackupExport: pack begin');
+                          file = await backupProvider.exportToFile();
+                          debugPrint(
+                            'BackupExport: pack done in '
+                            '${stopwatch.elapsedMilliseconds} ms -> '
+                            '${file.path}',
+                          );
+                        } catch (e) {
+                          debugPrint('BackupExport: pack failed: $e');
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            message: l10n.backupPageExportFailed(e.toString()),
+                            type: NotificationType.error,
+                          );
+                          return;
+                        }
+                        try {
+                          final savePath = await FilePicker.platform.saveFile(
+                            dialogTitle: l10n.backupPageExportToFile,
+                            fileName: file.uri.pathSegments.last,
+                            type: FileType.custom,
+                            allowedExtensions: ['zip'],
+                          );
+                          if (savePath != null) {
+                            try {
+                              await File(
+                                savePath,
+                              ).parent.create(recursive: true);
+                              await file.copy(savePath);
+                              debugPrint('BackupExport: copied to $savePath');
+                              if (context.mounted) {
+                                await context
+                                    .read<BackupReminderProvider>()
+                                    .recordBackupCompleted();
+                              }
+                            } catch (e) {
+                              debugPrint('BackupExport: copy failed: $e');
+                              if (!context.mounted) return;
+                              showAppSnackBar(
+                                context,
+                                message: l10n.backupPageExportFailed(
+                                  e.toString(),
+                                ),
+                                type: NotificationType.error,
+                              );
                             }
-                          } catch (_) {}
+                          }
+                        } finally {
+                          await DataSync.cleanupTemporaryBackupFile(file);
                         }
                       },
               ),

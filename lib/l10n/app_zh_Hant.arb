@@ -662,6 +662,8 @@
   "backupPageBackup": "立即備份",
   "backupPageExportToFile": "匯出為檔案",
   "backupPageExporting": "正在匯出...",
+  "backupPageExportFailed": "匯出失敗：{error}",
+  "backupPageExportElapsed": "已耗時 {seconds} 秒",
   "backupPageExportToFileSubtitle": "匯出APP資料為檔案",
   "backupPageImportBackupFile": "備份檔案匯入",
   "backupPageImportBackupFileSubtitle": "匯入本機備份檔案",

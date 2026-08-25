@@ -383,6 +383,63 @@ void main() {
     );
 
     test(
+      'pack prunes dot directories at walk time (same output set)',
+      () async {
+        // One visible file plus deep dot trees (.sandbox rootfs style and a
+        // .github dir). The pruned walk must pack exactly the visible file —
+        // identical to the old full-recursive walk + per-file dot filter.
+        final wsDir = Directory('${root.path}/workspaces/default');
+        await wsDir.create(recursive: true);
+        await File('${wsDir.path}/note.md').writeAsString('hello');
+        await File(
+          '${wsDir.path}/.github/workflows/release.yml',
+        ).create(recursive: true);
+        await File(
+          '${wsDir.path}/.sandbox/linux/usr/bin/python3',
+        ).create(recursive: true);
+        await File(
+          '${wsDir.path}/.sandbox/linux/usr/lib/libpython.so',
+        ).create(recursive: true);
+        final dotFile = File('${wsDir.path}/.gitignore');
+        await dotFile.writeAsString('ignored');
+
+        final sync = DataSync(chatService: ChatService());
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+        );
+
+        final input = InputFileStream(zipFile.path);
+        final Archive archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+        } finally {
+          await input.close();
+        }
+        expect(archive.findFile('workspaces/default/note.md'), isNotNull);
+        expect(
+          archive.findFile('workspaces/default/.github/workflows/release.yml'),
+          isNull,
+        );
+        expect(
+          archive.findFile('workspaces/default/.sandbox/linux/usr/bin/python3'),
+          isNull,
+        );
+        expect(
+          archive.findFile(
+            'workspaces/default/.sandbox/linux/usr/lib/libpython.so',
+          ),
+          isNull,
+        );
+        expect(archive.findFile('workspaces/default/.gitignore'), isNull);
+
+        // The count preview must agree (dots excluded, visible file counted).
+        final counted = await sync.countFilesForSince(DateTime(2026, 1, 1));
+        expect(counted.fileCount, 1);
+        expect(counted.totalBytes, 5);
+      },
+    );
+
+    test(
       'merge restore newer-wins survives odd-second mtimes (UT timestamp)',
       () async {
         // Round-trip through the PRODUCTION writer + extractor: a genuinely

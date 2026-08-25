@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Cuplivo/features/home/webview/android_web_chat_view.dart';
+import 'package:Cuplivo/shared/widgets/interactive_drawer.dart';
 
 void main() {
-  testWidgets('Android Web chat eagerly owns pointer sequences', (
+  testWidgets('Android Web chat only claims vertical drag gestures', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -19,6 +20,31 @@ void main() {
     final recognizers = view.gestureRecognizers;
     expect(recognizers, isNotNull);
     expect(recognizers, hasLength(1));
-    expect(recognizers!.single.constructor(), isA<EagerGestureRecognizer>());
+    final recognizer = recognizers!.single.constructor();
+    expect(recognizer, isA<VerticalDragGestureRecognizer>());
+    expect(recognizer, isNot(isA<EagerGestureRecognizer>()));
+  });
+
+  testWidgets('horizontal drag over Android Web chat opens the outer drawer', (
+    tester,
+  ) async {
+    final controller = InteractiveDrawerController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: InteractiveDrawer(
+          controller: controller,
+          drawerWidth: 300,
+          drawer: const ColoredBox(color: Colors.black),
+          child: AndroidWebChatView(onPlatformViewCreated: (_) {}),
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(AndroidView), const Offset(240, 0));
+    await tester.pumpAndSettle();
+
+    expect(controller.isOpen, isTrue);
   });
 }

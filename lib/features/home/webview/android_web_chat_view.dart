@@ -82,7 +82,7 @@ class AndroidWebChatView extends StatelessWidget {
     layoutDirection: Directionality.of(context),
     onPlatformViewCreated: onPlatformViewCreated,
     gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-      Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+      Factory<OneSequenceGestureRecognizer>(VerticalDragGestureRecognizer.new),
     },
   );
 }

@@ -1508,6 +1508,8 @@ class _HomePageState extends State<HomePage>
         showPresetToggle: showPresetToggle,
         user: user,
         ttsActive: ttsActive,
+        topContentPadding: topContentPadding,
+        bottomContentPadding: bottomContentPadding,
       );
       return WebConversationViewport(
         key: const ValueKey<String>('web-conversation-viewport'),
@@ -1669,6 +1671,8 @@ class _HomePageState extends State<HomePage>
     required bool showPresetToggle,
     required UserProvider user,
     required bool ttsActive,
+    required double topContentPadding,
+    required double bottomContentPadding,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
@@ -1810,6 +1814,8 @@ class _HomePageState extends State<HomePage>
         avatarValue: user.avatarValue,
       ),
       display: display,
+      topContentPadding: topContentPadding,
+      bottomContentPadding: bottomContentPadding,
       assistant: assistant,
       fontScale: settings.chatFontScale,
       canStartMultiAI: _controller.canStartMultiAIComparison,

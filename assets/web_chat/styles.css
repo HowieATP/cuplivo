@@ -26,6 +26,8 @@
   --cuplivo-font-scale: 1;
   --cuplivo-background-mask: transparent;
   --cuplivo-background-mask-opacity: 0;
+  --cuplivo-content-top-inset: 8px;
+  --cuplivo-content-bottom-inset: 8px;
 }
 
 * { box-sizing: border-box; }
@@ -65,9 +67,12 @@ button { -webkit-tap-highlight-color: transparent; }
   overflow-y: auto;
   overscroll-behavior-x: none;
   overscroll-behavior-y: contain;
+  overflow-anchor: none;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  padding: 8px max(0px, calc((100% - 900px) / 2));
+  padding-inline: max(0px, calc((100% - 900px) / 2));
+  padding-block: var(--cuplivo-content-top-inset) var(--cuplivo-content-bottom-inset);
+  scroll-padding-block: var(--cuplivo-content-top-inset) var(--cuplivo-content-bottom-inset);
   scrollbar-gutter: stable;
 }
 .spacer { width: 1px; }

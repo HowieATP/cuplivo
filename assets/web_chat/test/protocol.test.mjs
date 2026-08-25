@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   captureAnchor,
+  captureViewport,
   createExpansionCoordinator,
   createFrameCoalescer,
+  normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
+  restoreViewport,
   visibleRange,
 } from '../protocol.mjs';
 
@@ -33,14 +36,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v2', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v3', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v2',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v3',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -84,6 +87,15 @@ test('measured heights rebuild only when the visible range changes', () => {
     rangeChanged({ start: 4, end: 12 }, { start: 3, end: 12 }),
     true,
   );
+});
+
+test('content insets accept finite non-negative values only', () => {
+  assert.equal(normalizeContentInset(88), 88);
+  assert.equal(normalizeContentInset(-1), 8);
+  assert.equal(normalizeContentInset(Number.POSITIVE_INFINITY), 8);
+  assert.equal(normalizeContentInset('104'), 8);
+  assert.equal(normalizeContentInset(null), 8);
+  assert.equal(normalizeContentInset('invalid'), 8);
 });
 
 test('controlled expansion coalesces rapid clicks and ignores stale state', () => {
@@ -133,8 +145,87 @@ test('anchor capture and restore preserve the message offset', () => {
   const anchor = captureAnchor(container);
   assert.deepEqual(anchor, { id: 'b', offset: 8 });
   nodes[1].getBoundingClientRect = () => ({ top: 24, bottom: 124 });
-  restoreAnchor(container, anchor);
+  assert.equal(restoreAnchor(container, anchor), true);
   assert.equal(container.scrollTop, 106);
+});
+
+test('virtual rendering keeps the pre-replacement viewport position', () => {
+  let nodes = [
+    { dataset: { messageId: 'middle' }, getBoundingClientRect: () => ({ top: 10, bottom: 110 }) },
+  ];
+  const container = {
+    scrollTop: 12000,
+    scrollHeight: 36000,
+    clientHeight: 700,
+    getBoundingClientRect: () => ({ top: 0 }),
+    querySelectorAll: () => nodes,
+  };
+
+  const viewport = captureViewport(container);
+  container.scrollTop = 0;
+  container.scrollHeight = container.clientHeight;
+  nodes = [];
+
+  const range = visibleRange({
+    heights: new Array(360).fill(100),
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
+    overscan: 300,
+  });
+  assert.ok(range.start > 0);
+
+  container.scrollHeight = 36000;
+  restoreViewport(container, viewport);
+  assert.equal(container.scrollTop, 12000);
+});
+
+test('viewport restoration prefers anchors and clamps offset fallback', () => {
+  const replacement = {
+    dataset: { messageId: 'middle' },
+    getBoundingClientRect: () => ({ top: 30, bottom: 130 }),
+  };
+  let nodes = [replacement];
+  const container = {
+    scrollTop: 0,
+    scrollHeight: 900,
+    clientHeight: 700,
+    getBoundingClientRect: () => ({ top: 10 }),
+    querySelectorAll: () => nodes,
+  };
+
+  restoreViewport(container, {
+    scrollTop: 12000,
+    viewportHeight: 700,
+    anchor: { id: 'middle', offset: 5 },
+  });
+  assert.equal(container.scrollTop, 15);
+
+  nodes = [];
+  restoreViewport(container, {
+    scrollTop: 12000,
+    viewportHeight: 700,
+    anchor: { id: 'missing', offset: 0 },
+  });
+  assert.equal(container.scrollTop, 200);
+});
+
+test('a new render session starts with a fresh viewport', () => {
+  let queried = false;
+  const viewport = captureViewport({
+    scrollTop: 12000,
+    clientHeight: 700,
+    querySelectorAll: () => {
+      queried = true;
+      return [];
+    },
+  }, { preserve: false });
+
+  assert.deepEqual(viewport, {
+    scrollTop: 0,
+    viewportHeight: 700,
+    anchor: null,
+  });
+  assert.equal(queried, false);
 });
 
 test('mobile shell owns vertical gestures and uses controlled disclosures', () => {
@@ -142,6 +233,18 @@ test('mobile shell owns vertical gestures and uses controlled disclosures', () =
   assert.match(styleSource, /-webkit-overflow-scrolling:\s*touch/);
   assert.doesNotMatch(appSource, /createElement\(['"]details['"]\)/);
   assert.match(appSource, /setReasoningExpanded/);
+});
+
+test('virtual DOM replacement captures scroll state first and applies Flutter insets', () => {
+  const captureIndex = appSource.indexOf('captureViewport(timeline');
+  const themeIndex = appSource.indexOf('applyTheme();', captureIndex);
+  const replaceIndex = appSource.indexOf('timeline.replaceChildren(fragment)');
+  assert.ok(captureIndex >= 0 && themeIndex > captureIndex && replaceIndex > themeIndex);
+  assert.match(appSource, /document\.createDocumentFragment\(\)/);
+  assert.match(appSource, /restoreViewport\(timeline, viewport\)/);
+  assert.match(styleSource, /overflow-anchor:\s*none/);
+  assert.match(styleSource, /padding-block:\s*var\(--cuplivo-content-top-inset\)\s+var\(--cuplivo-content-bottom-inset\)/);
+  assert.match(styleSource, /scroll-padding-block:\s*var\(--cuplivo-content-top-inset\)\s+var\(--cuplivo-content-bottom-inset\)/);
 });
 
 test('message toolbar renders bundled Lucide icons instead of text actions', () => {

@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v2';
+export const ASSET_VERSION = 'web-chat-v3';
 
 const transfers = new Map();
 
@@ -84,6 +84,12 @@ export function visibleRange({ heights, scrollTop, viewportHeight, overscan = 70
 
 export function rangeChanged(previous, next) {
   return previous.start !== next.start || previous.end !== next.end;
+}
+
+export function normalizeContentInset(value, fallback = 8) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : fallback;
 }
 
 export function createExpansionCoordinator() {
@@ -187,12 +193,43 @@ export function captureAnchor(container) {
 }
 
 export function restoreAnchor(container, anchor) {
-  if (!anchor) return;
+  if (!anchor) return false;
   const node = [...container.querySelectorAll('[data-message-id]')]
     .find((item) => item.dataset.messageId === anchor.id);
-  if (!node) return;
+  if (!node) return false;
   const top = container.getBoundingClientRect().top;
   container.scrollTop += node.getBoundingClientRect().top - top - anchor.offset;
+  return true;
+}
+
+export function captureViewport(container, { preserve = true } = {}) {
+  const viewportHeight = normalizeContentInset(container.clientHeight, 0);
+  if (!preserve) {
+    return { scrollTop: 0, viewportHeight, anchor: null };
+  }
+  const rawScrollTop = Number(container.scrollTop);
+  return {
+    scrollTop: Number.isFinite(rawScrollTop) ? Math.max(0, rawScrollTop) : 0,
+    viewportHeight,
+    anchor: captureAnchor(container),
+  };
+}
+
+export function restoreViewport(container, viewport) {
+  if (!viewport || restoreAnchor(container, viewport.anchor)) return;
+  const rawScrollTop = Number(viewport.scrollTop);
+  const rawScrollHeight = Number(container.scrollHeight);
+  const rawClientHeight = Number(container.clientHeight);
+  const scrollTop = Number.isFinite(rawScrollTop)
+    ? Math.max(0, rawScrollTop)
+    : 0;
+  const scrollHeight = Number.isFinite(rawScrollHeight)
+    ? Math.max(0, rawScrollHeight)
+    : 0;
+  const clientHeight = Number.isFinite(rawClientHeight)
+    ? Math.max(0, rawClientHeight)
+    : 0;
+  container.scrollTop = Math.min(scrollTop, Math.max(0, scrollHeight - clientHeight));
 }
 
 export function createFrameCoalescer(callback, schedule = requestAnimationFrame) {

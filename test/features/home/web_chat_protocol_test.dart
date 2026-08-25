@@ -7,7 +7,7 @@ import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 void main() {
   test('Web chat protocol and bundled assets use version 2', () {
     expect(webChatProtocolVersion, 2);
-    expect(webChatAssetVersion, 'web-chat-v2');
+    expect(webChatAssetVersion, 'web-chat-v3');
   });
 
   group('Web chat transfer protocol', () {

@@ -2,12 +2,15 @@ import {
   ASSET_VERSION,
   PROTOCOL_VERSION,
   captureAnchor,
+  captureViewport,
   createExpansionCoordinator,
   createFrameCoalescer,
+  normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
+  restoreViewport,
   visibleRange,
 } from './protocol.mjs';
 
@@ -27,6 +30,7 @@ let renderedRange = { start: -1, end: -1 };
 let topSpacer = null;
 let bottomSpacer = null;
 let touchStartY = null;
+let renderedSessionId = null;
 
 const bridge = {
   post(message) {
@@ -47,6 +51,15 @@ function applyTheme() {
     document.documentElement.style.setProperty(`--cuplivo-${name}`, value);
   }
   document.documentElement.style.setProperty('--cuplivo-font-scale', String(state.fontScale ?? 1));
+  const insets = state.display?.contentInsets ?? {};
+  document.documentElement.style.setProperty(
+    '--cuplivo-content-top-inset',
+    `${normalizeContentInset(insets.top)}px`,
+  );
+  document.documentElement.style.setProperty(
+    '--cuplivo-content-bottom-inset',
+    `${normalizeContentInset(insets.bottom)}px`,
+  );
   document.body.dataset.backgroundStyle = state.display?.backgroundStyle ?? 'defaultStyle';
   document.body.dataset.dark = String(Boolean(state.display?.isDark));
   timeline.setAttribute('aria-label', t('timeline'));
@@ -758,20 +771,33 @@ function renderMessage(message) {
 
 function render() {
   if (!state) return;
-  const anchor = captureAnchor(timeline);
+  const viewport = captureViewport(timeline, {
+    preserve: renderedSessionId === state.renderSessionId,
+  });
+  applyTheme();
   resizeObserver?.disconnect();
   resizeObserver ??= new ResizeObserver(handleMeasuredHeights);
   const messages = state.messages ?? [];
-  timeline.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  const observedSlots = [];
   if (messages.length === 0) {
     renderedRange = { start: 0, end: 0 };
+    topSpacer = null;
+    bottomSpacer = null;
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.textContent = t('empty');
-    timeline.append(empty);
+    fragment.append(empty);
+    timeline.replaceChildren(fragment);
+    renderedSessionId = state.renderSessionId;
+    restoreViewport(timeline, viewport);
     return;
   }
-  const range = visibleRange({ heights: messages.map(messageHeight), scrollTop: timeline.scrollTop, viewportHeight: timeline.clientHeight });
+  const range = visibleRange({
+    heights: messages.map(messageHeight),
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
+  });
   renderedRange = { start: range.start, end: range.end };
   topSpacer = document.createElement('div');
   topSpacer.className = 'spacer';
@@ -779,12 +805,12 @@ function render() {
   bottomSpacer = document.createElement('div');
   bottomSpacer.className = 'spacer';
   bottomSpacer.style.height = `${range.bottom}px`;
-  timeline.append(topSpacer);
+  fragment.append(topSpacer);
   if (state.preset && range.start === 0) {
     const preset = document.createElement('div');
     preset.className = 'suggestions';
     preset.append(button(state.preset.label, () => sendAction('togglePresets'), 'suggestion'));
-    timeline.append(preset);
+    fragment.append(preset);
   }
   for (const message of messages.slice(range.start, range.end)) {
     const slot = document.createElement('div');
@@ -796,20 +822,26 @@ function render() {
       divider.textContent = t('contextDivider');
       slot.append(divider);
     }
-    const node = renderMessage(message); slot.append(node); timeline.append(slot); resizeObserver.observe(slot);
+    const node = renderMessage(message);
+    slot.append(node);
+    fragment.append(slot);
+    observedSlots.push(slot);
   }
-  timeline.append(bottomSpacer);
+  fragment.append(bottomSpacer);
   if (state.suggestions?.length) {
     const suggestions = document.createElement('div'); suggestions.className = 'suggestions';
     for (const suggestion of state.suggestions) suggestions.append(button(suggestion, () => sendAction('suggestion', null, { text: suggestion }), 'suggestion'));
-    timeline.append(suggestions);
+    fragment.append(suggestions);
   }
-  restoreAnchor(timeline, anchor);
+  timeline.replaceChildren(fragment);
+  for (const slot of observedSlots) resizeObserver.observe(slot);
+  renderedSessionId = state.renderSessionId;
+  restoreViewport(timeline, viewport);
 }
 
 function handleMeasuredHeights(entries) {
   if (!state?.messages?.length) return;
-  const anchor = captureAnchor(timeline);
+  const viewport = captureViewport(timeline);
   let changed = false;
   for (const entry of entries) {
     const id = entry.target.dataset.messageId;
@@ -824,8 +856,8 @@ function handleMeasuredHeights(entries) {
   if (!changed) return;
   const range = visibleRange({
     heights: state.messages.map(messageHeight),
-    scrollTop: timeline.scrollTop,
-    viewportHeight: timeline.clientHeight,
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
   });
   if (rangeChanged(renderedRange, range)) {
     scheduleRender();
@@ -833,7 +865,7 @@ function handleMeasuredHeights(entries) {
   }
   if (topSpacer) topSpacer.style.height = `${range.top}px`;
   if (bottomSpacer) bottomSpacer.style.height = `${range.bottom}px`;
-  restoreAnchor(timeline, anchor);
+  restoreViewport(timeline, viewport);
   sendViewportMetrics();
 }
 
@@ -953,7 +985,6 @@ window.CuplivoWeb = {
           if (state && payload.renderSessionId === state.renderSessionId && payload.conversationId === state.conversationId) {
             state = { ...state, media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl } };
             pendingMedia.delete(payload.handle);
-            if (payload.handle === state.assistant?.background) applyTheme();
             scheduleRender();
           }
         } else {
@@ -966,7 +997,7 @@ window.CuplivoWeb = {
             pendingMedia.clear();
             heights.clear();
           }
-          applyTheme(); scheduleRender();
+          scheduleRender();
         }
       } else if (envelope.type === 'messagePatches') {
         state = reduceEnvelope(state, envelope); scheduleRender();

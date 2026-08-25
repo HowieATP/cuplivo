@@ -38,11 +38,20 @@ class WebChatSnapshotBuilder {
     required Map<String, String> theme,
     required Map<String, dynamic> user,
     required Map<String, dynamic> display,
+    required double topContentPadding,
+    required double bottomContentPadding,
     required Assistant? assistant,
     required double fontScale,
     required bool canStartMultiAI,
     required bool autoCollapseThinking,
   }) {
+    final snapshotDisplay = <String, dynamic>{
+      ...display,
+      'contentInsets': <String, double>{
+        'top': _contentInset(topContentPadding),
+        'bottom': _contentInset(bottomContentPadding),
+      },
+    };
     return <String, dynamic>{
       'type': 'snapshot',
       'protocolVersion': webChatProtocolVersion,
@@ -67,7 +76,7 @@ class WebChatSnapshotBuilder {
             showContextDivider:
                 truncCollapsedIndex >= 0 && index == truncCollapsedIndex,
             assistant: assistant,
-            display: display,
+            display: snapshotDisplay,
             autoCollapseThinking: autoCollapseThinking,
           ),
       ],
@@ -77,7 +86,7 @@ class WebChatSnapshotBuilder {
       'strings': strings,
       'theme': theme,
       'user': user,
-      'display': display,
+      'display': snapshotDisplay,
       'fontScale': fontScale,
       'canStartMultiAI': canStartMultiAI,
       'assistant': <String, dynamic>{
@@ -90,6 +99,9 @@ class WebChatSnapshotBuilder {
       },
     };
   }
+
+  double _contentInset(double value) =>
+      value.isFinite && value >= 0 ? value : 0;
 
   Map<String, dynamic> _message(
     ChatMessage message, {

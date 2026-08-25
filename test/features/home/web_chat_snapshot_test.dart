@@ -64,6 +64,8 @@ void main() {
         'showUserMessageActions': true,
         'showTokenStats': true,
       },
+      topContentPadding: 72,
+      bottomContentPadding: 104,
       assistant: Assistant(
         id: 'a1',
         name: 'Assistant',
@@ -77,9 +79,13 @@ void main() {
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 2);
-    expect(snapshot['assetVersion'], 'web-chat-v2');
+    expect(snapshot['assetVersion'], 'web-chat-v3');
     expect((snapshot['user'] as Map)['name'], 'Ada');
     expect((snapshot['display'] as Map)['backgroundStyle'], 'frosted');
+    expect((snapshot['display'] as Map)['contentInsets'], <String, double>{
+      'top': 72,
+      'bottom': 104,
+    });
     expect((snapshot['assistant'] as Map)['avatar'], startsWith('local:'));
     expect((snapshot['assistant'] as Map)['avatar'], isNot(contains('server')));
     expect(rendered['content'], 'Visible answer');
@@ -134,6 +140,8 @@ void main() {
       theme: const <String, String>{},
       user: const <String, dynamic>{'name': 'User'},
       display: const <String, dynamic>{'showUserMessageActions': false},
+      topContentPadding: 0,
+      bottomContentPadding: 0,
       assistant: null,
       fontScale: 1,
       canStartMultiAI: false,

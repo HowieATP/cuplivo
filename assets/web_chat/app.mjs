@@ -2,7 +2,9 @@ import {
   ASSET_VERSION,
   PROTOCOL_VERSION,
   captureAnchor,
+  createExpansionCoordinator,
   createFrameCoalescer,
+  rangeChanged,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
@@ -15,10 +17,16 @@ let requestSequence = 0;
 const heights = new Map();
 const pendingActions = new Map();
 const pendingMedia = new Set();
+const localExpansions = new Map();
+const expansionCoordinator = createExpansionCoordinator();
+const disclosureAnimations = new WeakMap();
 let resizeObserver = null;
 let userScrolling = false;
 let userScrollTimer = null;
 let renderedRange = { start: -1, end: -1 };
+let topSpacer = null;
+let bottomSpacer = null;
+let touchStartY = null;
 
 const bridge = {
   post(message) {
@@ -30,12 +38,17 @@ const bridge = {
 
 function t(key) { return state?.strings?.[key] ?? ''; }
 function messageHeight(message) { return heights.get(message.id) ?? 170; }
+function isMediaHandle(value) {
+  return value?.startsWith('local:') || value?.startsWith('asset:');
+}
 function applyTheme() {
   if (!state) return;
   for (const [name, value] of Object.entries(state.theme ?? {})) {
     document.documentElement.style.setProperty(`--cuplivo-${name}`, value);
   }
   document.documentElement.style.setProperty('--cuplivo-font-scale', String(state.fontScale ?? 1));
+  document.body.dataset.backgroundStyle = state.display?.backgroundStyle ?? 'defaultStyle';
+  document.body.dataset.dark = String(Boolean(state.display?.isDark));
   timeline.setAttribute('aria-label', t('timeline'));
   const background = state.assistant?.background;
   const source = state.media?.[background] ?? background ?? '';
@@ -43,13 +56,13 @@ function applyTheme() {
   document.body.style.backgroundImage = /^(data:|https?:)/.test(source) ? `url("${source.replaceAll('"', '%22')}")` : 'none';
   document.body.style.backgroundSize = 'cover';
   document.body.style.backgroundPosition = 'center';
-  if (background?.startsWith('local:') && !state.media?.[background]) requestMedia(background);
+  if (isMediaHandle(background) && !state.media?.[background]) requestMedia(background);
 }
 
 function sendAction(action, messageId = null, payload = {}) {
-  if (!state) return;
+  if (!state) return null;
   if ((action === 'loadMoreBefore' || action === 'loadMoreAfter') &&
-      [...pendingActions.values()].includes(action)) return;
+      [...pendingActions.values()].includes(action)) return null;
   const requestId = `${state.renderSessionId}:${Date.now()}:${requestSequence += 1}`;
   pendingActions.set(requestId, action);
   bridge.post({
@@ -60,10 +73,11 @@ function sendAction(action, messageId = null, payload = {}) {
     actionEpoch: state.actionEpoch,
     capabilityToken: state.capabilityToken,
   });
+  return requestId;
 }
 
 function requestMedia(handle) {
-  if (!state || !handle?.startsWith('local:') || pendingMedia.has(handle)) return;
+  if (!state || !isMediaHandle(handle) || pendingMedia.has(handle)) return;
   pendingMedia.add(handle);
   bridge.post({
     type: 'mediaRequest', handle,
@@ -74,11 +88,46 @@ function requestMedia(handle) {
 }
 
 function actionLabel(action) {
+  if (action === 'speak' && state?.display?.ttsActive === true) return t('stop');
   return t({
     copy: 'copy', edit: 'edit', resend: 'resend', regenerate: 'regenerate',
     quote: 'quote', translate: 'translate', speak: 'speak', share: 'share',
     fork: 'fork', select: 'select', delete: 'delete', multiAI: 'multiAI',
+    more: 'more',
   }[action]);
+}
+
+const iconCodepoints = Object.freeze({
+  copy: 57502,
+  more: 57526,
+  regenerate: 57669,
+  speak: 57771,
+  stop: 57475,
+  translate: 57598,
+  edit: 57849,
+  resend: 57669,
+  previous: 57454,
+  next: 57455,
+  bot: 57787,
+  user: 57759,
+  reasoning: 58310,
+  tool: 57777,
+  sparkle: 58386,
+});
+
+function iconNode(name, className = 'lucide-icon') {
+  const node = document.createElement('span');
+  node.className = className;
+  node.setAttribute('aria-hidden', 'true');
+  node.textContent = String.fromCodePoint(iconCodepoints[name] ?? iconCodepoints.sparkle);
+  return node;
+}
+
+function iconButton(name, label, onClick, className = 'icon-action') {
+  const node = button(label, onClick, className);
+  node.title = label;
+  node.replaceChildren(iconNode(name));
+  return node;
 }
 
 function button(label, onClick, className = 'action') {
@@ -89,6 +138,84 @@ function button(label, onClick, className = 'action') {
   node.setAttribute('aria-label', label);
   node.addEventListener('click', onClick);
   return node;
+}
+
+function localExpansion(key, defaultValue) {
+  if (!localExpansions.has(key)) {
+    localExpansions.set(key, Boolean(defaultValue));
+  }
+  return localExpansions.get(key);
+}
+
+function updateDisclosure(root, header, body, expanded) {
+  const previous = header.getAttribute('aria-expanded') === 'true';
+  root.classList.toggle('is-expanded', expanded);
+  header.setAttribute('aria-expanded', String(expanded));
+  disclosureAnimations.get(body)?.cancel();
+  if (!root.isConnected || previous === expanded) {
+    body.hidden = !expanded;
+    return;
+  }
+  body.hidden = false;
+  if (typeof body.animate !== 'function' ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    body.hidden = !expanded;
+    return;
+  }
+  const animation = body.animate(
+    expanded
+      ? [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'translateY(0)' }]
+      : [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-4px)' }],
+    { duration: 180, easing: 'ease-out' },
+  );
+  disclosureAnimations.set(body, animation);
+  animation.finished.then(() => {
+    if (disclosureAnimations.get(body) !== animation) return;
+    disclosureAnimations.delete(body);
+    body.hidden = header.getAttribute('aria-expanded') !== 'true';
+  }).catch((error) => {
+    if (error?.name !== 'AbortError') {
+      bridge.post({ type: 'diagnostic', code: 'disclosure_animation_failed' });
+    }
+  });
+}
+
+function disclosure({ key, label, body, expanded, className, icon = null, onToggle }) {
+  const root = document.createElement('section');
+  root.className = `disclosure ${className}`;
+  root.dataset.expansionKey = key;
+  const header = button(label, () => {
+    const previous = header.getAttribute('aria-expanded') === 'true';
+    try {
+      const requested = !previous;
+      const resolved = onToggle?.(requested) ?? requested;
+      updateDisclosure(root, header, body, Boolean(resolved));
+    } catch (error) {
+      updateDisclosure(root, header, body, previous);
+      bridge.post({
+        type: 'diagnostic',
+        code: error?.message ?? 'disclosure_toggle_failed',
+      });
+    }
+  }, 'disclosure-header');
+  const title = document.createElement('span');
+  title.className = 'disclosure-title';
+  title.textContent = label;
+  const leading = icon ? iconNode(icon, 'disclosure-icon') : null;
+  const chevron = iconNode('next', 'disclosure-chevron');
+  header.replaceChildren(...[leading, title, chevron].filter(Boolean));
+  root.append(header, body);
+  updateDisclosure(root, header, body, Boolean(expanded));
+  return root;
+}
+
+function stableTextKey(prefix, source) {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${prefix}:${(hash >>> 0).toString(16)}`;
 }
 
 function markdownNode(content, streaming = false, kind = 'assistant') {
@@ -157,14 +284,20 @@ function enhanceMarkdown(root, streaming) {
     const lineCount = (code.textContent?.match(/\n/g)?.length ?? 0) + 1;
     if (threshold > 0 && lineCount > threshold) {
       const pre = code.parentElement;
-      pre.classList.add('code-collapsed');
+      const expansionKey = stableTextKey('code', code.textContent ?? '');
+      const applyCodeExpansion = (expanded) => {
+        pre.classList.toggle('code-collapsed', !expanded);
+        toggle.textContent = expanded ? t('collapseCode') : t('expandCode');
+        toggle.setAttribute('aria-label', toggle.textContent);
+      };
       pre.style.setProperty('--collapsed-lines', String(threshold));
       const toggle = button(t('expandCode'), () => {
-        const collapsed = pre.classList.toggle('code-collapsed');
-        toggle.textContent = collapsed ? t('expandCode') : t('collapseCode');
-        toggle.setAttribute('aria-label', toggle.textContent);
+        const expanded = !localExpansion(expansionKey, false);
+        localExpansions.set(expansionKey, expanded);
+        applyCodeExpansion(expanded);
       });
       pre.prepend(toggle);
+      applyCodeExpansion(localExpansion(expansionKey, false));
     }
   }
   try {
@@ -200,41 +333,70 @@ async function renderMermaid(pre, source) {
 }
 
 function addHtmlPreview(pre, source) {
-  const details = document.createElement('details');
-  const summary = document.createElement('summary');
-  summary.textContent = t('htmlPreview');
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.referrerPolicy = 'no-referrer';
   frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">${source}`;
-  details.append(summary, frame);
-  pre.after(details);
+  const key = stableTextKey('html-preview', source);
+  pre.after(disclosure({
+    key,
+    label: t('htmlPreview'),
+    body: frame,
+    expanded: localExpansion(key, false),
+    className: 'html-preview',
+    onToggle: (next) => {
+      localExpansions.set(key, next);
+      return next;
+    },
+  }));
 }
 
 function renderReasoning(message, parent) {
-  const segments = message.reasoning?.length ? message.reasoning :
-    (message.legacyThinking ?? []).map((text) => ({ text, expanded: false, loading: false }));
+  const segments = message.reasoning ?? [];
   for (const [index, segment] of segments.entries()) renderReasoningSegment(message, segment, index, parent);
 }
 
 function renderReasoningSegment(message, segment, index, parent) {
-    const details = document.createElement('details');
-    details.className = 'thinking';
-    details.dataset.component = 'reasoning';
-    details.open = Boolean(segment.expanded);
-    const summary = document.createElement('summary');
-    summary.textContent = segment.loading ? t('thinking') : t('reasoning');
-    const body = document.createElement('div');
-    body.className = 'thinking-body';
-    body.append(markdownNode(segment.text ?? '', Boolean(segment.loading), 'reasoning'));
-    details.addEventListener('toggle', () => sendAction('toggleReasoningSegment', message.id, { index, expanded: details.open }));
-    details.append(summary, body);
-    parent.append(details);
+  const kind = segment.kind ?? 'legacy';
+  const segmentIndex = Number.isInteger(segment.index) ? segment.index : index;
+  const key = segment.key ?? `${message.id}:reasoning:${kind}:${segmentIndex}`;
+  const authoritative = Boolean(segment.expanded);
+  const expanded = kind === 'legacy'
+    ? localExpansion(key, authoritative)
+    : expansionCoordinator.value(key, authoritative);
+  const body = document.createElement('div');
+  body.className = 'thinking-body';
+  body.append(markdownNode(segment.text ?? '', Boolean(segment.loading), 'reasoning'));
+  const card = disclosure({
+    key,
+    label: segment.loading ? t('thinking') : t('reasoning'),
+    body,
+    expanded,
+    className: 'thinking',
+    icon: 'reasoning',
+    onToggle: (next) => {
+      if (kind === 'legacy') {
+        localExpansions.set(key, next);
+        return next;
+      }
+      return expansionCoordinator.toggle({
+        key,
+        authoritative,
+        dispatch: (target) => sendAction('setReasoningExpanded', message.id, {
+          kind,
+          index: segmentIndex,
+          expanded: target,
+        }),
+      });
+    },
+  });
+  card.dataset.component = 'reasoning';
+  card.classList.toggle('is-loading', Boolean(segment.loading));
+  parent.append(card);
 }
 
 function renderConversationBlocks(message, parent) {
-  const reasoning = message.reasoning?.length ? message.reasoning :
-    (message.legacyThinking ?? []).map((text) => ({ text, expanded: false, loading: false }));
+  const reasoning = message.reasoning ?? [];
   const tools = message.tools ?? [];
   const splits = message.contentSplits ?? {};
   const offsets = splits.offsets ?? [];
@@ -274,11 +436,11 @@ function renderConversationBlocks(message, parent) {
 }
 
 function renderTool(message, tool, parent) {
-  const details = document.createElement('details');
-  details.className = 'tool';
-  details.dataset.component = 'tool';
-  const summary = document.createElement('summary');
-  summary.textContent = `${tool.content == null ? t('toolCall') : t('toolResult')} ${tool.toolName}`.trim();
+  const key = `${message.id}:tool:${tool.id}`;
+  const summary = state.display?.showToolResultSummary === true && tool.content != null
+    ? String(tool.content).replace(/\s+/g, ' ').trim().slice(0, 72)
+    : '';
+  const label = `${tool.content == null ? t('toolCall') : t('toolResult')} ${tool.toolName}${summary ? ` · ${summary}` : ''}`.trim();
   const body = document.createElement('div');
   body.className = 'tool-body';
   const args = document.createElement('pre');
@@ -295,8 +457,42 @@ function renderTool(message, tool, parent) {
     body.append(actions);
   }
   if (tool.arguments?.askUserActive === true && tool.content == null) renderAskUser(message, tool, body);
-  details.append(summary, body);
-  parent.append(details);
+  const card = disclosure({
+    key,
+    label,
+    body,
+    expanded: localExpansion(key, false),
+    className: 'tool',
+    icon: 'tool',
+    onToggle: (next) => {
+      localExpansions.set(key, next);
+      return next;
+    },
+  });
+  card.dataset.component = 'tool';
+  card.classList.toggle('is-loading', Boolean(tool.loading));
+  parent.append(card);
+}
+
+function applyThinkingStepCollapse(message, parent) {
+  if (state.display?.collapseThinkingSteps !== true) return;
+  const steps = [...parent.children].filter((node) =>
+    node.dataset?.component === 'reasoning' || node.dataset?.component === 'tool');
+  const hiddenCount = steps.length - 2;
+  if (hiddenCount <= 0) return;
+  const key = `${message.id}:thinking-steps`;
+  if (localExpansion(key, false)) return;
+  for (const step of steps.slice(0, hiddenCount)) step.hidden = true;
+  const show = button(
+    message.expandStepsLabel ?? String(hiddenCount),
+    () => {
+      localExpansions.set(key, true);
+      for (const step of steps.slice(0, hiddenCount)) step.hidden = false;
+      show.remove();
+    },
+    'show-thinking-steps',
+  );
+  steps[hiddenCount].before(show);
 }
 
 function renderAskUser(message, tool, parent) {
@@ -376,7 +572,7 @@ function renderAttachments(message, parent) {
       image.alt = attachment.name ?? '';
       image.referrerPolicy = 'no-referrer';
       parent.append(image);
-    } else if (attachment.kind === 'image' && attachment.reference?.startsWith('local:')) {
+    } else if (attachment.kind === 'image' && isMediaHandle(attachment.reference)) {
       requestMedia(attachment.reference);
     } else if (attachment.kind === 'file') {
       const file = document.createElement('div');
@@ -388,75 +584,175 @@ function renderAttachments(message, parent) {
   }
 }
 
+function mediaImage(reference, alt, monochrome = false) {
+  const source = state.media?.[reference] ?? reference ?? '';
+  if (!/^(data:|https?:)/.test(source)) {
+    if (isMediaHandle(reference)) requestMedia(reference);
+    return null;
+  }
+  const image = document.createElement('img');
+  image.src = source;
+  image.alt = alt ?? '';
+  image.referrerPolicy = 'no-referrer';
+  image.classList.toggle('is-monochrome', monochrome);
+  return image;
+}
+
+function renderAvatar(message) {
+  const isUser = message.role === 'user';
+  const display = state.display ?? {};
+  const assistant = state.assistant ?? {};
+  const user = state.user ?? {};
+  if (isUser && display.showUserAvatar === false) return null;
+  if (!isUser && !assistant.useAvatar && display.showModelIcon === false) return null;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  if (isUser) {
+    const image = mediaImage(user.avatar, user.name, false);
+    if (image) avatar.append(image);
+    else if (user.avatarLabel) avatar.textContent = user.avatarLabel;
+    else avatar.append(iconNode('user'));
+    return avatar;
+  }
+
+  if (assistant.useAvatar) {
+    const image = mediaImage(assistant.avatar, assistant.name, false);
+    if (image) avatar.append(image);
+    else if (assistant.avatarLabel) avatar.textContent = assistant.avatarLabel;
+    else avatar.append(iconNode('bot'));
+    return avatar;
+  }
+  avatar.classList.add('is-model-icon');
+  const image = mediaImage(
+    message.modelIcon,
+    message.modelId,
+    Boolean(message.modelIconMonochrome),
+  );
+  if (image) avatar.append(image);
+  else if (message.modelId?.trim()) {
+    avatar.textContent = [...message.modelId.trim()][0].toUpperCase();
+  } else {
+    avatar.append(iconNode('bot'));
+  }
+  return avatar;
+}
+
+function renderMessageHeader(message) {
+  const isUser = message.role === 'user';
+  const display = state.display ?? {};
+  const assistant = state.assistant ?? {};
+  const header = document.createElement('div');
+  header.className = 'message-header';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  if ((isUser && display.showUserName !== false) || (!isUser && display.showModelName !== false)) {
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = isUser
+      ? (state.user?.name ?? t('user'))
+      : (assistant.useName ? (assistant.name || t('assistant')) : (message.modelId || t('assistant')));
+    meta.append(name);
+  }
+  if ((isUser && display.showUserTimestamp !== false) || (!isUser && display.showModelTimestamp !== false)) {
+    const time = document.createElement('time');
+    time.dateTime = message.timestamp;
+    time.textContent = new Intl.DateTimeFormat(undefined, {
+      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    }).format(new Date(message.timestamp));
+    meta.append(time);
+  }
+  const avatar = renderAvatar(message);
+  if (isUser) header.append(meta, ...[avatar].filter(Boolean));
+  else header.append(...[avatar].filter(Boolean), meta);
+  return header.childElementCount ? header : null;
+}
+
+function renderMessageActions(message) {
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.dataset.component = 'message-actions';
+  for (const action of message.actions ?? []) {
+    const icon = action === 'speak' && state.display?.ttsActive === true
+      ? 'stop'
+      : ({ copy: 'copy', edit: 'edit', resend: 'resend', regenerate: 'regenerate',
+        speak: 'speak', translate: 'translate', more: 'more' }[action] ?? 'sparkle');
+    actions.append(iconButton(icon, actionLabel(action), () => sendAction(action, message.id)));
+  }
+  if ((message.versionCount ?? 1) > 1) {
+    const previous = iconButton('previous', t('previousVersion'),
+      () => sendAction('version', message.id, { delta: -1 }), 'version-action');
+    previous.disabled = (message.versionIndex ?? 0) <= 0;
+    const version = document.createElement('span');
+    version.className = 'version-label';
+    version.textContent = `${(message.versionIndex ?? 0) + 1}/${message.versionCount}`;
+    const next = iconButton('next', t('nextVersion'),
+      () => sendAction('version', message.id, { delta: 1 }), 'version-action');
+    next.disabled = (message.versionIndex ?? 0) >= message.versionCount - 1;
+    actions.append(previous, version, next);
+  }
+  if (message.role !== 'user' && state.display?.showTokenStats !== false && message.tokens != null) {
+    const tokens = document.createElement('span');
+    tokens.className = 'token-stats';
+    tokens.textContent = `${message.tokens} ${t('tokens')}`;
+    tokens.title = [
+      message.promptTokens == null ? null : `${message.promptTokens}`,
+      message.completionTokens == null ? null : `${message.completionTokens}`,
+      message.cachedTokens == null ? null : `${message.cachedTokens}`,
+    ].filter(Boolean).join(' / ');
+    actions.append(tokens);
+  }
+  return actions.childElementCount ? actions : null;
+}
+
 function renderMessage(message) {
   const article = document.createElement('article');
-  article.className = 'message';
+  article.className = `message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`;
   article.dataset.component = 'message';
   article.dataset.role = message.role;
   article.dataset.selected = String(Boolean(message.selected));
   article.tabIndex = -1;
 
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar';
-  const assistant = state.assistant ?? {};
-  const avatarSource = state.media?.[assistant.avatar] ?? assistant.avatar ?? '';
-  if (message.role !== 'user' && assistant.useAvatar && /^(data:|https?:)/.test(avatarSource)) {
-    const image = document.createElement('img');
-    image.src = avatarSource;
-    image.alt = assistant.name ?? '';
-    image.referrerPolicy = 'no-referrer';
-    avatar.append(image);
-  } else {
-    if (message.role !== 'user' && assistant.useAvatar && assistant.avatar?.startsWith('local:')) requestMedia(assistant.avatar);
-    avatar.textContent = message.role === 'user' ? t('userInitial') : (assistant.avatarLabel?.[0] ?? assistant.name?.[0] ?? t('assistantInitial'));
-  }
-
   const main = document.createElement('div');
   main.className = 'message-main';
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  const name = document.createElement('span');
-  name.className = 'name';
-  name.textContent = message.role === 'user' ? t('user') : (assistant.useName ? assistant.name : (message.modelId ?? assistant.name ?? t('assistant')));
-  const time = document.createElement('time');
-  time.dateTime = message.timestamp;
-  time.textContent = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(message.timestamp));
-  meta.append(name, time);
-  if (message.tokens != null) {
-    const tokens = document.createElement('span');
-    tokens.textContent = `${message.tokens} ${t('tokens')}`;
-    meta.append(tokens);
-  }
+  const header = renderMessageHeader(message);
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.dataset.component = 'message-bubble';
+  if (message.role === 'user') renderAttachments(message, bubble);
   renderConversationBlocks(message, bubble);
-  renderAttachments(message, bubble);
+  applyThinkingStepCollapse(message, bubble);
+  if (message.role !== 'user') renderAttachments(message, bubble);
   if (message.translation) {
-    const translation = document.createElement('details');
-    translation.open = true;
-    const summary = document.createElement('summary');
-    summary.textContent = t('translation');
-    translation.append(summary, markdownNode(message.translation, message.isStreaming));
-    bubble.append(translation);
+    const key = `${message.id}:translation`;
+    bubble.append(disclosure({
+      key,
+      label: t('translation'),
+      body: markdownNode(message.translation, message.isStreaming),
+      expanded: localExpansion(key, true),
+      className: 'translation',
+      icon: 'translate',
+      onToggle: (next) => {
+        localExpansions.set(key, next);
+        return next;
+      },
+    }));
   }
-
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  actions.dataset.component = 'message-actions';
-  for (const action of message.actions ?? []) {
-    actions.append(button(actionLabel(action), () => sendAction(action, message.id)));
+  const actions = message.selecting || (message.role !== 'user' && message.isStreaming)
+    ? null
+    : renderMessageActions(message);
+  main.append(...[header, bubble, actions].filter(Boolean));
+  article.append(main);
+  article.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    if (!message.selecting) sendAction('more', message.id);
+  });
+  if (message.selecting) {
+    article.addEventListener('click', (event) => {
+      if (!event.target.closest('button, a, input, textarea')) sendAction('select', message.id);
+    });
   }
-  if ((message.versionCount ?? 1) > 1) {
-    actions.append(
-      button(t('previousVersion'), () => sendAction('version', message.id, { delta: -1 })),
-      button(t('nextVersion'), () => sendAction('version', message.id, { delta: 1 })),
-    );
-  }
-  main.append(meta, bubble, actions);
-  article.append(avatar, main);
-  article.addEventListener('contextmenu', (event) => { event.preventDefault(); actions.firstElementChild?.focus(); });
   return article;
 }
 
@@ -464,15 +760,7 @@ function render() {
   if (!state) return;
   const anchor = captureAnchor(timeline);
   resizeObserver?.disconnect();
-  resizeObserver = new ResizeObserver((entries) => {
-    let changed = false;
-    for (const entry of entries) {
-      const id = entry.target.dataset.messageId;
-      const height = Math.ceil(entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height);
-      if (id && Math.abs((heights.get(id) ?? 0) - height) > 1) { heights.set(id, height); changed = true; }
-    }
-    if (changed) scheduleRender();
-  });
+  resizeObserver ??= new ResizeObserver(handleMeasuredHeights);
   const messages = state.messages ?? [];
   timeline.replaceChildren();
   if (messages.length === 0) {
@@ -485,10 +773,14 @@ function render() {
   }
   const range = visibleRange({ heights: messages.map(messageHeight), scrollTop: timeline.scrollTop, viewportHeight: timeline.clientHeight });
   renderedRange = { start: range.start, end: range.end };
-  const top = document.createElement('div'); top.className = 'spacer'; top.style.height = `${range.top}px`;
-  const bottom = document.createElement('div'); bottom.className = 'spacer'; bottom.style.height = `${range.bottom}px`;
-  timeline.append(top);
-  if (state.preset) {
+  topSpacer = document.createElement('div');
+  topSpacer.className = 'spacer';
+  topSpacer.style.height = `${range.top}px`;
+  bottomSpacer = document.createElement('div');
+  bottomSpacer.className = 'spacer';
+  bottomSpacer.style.height = `${range.bottom}px`;
+  timeline.append(topSpacer);
+  if (state.preset && range.start === 0) {
     const preset = document.createElement('div');
     preset.className = 'suggestions';
     preset.append(button(state.preset.label, () => sendAction('togglePresets'), 'suggestion'));
@@ -506,19 +798,43 @@ function render() {
     }
     const node = renderMessage(message); slot.append(node); timeline.append(slot); resizeObserver.observe(slot);
   }
-  timeline.append(bottom);
+  timeline.append(bottomSpacer);
   if (state.suggestions?.length) {
     const suggestions = document.createElement('div'); suggestions.className = 'suggestions';
     for (const suggestion of state.suggestions) suggestions.append(button(suggestion, () => sendAction('suggestion', null, { text: suggestion }), 'suggestion'));
     timeline.append(suggestions);
   }
-  const nav = document.createElement('nav'); nav.className = 'nav';
-  nav.append(
-    button(t('top'), () => timeline.scrollTo({ top: 0, behavior: 'smooth' })),
-    button(t('bottom'), () => timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'smooth' })),
-  );
-  timeline.append(nav);
   restoreAnchor(timeline, anchor);
+}
+
+function handleMeasuredHeights(entries) {
+  if (!state?.messages?.length) return;
+  const anchor = captureAnchor(timeline);
+  let changed = false;
+  for (const entry of entries) {
+    const id = entry.target.dataset.messageId;
+    const height = Math.ceil(
+      entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
+    );
+    if (id && Math.abs((heights.get(id) ?? 0) - height) > 1) {
+      heights.set(id, height);
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  const range = visibleRange({
+    heights: state.messages.map(messageHeight),
+    scrollTop: timeline.scrollTop,
+    viewportHeight: timeline.clientHeight,
+  });
+  if (rangeChanged(renderedRange, range)) {
+    scheduleRender();
+    return;
+  }
+  if (topSpacer) topSpacer.style.height = `${range.top}px`;
+  if (bottomSpacer) bottomSpacer.style.height = `${range.bottom}px`;
+  restoreAnchor(timeline, anchor);
+  sendViewportMetrics();
 }
 
 const scheduleRender = createFrameCoalescer(render);
@@ -534,30 +850,61 @@ const sendViewportMetrics = createFrameCoalescer(() => {
   });
 });
 function markUserScroll() {
+  const firstIntent = !userScrolling;
   userScrolling = true;
+  if (firstIntent) sendViewportMetrics();
   clearTimeout(userScrollTimer);
   userScrollTimer = setTimeout(() => { userScrolling = false; sendViewportMetrics(); }, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
-timeline.addEventListener('pointerdown', markUserScroll, { passive: true });
+timeline.addEventListener('touchstart', (event) => {
+  touchStartY = event.touches[0]?.clientY ?? null;
+}, { passive: true });
+timeline.addEventListener('touchmove', (event) => {
+  const current = event.touches[0]?.clientY;
+  if (touchStartY != null && current != null &&
+      Math.abs(current - touchStartY) >= 3) {
+    markUserScroll();
+    touchStartY = current;
+  }
+}, { passive: true });
+timeline.addEventListener('touchend', () => {
+  touchStartY = null;
+}, { passive: true });
+timeline.addEventListener('touchcancel', () => {
+  touchStartY = null;
+}, { passive: true });
 timeline.addEventListener('scroll', () => {
+  if (userScrolling) markUserScroll();
   if (state?.messages?.length) {
     const range = visibleRange({
       heights: state.messages.map(messageHeight),
       scrollTop: timeline.scrollTop,
       viewportHeight: timeline.clientHeight,
     });
-    if (range.start !== renderedRange.start || range.end !== renderedRange.end) scheduleRender();
+    if (rangeChanged(renderedRange, range)) scheduleRender();
   }
   sendViewportMetrics();
   if (timeline.scrollTop < 180 && state?.hasMoreBefore) sendAction('loadMoreBefore');
   if (timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 180 && state?.hasMoreAfter) sendAction('loadMoreAfter');
 }, { passive: true });
 timeline.addEventListener('keydown', (event) => {
-  if (event.key === 'Home') timeline.scrollTo({ top: 0, behavior: 'smooth' });
-  else if (event.key === 'End') timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'smooth' });
-  else if (event.key === 'PageUp') timeline.scrollBy({ top: -timeline.clientHeight * .85, behavior: 'smooth' });
-  else if (event.key === 'PageDown') timeline.scrollBy({ top: timeline.clientHeight * .85, behavior: 'smooth' });
+  if (event.key === 'Home') {
+    markUserScroll();
+    timeline.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (event.key === 'End') {
+    markUserScroll();
+    timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'smooth' });
+  } else if (event.key === 'PageUp') {
+    markUserScroll();
+    timeline.scrollBy({ top: -timeline.clientHeight * .85, behavior: 'smooth' });
+  } else if (event.key === 'PageDown') {
+    markUserScroll();
+    timeline.scrollBy({ top: timeline.clientHeight * .85, behavior: 'smooth' });
+  } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown' ||
+      event.key === ' ' || event.key === 'Spacebar') {
+    markUserScroll();
+  }
 });
 window.addEventListener('resize', scheduleRender);
 
@@ -606,15 +953,29 @@ window.CuplivoWeb = {
           if (state && payload.renderSessionId === state.renderSessionId && payload.conversationId === state.conversationId) {
             state = { ...state, media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl } };
             pendingMedia.delete(payload.handle);
+            if (payload.handle === state.assistant?.background) applyTheme();
             scheduleRender();
           }
         } else {
+          const previousSessionId = state?.renderSessionId;
           state = reduceEnvelope(state, payload);
+          if (previousSessionId && previousSessionId !== state?.renderSessionId) {
+            expansionCoordinator.clear();
+            localExpansions.clear();
+            pendingActions.clear();
+            pendingMedia.clear();
+            heights.clear();
+          }
           applyTheme(); scheduleRender();
         }
       } else if (envelope.type === 'messagePatches') {
         state = reduceEnvelope(state, envelope); scheduleRender();
-      } else if (envelope.type === 'actionResult') pendingActions.delete(envelope.requestId);
+      } else if (envelope.type === 'actionResult') {
+        pendingActions.delete(envelope.requestId);
+        if (expansionCoordinator.resolve(envelope.requestId, envelope.ok === true)) {
+          scheduleRender();
+        }
+      }
       else if (envelope.type === 'mediaError') pendingMedia.delete(envelope.handle);
       else if (envelope.type === 'viewportCommand') handleViewportCommand(envelope);
     } catch (error) {

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -79,5 +81,8 @@ class AndroidWebChatView extends StatelessWidget {
     viewType: viewType,
     layoutDirection: Directionality.of(context),
     onPlatformViewCreated: onPlatformViewCreated,
+    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+      Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+    },
   );
 }

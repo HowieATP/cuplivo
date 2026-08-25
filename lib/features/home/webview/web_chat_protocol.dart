@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-const int webChatProtocolVersion = 1;
-const String webChatAssetVersion = 'web-chat-v1';
+const int webChatProtocolVersion = 2;
+const String webChatAssetVersion = 'web-chat-v2';
 const int webChatMaxChunkBytes = 128 * 1024;
 const int webChatMaxChunkPayloadBytes = 95 * 1024;
 
@@ -54,6 +54,45 @@ class WebChatActionRequest {
       throw const WebChatProtocolException('malformed action request');
     }
     return request;
+  }
+}
+
+enum WebChatReasoningKind { single, segment }
+
+class WebChatReasoningTarget {
+  const WebChatReasoningTarget({
+    required this.kind,
+    required this.index,
+    required this.expanded,
+  });
+
+  final WebChatReasoningKind kind;
+  final int index;
+  final bool expanded;
+
+  factory WebChatReasoningTarget.fromPayload(Map<String, dynamic> payload) {
+    final kind = switch (payload['kind']) {
+      'single' => WebChatReasoningKind.single,
+      'segment' => WebChatReasoningKind.segment,
+      _ => throw const WebChatProtocolException(
+        'unsupported reasoning target kind',
+      ),
+    };
+    final rawIndex = payload['index'];
+    final rawExpanded = payload['expanded'];
+    if (rawIndex is! num ||
+        !rawIndex.isFinite ||
+        rawIndex != rawIndex.toInt() ||
+        rawIndex.toInt() < 0 ||
+        (kind == WebChatReasoningKind.single && rawIndex.toInt() != 0) ||
+        rawExpanded is! bool) {
+      throw const WebChatProtocolException('malformed reasoning target');
+    }
+    return WebChatReasoningTarget(
+      kind: kind,
+      index: rawIndex.toInt(),
+      expanded: rawExpanded,
+    );
   }
 }
 

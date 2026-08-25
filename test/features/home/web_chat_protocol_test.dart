@@ -5,6 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 
 void main() {
+  test('Web chat protocol and bundled assets use version 2', () {
+    expect(webChatProtocolVersion, 2);
+    expect(webChatAssetVersion, 'web-chat-v2');
+  });
+
   group('Web chat transfer protocol', () {
     test('round-trips a UTF-8 payload across bounded chunks', () {
       final payload = <String, dynamic>{
@@ -72,6 +77,79 @@ void main() {
           ),
         ),
         isFalse,
+      );
+    });
+  });
+
+  group('Web chat reasoning target', () {
+    test('parses idempotent single and segmented target states', () {
+      final single = WebChatReasoningTarget.fromPayload(<String, dynamic>{
+        'kind': 'single',
+        'index': 0,
+        'expanded': true,
+      });
+      final segment = WebChatReasoningTarget.fromPayload(<String, dynamic>{
+        'kind': 'segment',
+        'index': 2,
+        'expanded': false,
+      });
+
+      expect(single.kind, WebChatReasoningKind.single);
+      expect(single.index, 0);
+      expect(single.expanded, isTrue);
+      expect(segment.kind, WebChatReasoningKind.segment);
+      expect(segment.index, 2);
+      expect(segment.expanded, isFalse);
+    });
+
+    test('rejects local legacy state and malformed indices', () {
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'legacy',
+          'index': 0,
+          'expanded': true,
+        }),
+        throwsA(isA<WebChatProtocolException>()),
+      );
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'segment',
+          'index': -1,
+          'expanded': true,
+        }),
+        throwsA(isA<WebChatProtocolException>()),
+      );
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'single',
+          'index': 0,
+          'expanded': 'yes',
+        }),
+        throwsA(isA<WebChatProtocolException>()),
+      );
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'single',
+          'index': 1,
+          'expanded': true,
+        }),
+        throwsA(isA<WebChatProtocolException>()),
+      );
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'segment',
+          'index': 1.5,
+          'expanded': true,
+        }),
+        throwsA(isA<WebChatProtocolException>()),
+      );
+      expect(
+        () => WebChatReasoningTarget.fromPayload(<String, dynamic>{
+          'kind': 'segment',
+          'index': double.nan,
+          'expanded': true,
+        }),
+        throwsA(isA<WebChatProtocolException>()),
       );
     });
   });

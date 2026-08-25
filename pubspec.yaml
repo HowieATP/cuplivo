@@ -177,6 +177,7 @@ flutter:
     - assets/web_chat/app.mjs
     - assets/web_chat/protocol.mjs
     - assets/web_chat/vendor/
+    - assets/web_chat/vendor/fonts/
     - assets/html/mark.html
   #   - images/a_dot_ham.jpeg
 

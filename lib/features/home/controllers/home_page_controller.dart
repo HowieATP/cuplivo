@@ -2372,19 +2372,19 @@ class HomePageController extends ChangeNotifier {
 
   void toggleReasoning(String messageId) {
     final r = reasoning[messageId];
-    if (r != null) {
-      r.expanded = !r.expanded;
-      // Check if reasoning is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
-      final isStillStreaming = r.finishedAt == null && r.text.isNotEmpty;
-      if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
-        streamingContentNotifier.forceRebuild(messageId);
-      } else {
-        // For non-streaming messages, trigger full page rebuild
-        notifyListeners();
-      }
-    }
+    if (r != null) setReasoningExpanded(messageId, !r.expanded);
+  }
+
+  bool setReasoningExpanded(String messageId, bool expanded) {
+    final r = reasoning[messageId];
+    if (r == null) return false;
+    if (r.expanded == expanded) return true;
+    r.expanded = expanded;
+    _notifyReasoningExpansionChanged(
+      messageId,
+      isStillStreaming: r.finishedAt == null && r.text.isNotEmpty,
+    );
+    return true;
   }
 
   void toggleTranslation(String messageId) {
@@ -2397,19 +2397,47 @@ class HomePageController extends ChangeNotifier {
 
   void toggleReasoningSegment(String messageId, int segmentIndex) {
     final segments = reasoningSegments[messageId];
-    if (segments != null && segmentIndex < segments.length) {
-      final seg = segments[segmentIndex];
-      seg.expanded = !seg.expanded;
-      // Check if this segment is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
-      final isStillStreaming = seg.finishedAt == null && seg.text.isNotEmpty;
-      if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
-        streamingContentNotifier.forceRebuild(messageId);
-      } else {
-        // For non-streaming messages, trigger full page rebuild
-        notifyListeners();
-      }
+    if (segments == null ||
+        segmentIndex < 0 ||
+        segmentIndex >= segments.length) {
+      return;
+    }
+    setReasoningSegmentExpanded(
+      messageId,
+      segmentIndex,
+      !segments[segmentIndex].expanded,
+    );
+  }
+
+  bool setReasoningSegmentExpanded(
+    String messageId,
+    int segmentIndex,
+    bool expanded,
+  ) {
+    final segments = reasoningSegments[messageId];
+    if (segments == null ||
+        segmentIndex < 0 ||
+        segmentIndex >= segments.length) {
+      return false;
+    }
+    final segment = segments[segmentIndex];
+    if (segment.expanded == expanded) return true;
+    segment.expanded = expanded;
+    _notifyReasoningExpansionChanged(
+      messageId,
+      isStillStreaming: segment.finishedAt == null && segment.text.isNotEmpty,
+    );
+    return true;
+  }
+
+  void _notifyReasoningExpansionChanged(
+    String messageId, {
+    required bool isStillStreaming,
+  }) {
+    if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
+      streamingContentNotifier.forceRebuild(messageId);
+    } else {
+      notifyListeners();
     }
   }
 

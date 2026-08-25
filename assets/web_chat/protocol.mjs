@@ -1,5 +1,5 @@
-export const PROTOCOL_VERSION = 1;
-export const ASSET_VERSION = 'web-chat-v1';
+export const PROTOCOL_VERSION = 2;
+export const ASSET_VERSION = 'web-chat-v2';
 
 const transfers = new Map();
 
@@ -43,6 +43,12 @@ export function reduceEnvelope(state, envelope) {
         Number(envelope.renderRevision) < Number(state.renderRevision)) {
       return state;
     }
+    if (state?.renderSessionId === envelope.renderSessionId) {
+      return {
+        ...envelope,
+        media: { ...(state.media ?? {}), ...(envelope.media ?? {}) },
+      };
+    }
     return envelope;
   }
   if (envelope.type === 'messagePatches') {
@@ -74,6 +80,99 @@ export function visibleRange({ heights, scrollTop, viewportHeight, overscan = 70
     end += 1;
   }
   return { start, end, top: offset, bottom: heights.slice(end).reduce((a, b) => a + b, 0) };
+}
+
+export function rangeChanged(previous, next) {
+  return previous.start !== next.start || previous.end !== next.end;
+}
+
+export function createExpansionCoordinator() {
+  const entries = new Map();
+  const requests = new Map();
+
+  function reconcile(key, authoritative) {
+    const value = Boolean(authoritative);
+    const entry = entries.get(key);
+    if (!entry) return null;
+    entry.authoritative = value;
+    if (entry.inFlight == null && entry.awaitingTarget === value) {
+      entry.desired = value;
+      entry.awaitingTarget = null;
+    }
+    if (entry.inFlight == null && entry.awaitingTarget == null &&
+        entry.desired === entry.authoritative) {
+      entries.delete(key);
+      return null;
+    }
+    return entry;
+  }
+
+  function dispatch(entry) {
+    const target = entry.desired;
+    const requestId = entry.dispatch(target);
+    if (typeof requestId !== 'string' || requestId.length === 0) {
+      throw new Error('invalid_expansion_request');
+    }
+    entry.inFlight = { requestId, target };
+    requests.set(requestId, entry.key);
+  }
+
+  return {
+    value(key, authoritative) {
+      const entry = reconcile(key, authoritative);
+      return entry?.desired ?? Boolean(authoritative);
+    },
+
+    toggle({ key, authoritative, dispatch: send }) {
+      let entry = reconcile(key, authoritative);
+      if (!entry) {
+        entry = {
+          key,
+          authoritative: Boolean(authoritative),
+          desired: Boolean(authoritative),
+          awaitingTarget: null,
+          inFlight: null,
+          dispatch: send,
+        };
+        entries.set(key, entry);
+      } else {
+        entry.dispatch = send;
+      }
+      entry.desired = !entry.desired;
+      if (entry.awaitingTarget != null) entry.awaitingTarget = null;
+      if (entry.inFlight == null) dispatch(entry);
+      return entry.desired;
+    },
+
+    resolve(requestId, ok) {
+      const key = requests.get(requestId);
+      if (!key) return false;
+      requests.delete(requestId);
+      const entry = entries.get(key);
+      if (!entry || entry.inFlight?.requestId !== requestId) return false;
+      const completedTarget = entry.inFlight.target;
+      entry.inFlight = null;
+      if (!ok) {
+        entry.desired = entry.authoritative;
+        entry.awaitingTarget = null;
+        entries.delete(key);
+        return true;
+      }
+      if (entry.desired !== completedTarget) {
+        dispatch(entry);
+      } else if (entry.authoritative === completedTarget) {
+        entries.delete(key);
+      } else {
+        entry.awaitingTarget = completedTarget;
+      }
+      return true;
+    },
+
+    clear() {
+      entries.clear();
+      requests.clear();
+    },
+  };
 }
 
 export function captureAnchor(container) {

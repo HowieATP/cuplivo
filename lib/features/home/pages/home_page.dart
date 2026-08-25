@@ -19,6 +19,8 @@ import '../../../theme/design_tokens.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/tts_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -50,6 +52,7 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/pages/reading_mode_page.dart';
 import '../../chat/models/tool_ui_part.dart';
 import '../../chat/utils/message_visual_content.dart';
 import '../../search/widgets/search_settings_sheet.dart';
@@ -1487,6 +1490,10 @@ class _HomePageState extends State<HomePage>
     if (useWebViewport) {
       context.watch<ToolApprovalService>();
       context.watch<AskUserInteractionService>();
+      final user = context.watch<UserProvider>();
+      final ttsActive = context.select<TtsProvider, bool>(
+        (provider) => provider.playbackState.isActive,
+      );
       _controller.attachConversationViewportPort(_webViewportPort);
       _ensureWebRenderSession(conversationId);
       final snapshot = _buildWebChatSnapshot(
@@ -1499,13 +1506,17 @@ class _HomePageState extends State<HomePage>
         suggestions: suggestions,
         presetCount: presetCount,
         showPresetToggle: showPresetToggle,
+        user: user,
+        ttsActive: ttsActive,
       );
       return WebConversationViewport(
         key: const ValueKey<String>('web-conversation-viewport'),
         snapshot: snapshot,
-        localMediaPaths: buildWebChatLocalMediaRegistry(
+        mediaRegistry: buildWebChatMediaRegistry(
           messages,
           assistant: assistant,
+          userAvatarType: user.avatarType,
+          userAvatarValue: user.avatarValue,
         ),
         viewportPort: _webViewportPort,
         streamingContentNotifier: _controller.streamingContentNotifier,
@@ -1518,6 +1529,7 @@ class _HomePageState extends State<HomePage>
             _webFlutterConversationOverrides.add(conversationId);
           });
         },
+        onUserScrollIntent: _controller.scrollCtrl.revealNavButtons,
       );
     }
 
@@ -1655,10 +1667,42 @@ class _HomePageState extends State<HomePage>
     required List<String> suggestions,
     required int presetCount,
     required bool showPresetToggle,
+    required UserProvider user,
+    required bool ttsActive,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
     final semantic = context.appColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final display = <String, dynamic>{
+      'userMarkdown': settings.enableUserMarkdown,
+      'assistantMarkdown': settings.enableAssistantMarkdown,
+      'reasoningMarkdown': settings.enableReasoningMarkdown,
+      'math': settings.enableMathRendering,
+      'dollarMath': settings.enableDollarLatex,
+      'wrapCode':
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      'collapsedCodeLines': settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+      'backgroundStyle': settings.chatMessageBackgroundStyle.name,
+      'isDark': isDark,
+      'showUserAvatar': settings.showUserAvatar,
+      'showUserName': settings.showUserName,
+      'showUserTimestamp': settings.showUserTimestamp,
+      'showUserMessageActions': settings.showUserMessageActions,
+      'showModelIcon': settings.showModelIcon,
+      'showModelName': settings.showModelName,
+      'showModelTimestamp': settings.showModelTimestamp,
+      'showTokenStats': settings.showTokenStats,
+      'autoCollapseThinking': settings.autoCollapseThinking,
+      'collapseThinkingSteps': settings.collapseThinkingSteps,
+      'showToolResultSummary': settings.showToolResultSummary,
+      'ttsActive': ttsActive,
+    };
     final snapshot = const WebChatSnapshotBuilder().build(
       renderSessionId: _webRenderSessionId,
       conversationId: conversationId,
@@ -1688,7 +1732,7 @@ class _HomePageState extends State<HomePage>
         'collapseCode': l10n.codeBlockCollapseButton,
         'htmlPreview': l10n.webChatHtmlPreview,
         'thinking': l10n.chatMessageWidgetThinking,
-        'reasoning': l10n.webChatReasoning,
+        'reasoning': l10n.chatMessageWidgetDeepThinking,
         'toolCall': l10n.webChatToolCall,
         'toolResult': l10n.webChatToolResult,
         'translation': l10n.webChatTranslation,
@@ -1701,6 +1745,8 @@ class _HomePageState extends State<HomePage>
         'quote': l10n.chatMessageWidgetQuote,
         'translate': l10n.chatMessageWidgetTranslateTooltip,
         'speak': l10n.chatMessageWidgetSpeakTooltip,
+        'stop': l10n.chatMessageWidgetStopTooltip,
+        'more': l10n.chatMessageWidgetMoreTooltip,
         'share': l10n.messageMoreSheetShare,
         'fork': l10n.messageMoreSheetCreateBranch,
         'select': l10n.messageMoreSheetSelectMessages,
@@ -1712,29 +1758,62 @@ class _HomePageState extends State<HomePage>
         'customAnswer': l10n.askUserCardCustomHint,
         'skip': l10n.askUserCardSkip,
         'skipped': l10n.askUserCardSkipped,
-        'top': l10n.webChatTop,
-        'bottom': l10n.webChatBottom,
         'previousVersion': l10n.webChatPreviousVersion,
         'nextVersion': l10n.webChatNextVersion,
-        'assistantInitial': l10n.webChatAssistantInitial,
-        'userInitial': l10n.webChatUserInitial,
       },
       theme: <String, String>{
         'surface': _webCssColor(colors.surface),
         'on-surface': _webCssColor(colors.onSurface),
         'primary': _webCssColor(colors.primary),
         'on-primary': _webCssColor(colors.onPrimary),
+        'secondary': _webCssColor(colors.secondary),
+        'error': _webCssColor(colors.error),
         'card': _webCssColor(semantic.surfaceCard),
+        'surface-fill': _webCssColor(semantic.surfaceFill),
         'outline': _webCssColor(colors.outlineVariant),
-        'user': _webCssColor(colors.primaryContainer),
+        'outline-soft': _webCssColor(
+          colors.outlineVariant.withValues(alpha: isDark ? 0.24 : 0.18),
+        ),
+        'outline-frosted': _webCssColor(
+          colors.outlineVariant.withValues(alpha: 0.14),
+        ),
+        'outline-solid': _webCssColor(
+          colors.outlineVariant.withValues(alpha: 0.16),
+        ),
+        'user': _webCssColor(
+          colors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+        ),
+        'thinking': _webCssColor(
+          colors.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30),
+        ),
+        'frosted': _webCssColor(
+          isDark
+              // Matches the shared Flutter frosted message surface.
+              // color-gate: ignore
+              ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+              : Colors.white.withValues(alpha: 0.66),
+        ),
+        'muted': _webCssColor(
+          colors.onSurface.withValues(alpha: isDark ? 0.56 : 0.50),
+        ),
+        'model-icon-background': _webCssColor(
+          (isDark ? colors.onSurface : colors.primary).withValues(alpha: 0.10),
+        ),
         'background-mask': _webCssColor(colors.surface),
         'background-mask-opacity': settings.chatBackgroundMaskStrength
             .clamp(0, 1)
             .toString(),
       },
+      user: buildWebChatUserSnapshot(
+        name: user.name,
+        avatarType: user.avatarType,
+        avatarValue: user.avatarValue,
+      ),
+      display: display,
       assistant: assistant,
       fontScale: settings.chatFontScale,
       canStartMultiAI: _controller.canStartMultiAIComparison,
+      autoCollapseThinking: settings.autoCollapseThinking,
     );
     if (showPresetToggle) {
       snapshot['preset'] = <String, dynamic>{
@@ -1743,26 +1822,17 @@ class _HomePageState extends State<HomePage>
         'label': l10n.homePagePresetMessagesCount(presetCount),
       };
     }
-    snapshot['display'] = <String, dynamic>{
-      'userMarkdown': settings.enableUserMarkdown,
-      'assistantMarkdown': settings.enableAssistantMarkdown,
-      'reasoningMarkdown': settings.enableReasoningMarkdown,
-      'math': settings.enableMathRendering,
-      'dollarMath': settings.enableDollarLatex,
-      'wrapCode':
-          Platform.isMacOS ||
-          Platform.isWindows ||
-          Platform.isLinux ||
-          settings.mobileCodeBlockWrap,
-      'collapsedCodeLines': settings.autoCollapseCodeBlock
-          ? settings.autoCollapseCodeBlockLines
-          : null,
-    };
     final approvalService = context.read<ToolApprovalService>();
     final askUserService = context.read<AskUserInteractionService>();
     for (final message in snapshot['messages'] as List<dynamic>) {
       final map = message as Map<String, dynamic>;
-      for (final tool in map['tools'] as List<dynamic>) {
+      final tools = map['tools'] as List<dynamic>;
+      final stepCount =
+          (map['reasoning'] as List<dynamic>).length + tools.length;
+      if (stepCount > 2) {
+        map['expandStepsLabel'] = l10n.chainOfThoughtExpandSteps(stepCount - 2);
+      }
+      for (final tool in tools) {
         final toolMap = tool as Map<String, dynamic>;
         final toolId = toolMap['id']?.toString() ?? '';
         final arguments = Map<String, dynamic>.of(
@@ -1798,18 +1868,25 @@ class _HomePageState extends State<HomePage>
       message.copyWith(content: data.content),
       assistant: assistant,
     );
+    final reasoning = _webStreamingReasoning(messageId, data);
+    final tools = _webStreamingToolParts(messageId);
+    final hiddenStepCount = reasoning.length + tools.length - 2;
     return <String, dynamic>{
       'id': messageId,
       'content': visual,
       'isStreaming': true,
       'tokens': data.totalTokens,
-      'reasoning': _webStreamingReasoning(messageId, data),
+      'reasoning': reasoning,
       'contentSplits': <String, dynamic>{
         'offsets': data.contentSplitOffsets ?? const <int>[],
         'reasoningCounts': data.reasoningCountAtSplit ?? const <int>[],
         'toolCounts': data.toolCountAtSplit ?? const <int>[],
       },
-      'tools': _webStreamingToolParts(messageId),
+      'tools': tools,
+      if (hiddenStepCount > 0)
+        'expandStepsLabel': AppLocalizations.of(
+          context,
+        )!.chainOfThoughtExpandSteps(hiddenStepCount),
       'translation': data.translation,
     };
   }
@@ -1840,14 +1917,19 @@ class _HomePageState extends State<HomePage>
     final segments = _controller.reasoningSegments[messageId];
     if (segments != null && segments.isNotEmpty) {
       return segments
+          .asMap()
+          .entries
           .map(
-            (segment) => <String, dynamic>{
-              'text': segment.text,
-              'expanded': segment.expanded,
-              'loading': segment.finishedAt == null,
-              'startAt': segment.startAt?.toIso8601String(),
-              'finishedAt': segment.finishedAt?.toIso8601String(),
-              'toolStartIndex': segment.toolStartIndex,
+            (entry) => <String, dynamic>{
+              'kind': 'segment',
+              'index': entry.key,
+              'key': '$messageId:reasoning:segment:${entry.key}',
+              'text': entry.value.text,
+              'expanded': entry.value.expanded,
+              'loading': entry.value.finishedAt == null,
+              'startAt': entry.value.startAt?.toIso8601String(),
+              'finishedAt': entry.value.finishedAt?.toIso8601String(),
+              'toolStartIndex': entry.value.toolStartIndex,
             },
           )
           .toList(growable: false);
@@ -1857,8 +1939,13 @@ class _HomePageState extends State<HomePage>
     }
     return <Map<String, dynamic>>[
       <String, dynamic>{
+        'kind': 'single',
+        'index': 0,
+        'key': '$messageId:reasoning:single:0',
         'text': data.reasoningText,
-        'expanded': _controller.reasoning[messageId]?.expanded ?? true,
+        'expanded':
+            _controller.reasoning[messageId]?.expanded ??
+            !context.read<SettingsProvider>().autoCollapseThinking,
         'loading': data.reasoningFinishedAt == null,
         'startAt': data.reasoningStartAt?.toIso8601String(),
         'finishedAt': data.reasoningFinishedAt?.toIso8601String(),
@@ -1927,6 +2014,9 @@ class _HomePageState extends State<HomePage>
       case 'speak':
         await _controller.speakMessage(message);
         return;
+      case 'more':
+        await _showWebMessageMore(message, visibleMessages);
+        return;
       case 'share':
         _controller.shareMessage(
           visibleMessages.indexOf(message),
@@ -1976,11 +2066,23 @@ class _HomePageState extends State<HomePage>
           versions[next].version,
         );
         return;
-      case 'toggleReasoningSegment':
-        _controller.toggleReasoningSegment(
-          message.id,
-          (request.payload['index'] as num?)?.toInt() ?? 0,
-        );
+      case 'setReasoningExpanded':
+        final target = WebChatReasoningTarget.fromPayload(request.payload);
+        final updated = switch (target.kind) {
+          WebChatReasoningKind.single => _controller.setReasoningExpanded(
+            message.id,
+            target.expanded,
+          ),
+          WebChatReasoningKind.segment =>
+            _controller.setReasoningSegmentExpanded(
+              message.id,
+              target.index,
+              target.expanded,
+            ),
+        };
+        if (!updated) {
+          throw const WebChatProtocolException('reasoning target is stale');
+        }
         return;
       case 'approveTool':
         if (!mounted) return;
@@ -2006,19 +2108,94 @@ class _HomePageState extends State<HomePage>
         _submitWebAskUserAnswer(message, request.payload);
         return;
       case 'multiAI':
-        if (await _confirmWebMultiAIFallback()) {
-          if (!mounted) return;
-          final conversationId =
-              _controller.currentConversation?.id ?? message.conversationId;
-          setState(() {
-            _webFlutterConversationOverrides.add(conversationId);
-          });
-          await _controller.handleMultiAIAction(message);
-        }
+        await _startWebMultiAI(message);
         return;
       default:
         throw WebChatProtocolException('unsupported action ${request.action}');
     }
+  }
+
+  Future<void> _showWebMessageMore(
+    ChatMessage message,
+    List<ChatMessage> visibleMessages,
+  ) async {
+    if (!mounted) return;
+    final versions =
+        _controller.chatController.groupedMessages[message.groupId] ??
+        <ChatMessage>[message];
+    final hide = <MessageMoreAction>{};
+    if (!_controller.canStartMultiAIComparison) {
+      hide.add(MessageMoreAction.multiAI);
+    }
+    final action = await showMessageMoreSheet(
+      context,
+      message,
+      canDeleteAllVersions: versions.length > 1,
+      hideActions: hide,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case MessageMoreAction.deleteCurrentVersion:
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+        );
+        return;
+      case MessageMoreAction.deleteAllVersions:
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+          deleteAllVersions: true,
+        );
+        return;
+      case MessageMoreAction.edit:
+        await _controller.editMessage(message);
+        return;
+      case MessageMoreAction.fork:
+        await _controller.forkConversation(message);
+        return;
+      case MessageMoreAction.share:
+        _controller.shareMessage(
+          visibleMessages.indexOf(message),
+          visibleMessages,
+        );
+        return;
+      case MessageMoreAction.selectMessages:
+        _controller.startMessageSelection(
+          messageIndex: visibleMessages.indexOf(message),
+          messageList: visibleMessages,
+          mode: ChatSelectionMode.delete,
+        );
+        return;
+      case MessageMoreAction.multiAI:
+        await _startWebMultiAI(message);
+        return;
+      case MessageMoreAction.readingMode:
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ReadingModePage(
+              message: message,
+              assistantName: context
+                  .read<AssistantProvider>()
+                  .currentAssistant
+                  ?.name,
+            ),
+          ),
+        );
+        return;
+    }
+  }
+
+  Future<void> _startWebMultiAI(ChatMessage message) async {
+    if (!await _confirmWebMultiAIFallback() || !mounted) return;
+    final conversationId =
+        _controller.currentConversation?.id ?? message.conversationId;
+    setState(() {
+      _webFlutterConversationOverrides.add(conversationId);
+    });
+    await _controller.handleMultiAIAction(message);
   }
 
   ChatMessage? _findWebActionMessage(
@@ -2037,24 +2214,38 @@ class _HomePageState extends State<HomePage>
   }
 
   bool _webMessageActionAllowed(String action, ChatMessage message) {
+    if (message.isStreaming &&
+        const <String>{
+          'copy',
+          'more',
+          'regenerate',
+          'translate',
+          'speak',
+        }.contains(action)) {
+      return false;
+    }
     const common = <String>{
       'copy',
+      'more',
       'quote',
-      'translate',
-      'speak',
       'share',
       'fork',
       'select',
       'delete',
       'version',
-      'toggleReasoningSegment',
+    };
+    if (common.contains(action)) return true;
+    if (action == 'edit' || action == 'resend') return message.role == 'user';
+    const assistantOnly = <String>{
+      'regenerate',
+      'translate',
+      'speak',
+      'setReasoningExpanded',
       'approveTool',
       'denyTool',
       'answerTool',
     };
-    if (common.contains(action)) return true;
-    if (action == 'edit' || action == 'resend') return message.role == 'user';
-    if (action == 'regenerate') return message.role == 'assistant';
+    if (assistantOnly.contains(action)) return message.role == 'assistant';
     if (action == 'multiAI') {
       return message.role == 'assistant' &&
           _controller.canStartMultiAIComparison;
@@ -2158,8 +2349,17 @@ class _HomePageState extends State<HomePage>
   }
 
   String _webCssColor(Color color) {
-    final value = color.toARGB32() & 0x00ffffff;
-    return '#${value.toRadixString(16).padLeft(6, '0')}';
+    final value = color.toARGB32();
+    final alpha = (value >> 24) & 0xff;
+    final red = (value >> 16) & 0xff;
+    final green = (value >> 8) & 0xff;
+    final blue = value & 0xff;
+    if (alpha == 0xff) {
+      final rgb = value & 0x00ffffff;
+      return '#${rgb.toRadixString(16).padLeft(6, '0')}';
+    }
+    return 'rgba($red, $green, $blue, '
+        '${(alpha / 255).toStringAsFixed(3)})';
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {
@@ -2266,12 +2466,6 @@ class _HomePageState extends State<HomePage>
     return Builder(
       builder: (context) {
         final settings = context.watch<SettingsProvider>();
-        final conversationId =
-            _controller.currentConversation?.id ??
-            'temporary:${context.read<AssistantProvider>().currentAssistant?.id ?? 'unbound'}';
-        if (_webViewportRequested(settings, conversationId)) {
-          return const SizedBox.shrink();
-        }
         if (_controller.selecting) return const SizedBox.shrink();
         if (_controller.messages.isEmpty) {
           return const SizedBox.shrink();

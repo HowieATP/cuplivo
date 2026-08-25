@@ -54,18 +54,111 @@ void main() {
       hasMoreAfter: false,
       strings: const <String, String>{'copy': 'Copy'},
       theme: const <String, String>{'surface': '#ffffff'},
-      assistant: Assistant(id: 'a1', name: 'Assistant'),
+      user: const <String, dynamic>{
+        'name': 'Ada',
+        'avatarType': 'emoji',
+        'avatarLabel': '🦊',
+      },
+      display: const <String, dynamic>{
+        'backgroundStyle': 'frosted',
+        'showUserMessageActions': true,
+        'showTokenStats': true,
+      },
+      assistant: Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        avatar: r'\\server\share\assistant.png',
+        useAssistantAvatar: true,
+      ),
       fontScale: 1,
       canStartMultiAI: true,
+      autoCollapseThinking: true,
     );
 
     final rendered = (snapshot['messages'] as List).single as Map;
+    expect(snapshot['protocolVersion'], 2);
+    expect(snapshot['assetVersion'], 'web-chat-v2');
+    expect((snapshot['user'] as Map)['name'], 'Ada');
+    expect((snapshot['display'] as Map)['backgroundStyle'], 'frosted');
+    expect((snapshot['assistant'] as Map)['avatar'], startsWith('local:'));
+    expect((snapshot['assistant'] as Map)['avatar'], isNot(contains('server')));
     expect(rendered['content'], 'Visible answer');
-    expect(rendered['legacyThinking'], <String>['legacy thought']);
-    expect((rendered['reasoning'] as List).single['text'], 'live thought');
+    final renderedReasoning = (rendered['reasoning'] as List).single as Map;
+    expect(renderedReasoning['text'], 'live thought');
+    expect(renderedReasoning['kind'], 'single');
+    expect(renderedReasoning['index'], 0);
+    expect(renderedReasoning['key'], 'm1:reasoning:single:0');
+    expect(rendered['actions'], isEmpty);
     expect((rendered['tools'] as List).single['toolName'], 'search');
     expect(rendered['selected'], isTrue);
     expect(rendered['showContextDivider'], isTrue);
+  });
+
+  test('snapshot distinguishes segmented and local legacy reasoning', () {
+    final segmented = ChatMessage(
+      id: 'segment-message',
+      role: 'assistant',
+      content: 'Segment answer',
+      conversationId: 'c1',
+    );
+    final legacy = ChatMessage(
+      id: 'legacy-message',
+      role: 'assistant',
+      content: '<think>legacy thought</think>Legacy answer',
+      conversationId: 'c1',
+    );
+    final segment = stream_ctrl.ReasoningSegmentData()
+      ..text = 'segment thought'
+      ..expanded = false;
+    final snapshot = const WebChatSnapshotBuilder().build(
+      renderSessionId: 's1',
+      conversationId: 'c1',
+      renderRevision: 1,
+      actionEpoch: 1,
+      messages: <ChatMessage>[segmented, legacy],
+      byGroup: const <String, List<ChatMessage>>{},
+      versionSelections: const <String, int>{},
+      reasoning: const <String, stream_ctrl.ReasoningData>{},
+      reasoningSegments: <String, List<stream_ctrl.ReasoningSegmentData>>{
+        segmented.id: <stream_ctrl.ReasoningSegmentData>[segment],
+      },
+      contentSplits: const <String, stream_ctrl.ContentSplitData>{},
+      toolParts: const <String, List<ToolUIPart>>{},
+      selectedItems: const <String>{},
+      selecting: false,
+      truncCollapsedIndex: -1,
+      suggestions: const <String>[],
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+      strings: const <String, String>{},
+      theme: const <String, String>{},
+      user: const <String, dynamic>{'name': 'User'},
+      display: const <String, dynamic>{'showUserMessageActions': false},
+      assistant: null,
+      fontScale: 1,
+      canStartMultiAI: false,
+      autoCollapseThinking: true,
+    );
+
+    final messages = snapshot['messages'] as List;
+    final segmentedReasoning =
+        ((messages.first as Map)['reasoning'] as List).single as Map;
+    final legacyReasoning =
+        ((messages.last as Map)['reasoning'] as List).single as Map;
+
+    expect(segmentedReasoning['kind'], 'segment');
+    expect(segmentedReasoning['key'], 'segment-message:reasoning:segment:0');
+    expect(segmentedReasoning['expanded'], isFalse);
+    expect((messages.first as Map)['actions'], <String>[
+      'copy',
+      'regenerate',
+      'speak',
+      'translate',
+      'more',
+    ]);
+    expect(legacyReasoning['kind'], 'legacy');
+    expect(legacyReasoning['key'], 'legacy-message:reasoning:legacy:0');
+    expect(legacyReasoning['expanded'], isFalse);
   });
 
   test('attachment parser emits opaque handles for local paths', () {
@@ -77,5 +170,47 @@ void main() {
     expect(attachments.first['reference'], startsWith('local:'));
     expect(attachments.first['reference'], isNot(contains('/private')));
     expect(attachments.last['name'], 'Doc');
+  });
+
+  test('media registry keeps local and bundled asset paths opaque', () {
+    final message = ChatMessage(
+      id: 'model-message',
+      role: 'assistant',
+      content: '[image:/private/photo.png]',
+      conversationId: 'c1',
+      modelId: 'gpt-5',
+      providerId: 'openai',
+    );
+
+    final registry = buildWebChatMediaRegistry(
+      <ChatMessage>[message],
+      assistant: Assistant(
+        id: 'assistant',
+        name: 'Assistant',
+        avatar: r'\\server\share\assistant.png',
+      ),
+      userAvatarType: 'file',
+      userAvatarValue: '/private/avatar.png',
+    );
+
+    expect(registry.keys, everyElement(isNot(contains('/private'))));
+    expect(
+      registry.values.any(
+        (source) => source.kind == WebChatMediaSourceKind.localFile,
+      ),
+      isTrue,
+    );
+    expect(
+      registry.values.any(
+        (source) => source.kind == WebChatMediaSourceKind.bundledAsset,
+      ),
+      isTrue,
+    );
+    expect(
+      registry.values.any(
+        (source) => source.value == r'\\server\share\assistant.png',
+      ),
+      isTrue,
+    );
   });
 }

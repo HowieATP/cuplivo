@@ -20,6 +20,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../controllers/conversation_viewport_port.dart';
 import 'android_web_chat_view.dart';
 import 'web_chat_protocol.dart';
+import 'web_chat_snapshot.dart';
 
 typedef WebChatActionHandler =
     Future<void> Function(WebChatActionRequest request);
@@ -30,21 +31,23 @@ class WebConversationViewport extends StatefulWidget {
   const WebConversationViewport({
     super.key,
     required this.snapshot,
-    required this.localMediaPaths,
+    required this.mediaRegistry,
     required this.viewportPort,
     required this.streamingContentNotifier,
     required this.buildStreamingPatch,
     required this.onAction,
     required this.onUseFlutter,
+    required this.onUserScrollIntent,
   });
 
   final Map<String, dynamic> snapshot;
-  final Map<String, String> localMediaPaths;
+  final Map<String, WebChatMediaSource> mediaRegistry;
   final WebConversationViewportPort viewportPort;
   final StreamingContentNotifier streamingContentNotifier;
   final WebChatStreamingPatchBuilder buildStreamingPatch;
   final WebChatActionHandler onAction;
   final VoidCallback onUseFlutter;
+  final VoidCallback onUserScrollIntent;
 
   @override
   State<WebConversationViewport> createState() =>
@@ -382,7 +385,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         unawaited(_handleMediaRequest(message));
         return;
       case 'viewportMetrics':
+        final wasUserScrolling = widget.viewportPort.isUserScrolling;
         widget.viewportPort.updateMetrics(message);
+        if (!wasUserScrolling && widget.viewportPort.isUserScrolling) {
+          widget.onUserScrollIntent();
+        }
         return;
       case 'diagnostic':
         debugPrint(
@@ -422,33 +429,31 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       return;
     }
     final handle = message['handle']?.toString() ?? '';
-    if (!handle.startsWith('local:')) return;
+    if (!handle.startsWith('local:') && !handle.startsWith('asset:')) return;
     try {
-      final path = widget.localMediaPaths[handle];
-      if (path == null) {
-        throw const WebChatProtocolException('unknown local media handle');
+      final source = widget.mediaRegistry[handle];
+      if (source == null) {
+        throw const WebChatProtocolException('unknown media handle');
       }
-      final resolvedPath = SandboxPathResolver.fix(path);
-      final file = File(resolvedPath);
-      if (!await file.exists()) {
-        throw const FileSystemException('media file does not exist');
-      }
-      final extension = resolvedPath.toLowerCase().split('.').last;
+      final extension = source.value.toLowerCase().split('.').last;
       final mime = switch (extension) {
         'png' => 'image/png',
         'jpg' || 'jpeg' => 'image/jpeg',
         'gif' => 'image/gif',
         'webp' => 'image/webp',
+        'svg' when source.kind == WebChatMediaSourceKind.bundledAsset =>
+          'image/svg+xml',
         _ => null,
       };
       if (mime == null) {
-        throw const WebChatProtocolException('unsupported local media type');
+        throw const WebChatProtocolException('unsupported media type');
       }
-      final length = await file.length();
-      if (length > 16 * 1024 * 1024) {
-        throw const WebChatProtocolException('local media exceeds size limit');
-      }
-      final bytes = await file.readAsBytes();
+      final bytes = switch (source.kind) {
+        WebChatMediaSourceKind.localFile => await _readLocalMedia(source.value),
+        WebChatMediaSourceKind.bundledAsset => await _readBundledMedia(
+          source.value,
+        ),
+      };
       final payload = <String, dynamic>{
         'type': 'mediaResult',
         'renderSessionId': _renderSessionId,
@@ -464,7 +469,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       }
     } catch (error) {
       debugPrint(
-        'WebConversationViewport: local media request failed '
+        'WebConversationViewport: media request failed '
         '(${error.runtimeType})',
       );
       await _sendEnvelope(<String, dynamic>{
@@ -472,6 +477,32 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         'handle': handle,
       });
     }
+  }
+
+  Future<Uint8List> _readLocalMedia(String path) async {
+    final resolvedPath = SandboxPathResolver.fix(path);
+    final file = File(resolvedPath);
+    if (!await file.exists()) {
+      throw const FileSystemException('media file does not exist');
+    }
+    final length = await file.length();
+    if (length > 16 * 1024 * 1024) {
+      throw const WebChatProtocolException('local media exceeds size limit');
+    }
+    return file.readAsBytes();
+  }
+
+  Future<Uint8List> _readBundledMedia(String path) async {
+    if (!path.startsWith('assets/icons/') ||
+        path.contains('..') ||
+        path.contains(r'\')) {
+      throw const WebChatProtocolException('bundled media is not allowed');
+    }
+    final data = await rootBundle.load(path);
+    if (data.lengthInBytes > 2 * 1024 * 1024) {
+      throw const WebChatProtocolException('bundled media exceeds size limit');
+    }
+    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
   }
 
   bool _isAuthorizedBridgeRequest(Map<String, dynamic> message) =>

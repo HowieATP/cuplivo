@@ -2289,6 +2289,7 @@
   "webChatUser": "你",
   "webChatAssistant": "助手",
   "webChatTokens": "Token",
+  "webChatCode": "程式碼",
   "webChatCopyCode": "複製程式碼",
   "webChatHtmlPreview": "HTML 預覽",
   "webChatReasoning": "思維鏈",

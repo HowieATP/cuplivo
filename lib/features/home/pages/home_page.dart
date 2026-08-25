@@ -1732,6 +1732,7 @@ class _HomePageState extends State<HomePage>
         'user': l10n.webChatUser,
         'assistant': l10n.webChatAssistant,
         'tokens': l10n.webChatTokens,
+        'code': l10n.webChatCode,
         'copyCode': l10n.webChatCopyCode,
         'expandCode': l10n.codeBlockExpandButton,
         'collapseCode': l10n.codeBlockCollapseButton,
@@ -1775,6 +1776,19 @@ class _HomePageState extends State<HomePage>
         'error': _webCssColor(colors.error),
         'card': _webCssColor(semantic.surfaceCard),
         'surface-fill': _webCssColor(semantic.surfaceFill),
+        'code-body': _webCssColor(
+          colors.surfaceContainer.withValues(alpha: 0.90),
+        ),
+        'code-header': _webCssColor(
+          colors.surfaceContainerHighest.withValues(alpha: 0.90),
+        ),
+        'code-border': _webCssColor(colors.outlineVariant),
+        'code-header-text': _webCssColor(
+          colors.onSurfaceVariant.withValues(alpha: 0.72),
+        ),
+        'code-action': _webCssColor(
+          colors.onSurfaceVariant.withValues(alpha: 0.50),
+        ),
         'outline': _webCssColor(colors.outlineVariant),
         'outline-soft': _webCssColor(
           colors.outlineVariant.withValues(alpha: isDark ? 0.24 : 0.18),

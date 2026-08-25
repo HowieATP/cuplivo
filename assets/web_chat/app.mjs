@@ -14,6 +14,7 @@ import {
   reduceEnvelope,
   restoreAnchor,
   restoreViewport,
+  verticalGestureIntent,
   visibleRange,
 } from './protocol.mjs';
 
@@ -33,13 +34,17 @@ let userScrollTimer = null;
 let renderedRange = { start: -1, end: -1 };
 let topSpacer = null;
 let bottomSpacer = null;
+let touchStartX = null;
 let touchStartY = null;
 let touchActive = false;
+let pointerStartX = null;
 let pointerStartY = null;
 let scrollStopLock = false;
 let scrollStopFrame = 0;
 let scrollStopTop = 0;
 let scrollStopLeft = 0;
+let gestureActive = false;
+let gestureIntent = 'idle';
 let renderedSessionId = null;
 let reasoningElapsedTimer = null;
 
@@ -295,6 +300,29 @@ function markdownNode(content, streaming = false, kind = 'assistant') {
   return root;
 }
 
+function normalizeCodeLanguage(language) {
+  const normalized = language.trim().toLowerCase();
+  return ({
+    js: 'javascript',
+    ts: 'typescript',
+    sh: 'bash',
+    zsh: 'bash',
+    shell: 'bash',
+    yml: 'yaml',
+    py: 'python',
+    rb: 'ruby',
+    rs: 'rust',
+    kt: 'kotlin',
+    'c++': 'cpp',
+    'c#': 'csharp',
+    md: 'markdown',
+    text: 'plaintext',
+    txt: 'plaintext',
+    plain: 'plaintext',
+    plaintext: 'plaintext',
+  }[normalized] ?? normalized) || 'plaintext';
+}
+
 function enhanceMarkdown(root, streaming) {
   for (const link of root.querySelectorAll('a[href]')) {
     const href = link.getAttribute('href');
@@ -317,37 +345,26 @@ function enhanceMarkdown(root, streaming) {
   for (const image of root.querySelectorAll('img')) image.referrerPolicy = 'no-referrer';
   for (const code of root.querySelectorAll('pre > code')) {
     const language = [...code.classList].find((name) => name.startsWith('language-'))?.slice(9) ?? '';
-    if (language === 'mermaid' && !streaming) {
+    const highlightLanguage = normalizeCodeLanguage(language);
+    const pre = code.parentElement;
+    const source = code.textContent ?? '';
+    if (highlightLanguage === 'mermaid' && !streaming) {
       renderMermaid(code.parentElement, code.textContent ?? '');
       continue;
     }
-    if (language === 'html' && !streaming) addHtmlPreview(code.parentElement, code.textContent ?? '');
-    try { window.hljs.highlightElement(code); }
-    catch { bridge.post({ type: 'diagnostic', code: 'highlight_block_failed' }); }
-    const copy = button(t('copyCode'), () => {
-      sendAction('copyText', null, { text: code.textContent ?? '' });
-    });
-    code.parentElement.prepend(copy);
-    if (state.display?.wrapCode === true) code.style.whiteSpace = 'pre-wrap';
-    const threshold = Number(state.display?.collapsedCodeLines ?? 0);
-    const lineCount = (code.textContent?.match(/\n/g)?.length ?? 0) + 1;
-    if (threshold > 0 && lineCount > threshold) {
-      const pre = code.parentElement;
-      const expansionKey = stableTextKey('code', code.textContent ?? '');
-      const applyCodeExpansion = (expanded) => {
-        pre.classList.toggle('code-collapsed', !expanded);
-        toggle.textContent = expanded ? t('collapseCode') : t('expandCode');
-        toggle.setAttribute('aria-label', toggle.textContent);
-      };
-      pre.style.setProperty('--collapsed-lines', String(threshold));
-      const toggle = button(t('expandCode'), () => {
-        const expanded = !localExpansion(expansionKey, false);
-        localExpansions.set(expansionKey, expanded);
-        applyCodeExpansion(expanded);
-      });
-      pre.prepend(toggle);
-      applyCodeExpansion(localExpansion(expansionKey, false));
+    if (highlightLanguage === 'html' && !streaming) addHtmlPreview(pre, code.textContent ?? '');
+    const displaySource = source.replace(/(?:\r\n|\r|\n)+$/, '');
+    code.classList.add('hljs');
+    try {
+      code.innerHTML = window.hljs.highlight(displaySource, {
+        language: highlightLanguage,
+        ignoreIllegals: true,
+      }).value;
+    } catch {
+      code.textContent = displaySource;
+      bridge.post({ type: 'diagnostic', code: 'highlight_block_failed' });
     }
+    renderCodeBlock(pre, code, language, source);
   }
   try {
     if (state.display?.math === false) return;
@@ -361,6 +378,63 @@ function enhanceMarkdown(root, streaming) {
       ],
     });
   } catch { bridge.post({ type: 'diagnostic', code: 'math_block_failed' }); }
+}
+
+function renderCodeBlock(pre, code, language, source) {
+  const displaySource = code.textContent ?? '';
+  const threshold = Number(state.display?.collapsedCodeLines ?? 0);
+  const lineCount = (displaySource.match(/\n/g)?.length ?? 0) + 1;
+  const collapsible = threshold > 0 && lineCount > threshold;
+  const expansionKey = stableTextKey('code', source);
+  const block = document.createElement('section');
+  block.className = 'code-block';
+  block.dataset.component = 'code-block';
+  block.classList.toggle('is-wrapped', state.display?.wrapCode === true);
+  if (collapsible) block.style.setProperty('--collapsed-lines', String(threshold));
+
+  const header = document.createElement('div');
+  header.className = 'code-block-header';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'code-block-toggle';
+  toggle.setAttribute('aria-label', collapsible ? t('expandCode') : t('code'));
+  toggle.setAttribute('aria-expanded', String(!collapsible));
+  const languageLabel = document.createElement('span');
+  languageLabel.className = 'code-block-language';
+  languageLabel.textContent = language.trim() || t('code');
+  const chevron = iconNode('next', 'code-block-chevron');
+  chevron.hidden = true;
+  toggle.append(languageLabel, chevron);
+
+  const copy = iconButton(
+    'copy',
+    t('copyCode'),
+    () => sendAction('copyText', null, { text: source }),
+    'code-block-action',
+  );
+  header.append(toggle, copy);
+
+  const body = document.createElement('div');
+  body.className = 'code-block-body';
+  pre.className = 'code-block-pre';
+  body.append(pre);
+  block.append(header, body);
+  pre.replaceWith(block);
+
+  const applyCodeExpansion = (expanded) => {
+    block.classList.toggle('is-collapsed', !expanded);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', expanded ? t('collapseCode') : t('expandCode'));
+    chevron.hidden = expanded;
+  };
+  if (collapsible) {
+    toggle.addEventListener('click', () => {
+      const expanded = !localExpansion(expansionKey, false);
+      localExpansions.set(expansionKey, expanded);
+      applyCodeExpansion(expanded);
+    });
+    applyCodeExpansion(localExpansion(expansionKey, false));
+  }
 }
 
 async function renderMermaid(pre, source) {
@@ -1048,24 +1122,32 @@ function releaseScrollStopLock() {
     scrollStopFrame = 0;
   }
 }
+function restoreScrollStopPosition() {
+  if (!scrollStopLock) return;
+  if (timeline.scrollTop !== scrollStopTop || timeline.scrollLeft !== scrollStopLeft) {
+    timeline.scrollTo({ left: scrollStopLeft, top: scrollStopTop, behavior: 'auto' });
+  }
+}
 function enforceScrollStop() {
   if (!scrollStopLock) {
     scrollStopFrame = 0;
     return;
   }
-  if (timeline.scrollTop !== scrollStopTop || timeline.scrollLeft !== scrollStopLeft) {
-    timeline.scrollTo({ left: scrollStopLeft, top: scrollStopTop, behavior: 'auto' });
-  }
+  restoreScrollStopPosition();
   scrollStopFrame = requestAnimationFrame(enforceScrollStop);
 }
 function stopScrolling() {
-  scrollStopLock = true;
-  scrollStopTop = timeline.scrollTop;
-  scrollStopLeft = timeline.scrollLeft;
+  // The Flutter/Android bridge may deliver this call slightly after the DOM
+  // pointer event. Never restart the lock after this gesture already became a
+  // real drag.
+  if (gestureActive && gestureIntent !== 'hold') return;
+  if (!scrollStopLock) {
+    scrollStopLock = true;
+    scrollStopTop = timeline.scrollTop;
+    scrollStopLeft = timeline.scrollLeft;
+  }
   timeline.style.scrollBehavior = 'auto';
-  timeline.scrollTo({ left: scrollStopLeft, top: scrollStopTop, behavior: 'auto' });
-  timeline.scrollLeft = scrollStopLeft;
-  timeline.scrollTop = scrollStopTop;
+  restoreScrollStopPosition();
   if (!scrollStopFrame) scrollStopFrame = requestAnimationFrame(enforceScrollStop);
 }
 function markUserScroll() {
@@ -1082,51 +1164,98 @@ function markUserScroll() {
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
 timeline.addEventListener('pointerdown', (event) => {
+  gestureActive = true;
+  gestureIntent = 'hold';
+  pointerStartX = event.clientX;
   pointerStartY = event.clientY;
   stopScrolling();
 }, { passive: true });
 timeline.addEventListener('pointermove', (event) => {
-  if (pointerStartY != null && Math.abs(event.clientY - pointerStartY) >= 3) {
-    releaseScrollStopLock();
-    pointerStartY = event.clientY;
-  }
+  if (pointerStartX == null || pointerStartY == null) return;
+  const intent = verticalGestureIntent({
+    startX: pointerStartX,
+    startY: pointerStartY,
+    currentX: event.clientX,
+    currentY: event.clientY,
+  });
+  if (intent === 'hold') return;
+  gestureIntent = intent;
+  releaseScrollStopLock();
+  pointerStartX = null;
+  pointerStartY = null;
+  if (intent === 'vertical') markUserScroll();
 }, { passive: true });
 timeline.addEventListener('pointerup', () => {
+  gestureActive = false;
+  gestureIntent = 'idle';
+  pointerStartX = null;
   pointerStartY = null;
   releaseScrollStopLock();
 }, { passive: true });
 timeline.addEventListener('pointercancel', () => {
+  if (touchActive && gestureIntent === 'hold') return;
+  gestureActive = false;
+  gestureIntent = 'idle';
+  pointerStartX = null;
   pointerStartY = null;
   releaseScrollStopLock();
 }, { passive: true });
 timeline.addEventListener('touchstart', (event) => {
+  gestureActive = true;
+  gestureIntent = 'hold';
   touchActive = true;
   stopScrolling();
   setRenderBlocked(true);
+  touchStartX = event.touches[0]?.clientX ?? null;
   touchStartY = event.touches[0]?.clientY ?? null;
 }, { passive: true });
 timeline.addEventListener('touchmove', (event) => {
+  const currentX = event.touches[0]?.clientX;
   const current = event.touches[0]?.clientY;
-  if (touchStartY != null && current != null &&
-      Math.abs(current - touchStartY) >= 3) {
-    releaseScrollStopLock();
-    markUserScroll();
-    touchStartY = current;
+  if (touchStartX == null || touchStartY == null ||
+      currentX == null || current == null) return;
+  const intent = verticalGestureIntent({
+    startX: touchStartX,
+    startY: touchStartY,
+    currentX,
+    currentY: current,
+  });
+  if (intent === 'hold') {
+    restoreScrollStopPosition();
+    if (scrollStopLock && event.cancelable) {
+      event.preventDefault();
+    }
+    return;
   }
-}, { passive: true });
+  gestureIntent = intent;
+  releaseScrollStopLock();
+  touchStartX = null;
+  touchStartY = null;
+  if (intent === 'vertical') markUserScroll();
+}, { passive: false });
 timeline.addEventListener('touchend', () => {
+  gestureActive = false;
+  gestureIntent = 'idle';
   releaseScrollStopLock();
   touchActive = false;
+  touchStartX = null;
   touchStartY = null;
   if (!userScrolling) setRenderBlocked(false);
 }, { passive: true });
 timeline.addEventListener('touchcancel', () => {
+  gestureActive = false;
+  gestureIntent = 'idle';
   releaseScrollStopLock();
   touchActive = false;
+  touchStartX = null;
   touchStartY = null;
   if (!userScrolling) setRenderBlocked(false);
 }, { passive: true });
 timeline.addEventListener('scroll', () => {
+  if (scrollStopLock) {
+    restoreScrollStopPosition();
+    return;
+  }
   if (userScrolling) markUserScroll();
   if (state?.messages?.length) {
     const range = visibleRange({

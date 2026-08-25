@@ -12287,6 +12287,12 @@ abstract class AppLocalizations {
   /// **'tokens'**
   String get webChatTokens;
 
+  /// No description provided for @webChatCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get webChatCode;
+
   /// No description provided for @webChatCopyCode.
   ///
   /// In en, this message translates to:

@@ -2760,6 +2760,7 @@
   "webChatUser": "You",
   "webChatAssistant": "Assistant",
   "webChatTokens": "tokens",
+  "webChatCode": "Code",
   "webChatCopyCode": "Copy code",
   "webChatHtmlPreview": "HTML preview",
   "webChatReasoning": "Reasoning",

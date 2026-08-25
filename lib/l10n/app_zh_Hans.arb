@@ -2292,6 +2292,7 @@
   "webChatUser": "你",
   "webChatAssistant": "助手",
   "webChatTokens": "Token",
+  "webChatCode": "代码",
   "webChatCopyCode": "复制代码",
   "webChatHtmlPreview": "HTML 预览",
   "webChatReasoning": "思维链",

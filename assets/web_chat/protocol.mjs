@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v6';
+export const ASSET_VERSION = 'web-chat-v8';
 
 const transfers = new Map();
 
@@ -95,6 +95,24 @@ export function normalizeContentInset(value, fallback = 8) {
 export function normalizeMeasuredHeight(value) {
   const height = Number(value);
   return Number.isFinite(height) && height > 0 ? Math.ceil(height) : null;
+}
+
+export function verticalGestureIntent({
+  startX,
+  startY,
+  currentX,
+  currentY,
+  slop = 18,
+}) {
+  const dx = Number(currentX) - Number(startX);
+  const dy = Number(currentY) - Number(startY);
+  const threshold = Number.isFinite(Number(slop)) && Number(slop) > 0
+    ? Number(slop)
+    : 18;
+  if (![dx, dy].every(Number.isFinite) || Math.hypot(dx, dy) < threshold) {
+    return 'hold';
+  }
+  return Math.abs(dy) >= Math.abs(dx) ? 'vertical' : 'horizontal';
 }
 
 export function formatReasoningElapsed(startAt, finishedAt, loading, now = Date.now()) {

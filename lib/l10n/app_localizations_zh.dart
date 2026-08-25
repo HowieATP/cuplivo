@@ -6496,6 +6496,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webChatTokens => 'Token';
 
   @override
+  String get webChatCode => '代码';
+
+  @override
   String get webChatCopyCode => '复制代码';
 
   @override
@@ -15161,6 +15164,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCode => '代码';
 
   @override
   String get webChatCopyCode => '复制代码';
@@ -23829,6 +23835,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCode => '程式碼';
 
   @override
   String get webChatCopyCode => '複製程式碼';

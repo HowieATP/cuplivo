@@ -8,6 +8,7 @@ import {
   createFrameCoalescer,
   createRenderGate,
   formatReasoningElapsed,
+  verticalGestureIntent,
   normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
@@ -40,14 +41,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v6', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v8', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v6',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v8',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -291,6 +292,57 @@ test('pointer down cancels momentum before release while preserving a new drag',
   const touchStart = appSource.indexOf("timeline.addEventListener('touchstart'");
   const touchStartBody = appSource.slice(touchStart, touchStart + 500);
   assert.match(touchStartBody, /touchActive = true[\s\S]*?stopScrolling\(\)/);
+});
+
+test('touch jitter below the Flutter slop keeps the scroll lock and blocks native drift', () => {
+  assert.equal(
+    verticalGestureIntent({ startX: 100, startY: 100, currentX: 110, currentY: 110 }),
+    'hold',
+  );
+  assert.equal(
+    verticalGestureIntent({ startX: 100, startY: 100, currentX: 100, currentY: 118 }),
+    'vertical',
+  );
+  assert.equal(
+    verticalGestureIntent({ startX: 100, startY: 100, currentX: 120, currentY: 101 }),
+    'horizontal',
+  );
+  assert.match(appSource, /let touchStartX = null/);
+  assert.match(appSource, /let pointerStartX = null/);
+  assert.match(appSource, /verticalGestureIntent\(/);
+  assert.match(appSource, /event\.preventDefault\(\)/);
+  assert.match(appSource, /touchmove'[\s\S]*?passive: false/);
+  assert.match(appSource, /intent === 'hold'[\s\S]*?scrollStopLock/);
+  assert.match(appSource, /function stopScrolling[\s\S]*?if \(!scrollStopLock\)/);
+  assert.match(appSource, /function restoreScrollStopPosition/);
+  assert.match(appSource, /let gestureActive = false/);
+  assert.match(appSource, /let gestureIntent = 'idle'/);
+  assert.match(appSource, /function stopScrolling[\s\S]*?gestureActive[\s\S]*?gestureIntent/);
+  assert.match(appSource, /timeline\.addEventListener\('scroll'[\s\S]*?if \(scrollStopLock\)[\s\S]*?return;/);
+});
+
+test('code blocks use the Flutter surface, header, and code-view structure', () => {
+  assert.match(appSource, /code-block-header/);
+  assert.match(appSource, /code-block-body/);
+  assert.match(appSource, /code-block-toggle/);
+  assert.match(appSource, /code-block-action/);
+  assert.match(appSource, /code-block-pre/);
+  assert.match(styleSource, /\.code-block\s*\{/);
+  assert.match(styleSource, /\.code-block-header\s*\{/);
+  assert.match(styleSource, /\.code-block-body\s*\{/);
+  assert.match(styleSource, /\.code-block-pre\s*\{/);
+  assert.match(styleSource, /\.code-block-action[\s\S]*?display: grid/);
+  assert.match(styleSource, /\.code-block-action[\s\S]*?border: 0/);
+  assert.match(styleSource, /code\.hljs\s*\{/);
+  assert.match(styleSource, /body\[data-dark="true"\][\s\S]*?\.hljs-keyword/);
+  assert.match(styleSource, /font-size:\s*calc\(13px \* var\(--cuplivo-font-scale\)\)/);
+  assert.match(styleSource, /\.hljs-deletion[\s\S]*?background: #ffdddd/);
+  assert.match(styleSource, /\.hljs-addition[\s\S]*?background: #ddffdd/);
+  assert.match(appSource, /function normalizeCodeLanguage/);
+  assert.match(appSource, /language: highlightLanguage/);
+  assert.match(appSource, /plaintext/);
+  assert.match(styleSource, /\.code-block\.is-collapsed/);
+  assert.match(appSource, /source\.replace\(\/\(\?:\\r\\n\|\\r\|\\n\)\+\$\//);
 });
 
 test('virtual DOM replacement captures scroll state first and applies Flutter insets', () => {

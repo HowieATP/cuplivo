@@ -6788,6 +6788,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webChatTokens => 'tokens';
 
   @override
+  String get webChatCode => 'Code';
+
+  @override
   String get webChatCopyCode => 'Copy code';
 
   @override

@@ -181,6 +181,7 @@ List<ChatMessage> selectForkConversationMessages({
   required List<ChatMessage> messages,
   required ChatMessage targetMessage,
   Map<String, int> versionSelections = const <String, int>{},
+  bool preserveVersions = false,
 }) {
   // When forking from a multi-AI thread, only include messages from the same
   // thread (subgroupId). Cross-round continuity is maintained per thread.
@@ -208,6 +209,16 @@ List<ChatMessage> selectForkConversationMessages({
   final targetGroup = (targetMessage.groupId ?? targetMessage.id);
   final targetOrderIndex = groupOrder.indexOf(targetGroup);
   if (targetOrderIndex < 0) return const <ChatMessage>[];
+
+  if (preserveVersions) {
+    // Keep every version of every group anchored at or before the target;
+    // emit in source timeline order (later versions of a kept group drift
+    // after other groups — preserve those drift positions).
+    final keptGroups = groupOrder.take(targetOrderIndex + 1).toSet();
+    return filtered
+        .where((m) => keptGroups.contains(m.groupId ?? m.id))
+        .toList(growable: false);
+  }
 
   final selected = <ChatMessage>[];
   for (final groupId in groupOrder.take(targetOrderIndex + 1)) {
@@ -1041,12 +1052,16 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
+    final preserveVersions = _contextProvider
+        .read<SettingsProvider>()
+        .forkKeepMessageVersions;
     final allMessages = _chatController
         .allMessagesForCurrentConversationContext();
     final selected = selectForkConversationMessages(
       messages: allMessages,
       targetMessage: message,
       versionSelections: versionSelections,
+      preserveVersions: preserveVersions,
     );
     if (selected.isEmpty) return;
 
@@ -1054,6 +1069,9 @@ class HomeViewModel extends ChangeNotifier {
       title: getTitleForLocale(_contextProvider),
       assistantId: currentConversation?.assistantId,
       sourceMessages: selected,
+      preserveVersions: preserveVersions,
+      sourceVersionSelections: preserveVersions ? versionSelections : null,
+      forkTargetMessageId: preserveVersions ? message.id : null,
     );
 
     // Switch to the new conversation

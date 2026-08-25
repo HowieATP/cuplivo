@@ -444,7 +444,6 @@ class McpProvider extends ChangeNotifier {
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
   McpStatus statusFor(String id) => _status[id] ?? McpStatus.idle;
   String? errorFor(String id) => _errors[id];
-  bool get hasAnyEnabled => _servers.any((s) => s.enabled);
   bool isConnected(String id) =>
       _clients.containsKey(id) && statusFor(id) == McpStatus.connected;
   List<McpServerConfig> get connectedServers => _servers

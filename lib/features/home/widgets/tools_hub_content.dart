@@ -543,7 +543,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, child) in children.indexed) ...[
-                if (i > 0) const SizedBox(height: 10),
+                if (i > 0) const SizedBox(height: 6),
                 child,
               ],
             ],

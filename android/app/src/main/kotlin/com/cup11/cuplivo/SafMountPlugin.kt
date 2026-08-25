@@ -214,6 +214,7 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
       } catch (e: FileNotFoundException) {
         mainHandler.post { result.error("uri_not_found", e.message, null) }
       } catch (e: Exception) {
+        android.util.Log.e(TAG, "saf_mount background operation failed", e)
         mainHandler.post { result.error("access_failed", e.message ?: e.javaClass.simpleName, null) }
       }
     }.start()
@@ -233,6 +234,29 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     return uri
   }
 
+  /**
+   * Canonical roots of the app-private internal storage that the Dart side
+   * may legitimately stream files through (path_provider layout on Android):
+   *
+   * - [Context.filesDir]            -> /data/user/0/<pkg>/files
+   *   (`getApplicationSupportDirectory`, databases, plugin stores)
+   * - [Context.getDir]("flutter")   -> /data/user/0/<pkg>/app_flutter
+   *   (`getApplicationDocumentsDirectory`: SAF mirrors, uploads, images, …)
+   * - [Context.cacheDir]            -> /data/user/0/<pkg>/cache
+   *   (transient scratch)
+   *
+   * The SAF mirror lives under the DOCUMENTS directory (`app_flutter/
+   * saf_mounts/`), which is a SIBLING of filesDir — NOT inside it. A
+   * whitelist of filesDir alone rejects every mirror/temp path with
+   * bad_args, so no file is ever copied in either direction (issue #528:
+   * partial enumeration, zero-file sync, "sync failed — will retry").
+   */
+  private fun internalRoots(): List<File> = listOf(
+    appContext.filesDir,
+    appContext.getDir("flutter", Context.MODE_PRIVATE),
+    appContext.cacheDir,
+  ).map { it.canonicalFile }
+
   private fun parseInternalFile(
     call: MethodCall,
     key: String,
@@ -244,10 +268,15 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
       return null
     }
     return try {
-      val root = appContext.filesDir.canonicalFile
       val file = File(raw).canonicalFile
-      val rootPrefix = root.path + File.separator
-      if (!file.path.startsWith(rootPrefix)) {
+      // A path exactly equal to one of the roots has nothing to stream;
+      // require it to be strictly INSIDE a root so ".."-spelled roots and
+      // the root directories themselves are rejected.
+      if (!isInsideInternalRoots(file, internalRoots())) {
+        android.util.Log.w(
+          TAG,
+          "Rejected $key outside app-internal storage: ${file.path}",
+        )
         result.error("bad_args", "$key must stay inside app storage", null)
         null
       } else {
@@ -273,16 +302,17 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     }
   }
 
-  private fun copyToPath(uri: Uri, target: File) {
+  private fun copyToPath(uri: Uri, target: File): Boolean {
     val input = appContext.contentResolver.openInputStream(uri)
       ?: throw FileNotFoundException("Cannot open: $uri")
     target.parentFile?.mkdirs()
     input.use { source ->
       FileOutputStream(target).use { destination -> source.copyTo(destination) }
     }
+    return true
   }
 
-  private fun copyFromPath(uri: Uri, source: File) {
+  private fun copyFromPath(uri: Uri, source: File): Boolean {
     if (!source.isFile) throw FileNotFoundException("Cannot open: $source")
     // "rwt": read, write, truncate — overwrite in place without recreating
     // the document (keeps its identity and mtime behavior provider-side).
@@ -293,6 +323,7 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         FileOutputStream(descriptor.fileDescriptor).use { output -> input.copyTo(output) }
       }
     }
+    return true
   }
 
   private fun createFile(parentUri: Uri, name: String): String {
@@ -355,6 +386,18 @@ class SafMountPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
   companion object {
     private const val TAG = "SafMountPlugin"
     private const val PICK_TREE_REQUEST_CODE = 4201
+
+    /**
+     * True when [file] (already canonicalized) sits strictly inside one of
+     * [roots] (canonical app-internal directories). Pure so it can be unit
+     * tested without an Android context.
+     */
+    @JvmStatic
+    fun isInsideInternalRoots(file: File, roots: List<File>): Boolean {
+      return roots.any { root ->
+        file.path.startsWith(root.path + File.separator)
+      }
+    }
 
     /**
      * The outstanding pickTree result, shared across plugin instances.

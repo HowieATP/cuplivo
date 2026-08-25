@@ -128,7 +128,9 @@
 - **Export pipeline (两阶段流程, issue #538)**: ① **pack(打包)**: main-isolate 生成 settings.json/chats.json/deleted.json + `Isolate.run(_packZipSync)` 打成 staging ZIP(写入 `getTemporaryDirectory()`,即应用缓存目录);② **deliver(交付)**: 移动端 SAF `ACTION_CREATE_DOCUMENT`(contentResolver 流式拷贝到用户选的位置),桌面端 FilePicker 保存对话框。用户可见的导出文件只产生于第二阶段——staging ZIP 是匿名缓存,交付/失败后由 `cleanupTemporaryBackupFile` 清理。
 - **Success contract (成功契约)**: 打包转圈结束的瞬间**必须**弹出系统保存对话框(或桌面保存框)。未弹框 = pack 阶段异常或 deliver 启动前失败——历史上曾因导出入口无 try/catch 而静默吞掉(issue #538 的症状: 转几秒 → 无弹窗 → 无文件)。
 - **Failure semantics (失败语义)**: pack 或保存异常必须用户可见——`showAppSnackBar(backupPageExportFailed(e))` 展示错误 + `debugPrint` 阶段日志(打包起止耗时、SAF/FilePicker 结果);静默失败是 bug。SAF/FilePicker **用户取消**(`saved == false` / `savePath == null`)保持静默——系统语义,非错误。
-- **耗时提示 (elapsed hint)**: 导出转圈卡片可带"已耗时 Xs"轻量计时(1s ticker,dispose 取消)。字节级进度不做——隔离区 SendPort 进度管道成本不成比例(KISS)。
+- **耗时提示 (elapsed hint)**: 导出/备份转圈卡片带"已耗时 Xs"轻量计时(1s ticker,dispose 取消)。字节级进度不做——隔离区 SendPort 进度管道成本不成比例(KISS)。
+- **Stage model (三阶段, `BackupStage`)**: 生成文件(generating,main-isolate 写 settings/chats/deleted.json)→ 整合压缩(packing,`Isolate.run(_packZipSync)`)→ 上传(uploading,WebDAV/S3 PUT)。本地 `exportToFile` 无上传阶段(交付=用户保存对话框)。阶段 = 状态迁移回调(`BackupStageCallback`),不是字节级进度;`onStage` 为可选参数,LAN sync 等后台调用方不传。文案经 `backupStageLabel(l10n, stage)` 映射,"阶段"通过 `ValueNotifier<String>` 进入 `LoadingDialogCard`。
+- **Desktop modal parity (桌面模态对齐)**: 桌面端本地导出/WebDAV/S3 备份/增量与移动端一致——模态 `LoadingDialogCard`(barrierDismissible:false,防止重复触发)+ 阶段文案 + 计时;角落 busy 转圈仅保留为附加指示。
 - **Dot rule (dot 目录规则)**: `workspaces/` 下任何路径段以 `.` 开头的文件/目录(.sandbox、.fetch_cache、.github 等)声明性排除于备份/同步/恢复 —— 一条规则、多个表面(导出、增量统计、LAN manifest、恢复;glob/grep 同源)。导出侧遍历在 **walk 期剪枝**(dot 目录不下穿,`.sandbox` rootfs 可达十万级文件),输出集合与"全量递归 + 逐文件过滤"完全一致,只省遍历成本——剪枝永远不该改变内容集合。
 
 ## Backup Merge Semantics (智能合并)

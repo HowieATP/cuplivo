@@ -3,6 +3,7 @@ import 'package:Cuplivo/theme/app_font_weights.dart';
 import 'package:Cuplivo/theme/app_semantic_colors.dart';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -183,6 +184,7 @@ class _BackupPageState extends State<BackupPage> {
     BuildContext context,
     Future<T> Function() task, {
     String Function(int seconds)? elapsedTextBuilder,
+    ValueListenable<String>? labelListenable,
   }) async {
     final l10n = AppLocalizations.of(context)!;
     return _runWithLoadingOverlay(
@@ -190,6 +192,7 @@ class _BackupPageState extends State<BackupPage> {
       task,
       label: l10n.backupPageExporting,
       elapsedTextBuilder: elapsedTextBuilder,
+      labelListenable: labelListenable,
     );
   }
 
@@ -198,22 +201,35 @@ class _BackupPageState extends State<BackupPage> {
     Future<T> Function() task, {
     String? label,
     String Function(int seconds)? elapsedTextBuilder,
-  }) async {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => LoadingDialogCard(
-        label: label,
-        elapsedTextBuilder: elapsedTextBuilder,
-      ),
+    ValueListenable<String>? labelListenable,
+  }) {
+    return runWithLoadingDialog(
+      context,
+      task,
+      label: label,
+      elapsedTextBuilder: elapsedTextBuilder,
+      labelListenable: labelListenable,
     );
+  }
+
+  /// Runs a backup task under the modal overlay with a live stage label
+  /// (生成文件 → 整合压缩 → 上传). The notifier is created/disposed here so
+  /// callers never leak listeners.
+  Future<T> _runWithStageOverlay<T>(
+    BuildContext context,
+    Future<T> Function(BackupStageCallback onStage) task,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final stageLabel = ValueNotifier<String>(l10n.backupStageGenerating);
     try {
-      final res = await task();
-      return res;
+      return await _runWithExportingOverlay(
+        context,
+        () => task((stage) => stageLabel.value = backupStageLabel(l10n, stage)),
+        elapsedTextBuilder: l10n.backupPageExportElapsed,
+        labelListenable: stageLabel,
+      );
     } finally {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+      stageLabel.dispose();
     }
   }
 
@@ -713,9 +729,9 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final reminderProvider = context
                                   .read<BackupReminderProvider>();
-                              final success = await _runWithExportingOverlay(
+                              final success = await _runWithStageOverlay(
                                 context,
-                                () => vm.backup(),
+                                (onStage) => vm.backup(onStage: onStage),
                               );
                               if (!context.mounted) return;
                               final rawMessage = vm.message;
@@ -750,9 +766,12 @@ class _BackupPageState extends State<BackupPage> {
                                     analyzer: vm.analyzeIncrementalScope,
                                   );
                               if (config == null || !context.mounted) return;
-                              final success = await _runWithExportingOverlay(
+                              final success = await _runWithStageOverlay(
                                 context,
-                                () => vm.incrementalBackup(config),
+                                (onStage) => vm.incrementalBackup(
+                                  config,
+                                  onStage: onStage,
+                                ),
                               );
                               if (!context.mounted) return;
                               if (success && config.updateBackupTime) {
@@ -1118,9 +1137,9 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final reminderProvider = context
                                   .read<BackupReminderProvider>();
-                              final success = await _runWithExportingOverlay(
+                              final success = await _runWithStageOverlay(
                                 context,
-                                () => s3Vm.backup(),
+                                (onStage) => s3Vm.backup(onStage: onStage),
                               );
                               if (!context.mounted) return;
                               final rawMessage = s3Vm.message;
@@ -1155,9 +1174,12 @@ class _BackupPageState extends State<BackupPage> {
                                     analyzer: s3Vm.analyzeIncrementalScope,
                                   );
                               if (config == null || !context.mounted) return;
-                              final success = await _runWithExportingOverlay(
+                              final success = await _runWithStageOverlay(
                                 context,
-                                () => s3Vm.incrementalBackup(config),
+                                (onStage) => s3Vm.incrementalBackup(
+                                  config,
+                                  onStage: onStage,
+                                ),
                               );
                               if (!context.mounted) return;
                               if (success && config.updateBackupTime) {
@@ -1370,10 +1392,9 @@ class _BackupPageState extends State<BackupPage> {
     final File file;
     try {
       debugPrint('BackupExport: pack begin');
-      file = await _runWithExportingOverlay(
+      file = await _runWithStageOverlay(
         context,
-        () => vm.exportToFile(),
-        elapsedTextBuilder: l10n.backupPageExportElapsed,
+        (onStage) => vm.exportToFile(onStage: onStage),
       );
       stopwatch.stop();
       debugPrint(
@@ -1381,7 +1402,10 @@ class _BackupPageState extends State<BackupPage> {
         '${file.path}',
       );
     } catch (e) {
-      debugPrint('BackupExport: pack failed: $e');
+      debugPrint(
+        'BackupExport: pack failed after ${stopwatch.elapsedMilliseconds} ms: '
+        '$e',
+      );
       if (!context.mounted) return;
       showAppSnackBar(
         context,
@@ -1403,9 +1427,7 @@ class _BackupPageState extends State<BackupPage> {
           );
           debugPrint('BackupExport: system save result=$saved');
           if (saved && context.mounted) {
-            await context
-                .read<BackupReminderProvider>()
-                .recordBackupCompleted();
+            await _recordBackupReminderQuietly(context);
           }
         } catch (e) {
           debugPrint('BackupExport: system save failed: $e');
@@ -1417,21 +1439,32 @@ class _BackupPageState extends State<BackupPage> {
           );
         }
       } else {
-        final savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: file.uri.pathSegments.last,
-          type: FileType.custom,
-          allowedExtensions: ['zip'],
-        );
+        final String? savePath;
+        try {
+          savePath = await FilePicker.platform.saveFile(
+            dialogTitle: l10n.backupPageExportToFile,
+            fileName: file.uri.pathSegments.last,
+            type: FileType.custom,
+            allowedExtensions: ['zip'],
+          );
+          debugPrint('BackupExport: FilePicker result=$savePath');
+        } catch (e) {
+          debugPrint('BackupExport: picker failed: $e');
+          if (!context.mounted) return;
+          showAppSnackBar(
+            context,
+            message: l10n.backupPageExportFailed(e.toString()),
+            type: NotificationType.error,
+          );
+          return;
+        }
         if (savePath != null) {
           try {
             await File(savePath).parent.create(recursive: true);
             await file.copy(savePath);
             debugPrint('BackupExport: copied to $savePath');
             if (context.mounted) {
-              await context
-                  .read<BackupReminderProvider>()
-                  .recordBackupCompleted();
+              await _recordBackupReminderQuietly(context);
             }
           } catch (e) {
             debugPrint('BackupExport: copy failed: $e');
@@ -1446,6 +1479,17 @@ class _BackupPageState extends State<BackupPage> {
       }
     } finally {
       await DataSync.cleanupTemporaryBackupFile(file);
+    }
+  }
+
+  /// Best-effort: recording the backup reminder is a non-critical side effect
+  /// after the file was already saved — its failure must not surface as an
+  /// export error.
+  Future<void> _recordBackupReminderQuietly(BuildContext context) async {
+    try {
+      await context.read<BackupReminderProvider>().recordBackupCompleted();
+    } catch (e) {
+      debugPrint('BackupExport: recordBackupCompleted failed: $e');
     }
   }
 

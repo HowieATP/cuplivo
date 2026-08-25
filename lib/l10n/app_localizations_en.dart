@@ -2172,6 +2172,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get backupStageGenerating => 'Preparing files...';
+
+  @override
+  String get backupStagePacking => 'Packing backup...';
+
+  @override
+  String get backupStageUploading => 'Uploading...';
+
+  @override
   String get backupPageExportToFile => 'Export to File';
 
   @override

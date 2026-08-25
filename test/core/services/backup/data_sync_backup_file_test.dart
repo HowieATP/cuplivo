@@ -440,6 +440,34 @@ void main() {
     );
 
     test(
+      'prepareBackupFile reports stages in order (generating, packing)',
+      () async {
+        final uploadDir = Directory('${root.path}/upload');
+        await uploadDir.create(recursive: true);
+        await File(
+          '${uploadDir.path}/a.bin',
+        ).writeAsBytes(List<int>.filled(16, 7));
+
+        final sync = DataSync(chatService: ChatService());
+        final stages = <BackupStage>[];
+        final zipFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          onStage: stages.add,
+        );
+
+        expect(stages, [BackupStage.generating, BackupStage.packing]);
+
+        final input = InputFileStream(zipFile.path);
+        try {
+          final archive = ZipDecoder().decodeStream(input);
+          expect(archive.findFile('upload/a.bin'), isNotNull);
+        } finally {
+          await input.close();
+        }
+      },
+    );
+
+    test(
       'merge restore newer-wins survives odd-second mtimes (UT timestamp)',
       () async {
         // Round-trip through the PRODUCTION writer + extractor: a genuinely

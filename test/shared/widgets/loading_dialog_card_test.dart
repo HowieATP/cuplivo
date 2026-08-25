@@ -67,6 +67,29 @@ void main() {
       expect(find.text('Hi'), findsOneWidget);
       expect(find.textContaining('tick'), findsNothing);
     });
+
+    testWidgets('labelListenable wins over static label and updates live', (
+      tester,
+    ) async {
+      final label = ValueNotifier<String>('stage one');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LoadingDialogCard(label: 'static', labelListenable: label),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('stage one'), findsOneWidget);
+      expect(find.text('static'), findsNothing);
+
+      label.value = 'stage two';
+      await tester.pump();
+      expect(find.text('stage two'), findsOneWidget);
+      expect(find.text('stage one'), findsNothing);
+
+      label.dispose();
+    });
   });
 }
 

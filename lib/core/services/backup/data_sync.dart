@@ -76,6 +76,25 @@ class RestoreProgress {
 /// that do not surface progress (backup page/pane, S3, BackupProvider).
 typedef RestoreProgressCallback = void Function(RestoreProgress progress);
 
+/// Stage of a backup build/upload in progress, for UI progress display.
+enum BackupStage {
+  /// Building the intermediate files (settings.json / chats.json /
+  /// deleted.json) on the main isolate.
+  generating,
+
+  /// ZIP packing inside the isolate (`_packZipSync` — indeterminate).
+  packing,
+
+  /// Uploading the finished staging ZIP (WebDAV PUT / S3 PUT). Local
+  /// `exportToFile` never enters this stage — delivery is the user's own
+  /// save dialog.
+  uploading,
+}
+
+/// Optional stage callback threaded through a backup. Null for callers that
+/// do not surface progress (LAN sync, tests).
+typedef BackupStageCallback = void Function(BackupStage stage);
+
 class DataSync {
   final ChatService chatService;
   final Future<Set<String>> Function(String type)? _localIdResolver;
@@ -226,7 +245,9 @@ class DataSync {
   Future<File> prepareBackupFile(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
+    BackupStageCallback? onStage,
   }) async {
+    onStage?.call(BackupStage.generating);
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
     final now = DateTime.now();
@@ -291,6 +312,7 @@ class DataSync {
           : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      onStage?.call(BackupStage.packing);
       final packSince = incremental?.since;
       final packIncludeFilePaths = incremental?.includeFilePaths;
       await Isolate.run(() {
@@ -847,9 +869,15 @@ class DataSync {
   Future<void> backupToWebDav(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
+    BackupStageCallback? onStage,
   }) async {
-    final file = await prepareBackupFile(cfg, incremental: incremental);
+    final file = await prepareBackupFile(
+      cfg,
+      incremental: incremental,
+      onStage: onStage,
+    );
     try {
+      onStage?.call(BackupStage.uploading);
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
       final fileLen = await file.length();
@@ -1051,7 +1079,8 @@ class DataSync {
   Future<File> exportToFile(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
-  }) => prepareBackupFile(cfg, incremental: incremental);
+    BackupStageCallback? onStage,
+  }) => prepareBackupFile(cfg, incremental: incremental, onStage: onStage);
 
   Future<void> restoreFromLocalFile(
     File file,

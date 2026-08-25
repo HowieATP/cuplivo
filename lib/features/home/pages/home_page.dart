@@ -1729,6 +1729,7 @@ class _HomePageState extends State<HomePage>
       hasMoreAfter: _controller.chatController.hasMoreAfter,
       strings: <String, String>{
         'timeline': l10n.webChatTimelineLabel,
+        'loading': l10n.webChatLoading,
         'empty': l10n.webChatEmptyConversation,
         'user': l10n.webChatUser,
         'assistant': l10n.webChatAssistant,

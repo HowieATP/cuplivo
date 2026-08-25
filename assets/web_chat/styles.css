@@ -98,6 +98,36 @@ button { -webkit-tap-highlight-color: transparent; }
   scroll-padding-block: var(--cuplivo-content-top-inset) var(--cuplivo-content-bottom-inset);
   scrollbar-gutter: stable;
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+#virtual-window-loader {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--cuplivo-frosted);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+#virtual-window-loader[hidden] { display: none; }
+.virtual-window-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--cuplivo-outline-soft);
+  border-top-color: var(--cuplivo-primary);
+  border-radius: 50%;
+  animation: virtual-window-spin 720ms linear infinite;
+}
+@keyframes virtual-window-spin { to { transform: rotate(360deg); } }
 .spacer { width: 1px; }
 .empty {
   min-height: 60vh;

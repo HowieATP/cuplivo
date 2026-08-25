@@ -36,6 +36,20 @@ void main() {
     },
   );
 
+  test('streaming bridge serializes batches and retains latest patches', () {
+    final source = File(
+      'lib/features/home/webview/web_conversation_viewport.dart',
+    ).readAsStringSync();
+    final protocolSource = File(
+      'lib/features/home/webview/web_chat_protocol.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('WebChatStreamingPatchBuffer'));
+    expect(source, contains('completeBatch()'));
+    expect(source, contains('hasPending'));
+    expect(protocolSource, contains("'streamRevision'"));
+  });
+
   test(
     'conversation switching restores a saved Web viewport before bottoming',
     () {
@@ -71,6 +85,17 @@ void main() {
       expect(source, contains("'code-border'"));
       expect(source, contains("'code-header-text'"));
       expect(source, contains("'code-action'"));
+    },
+  );
+
+  test(
+    'HomePage reuses the localized Web loading label for virtual windows',
+    () {
+      final source = File(
+        'lib/features/home/pages/home_page.dart',
+      ).readAsStringSync();
+
+      expect(source, contains("'loading': l10n.webChatLoading"));
     },
   );
 

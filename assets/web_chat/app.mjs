@@ -1,22 +1,27 @@
 import {
   ASSET_VERSION,
   PROTOCOL_VERSION,
+  buildWithFrameBudget,
   captureAnchor,
   captureViewport,
+  createAdaptiveStreamPresenter,
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
   formatReasoningElapsed,
+  longestStablePrefix,
   mountCodeBlock,
   messageIndexAtOffset,
   normalizeMeasuredHeight,
   normalizeContentInset,
-  rangeChanged,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
   restoreViewport,
+  virtualCoverage,
+  virtualOverscan,
   viewportForSavedAnchor,
   verticalGestureIntent,
   visibleRange,
@@ -24,12 +29,20 @@ import {
 
 const timeline = document.getElementById('timeline');
 const backgroundLayer = document.getElementById('chat-background');
+const virtualWindowLoader = document.getElementById('virtual-window-loader');
+const virtualWindowLoaderLabel = document.getElementById('virtual-window-loader-label');
 let state = null;
 let requestSequence = 0;
 const heights = new Map();
 const pendingActions = new Map();
 const pendingMedia = new Set();
 const localExpansions = new Map();
+const mountedSlots = new Map();
+const presentedStreamContent = new Map();
+const pendingMountedUpdates = new Set();
+const markdownHtmlCache = new Map();
+const streamingMarkdownStates = new WeakMap();
+const streamStructureSignatureCache = new WeakMap();
 const expansionCoordinator = createExpansionCoordinator();
 const disclosureAnimations = new WeakMap();
 let resizeObserver = null;
@@ -54,6 +67,16 @@ let renderedConversationId = null;
 let reasoningElapsedTimer = null;
 let navigationCursorId = null;
 let navigationEdge = null;
+let forcedViewport = null;
+let virtualPrefetchFrame = 0;
+let virtualPrefetchTarget = null;
+let virtualPrefetchActive = false;
+let virtualPrefetchRevision = 0;
+let virtualPruneTimer = null;
+let virtualWindowLoading = false;
+let lastTimelineScrollTop = 0;
+let programmaticNavigationActive = false;
+let measuredHeightsPending = false;
 
 const bridge = {
   post(message) {
@@ -62,12 +85,21 @@ const bridge = {
     else window.CuplivoChat?.postMessage(encoded);
   },
 };
+const safeProtocolDiagnostics = new Set([
+  'protocol_mismatch',
+  'invalid_transfer_sequence',
+  'transfer_total_changed',
+  'invalid_transfer_data',
+  'snapshot_version_mismatch',
+  'invalid_expansion_request',
+]);
+
+function safeDiagnosticCode(error, fallback) {
+  return safeProtocolDiagnostics.has(error?.message) ? error.message : fallback;
+}
 
 function t(key) { return state?.strings?.[key] ?? ''; }
 function messageHeight(message) { return heights.get(message.id) ?? 170; }
-function virtualOverscan(viewportHeight) {
-  return Math.max(6000, Number(viewportHeight) * 8 || 0);
-}
 function isMediaHandle(value) {
   return value?.startsWith('local:') || value?.startsWith('asset:');
 }
@@ -255,7 +287,7 @@ function disclosure({
       updateDisclosure(root, header, body, previous);
       bridge.post({
         type: 'diagnostic',
-        code: error?.message ?? 'disclosure_toggle_failed',
+        code: safeDiagnosticCode(error, 'disclosure_toggle_failed'),
       });
     }
   }, 'disclosure-header');
@@ -279,6 +311,48 @@ function stableTextKey(prefix, source) {
   return `${prefix}:${(hash >>> 0).toString(16)}`;
 }
 
+function sanitizeMarkdownHtml(html) {
+  return window.DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true, svg: true, svgFilters: true },
+    ADD_ATTR: ['target', 'rel', 'referrerpolicy'],
+    FORBID_TAGS: ['style', 'form', 'object', 'iframe', 'script'],
+    FORBID_ATTR: ['style', 'srcset'],
+  });
+}
+
+function patchStreamingMarkdownRoot(root, source, kind) {
+  const markdownEnabled = kind === 'user' ? state.display?.userMarkdown !== false :
+    kind === 'reasoning' ? state.display?.reasoningMarkdown !== false :
+    state.display?.assistantMarkdown !== false;
+  if (!markdownEnabled) {
+    streamingMarkdownStates.delete(root);
+    root.textContent = source;
+    root.style.whiteSpace = 'pre-wrap';
+    return;
+  }
+  const tokens = window.marked.lexer(source, { gfm: true, breaks: true });
+  const signatures = tokens.map((token) => `${token.type}\u0000${token.raw ?? ''}`);
+  const previous = streamingMarkdownStates.get(root);
+  const prefix = longestStablePrefix(previous?.signatures, signatures);
+  for (const group of previous?.groups.slice(prefix) ?? []) {
+    for (const node of group) node.remove();
+  }
+  const groups = previous?.groups.slice(0, prefix) ?? [];
+  const fragment = document.createDocumentFragment();
+  for (let index = prefix; index < tokens.length; index += 1) {
+    const container = document.createElement('div');
+    container.innerHTML = sanitizeMarkdownHtml(
+      window.marked.parser([tokens[index]], { gfm: true, breaks: true }),
+    );
+    enhanceMarkdown(container, true);
+    const nodes = [...container.childNodes];
+    fragment.append(...nodes);
+    groups.push(nodes);
+  }
+  root.append(fragment);
+  streamingMarkdownStates.set(root, { signatures, groups, source, kind });
+}
+
 function markdownNode(content, streaming = false, kind = 'assistant') {
   const root = document.createElement('div');
   root.className = 'markdown';
@@ -291,13 +365,30 @@ function markdownNode(content, streaming = false, kind = 'assistant') {
     return root;
   }
   try {
-    const html = window.marked.parse(content ?? '', { gfm: true, breaks: true });
-    root.innerHTML = window.DOMPurify.sanitize(html, {
-      USE_PROFILES: { html: true, svg: true, svgFilters: true },
-      ADD_ATTR: ['target', 'rel', 'referrerpolicy'],
-      FORBID_TAGS: ['style', 'form', 'object', 'iframe', 'script'],
-      FORBID_ATTR: ['style', 'srcset'],
-    });
+    const source = content ?? '';
+    if (streaming) {
+      patchStreamingMarkdownRoot(root, source, kind);
+      return root;
+    }
+    const cacheKey = !streaming && source.length <= 64 * 1024
+      ? stableTextKey(`markdown:${kind}`, source)
+      : null;
+    const cached = cacheKey == null ? null : markdownHtmlCache.get(cacheKey);
+    let sanitized = cached?.source === source ? cached.html : null;
+    if (sanitized == null) {
+      const html = window.marked.parse(source, { gfm: true, breaks: true });
+      sanitized = sanitizeMarkdownHtml(html);
+      if (cacheKey != null) {
+        markdownHtmlCache.set(cacheKey, { source, html: sanitized });
+        if (markdownHtmlCache.size > 64) {
+          markdownHtmlCache.delete(markdownHtmlCache.keys().next().value);
+        }
+      }
+    } else {
+      markdownHtmlCache.delete(cacheKey);
+      markdownHtmlCache.set(cacheKey, cached);
+    }
+    root.innerHTML = sanitized;
     enhanceMarkdown(root, streaming);
   } catch (error) {
     bridge.post({ type: 'diagnostic', code: 'markdown_block_failed' });
@@ -362,19 +453,23 @@ function enhanceMarkdown(root, streaming) {
     if (highlightLanguage === 'html' && !streaming) addHtmlPreview(pre, code.textContent ?? '');
     const displaySource = source.replace(/(?:\r\n|\r|\n)+$/, '');
     code.classList.add('hljs');
-    try {
-      code.innerHTML = window.hljs.highlight(displaySource, {
-        language: highlightLanguage,
-        ignoreIllegals: true,
-      }).value;
-    } catch {
+    if (streaming) {
       code.textContent = displaySource;
-      bridge.post({ type: 'diagnostic', code: 'highlight_block_failed' });
+    } else {
+      try {
+        code.innerHTML = window.hljs.highlight(displaySource, {
+          language: highlightLanguage,
+          ignoreIllegals: true,
+        }).value;
+      } catch {
+        code.textContent = displaySource;
+        bridge.post({ type: 'diagnostic', code: 'highlight_block_failed' });
+      }
     }
     renderCodeBlock(pre, code, language, source);
   }
   try {
-    if (state.display?.math === false) return;
+    if (streaming || state.display?.math === false) return;
     window.renderMathInElement(root, {
       throwOnError: false,
       delimiters: [
@@ -565,9 +660,10 @@ function renderReasoningSegment(message, segment, index, parent) {
   parent.append(card);
 }
 
-function appendConversationText(message, parent, content) {
+function appendConversationText(message, parent, content, blockKey) {
   if (!content) return;
   const markdown = markdownNode(content, message.isStreaming, message.role);
+  markdown.dataset.contentBlockKey = blockKey;
   if (message.role === 'user') {
     parent.append(markdown);
     return;
@@ -587,11 +683,12 @@ function renderConversationBlocks(message, parent) {
   const toolCounts = splits.toolCounts ?? [];
   if (!offsets.length) {
     renderReasoning(message, parent);
-    appendConversationText(message, parent, message.content);
+    appendConversationText(message, parent, message.content, 'content:0');
     for (const tool of tools) renderTool(message, tool, parent);
     return;
   }
   let contentOffset = 0;
+  let textBlockIndex = 0;
   let reasoningIndex = 0;
   let toolIndex = 0;
   for (let index = 0; index < offsets.length; index += 1) {
@@ -601,7 +698,9 @@ function renderConversationBlocks(message, parent) {
         message,
         parent,
         message.content.slice(contentOffset, offset),
+        `content:${textBlockIndex}`,
       );
+      textBlockIndex += 1;
     }
     while (reasoningIndex < Math.min(reasoning.length, reasoningCounts[index] ?? 0)) {
       renderReasoningSegment(message, reasoning[reasoningIndex], reasoningIndex, parent);
@@ -622,8 +721,34 @@ function renderConversationBlocks(message, parent) {
     toolIndex += 1;
   }
   if (contentOffset < message.content.length) {
-    appendConversationText(message, parent, message.content.slice(contentOffset));
+    appendConversationText(
+      message,
+      parent,
+      message.content.slice(contentOffset),
+      `content:${textBlockIndex}`,
+    );
   }
+}
+
+function conversationTextBlocks(message) {
+  const content = String(message.content ?? '');
+  const offsets = message.contentSplits?.offsets ?? [];
+  if (!offsets.length) {
+    return content ? [{ key: 'content:0', content }] : [];
+  }
+  const blocks = [];
+  let contentOffset = 0;
+  for (const rawOffset of offsets) {
+    const offset = Math.max(contentOffset, Math.min(content.length, Number(rawOffset) || 0));
+    if (offset > contentOffset) {
+      blocks.push({ key: `content:${blocks.length}`, content: content.slice(contentOffset, offset) });
+    }
+    contentOffset = offset;
+  }
+  if (contentOffset < content.length) {
+    blocks.push({ key: `content:${blocks.length}`, content: content.slice(contentOffset) });
+  }
+  return blocks;
 }
 
 function groupChainCards(parent) {
@@ -1002,8 +1127,125 @@ function renderMessage(message, isLast = false) {
   return article;
 }
 
+function messageForPresentation(message) {
+  if (message.isStreaming !== true) {
+    presentedStreamContent.delete(message.id);
+    return message;
+  }
+  if (!presentedStreamContent.has(message.id)) {
+    presentedStreamContent.set(message.id, message.content ?? '');
+  }
+  return { ...message, content: presentedStreamContent.get(message.id) ?? '' };
+}
+
+function createMessageSlot(message, index, messageCount) {
+  const slot = document.createElement('div');
+  slot.className = 'message-slot';
+  slot.dataset.messageId = message.id;
+  const presented = messageForPresentation(message);
+  slot.append(renderMessage(presented, index === messageCount - 1));
+  if (message.showContextDivider) {
+    const divider = document.createElement('div');
+    divider.className = 'context-divider';
+    divider.textContent = t('contextDivider');
+    slot.append(divider);
+  }
+  return slot;
+}
+
+function reportSlowRender(startedAt, code) {
+  const elapsed = performance.now() - startedAt;
+  if (elapsed < 50) return;
+  bridge.post({
+    type: 'diagnostic',
+    code,
+    durationBucketMs: Math.min(1000, Math.ceil(elapsed / 50) * 50),
+  });
+}
+
+function streamStructureSignature(message) {
+  const cached = streamStructureSignatureCache.get(message);
+  if (cached != null) return cached;
+  const signature = stableTextKey('stream-structure', JSON.stringify({
+    role: message.role,
+    isStreaming: message.isStreaming,
+    reasoning: message.reasoning,
+    contentSplits: message.contentSplits,
+    tools: message.tools,
+    translation: message.translation,
+    expandStepsLabel: message.expandStepsLabel,
+  }));
+  streamStructureSignatureCache.set(message, signature);
+  return signature;
+}
+
+function updateMountedStreamingContent(messageId, content) {
+  const slot = mountedSlots.get(messageId);
+  if (!slot?.isConnected || !state?.messages?.length) return false;
+  if (touchActive || userScrolling || virtualWindowLoading) {
+    pendingMountedUpdates.add(messageId);
+    return false;
+  }
+  const message = state.messages.find((candidate) => candidate.id === messageId);
+  if (!message || message.isStreaming !== true) return false;
+  const blocks = conversationTextBlocks({ ...message, content });
+  const roots = [...slot.querySelectorAll('.markdown[data-content-block-key]')];
+  if (blocks.length !== roots.length || blocks.some(
+    (block, index) => roots[index].dataset.contentBlockKey !== block.key,
+  )) return false;
+  const viewport = captureViewport(timeline);
+  const startedAt = performance.now();
+  try {
+    for (const [index, block] of blocks.entries()) {
+      patchStreamingMarkdownRoot(roots[index], block.content, message.role);
+    }
+  } catch (error) {
+    bridge.post({ type: 'diagnostic', code: 'stream_markdown_patch_failed' });
+    return false;
+  }
+  restoreViewport(timeline, viewport);
+  enforceNavigationEdge();
+  sendViewportMetrics();
+  reportSlowRender(startedAt, 'stream_markdown_render_slow');
+  return true;
+}
+
+function updateMountedMessage(messageId) {
+  const slot = mountedSlots.get(messageId);
+  if (!slot?.isConnected || !state?.messages?.length) return false;
+  if (touchActive || userScrolling || virtualWindowLoading) {
+    pendingMountedUpdates.add(messageId);
+    return false;
+  }
+  const index = state.messages.findIndex((message) => message.id === messageId);
+  if (index < 0) return false;
+  const viewport = captureViewport(timeline);
+  const startedAt = performance.now();
+  const replacement = createMessageSlot(
+    state.messages[index],
+    index,
+    state.messages.length,
+  );
+  slot.replaceChildren(...replacement.children);
+  restoreViewport(timeline, viewport);
+  enforceNavigationEdge();
+  ensureReasoningElapsedTimer();
+  sendViewportMetrics();
+  reportSlowRender(startedAt, 'stream_message_render_slow');
+  return true;
+}
+
+function flushMountedUpdates() {
+  if (touchActive || userScrolling || virtualWindowLoading) return;
+  const ids = [...pendingMountedUpdates];
+  pendingMountedUpdates.clear();
+  for (const id of ids) updateMountedMessage(id);
+}
+
 function render() {
   if (!state) return;
+  cancelVirtualPrefetch();
+  const startedAt = performance.now();
   const sameSession = renderedSessionId === state.renderSessionId;
   const savedViewport = sameSession
     ? null
@@ -1016,7 +1258,9 @@ function render() {
   const messages = state.messages ?? [];
   const missingSavedAnchor = !sameSession &&
     state.initialViewportAnchor != null && savedViewport == null;
-  const viewport = savedViewport ?? (missingSavedAnchor
+  const override = forcedViewport;
+  forcedViewport = null;
+  const viewport = override ?? savedViewport ?? (missingSavedAnchor
     ? {
       scrollTop: messages.reduce((sum, message) => sum + messageHeight(message), 0),
       viewportHeight: timeline.clientHeight,
@@ -1032,6 +1276,7 @@ function render() {
     renderedRange = { start: 0, end: 0 };
     topSpacer = null;
     bottomSpacer = null;
+    mountedSlots.clear();
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.textContent = t('empty');
@@ -1041,8 +1286,11 @@ function render() {
     renderedConversationId = state.conversationId;
     ensureReasoningElapsedTimer();
     restoreViewport(timeline, viewport);
+    lastTimelineScrollTop = timeline.scrollTop;
+    pendingMountedUpdates.clear();
     enforceNavigationEdge();
     sendViewportMetrics();
+    reportSlowRender(startedAt, 'virtual_window_render_slow');
     return;
   }
   const range = visibleRange({
@@ -1052,6 +1300,7 @@ function render() {
     overscan: virtualOverscan(viewport.viewportHeight),
   });
   renderedRange = { start: range.start, end: range.end };
+  mountedSlots.clear();
   topSpacer = document.createElement('div');
   topSpacer.className = 'spacer';
   topSpacer.style.height = `${range.top}px`;
@@ -1060,25 +1309,17 @@ function render() {
   bottomSpacer.style.height = `${range.bottom}px`;
   fragment.append(topSpacer);
   if (state.preset && range.start === 0) {
-    const preset = document.createElement('div');
-    preset.className = 'suggestions';
-    preset.append(button(state.preset.label, () => sendAction('togglePresets'), 'suggestion'));
-    fragment.append(preset);
+    fragment.append(createPresetNode());
   }
   for (const [visibleIndex, message] of messages.slice(range.start, range.end).entries()) {
-    const slot = document.createElement('div');
-    slot.className = 'message-slot';
-    slot.dataset.messageId = message.id;
-    const node = renderMessage(message, range.start + visibleIndex === messages.length - 1);
-    slot.append(node);
-    if (message.showContextDivider) {
-      const divider = document.createElement('div');
-      divider.className = 'context-divider';
-      divider.textContent = t('contextDivider');
-      slot.append(divider);
-    }
+    const slot = createMessageSlot(
+      message,
+      range.start + visibleIndex,
+      messages.length,
+    );
     fragment.append(slot);
     observedSlots.push(slot);
+    mountedSlots.set(message.id, slot);
   }
   fragment.append(bottomSpacer);
   timeline.replaceChildren(fragment);
@@ -1087,50 +1328,77 @@ function render() {
   renderedConversationId = state.conversationId;
   ensureReasoningElapsedTimer();
   restoreViewport(timeline, viewport);
+  lastTimelineScrollTop = timeline.scrollTop;
+  pendingMountedUpdates.clear();
   enforceNavigationEdge();
   sendViewportMetrics();
+  reportSlowRender(startedAt, 'virtual_window_render_slow');
 }
 
 function handleMeasuredHeights(entries) {
   if (!state?.messages?.length) return;
-  const viewport = captureViewport(timeline);
   let changed = false;
   for (const entry of entries) {
     const id = entry.target.dataset.messageId;
     const height = normalizeMeasuredHeight(
       entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
     );
-    if (id && height != null && Math.abs((heights.get(id) ?? 0) - height) > 1) {
+    if (id && mountedSlots.get(id) === entry.target && height != null &&
+        Math.abs((heights.get(id) ?? 0) - height) > 1) {
       heights.set(id, height);
       changed = true;
     }
   }
   if (!changed) return;
-  if (touchActive || userScrolling) {
-    requestRender();
+  measuredHeightsPending = true;
+  scheduleMeasuredHeightReconcile();
+}
+
+function reconcileMeasuredHeights() {
+  if (!measuredHeightsPending || !state?.messages?.length ||
+      touchActive || userScrolling || virtualWindowLoading ||
+      !topSpacer || !bottomSpacer || renderedRange.start < 0) return;
+  measuredHeightsPending = false;
+  const viewport = captureViewport(timeline);
+  const coverage = coverageFor(viewport.scrollTop);
+  if (!coverage.covered) {
+    beginVirtualWindowLoad(coverage.requested, coverage.clamped);
     return;
   }
+  const messages = state.messages;
+  topSpacer.style.height = `${messages.slice(0, renderedRange.start)
+    .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
+  bottomSpacer.style.height = `${messages.slice(renderedRange.end)
+    .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
+  restoreViewport(timeline, viewport);
+  enforceNavigationEdge();
+  sendViewportMetrics();
   const range = visibleRange({
-    heights: state.messages.map(messageHeight),
+    heights: messages.map(messageHeight),
     scrollTop: viewport.scrollTop,
     viewportHeight: viewport.viewportHeight,
     overscan: virtualOverscan(viewport.viewportHeight),
   });
-  if (rangeChanged(renderedRange, range)) {
-    requestRender();
-    return;
+  if (range.start < renderedRange.start || range.end > renderedRange.end) {
+    scheduleVirtualPrefetch(viewport.scrollTop);
   }
-  if (topSpacer) topSpacer.style.height = `${range.top}px`;
-  if (bottomSpacer) bottomSpacer.style.height = `${range.bottom}px`;
-  restoreViewport(timeline, viewport);
-  enforceNavigationEdge();
-  sendViewportMetrics();
 }
 
 const scheduleRender = createFrameCoalescer(render);
+const scheduleMeasuredHeightReconcile = createFrameCoalescer(
+  reconcileMeasuredHeights,
+);
 const renderGate = createRenderGate(scheduleRender);
 function requestRender() { renderGate.request(); }
 function setRenderBlocked(value) { renderGate.setBlocked(value); }
+const streamPresenter = createAdaptiveStreamPresenter({
+  commit: (messageId, content) => {
+    presentedStreamContent.set(messageId, content);
+    if (!updateMountedStreamingContent(messageId, content)) {
+      updateMountedMessage(messageId);
+    }
+  },
+});
 const sendViewportMetrics = createFrameCoalescer(() => {
   const anchor = captureAnchor(timeline);
   bridge.post({
@@ -1148,7 +1416,326 @@ const viewportNavigation = createViewportNavigationCoordinator({
   setRenderBlocked,
   requestRender,
 });
+
+function webContentInsets() {
+  const insets = state?.display?.contentInsets ?? {};
+  return {
+    top: normalizeContentInset(insets.top, 0),
+    bottom: normalizeContentInset(insets.bottom, 0),
+  };
+}
+
+function coverageFor(scrollTop) {
+  const insets = webContentInsets();
+  return virtualCoverage({
+    heights: (state?.messages ?? []).map(messageHeight),
+    range: renderedRange,
+    scrollTop,
+    viewportHeight: timeline.clientHeight,
+    leadingInset: insets.top,
+    trailingInset: insets.bottom,
+  });
+}
+
+function setVirtualWindowLoading(value) {
+  virtualWindowLoading = Boolean(value);
+  virtualWindowLoader.hidden = !virtualWindowLoading;
+  virtualWindowLoaderLabel.textContent = virtualWindowLoading ? t('loading') : '';
+  timeline.setAttribute('aria-busy', String(virtualWindowLoading));
+  if (virtualWindowLoading) return;
+  releaseScrollStopLock();
+  if (!touchActive && !userScrolling) setRenderBlocked(false);
+  flushMountedUpdates();
+  scheduleMeasuredHeightReconcile();
+}
+
+function clampVirtualScroll(scrollTop) {
+  const top = Math.max(0, Number(scrollTop) || 0);
+  scrollStopLock = true;
+  scrollStopTop = top;
+  scrollStopLeft = timeline.scrollLeft;
+  timeline.scrollTo({ left: scrollStopLeft, top, behavior: 'auto' });
+  if (!scrollStopFrame) scrollStopFrame = requestAnimationFrame(enforceScrollStop);
+}
+
+function messageOrderMatches(messageIds, renderSessionId) {
+  const current = state?.messages ?? [];
+  return state?.renderSessionId === renderSessionId &&
+    current.length === messageIds.length &&
+    current.every((message, index) => message.id === messageIds[index]);
+}
+
+async function renderVirtualTarget(scrollTop, requestRevision) {
+  const startedAt = performance.now();
+  const target = Math.max(0, Number(scrollTop) || 0);
+  const renderSessionId = state?.renderSessionId;
+  const messageIds = (state?.messages ?? []).map((message) => message.id);
+  if (!renderSessionId || messageIds.length === 0) {
+    throw new Error('virtual_window_target_missing');
+  }
+  const viewportHeight = timeline.clientHeight;
+  const range = visibleRange({
+    heights: state.messages.map(messageHeight),
+    scrollTop: target,
+    viewportHeight,
+    overscan: virtualOverscan(viewportHeight),
+  });
+  if (range.start >= range.end) {
+    throw new Error('virtual_window_target_missing');
+  }
+  const indices = Array.from(
+    { length: range.end - range.start },
+    (_, offset) => range.start + offset,
+  );
+  const built = await buildWithFrameBudget({
+    items: indices,
+    shouldContinue: () => virtualWindowCoordinator.isCurrent(requestRevision) &&
+      messageOrderMatches(messageIds, renderSessionId),
+    build: (index) => {
+      const message = state.messages[index];
+      if (message?.id !== messageIds[index]) {
+        throw new Error('virtual_window_target_missing');
+      }
+      return {
+        id: message.id,
+        slot: createMessageSlot(message, index, state.messages.length),
+      };
+    },
+  });
+  if (!virtualWindowCoordinator.isCurrent(requestRevision) ||
+      !messageOrderMatches(messageIds, renderSessionId)) {
+    throw new Error('virtual_window_stale');
+  }
+
+  const fragment = document.createDocumentFragment();
+  const nextTopSpacer = document.createElement('div');
+  nextTopSpacer.className = 'spacer';
+  nextTopSpacer.style.height = `${range.top}px`;
+  const nextBottomSpacer = document.createElement('div');
+  nextBottomSpacer.className = 'spacer';
+  nextBottomSpacer.style.height = `${range.bottom}px`;
+  fragment.append(nextTopSpacer);
+  if (state.preset && range.start === 0) fragment.append(createPresetNode());
+  for (const entry of built) fragment.append(entry.slot);
+  fragment.append(nextBottomSpacer);
+
+  applyTheme();
+  resizeObserver?.disconnect();
+  resizeObserver ??= new ResizeObserver(handleMeasuredHeights);
+  timeline.replaceChildren(fragment);
+  mountedSlots.clear();
+  for (const entry of built) {
+    mountedSlots.set(entry.id, entry.slot);
+    resizeObserver.observe(entry.slot);
+  }
+  topSpacer = nextTopSpacer;
+  bottomSpacer = nextBottomSpacer;
+  renderedRange = { start: range.start, end: range.end };
+  renderedSessionId = state.renderSessionId;
+  renderedConversationId = state.conversationId;
+  ensureReasoningElapsedTimer();
+  reportSlowRender(startedAt, 'virtual_window_target_slow');
+}
+
+const virtualWindowCoordinator = createVirtualWindowCoordinator({
+  setLoading: setVirtualWindowLoading,
+  clamp: clampVirtualScroll,
+  renderTarget: renderVirtualTarget,
+  settleTarget: (target) => {
+    scrollStopTop = Math.max(0, Number(target) || 0);
+    lastTimelineScrollTop = scrollStopTop;
+    timeline.scrollTo({ top: scrollStopTop, behavior: 'auto' });
+    sendViewportMetrics();
+  },
+  onError: (error) => {
+    const code = error?.message === 'virtual_window_timeout'
+      ? 'virtual_window_timeout'
+      : error?.message === 'virtual_window_target_missing'
+        ? 'virtual_window_target_missing'
+        : 'virtual_window_render_failed';
+    bridge.post({ type: 'diagnostic', code });
+  },
+});
+
+function beginVirtualWindowLoad(target, safe, onSettled = null) {
+  cancelVirtualPrefetch();
+  setRenderBlocked(true);
+  virtualWindowCoordinator.request({ target, safe, onSettled });
+}
+
+function createPresetNode() {
+  if (!state?.preset) return null;
+  const preset = document.createElement('div');
+  preset.className = 'suggestions';
+  preset.dataset.component = 'preset-toggle';
+  preset.append(button(state.preset.label, () => sendAction('togglePresets'), 'suggestion'));
+  return preset;
+}
+
+async function extendVirtualRange(targetTop, prefetchRevision) {
+  if (!state?.messages?.length || virtualWindowLoading || !topSpacer || !bottomSpacer) {
+    return false;
+  }
+  const messages = state.messages;
+  const renderSessionId = state.renderSessionId;
+  const messageIds = messages.map((message) => message.id);
+  const baseRange = { ...renderedRange };
+  const desired = visibleRange({
+    heights: messages.map(messageHeight),
+    scrollTop: Math.max(0, Number(targetTop) || 0),
+    viewportHeight: timeline.clientHeight,
+    overscan: virtualOverscan(timeline.clientHeight),
+  });
+  const start = Math.min(baseRange.start, desired.start);
+  const end = Math.max(baseRange.end, desired.end);
+  if (start === baseRange.start && end === baseRange.end) return true;
+  const span = messages.slice(start, end).reduce((sum, message) => sum + messageHeight(message), 0);
+  const limit = virtualOverscan(timeline.clientHeight) * 2 + timeline.clientHeight * 3;
+  if (span > limit) return false;
+
+  const startedAt = performance.now();
+  const indices = [
+    ...Array.from(
+      { length: baseRange.start - start },
+      (_, offset) => start + offset,
+    ),
+    ...Array.from(
+      { length: end - baseRange.end },
+      (_, offset) => baseRange.end + offset,
+    ),
+  ];
+  const built = await buildWithFrameBudget({
+    items: indices,
+    shouldContinue: () => prefetchRevision === virtualPrefetchRevision &&
+      !virtualWindowLoading && messageOrderMatches(messageIds, renderSessionId) &&
+      renderedRange.start === baseRange.start && renderedRange.end === baseRange.end,
+    build: (index) => {
+      const message = state.messages[index];
+      if (message?.id !== messageIds[index]) {
+        throw new Error('virtual_window_stale');
+      }
+      return {
+        id: message.id,
+        index,
+        slot: createMessageSlot(message, index, state.messages.length),
+      };
+    },
+  });
+  if (prefetchRevision !== virtualPrefetchRevision || virtualWindowLoading ||
+      !messageOrderMatches(messageIds, renderSessionId) ||
+      renderedRange.start !== baseRange.start || renderedRange.end !== baseRange.end) {
+    throw new Error('virtual_window_stale');
+  }
+
+  const viewport = captureViewport(timeline);
+  const before = document.createDocumentFragment();
+  const after = document.createDocumentFragment();
+  for (const entry of built) {
+    if (entry.index < baseRange.start) before.append(entry.slot);
+    else after.append(entry.slot);
+  }
+  if (before.childNodes.length) {
+    const preset = start === 0 && !timeline.querySelector('[data-component="preset-toggle"]')
+      ? createPresetNode()
+      : null;
+    topSpacer.after(...[preset, before].filter(Boolean));
+  }
+  if (after.childNodes.length) bottomSpacer.before(after);
+  for (const entry of built) {
+    mountedSlots.set(entry.id, entry.slot);
+    resizeObserver.observe(entry.slot);
+  }
+
+  renderedRange = { start, end };
+  topSpacer.style.height = `${messages.slice(0, start)
+    .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
+  bottomSpacer.style.height = `${messages.slice(end)
+    .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
+  restoreViewport(timeline, viewport);
+  reportSlowRender(startedAt, 'virtual_window_prefetch_slow');
+  return true;
+}
+
+function scheduleVirtualPrefetch(targetTop) {
+  virtualPrefetchTarget = Math.max(0, Number(targetTop) || 0);
+  if (virtualPrefetchFrame || virtualPrefetchActive) return;
+  virtualPrefetchFrame = requestAnimationFrame(async () => {
+    virtualPrefetchFrame = 0;
+    const target = virtualPrefetchTarget;
+    virtualPrefetchTarget = null;
+    if (target == null) return;
+    virtualPrefetchActive = true;
+    const revision = ++virtualPrefetchRevision;
+    let extended = false;
+    try {
+      extended = await extendVirtualRange(target, revision);
+    } catch (error) {
+      if (error?.message !== 'virtual_window_stale') {
+        bridge.post({ type: 'diagnostic', code: 'virtual_window_prefetch_failed' });
+      }
+    } finally {
+      virtualPrefetchActive = false;
+      if (virtualPrefetchTarget != null) {
+        scheduleVirtualPrefetch(virtualPrefetchTarget);
+      } else if (extended && !touchActive && !userScrolling &&
+          !virtualWindowLoading) {
+        scheduleVirtualPrune();
+      }
+    }
+  });
+}
+
+function cancelVirtualPrefetch() {
+  virtualPrefetchRevision += 1;
+  virtualPrefetchTarget = null;
+  if (virtualPrefetchFrame) cancelAnimationFrame(virtualPrefetchFrame);
+  virtualPrefetchFrame = 0;
+}
+
+function pruneVirtualRange() {
+  if (!state?.messages?.length || touchActive || userScrolling ||
+      virtualWindowLoading || virtualPrefetchActive || !topSpacer || !bottomSpacer) return;
+  const messages = state.messages;
+  const viewport = captureViewport(timeline);
+  const desired = visibleRange({
+    heights: messages.map(messageHeight),
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
+    overscan: virtualOverscan(viewport.viewportHeight),
+  });
+  if (desired.start < renderedRange.start || desired.end > renderedRange.end) {
+    scheduleVirtualPrefetch(viewport.scrollTop);
+    return;
+  }
+  for (let index = renderedRange.start; index < desired.start; index += 1) {
+    const slot = mountedSlots.get(messages[index].id);
+    if (slot) resizeObserver.unobserve(slot);
+    slot?.remove();
+    mountedSlots.delete(messages[index].id);
+  }
+  for (let index = desired.end; index < renderedRange.end; index += 1) {
+    const slot = mountedSlots.get(messages[index].id);
+    if (slot) resizeObserver.unobserve(slot);
+    slot?.remove();
+    mountedSlots.delete(messages[index].id);
+  }
+  if (desired.start > 0) {
+    timeline.querySelector('[data-component="preset-toggle"]')?.remove();
+  }
+  renderedRange = { start: desired.start, end: desired.end };
+  topSpacer.style.height = `${desired.top}px`;
+  bottomSpacer.style.height = `${desired.bottom}px`;
+  restoreViewport(timeline, viewport);
+  sendViewportMetrics();
+}
+
+function scheduleVirtualPrune() {
+  clearTimeout(virtualPruneTimer);
+  virtualPruneTimer = setTimeout(pruneVirtualRange, 160);
+}
+
 function releaseScrollStopLock() {
+  if (virtualWindowLoading) return;
   scrollStopLock = false;
   if (scrollStopFrame) {
     cancelAnimationFrame(scrollStopFrame);
@@ -1186,6 +1773,7 @@ function stopScrolling() {
 function markUserScroll() {
   const firstIntent = !userScrolling;
   if (firstIntent) {
+    programmaticNavigationActive = false;
     viewportNavigation.cancel();
     navigationCursorId = null;
     navigationEdge = null;
@@ -1197,7 +1785,10 @@ function markUserScroll() {
   userScrollTimer = setTimeout(() => {
     userScrolling = false;
     sendViewportMetrics();
-    if (!touchActive) setRenderBlocked(false);
+    if (!touchActive && !virtualWindowLoading) setRenderBlocked(false);
+    flushMountedUpdates();
+    scheduleMeasuredHeightReconcile();
+    scheduleVirtualPrune();
   }, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
@@ -1209,6 +1800,10 @@ timeline.addEventListener('pointerdown', (event) => {
   stopScrolling();
 }, { passive: true });
 timeline.addEventListener('pointermove', (event) => {
+  if (virtualWindowLoading) {
+    restoreScrollStopPosition();
+    return;
+  }
   if (pointerStartX == null || pointerStartY == null) return;
   const intent = verticalGestureIntent({
     startX: pointerStartX,
@@ -1248,6 +1843,11 @@ timeline.addEventListener('touchstart', (event) => {
   touchStartY = event.touches[0]?.clientY ?? null;
 }, { passive: true });
 timeline.addEventListener('touchmove', (event) => {
+  if (virtualWindowLoading) {
+    restoreScrollStopPosition();
+    if (event.cancelable) event.preventDefault();
+    return;
+  }
   const currentX = event.touches[0]?.clientX;
   const current = event.touches[0]?.clientY;
   if (touchStartX == null || touchStartY == null ||
@@ -1278,7 +1878,9 @@ timeline.addEventListener('touchend', () => {
   touchActive = false;
   touchStartX = null;
   touchStartY = null;
-  if (!userScrolling) setRenderBlocked(false);
+  if (!userScrolling && !virtualWindowLoading) setRenderBlocked(false);
+  flushMountedUpdates();
+  scheduleMeasuredHeightReconcile();
 }, { passive: true });
 timeline.addEventListener('touchcancel', () => {
   gestureActive = false;
@@ -1287,23 +1889,34 @@ timeline.addEventListener('touchcancel', () => {
   touchActive = false;
   touchStartX = null;
   touchStartY = null;
-  if (!userScrolling) setRenderBlocked(false);
+  if (!userScrolling && !virtualWindowLoading) setRenderBlocked(false);
+  flushMountedUpdates();
+  scheduleMeasuredHeightReconcile();
 }, { passive: true });
 timeline.addEventListener('scroll', () => {
   if (scrollStopLock) {
     restoreScrollStopPosition();
     return;
   }
-  if (userScrolling) markUserScroll();
-  if (state?.messages?.length) {
-    const range = visibleRange({
-      heights: state.messages.map(messageHeight),
-      scrollTop: timeline.scrollTop,
-      viewportHeight: timeline.clientHeight,
-      overscan: virtualOverscan(timeline.clientHeight),
-    });
-    if (rangeChanged(renderedRange, range)) requestRender();
+  const attemptedTop = timeline.scrollTop;
+  const direction = Math.sign(attemptedTop - lastTimelineScrollTop);
+  lastTimelineScrollTop = attemptedTop;
+  if (!programmaticNavigationActive && state?.messages?.length && renderedRange.start >= 0) {
+    const coverage = coverageFor(attemptedTop);
+    if (!coverage.covered) {
+      navigationCursorId = null;
+      navigationEdge = null;
+      beginVirtualWindowLoad(coverage.requested, coverage.clamped);
+      return;
+    }
+    const viewport = Math.max(1, timeline.clientHeight);
+    if (direction > 0 && coverage.max - attemptedTop <= viewport) {
+      scheduleVirtualPrefetch(attemptedTop + viewport * 2);
+    } else if (direction < 0 && attemptedTop - coverage.min <= viewport) {
+      scheduleVirtualPrefetch(Math.max(0, attemptedTop - viewport * 2));
+    }
   }
+  if (userScrolling) markUserScroll();
   sendViewportMetrics();
   if (timeline.scrollTop < 180 && state?.hasMoreBefore) sendAction('loadMoreBefore');
   if (timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 180 && state?.hasMoreAfter) sendAction('loadMoreAfter');
@@ -1333,6 +1946,9 @@ timeline.addEventListener('keydown', (event) => {
 window.addEventListener('resize', requestRender);
 
 function prepareProgrammaticNavigation() {
+  virtualWindowCoordinator.cancel();
+  cancelVirtualPrefetch();
+  programmaticNavigationActive = true;
   releaseScrollStopLock();
   clearTimeout(userScrollTimer);
   userScrollTimer = null;
@@ -1369,19 +1985,30 @@ function handleViewportCommand(envelope) {
 }
 
 function navigateToEdge(edge) {
+  programmaticNavigationActive = true;
   navigationEdge = edge;
   const settle = edge === 'top'
     ? () => timeline.scrollTo({ top: 0, behavior: 'auto' })
     : () => timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'auto' });
-  settle();
-  viewportNavigation.run(settle, () => {
+  const complete = () => {
     const remaining = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop;
     const settled = edge === 'top' ? timeline.scrollTop <= 1 : remaining <= 1;
     if (!settled) {
       bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
     }
+    programmaticNavigationActive = false;
     sendViewportMetrics();
-  });
+  };
+  const coverage = coverageFor(edge === 'top' ? 0 : Number.POSITIVE_INFINITY);
+  if (!coverage.covered) {
+    beginVirtualWindowLoad(coverage.requested, coverage.clamped, () => {
+      settle();
+      complete();
+    });
+    return;
+  }
+  settle();
+  viewportNavigation.run(settle, complete);
 }
 
 function enforceNavigationEdge() {
@@ -1393,6 +2020,7 @@ function enforceNavigationEdge() {
 }
 
 function restoreMessageAnchor(anchor) {
+  programmaticNavigationActive = true;
   navigationEdge = null;
   const viewport = viewportForSavedAnchor({
     messageIds: (state?.messages ?? []).map((message) => message.id),
@@ -1400,21 +2028,32 @@ function restoreMessageAnchor(anchor) {
     anchor,
     viewportHeight: timeline.clientHeight,
   });
-  if (!viewport) return false;
+  if (!viewport) {
+    programmaticNavigationActive = false;
+    return false;
+  }
+  const complete = () => {
+    if (!restoreAnchor(timeline, viewport.anchor)) {
+      bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+    }
+    programmaticNavigationActive = false;
+    sendViewportMetrics();
+  };
+  const coverage = coverageFor(viewport.scrollTop);
+  if (!coverage.covered) {
+    beginVirtualWindowLoad(coverage.requested, coverage.clamped, complete);
+    return true;
+  }
   timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
   viewportNavigation.run(
     () => restoreAnchor(timeline, viewport.anchor),
-    () => {
-      if (!restoreAnchor(timeline, viewport.anchor)) {
-        bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
-      }
-      sendViewportMetrics();
-    },
+    complete,
   );
   return true;
 }
 
 function scrollToMessage(messageId) {
+  programmaticNavigationActive = true;
   navigationEdge = null;
   const viewport = viewportForSavedAnchor({
     messageIds: (state?.messages ?? []).map((message) => message.id),
@@ -1422,20 +2061,30 @@ function scrollToMessage(messageId) {
     anchor: { messageId, offset: 0 },
     viewportHeight: timeline.clientHeight,
   });
-  if (!viewport) return false;
+  if (!viewport) {
+    programmaticNavigationActive = false;
+    return false;
+  }
+  const complete = () => {
+    if (!restoreAnchor(timeline, viewport.anchor)) {
+      bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+    }
+    const target = timeline.querySelector(
+      `[data-message-id="${CSS.escape(messageId)}"]`,
+    );
+    target?.focus({ preventScroll: true });
+    programmaticNavigationActive = false;
+    sendViewportMetrics();
+  };
+  const coverage = coverageFor(viewport.scrollTop);
+  if (!coverage.covered) {
+    beginVirtualWindowLoad(coverage.requested, coverage.clamped, complete);
+    return true;
+  }
   timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
   viewportNavigation.run(
     () => restoreAnchor(timeline, viewport.anchor),
-    () => {
-      if (!restoreAnchor(timeline, viewport.anchor)) {
-        bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
-      }
-      const target = timeline.querySelector(
-        `[data-message-id="${CSS.escape(messageId)}"]`,
-      );
-      target?.focus({ preventScroll: true });
-      sendViewportMetrics();
-    },
+    complete,
   );
   return true;
 }
@@ -1443,7 +2092,10 @@ function scrollToMessage(messageId) {
 function jumpQuestion(delta) {
   navigationEdge = null;
   const messages = state?.messages ?? [];
-  if (!messages.length) return;
+  if (!messages.length) {
+    programmaticNavigationActive = false;
+    return;
+  }
   const anchor = captureAnchor(timeline);
   let index = messages.findIndex((message) => message.id === navigationCursorId);
   if (index < 0) index = messages.findIndex((message) => message.id === anchor?.id);
@@ -1453,10 +2105,76 @@ function jumpQuestion(delta) {
   const next = index + delta;
   if (next < 0 || next >= messages.length) {
     navigationCursorId = null;
+    programmaticNavigationActive = false;
     return;
   }
   navigationCursorId = messages[next].id;
   scrollToMessage(navigationCursorId);
+}
+
+function handleMessagePatches(envelope) {
+  if (!state || envelope.renderSessionId !== state.renderSessionId ||
+      envelope.conversationId !== state.conversationId) return;
+  const previousById = new Map(state.messages.map((message) => [message.id, message]));
+  const nextState = reduceEnvelope(state, envelope);
+  state = nextState;
+  const nextById = new Map(state.messages.map((message) => [message.id, message]));
+  for (const patch of envelope.patches ?? []) {
+    const id = patch.id?.toString();
+    const previous = previousById.get(id);
+    const next = nextById.get(id);
+    if (!id || !previous || !next) continue;
+    if (Number.isInteger(patch.streamRevision) &&
+        next.streamRevision !== patch.streamRevision) {
+      bridge.post({ type: 'diagnostic', code: 'stream_patch_stale' });
+      continue;
+    }
+    const target = String(next.content ?? '');
+    const displayed = presentedStreamContent.get(id) ?? String(previous.content ?? '');
+    if (!mountedSlots.get(id)?.isConnected) {
+      streamPresenter.cancel(id);
+      presentedStreamContent.set(id, target);
+      continue;
+    }
+    const contentChanged = target !== displayed;
+    if (next.isStreaming !== true) {
+      streamPresenter.update({ id, displayed, target, final: true });
+      continue;
+    }
+    if (contentChanged) {
+      streamPresenter.update({
+        id,
+        displayed,
+        target,
+        final: false,
+      });
+    }
+    const structuralChange = streamStructureSignature(previous) !==
+      streamStructureSignature(next);
+    if (!contentChanged || structuralChange) updateMountedMessage(id);
+  }
+}
+
+function handleMediaResult(payload) {
+  if (!state || payload.renderSessionId !== state.renderSessionId ||
+      payload.conversationId !== state.conversationId) return;
+  state = {
+    ...state,
+    media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl },
+  };
+  pendingMedia.delete(payload.handle);
+  applyTheme();
+  const userAvatar = state.user?.avatar === payload.handle;
+  const assistantAvatar = state.assistant?.avatar === payload.handle;
+  for (const message of state.messages ?? []) {
+    const affected = message.modelIcon === payload.handle ||
+      (userAvatar && message.role === 'user') ||
+      (assistantAvatar && message.role !== 'user') ||
+      (message.attachments ?? []).some(
+        (attachment) => attachment.reference === payload.handle,
+      );
+    if (affected) updateMountedMessage(message.id);
+  }
 }
 
 window.CuplivoWeb = {
@@ -1468,28 +2186,40 @@ window.CuplivoWeb = {
         const payload = receiveTransferChunk(envelope);
         if (!payload) return;
         if (payload.type === 'mediaResult') {
-          if (state && payload.renderSessionId === state.renderSessionId && payload.conversationId === state.conversationId) {
-            state = { ...state, media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl } };
-            pendingMedia.delete(payload.handle);
-            requestRender();
-          }
+          handleMediaResult(payload);
         } else {
           const previousSessionId = state?.renderSessionId;
           state = reduceEnvelope(state, payload);
           if (previousSessionId && previousSessionId !== state?.renderSessionId) {
             viewportNavigation.cancel();
+            virtualWindowCoordinator.cancel();
+            streamPresenter.clear();
             navigationCursorId = null;
             navigationEdge = null;
+            programmaticNavigationActive = false;
             expansionCoordinator.clear();
             localExpansions.clear();
             pendingActions.clear();
             pendingMedia.clear();
             heights.clear();
+            mountedSlots.clear();
+            presentedStreamContent.clear();
+            pendingMountedUpdates.clear();
+            markdownHtmlCache.clear();
+            measuredHeightsPending = false;
+            cancelVirtualPrefetch();
+            clearTimeout(virtualPruneTimer);
+          }
+          for (const message of state?.messages ?? []) {
+            if (message.isStreaming !== true) {
+              streamPresenter.cancel(message.id);
+              presentedStreamContent.delete(message.id);
+            }
           }
           requestRender();
         }
       } else if (envelope.type === 'messagePatches') {
-        state = reduceEnvelope(state, envelope); requestRender();
+        handleMessagePatches(envelope);
       } else if (envelope.type === 'actionResult') {
         pendingActions.delete(envelope.requestId);
         if (expansionCoordinator.resolve(envelope.requestId, envelope.ok === true)) {
@@ -1499,7 +2229,10 @@ window.CuplivoWeb = {
       else if (envelope.type === 'mediaError') pendingMedia.delete(envelope.handle);
       else if (envelope.type === 'viewportCommand') handleViewportCommand(envelope);
     } catch (error) {
-      bridge.post({ type: 'diagnostic', code: error?.message ?? 'receive_failed' });
+      bridge.post({
+        type: 'diagnostic',
+        code: safeDiagnosticCode(error, 'receive_failed'),
+      });
     }
   },
 };

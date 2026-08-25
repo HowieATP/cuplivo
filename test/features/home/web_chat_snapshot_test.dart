@@ -85,7 +85,7 @@ void main() {
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 2);
-    expect(snapshot['assetVersion'], 'web-chat-v11');
+    expect(snapshot['assetVersion'], 'web-chat-v12');
     expect(snapshot['initialViewportAnchor'], <String, dynamic>{
       'messageId': 'm1',
       'offset': -16.0,

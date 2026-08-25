@@ -77,8 +77,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   winweb.WebviewController? _windowsController;
   StreamSubscription<dynamic>? _windowsMessageSubscription;
   final Map<String, VoidCallback> _streamListeners = <String, VoidCallback>{};
-  final Map<String, Map<String, dynamic>> _queuedStreamingPatches =
-      <String, Map<String, dynamic>>{};
+  final WebChatStreamingPatchBuffer _streamPatchBuffer =
+      WebChatStreamingPatchBuffer();
   Timer? _streamFlushTimer;
   Timer? _initializationTimer;
   bool _ready = false;
@@ -118,6 +118,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         oldWidget.snapshot['actionEpoch'] != widget.snapshot['actionEpoch']) {
       _actionGate = _newActionGate();
     }
+    if (sessionChanged) {
+      _streamFlushTimer?.cancel();
+      _streamFlushTimer = null;
+      _streamPatchBuffer.clear();
+    }
     if (!identical(oldWidget.viewportPort, widget.viewportPort)) {
       oldWidget.viewportPort.detach(_viewportCommandSender);
       widget.viewportPort.attach(_viewportCommandSender);
@@ -131,6 +136,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     _generation++;
     _initializationTimer?.cancel();
     _streamFlushTimer?.cancel();
+    _streamPatchBuffer.clear();
     _detachStreamingListeners();
     widget.viewportPort.detach(_viewportCommandSender);
     unawaited(_windowsMessageSubscription?.cancel());
@@ -369,7 +375,13 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         _initializing = false;
         _initializationTimer?.cancel();
         if (mounted) setState(() {});
-        unawaited(_sendSnapshot());
+        unawaited(
+          _sendSnapshot().whenComplete(() {
+            if (_streamPatchBuffer.hasPending) {
+              _scheduleStreamingPatchFlush();
+            }
+          }),
+        );
         return;
       case 'action':
         unawaited(_handleAction(message));
@@ -599,6 +611,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       if (ids.contains(id)) continue;
       final notifier = widget.streamingContentNotifier.getNotifier(id);
       notifier.removeListener(_streamListeners.remove(id)!);
+      _streamPatchBuffer.remove(id);
     }
     for (final id in ids) {
       if (_streamListeners.containsKey(id) ||
@@ -609,11 +622,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       void listener() {
         final patch = widget.buildStreamingPatch(id, notifier.value);
         if (patch == null) return;
-        _queuedStreamingPatches[id] = patch;
-        _streamFlushTimer ??= Timer(const Duration(milliseconds: 16), () {
-          _streamFlushTimer = null;
-          unawaited(_flushStreamingPatches());
-        });
+        _streamPatchBuffer.enqueue(id, patch);
+        _scheduleStreamingPatchFlush();
       }
 
       _streamListeners[id] = listener;
@@ -632,16 +642,29 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     _streamListeners.clear();
   }
 
-  Future<void> _flushStreamingPatches() async {
-    if (!_ready || _queuedStreamingPatches.isEmpty) return;
-    final patches = _queuedStreamingPatches.values.toList(growable: false);
-    _queuedStreamingPatches.clear();
-    await _sendEnvelope(<String, dynamic>{
-      'type': 'messagePatches',
-      'renderSessionId': _renderSessionId,
-      'conversationId': _conversationId,
-      'patches': patches,
+  void _scheduleStreamingPatchFlush() {
+    if (_streamFlushTimer != null || _streamPatchBuffer.inFlight) return;
+    _streamFlushTimer = Timer(const Duration(milliseconds: 16), () {
+      _streamFlushTimer = null;
+      unawaited(_flushStreamingPatches());
     });
+  }
+
+  Future<void> _flushStreamingPatches() async {
+    if (!_ready) return;
+    final patches = _streamPatchBuffer.takeBatch();
+    if (patches == null) return;
+    try {
+      await _sendEnvelope(<String, dynamic>{
+        'type': 'messagePatches',
+        'renderSessionId': _renderSessionId,
+        'conversationId': _conversationId,
+        'patches': patches,
+      });
+    } finally {
+      _streamPatchBuffer.completeBatch();
+      if (_streamPatchBuffer.hasPending) _scheduleStreamingPatchFlush();
+    }
   }
 
   Future<void> _openExternalUrl(String raw) async {

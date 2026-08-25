@@ -5,9 +5,55 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 
 void main() {
-  test('Web chat uses protocol v2 and bundled assets v11', () {
+  test('Web chat uses protocol v2 and bundled assets v12', () {
     expect(webChatProtocolVersion, 2);
-    expect(webChatAssetVersion, 'web-chat-v11');
+    expect(webChatAssetVersion, 'web-chat-v12');
+  });
+
+  group('Web streaming patch buffer', () {
+    test('keeps only the latest patch and permits one in-flight batch', () {
+      final buffer = WebChatStreamingPatchBuffer();
+
+      expect(buffer.enqueue('m', <String, dynamic>{'content': 'a'}), 1);
+      expect(buffer.enqueue('m', <String, dynamic>{'content': 'ab'}), 2);
+      final first = buffer.takeBatch();
+      expect(first, hasLength(1));
+      expect(first!.single['content'], 'ab');
+      expect(first.single['streamRevision'], 2);
+      expect(buffer.takeBatch(), isNull);
+
+      expect(buffer.enqueue('m', <String, dynamic>{'content': 'abc'}), 3);
+      expect(buffer.takeBatch(), isNull);
+      buffer.completeBatch();
+      final second = buffer.takeBatch();
+      expect(second!.single['content'], 'abc');
+      expect(second.single['streamRevision'], 3);
+    });
+
+    test('clear drops pending and revision state', () {
+      final buffer = WebChatStreamingPatchBuffer();
+      buffer.enqueue('m', <String, dynamic>{'content': 'a'});
+      buffer.clear();
+
+      expect(buffer.hasPending, isFalse);
+      expect(buffer.enqueue('m', <String, dynamic>{'content': 'b'}), 1);
+    });
+
+    test('session clearing does not overlap an existing platform send', () {
+      final buffer = WebChatStreamingPatchBuffer();
+      buffer.enqueue('old', <String, dynamic>{'content': 'old'});
+      expect(buffer.takeBatch(), isNotNull);
+
+      buffer.clear();
+      buffer.enqueue('new', <String, dynamic>{'content': 'new'});
+      expect(buffer.takeBatch(), isNull);
+
+      buffer.completeBatch();
+      final next = buffer.takeBatch();
+      expect(next, hasLength(1));
+      expect(next!.single['id'], 'new');
+      expect(next.single['streamRevision'], 1);
+    });
   });
 
   group('Web chat transfer protocol', () {

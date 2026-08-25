@@ -2,9 +2,58 @@ import 'dart:convert';
 import 'dart:math';
 
 const int webChatProtocolVersion = 2;
-const String webChatAssetVersion = 'web-chat-v11';
+const String webChatAssetVersion = 'web-chat-v12';
 const int webChatMaxChunkBytes = 128 * 1024;
 const int webChatMaxChunkPayloadBytes = 95 * 1024;
+
+/// Latest-wins buffer for streaming message patches.
+///
+/// A WebView controller call can take longer than one model chunk. This keeps
+/// at most one bridge batch in flight and retains only the newest pending
+/// state for each message while that batch is being delivered.
+class WebChatStreamingPatchBuffer {
+  final Map<String, Map<String, dynamic>> _pending =
+      <String, Map<String, dynamic>>{};
+  final Map<String, int> _revisions = <String, int>{};
+  bool _inFlight = false;
+
+  bool get hasPending => _pending.isNotEmpty;
+  bool get inFlight => _inFlight;
+
+  int enqueue(String messageId, Map<String, dynamic> patch) {
+    final revision = (_revisions[messageId] ?? 0) + 1;
+    _revisions[messageId] = revision;
+    _pending[messageId] = <String, dynamic>{
+      ...patch,
+      'id': messageId,
+      'streamRevision': revision,
+    };
+    return revision;
+  }
+
+  List<Map<String, dynamic>>? takeBatch() {
+    if (_inFlight || _pending.isEmpty) return null;
+    _inFlight = true;
+    final batch = _pending.values
+        .map(Map<String, dynamic>.of)
+        .toList(growable: false);
+    _pending.clear();
+    return batch;
+  }
+
+  void completeBatch() {
+    _inFlight = false;
+  }
+
+  void remove(String messageId) {
+    _pending.remove(messageId);
+  }
+
+  void clear() {
+    _pending.clear();
+    _revisions.clear();
+  }
+}
 
 class WebChatProtocolException implements Exception {
   const WebChatProtocolException(this.message);

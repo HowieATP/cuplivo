@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v11';
+export const ASSET_VERSION = 'web-chat-v12';
 
 const transfers = new Map();
 
@@ -44,9 +44,26 @@ export function reduceEnvelope(state, envelope) {
       return state;
     }
     if (state?.renderSessionId === envelope.renderSessionId) {
+      const liveById = new Map((state.messages ?? []).map((message) => [message.id, message]));
       return {
         ...envelope,
         media: { ...(state.media ?? {}), ...(envelope.media ?? {}) },
+        messages: (envelope.messages ?? []).map((message) => {
+          const live = liveById.get(message.id);
+          if (!live?.isStreaming || message.isStreaming !== true ||
+              !Number.isInteger(live.streamRevision)) return message;
+          return {
+            ...message,
+            content: live.content,
+            tokens: live.tokens,
+            reasoning: live.reasoning,
+            contentSplits: live.contentSplits,
+            tools: live.tools,
+            expandStepsLabel: live.expandStepsLabel,
+            translation: live.translation,
+            streamRevision: live.streamRevision,
+          };
+        }),
       };
     }
     return envelope;
@@ -57,8 +74,17 @@ export function reduceEnvelope(state, envelope) {
     const byId = new Map(envelope.patches.map((patch) => [patch.id, patch]));
     return {
       ...state,
-      messages: state.messages.map((message) =>
-        byId.has(message.id) ? { ...message, ...byId.get(message.id) } : message),
+      messages: state.messages.map((message) => {
+        const patch = byId.get(message.id);
+        if (!patch) return message;
+        const revision = patch.streamRevision;
+        const currentRevision = message.streamRevision;
+        if (Number.isInteger(revision) && message.isStreaming !== true &&
+            patch.isStreaming === true) return message;
+        if (Number.isInteger(revision) && Number.isInteger(currentRevision) &&
+            revision <= currentRevision) return message;
+        return { ...message, ...patch };
+      }),
     };
   }
   return state;
@@ -80,6 +106,303 @@ export function visibleRange({ heights, scrollTop, viewportHeight, overscan = 70
     end += 1;
   }
   return { start, end, top: offset, bottom: heights.slice(end).reduce((a, b) => a + b, 0) };
+}
+
+export function virtualOverscan(viewportHeight) {
+  const viewport = Number(viewportHeight);
+  return Math.max(2400, Number.isFinite(viewport) && viewport > 0 ? viewport * 3 : 0);
+}
+
+export function virtualCoverage({
+  heights,
+  range,
+  scrollTop,
+  viewportHeight,
+  leadingInset = 0,
+  trailingInset = 0,
+}) {
+  const values = Array.isArray(heights) ? heights.map((value) => {
+    const height = Number(value);
+    return Number.isFinite(height) && height > 0 ? height : 170;
+  }) : [];
+  const viewport = Math.max(0, Number(viewportHeight) || 0);
+  const leading = normalizeContentInset(leadingInset, 0);
+  const trailing = normalizeContentInset(trailingInset, 0);
+  const start = Math.max(0, Math.min(values.length, Number(range?.start) || 0));
+  const end = Math.max(start, Math.min(values.length, Number(range?.end) || 0));
+  const renderedTop = leading + values.slice(0, start).reduce((sum, value) => sum + value, 0);
+  const renderedBottom = leading + values.slice(0, end).reduce((sum, value) => sum + value, 0);
+  const total = leading + trailing + values.reduce((sum, value) => sum + value, 0);
+  const maxExtent = Math.max(0, total - viewport);
+  const min = start === 0 ? 0 : Math.min(maxExtent, renderedTop);
+  const max = end === values.length
+    ? maxExtent
+    : Math.max(min, Math.min(maxExtent, renderedBottom - viewport));
+  const requested = Math.max(0, Math.min(maxExtent, Number(scrollTop) || 0));
+  const clamped = Math.max(min, Math.min(max, requested));
+  return {
+    covered: requested >= min - 1 && requested <= max + 1,
+    requested,
+    maxExtent,
+    min,
+    max,
+    clamped,
+  };
+}
+
+export function createVirtualWindowCoordinator({
+  schedule = requestAnimationFrame,
+  setLoading,
+  clamp,
+  renderTarget,
+  settleTarget,
+  onError = null,
+  timeoutMs = 2500,
+}) {
+  let revision = 0;
+  let active = false;
+  let framePending = false;
+  let rendering = false;
+  let latest = null;
+  const timeout = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
+    ? Number(timeoutMs)
+    : 0;
+
+  const scheduleLatest = () => {
+    if (!active || framePending || rendering || latest == null) return;
+    framePending = true;
+    schedule(() => {
+      framePending = false;
+      if (!active || latest == null) {
+        scheduleLatest();
+        return;
+      }
+      const request = latest;
+      rendering = true;
+      let timeoutId = null;
+      let task;
+      try {
+        task = Promise.resolve(renderTarget(request.target, request.revision));
+      } catch (error) {
+        task = Promise.reject(error);
+      }
+      const guarded = timeout === 0 ? task : Promise.race([
+        task,
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error('virtual_window_timeout')),
+            timeout,
+          );
+        }),
+      ]);
+      guarded.then(() => {
+        if (timeoutId != null) clearTimeout(timeoutId);
+        rendering = false;
+        if (!active || request.revision !== revision) {
+          scheduleLatest();
+          return;
+        }
+        schedule(() => {
+          if (!active || request.revision !== revision) {
+            scheduleLatest();
+            return;
+          }
+          try {
+            settleTarget(request.target, request.revision);
+            request.onSettled?.(request.target, request.revision);
+            active = false;
+            latest = null;
+            setLoading(false);
+          } catch (error) {
+            active = false;
+            latest = null;
+            setLoading(false);
+            onError?.(error);
+          }
+        });
+      }).catch((error) => {
+        if (timeoutId != null) clearTimeout(timeoutId);
+        rendering = false;
+        if (!active || request.revision !== revision) {
+          scheduleLatest();
+          return;
+        }
+        active = false;
+        latest = null;
+        setLoading(false);
+        onError?.(error);
+      });
+    });
+  };
+
+  return {
+    request({ target, safe, onSettled = null }) {
+      const nextTarget = Math.max(0, Number(target) || 0);
+      const nextSafe = Math.max(0, Number(safe) || 0);
+      const wasActive = active;
+      active = true;
+      const requestRevision = ++revision;
+      latest = {
+        target: nextTarget,
+        safe: nextSafe,
+        revision: requestRevision,
+        onSettled,
+      };
+      if (!wasActive) setLoading(true);
+      clamp(nextSafe);
+      scheduleLatest();
+      return requestRevision;
+    },
+
+    cancel() {
+      revision += 1;
+      latest = null;
+      if (!active) return;
+      active = false;
+      setLoading(false);
+    },
+
+    isCurrent(requestRevision) {
+      return active && requestRevision === revision;
+    },
+    get active() { return active; },
+    get target() { return latest?.target ?? null; },
+  };
+}
+
+export function buildWithFrameBudget({
+  items,
+  build,
+  schedule = requestAnimationFrame,
+  now = () => performance.now(),
+  budgetMs = 6,
+  shouldContinue = () => true,
+}) {
+  const source = Array.isArray(items) ? items : [];
+  const budget = Number.isFinite(Number(budgetMs)) && Number(budgetMs) > 0
+    ? Number(budgetMs)
+    : 6;
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let index = 0;
+    const runFrame = () => {
+      if (!shouldContinue()) {
+        reject(new Error('virtual_window_stale'));
+        return;
+      }
+      const startedAt = now();
+      let built = 0;
+      try {
+        while (index < source.length) {
+          results.push(build(source[index], index));
+          index += 1;
+          built += 1;
+          if (built > 0 && now() - startedAt >= budget) break;
+        }
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      if (index >= source.length) {
+        resolve(results);
+      } else {
+        schedule(runFrame);
+      }
+    };
+    schedule(runFrame);
+  });
+}
+
+export function longestStablePrefix(previous, next) {
+  const before = Array.isArray(previous) ? previous : [];
+  const after = Array.isArray(next) ? next : [];
+  let index = 0;
+  while (index < before.length && index < after.length &&
+      before[index] === after[index]) {
+    index += 1;
+  }
+  return index;
+}
+
+export function safeUtf16SliceEnd(text, requestedEnd) {
+  const source = String(text ?? '');
+  let end = Math.max(0, Math.min(source.length, Math.trunc(Number(requestedEnd) || 0)));
+  if (end > 0 && end < source.length) {
+    const previous = source.charCodeAt(end - 1);
+    const next = source.charCodeAt(end);
+    if (previous >= 0xD800 && previous <= 0xDBFF &&
+        next >= 0xDC00 && next <= 0xDFFF) end += 1;
+  }
+  return end;
+}
+
+export function createAdaptiveStreamPresenter({
+  schedule = requestAnimationFrame,
+  now = () => performance.now(),
+  commit,
+  frameInterval = 32,
+  maxLag = 96,
+}) {
+  const entries = new Map();
+  let scheduled = false;
+
+  const scheduleFrame = () => {
+    if (scheduled || entries.size === 0) return;
+    scheduled = true;
+    schedule(runFrame);
+  };
+
+  const runFrame = (timestamp) => {
+    scheduled = false;
+    const currentTime = Number.isFinite(Number(timestamp)) ? Number(timestamp) : now();
+    for (const [id, entry] of entries) {
+      if (currentTime - entry.lastCommit < frameInterval) continue;
+      const backlog = entry.target.length - entry.displayed.length;
+      if (backlog <= 0) {
+        entries.delete(id);
+        continue;
+      }
+      const remaining = Math.max(1, entry.deadline - currentTime);
+      const framesLeft = Math.max(1, Math.ceil(remaining / frameInterval));
+      const requestedEnd = entry.displayed.length + Math.ceil(backlog / framesLeft);
+      const end = safeUtf16SliceEnd(entry.target, requestedEnd);
+      entry.displayed = entry.target.slice(0, end);
+      entry.lastCommit = currentTime;
+      commit(id, entry.displayed);
+      if (entry.displayed === entry.target) entries.delete(id);
+    }
+    scheduleFrame();
+  };
+
+  return {
+    update({ id, displayed = '', target = '', final = false }) {
+      const key = String(id ?? '');
+      if (!key) return;
+      const nextTarget = String(target ?? '');
+      let entry = entries.get(key);
+      const current = entry?.displayed ?? String(displayed ?? '');
+      if (final || !nextTarget.startsWith(current)) {
+        entries.delete(key);
+        commit(key, nextTarget);
+        return;
+      }
+      if (nextTarget === current) return;
+      const currentTime = now();
+      entry ??= {
+        displayed: current,
+        target: nextTarget,
+        deadline: currentTime + maxLag,
+        lastCommit: currentTime - frameInterval,
+      };
+      entry.target = nextTarget;
+      entries.set(key, entry);
+      scheduleFrame();
+    },
+
+    cancel(id) { entries.delete(String(id ?? '')); },
+    clear() { entries.clear(); },
+    get pending() { return entries.size; },
+  };
 }
 
 export function messageIndexAtOffset(heights, scrollTop, fallbackHeight = 170) {

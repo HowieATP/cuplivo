@@ -5,11 +5,15 @@ import vm from 'node:vm';
 import {
   captureAnchor,
   captureViewport,
+  buildWithFrameBudget,
+  createAdaptiveStreamPresenter,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
   createRenderGate,
   formatReasoningElapsed,
+  longestStablePrefix,
   mountCodeBlock,
   messageIndexAtOffset,
   verticalGestureIntent,
@@ -20,6 +24,9 @@ import {
   reduceEnvelope,
   restoreAnchor,
   restoreViewport,
+  safeUtf16SliceEnd,
+  virtualCoverage,
+  virtualOverscan,
   viewportForSavedAnchor,
   visibleRange,
 } from '../protocol.mjs';
@@ -88,14 +95,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v11', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v11',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -114,10 +121,268 @@ test('message patches affect only the active render session', () => {
   assert.equal(reduceEnvelope(state, { type: 'messagePatches', renderSessionId: 'old', conversationId: 'c', patches: [] }), state);
 });
 
+test('message patches reject stale stream revisions without breaking legacy patches', () => {
+  const state = {
+    renderSessionId: 's',
+    conversationId: 'c',
+    messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 4 }],
+  };
+  const stale = reduceEnvelope(state, {
+    type: 'messagePatches',
+    renderSessionId: 's',
+    conversationId: 'c',
+    patches: [{ id: 'm', content: 'old', streamRevision: 3 }],
+  });
+  assert.equal(stale.messages[0].content, 'new');
+  const legacy = reduceEnvelope(state, {
+    type: 'messagePatches',
+    renderSessionId: 's',
+    conversationId: 'c',
+    patches: [{ id: 'm', content: 'legacy' }],
+  });
+  assert.equal(legacy.messages[0].content, 'legacy');
+  const finished = {
+    ...state,
+    messages: [{ id: 'm', content: 'final', isStreaming: false }],
+  };
+  const late = reduceEnvelope(finished, {
+    type: 'messagePatches',
+    renderSessionId: 's',
+    conversationId: 'c',
+    patches: [{ id: 'm', content: 'partial', isStreaming: true, streamRevision: 5 }],
+  });
+  assert.equal(late.messages[0].content, 'final');
+});
+
+test('same-session streaming snapshots preserve a newer live patch', () => {
+  const state = {
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12',
+    renderSessionId: 's', conversationId: 'c', renderRevision: 2,
+    messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
+  };
+  const next = reduceEnvelope(state, {
+    ...state,
+    renderRevision: 3,
+    messages: [{ id: 'm', content: 'old', isStreaming: true }],
+  });
+  assert.equal(next.messages[0].content, 'new');
+  assert.equal(next.messages[0].streamRevision, 7);
+});
+
 test('virtual range grows with the viewport rather than total messages', () => {
   const range = visibleRange({ heights: new Array(360).fill(100), scrollTop: 12000, viewportHeight: 700, overscan: 300 });
   assert.ok(range.end - range.start < 20);
   assert.equal(range.top, range.start * 100);
+});
+
+test('virtual window uses a bounded three-screen overscan', () => {
+  assert.equal(virtualOverscan(700), 2400);
+  assert.equal(virtualOverscan(1000), 3000);
+  const range = visibleRange({
+    heights: new Array(360).fill(100),
+    scrollTop: 12000,
+    viewportHeight: 700,
+    overscan: virtualOverscan(700),
+  });
+  assert.ok(range.end - range.start < 60);
+});
+
+test('virtual coverage clamps an uncovered viewport to rendered messages', () => {
+  const heights = new Array(100).fill(100);
+  const coverage = virtualCoverage({
+    heights,
+    range: { start: 20, end: 40 },
+    scrollTop: 8200,
+    viewportHeight: 700,
+  });
+  assert.equal(coverage.covered, false);
+  assert.equal(coverage.min, 2000);
+  assert.equal(coverage.max, 3300);
+  assert.equal(coverage.requested, 8200);
+  assert.equal(coverage.maxExtent, 9300);
+  assert.equal(coverage.clamped, 3300);
+  assert.equal(virtualCoverage({
+    heights,
+    range: { start: 20, end: 40 },
+    scrollTop: 2500,
+    viewportHeight: 700,
+  }).covered, true);
+});
+
+test('virtual window paints a loader before rendering and latest target wins', async () => {
+  const frames = [];
+  const events = [];
+  const coordinator = createVirtualWindowCoordinator({
+    schedule: (callback) => frames.push(callback),
+    setLoading: (value) => events.push(`loading:${value}`),
+    clamp: (value) => events.push(`clamp:${value}`),
+    renderTarget: async (value) => events.push(`render:${value}`),
+    settleTarget: (value) => events.push(`settle:${value}`),
+    timeoutMs: 0,
+  });
+  coordinator.request({ target: 9000, safe: 3300 });
+  coordinator.request({ target: 1200, safe: 2000 });
+  assert.deepEqual(events, ['loading:true', 'clamp:3300', 'clamp:2000']);
+  assert.equal(frames.length, 1);
+  frames.shift()(16);
+  await Promise.resolve();
+  assert.deepEqual(events, [
+    'loading:true', 'clamp:3300', 'clamp:2000', 'render:1200',
+  ]);
+  assert.equal(frames.length, 1);
+  frames.shift()(32);
+  assert.deepEqual(events, [
+    'loading:true', 'clamp:3300', 'clamp:2000', 'render:1200',
+    'settle:1200', 'loading:false',
+  ]);
+});
+
+test('canceling a virtual window prevents stale completion', async () => {
+  const frames = [];
+  const events = [];
+  let finishRender;
+  const coordinator = createVirtualWindowCoordinator({
+    schedule: (callback) => frames.push(callback),
+    setLoading: (value) => events.push(`loading:${value}`),
+    clamp: () => {},
+    renderTarget: () => new Promise((resolve) => { finishRender = resolve; }),
+    settleTarget: () => events.push('settled'),
+  });
+  coordinator.request({ target: 9000, safe: 3300 });
+  frames.shift()(16);
+  coordinator.cancel();
+  finishRender();
+  await Promise.resolve();
+  assert.deepEqual(events, ['loading:true', 'loading:false']);
+});
+
+test('virtual window timeout stays at the safe boundary and reports failure', async () => {
+  const events = [];
+  const coordinator = createVirtualWindowCoordinator({
+    schedule: (callback) => callback(),
+    setLoading: (value) => events.push(`loading:${value}`),
+    clamp: (value) => events.push(`clamp:${value}`),
+    renderTarget: () => new Promise(() => {}),
+    settleTarget: () => events.push('settled'),
+    onError: (error) => events.push(error.message),
+    timeoutMs: 5,
+  });
+  coordinator.request({ target: 9000, safe: 3300 });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(events, [
+    'loading:true',
+    'clamp:3300',
+    'loading:false',
+    'virtual_window_timeout',
+  ]);
+  assert.equal(coordinator.active, false);
+});
+
+test('virtual messages build within a per-frame budget and cancel stale work', async () => {
+  const frames = [];
+  let clock = 0;
+  const work = buildWithFrameBudget({
+    items: [1, 2, 3, 4, 5],
+    schedule: (callback) => frames.push(callback),
+    now: () => clock,
+    budgetMs: 6,
+    build: (value) => {
+      clock += 4;
+      return value * 2;
+    },
+  });
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  assert.deepEqual(await work, [2, 4, 6, 8, 10]);
+
+  const canceledFrames = [];
+  let current = true;
+  const canceled = buildWithFrameBudget({
+    items: [1, 2],
+    schedule: (callback) => canceledFrames.push(callback),
+    shouldContinue: () => current,
+    build: (value) => value,
+  });
+  current = false;
+  canceledFrames.shift()();
+  await assert.rejects(canceled, /virtual_window_stale/);
+});
+
+test('adaptive streaming catches up by its deadline and preserves Unicode', () => {
+  const frames = [];
+  const commits = [];
+  let clock = 0;
+  const presenter = createAdaptiveStreamPresenter({
+    schedule: (callback) => frames.push(callback),
+    now: () => clock,
+    commit: (id, content) => commits.push([id, content]),
+  });
+  presenter.update({ id: 'm', displayed: '', target: '你好😀世界' });
+  for (const time of [32, 64, 96]) {
+    clock = time;
+    frames.shift()?.(time);
+  }
+  assert.equal(commits.at(-1)[1], '你好😀世界');
+  for (const [, content] of commits) {
+    assert.doesNotMatch(content, /[\uD800-\uDBFF]$/);
+  }
+});
+
+test('continuous stream updates do not move the original catch-up deadline', () => {
+  const frames = [];
+  const commits = [];
+  let clock = 0;
+  const presenter = createAdaptiveStreamPresenter({
+    schedule: (callback) => frames.push(callback),
+    now: () => clock,
+    commit: (_, content) => commits.push(content),
+  });
+  presenter.update({ id: 'm', target: '第一段较长的初始内容' });
+  clock = 20;
+  presenter.update({ id: 'm', target: '第一段较长的初始内容和追加内容' });
+  clock = 32;
+  frames.shift()(clock);
+  clock = 48;
+  presenter.update({ id: 'm', target: '第一段较长的初始内容和追加内容😀' });
+  clock = 64;
+  frames.shift()(clock);
+  clock = 96;
+  frames.shift()?.(clock);
+  assert.equal(commits.at(-1), '第一段较长的初始内容和追加内容😀');
+});
+
+test('Markdown diff retains the longest unchanged top-level prefix', () => {
+  assert.equal(
+    longestStablePrefix(
+      ['paragraph:first', 'code:stable', 'paragraph:old tail'],
+      ['paragraph:first', 'code:stable', 'paragraph:new tail'],
+    ),
+    2,
+  );
+  assert.equal(longestStablePrefix(['a'], ['different']), 0);
+  assert.equal(longestStablePrefix(null, ['a']), 0);
+});
+
+test('streaming rewrites and completion flush immediately', () => {
+  const commits = [];
+  const presenter = createAdaptiveStreamPresenter({
+    schedule: () => {},
+    now: () => 0,
+    commit: (id, content) => commits.push([id, content]),
+  });
+  presenter.update({ id: 'm', displayed: 'prefix', target: 'replacement' });
+  presenter.update({
+    id: 'm', displayed: 'replacement', target: 'replacement final', final: true,
+  });
+  assert.deepEqual(commits, [
+    ['m', 'replacement'],
+    ['m', 'replacement final'],
+  ]);
+  assert.equal(safeUtf16SliceEnd('a😀b', 2), 3);
 });
 
 test('frame coalescer runs once for a burst', () => {
@@ -555,9 +820,40 @@ test('virtual DOM replacement captures scroll state first and applies Flutter in
 test('touch and inertial scrolling defer every virtual DOM replacement', () => {
   assert.match(appSource, /touchstart[\s\S]*?setRenderBlocked\(true\)/);
   assert.match(appSource, /function markUserScroll[\s\S]*?setRenderBlocked\(true\)/);
-  assert.match(appSource, /messagePatches[\s\S]*?requestRender\(\)/);
+  assert.match(appSource, /messagePatches[\s\S]*?handleMessagePatches\(envelope\)/);
+  assert.match(appSource, /function updateMountedStreamingContent/);
+  assert.match(appSource, /patchStreamingMarkdownRoot/);
+  assert.match(appSource, /function handleMediaResult/);
+  assert.doesNotMatch(appSource, /payload\.type === 'mediaResult'[\s\S]{0,300}requestRender\(\)/);
   assert.doesNotMatch(appSource, /messagePatches[^\n]*scheduleRender\(\)/);
-  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?if \(touchActive \|\| userScrolling\)[\s\S]*?requestRender\(\)/);
+  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?measuredHeightsPending = true/);
+  assert.match(appSource, /createFrameCoalescer\(\s*reconcileMeasuredHeights/);
+  const measureStart = appSource.indexOf('function handleMeasuredHeights');
+  const measureEnd = appSource.indexOf('function reconcileMeasuredHeights', measureStart);
+  assert.doesNotMatch(appSource.slice(measureStart, measureEnd), /requestRender\(\)/);
+});
+
+test('virtual boundaries show a localized loader and use budgeted detached work', () => {
+  assert.match(htmlSource, /id="virtual-window-loader"/);
+  assert.match(htmlSource, /id="virtual-window-loader-label"/);
+  assert.match(styleSource, /#virtual-window-loader\s*\{/);
+  assert.match(appSource, /setVirtualWindowLoading/);
+  assert.match(appSource, /buildWithFrameBudget/);
+  assert.match(appSource, /coverage\.requested/);
+  assert.match(appSource, /virtual_window_timeout/);
+});
+
+test('stream patches avoid DOM work for offscreen messages and retain stable blocks', () => {
+  const handlerStart = appSource.indexOf('function handleMessagePatches');
+  const handlerEnd = appSource.indexOf('function handleMediaResult', handlerStart);
+  const handler = appSource.slice(handlerStart, handlerEnd);
+  const offscreen = handler.indexOf('!mountedSlots.get(id)?.isConnected');
+  const offscreenContinue = handler.indexOf('continue;', offscreen);
+  const mountedUpdate = handler.indexOf('updateMountedMessage(id)', offscreen);
+  assert.ok(offscreen >= 0 && offscreenContinue > offscreen);
+  assert.ok(mountedUpdate > offscreenContinue);
+  assert.match(appSource, /longestStablePrefix\(previous\?\.signatures, signatures\)/);
+  assert.match(appSource, /streamingMarkdownStates\.set/);
 });
 
 test('viewport commands use an atomic render-and-settle transaction', () => {
@@ -571,8 +867,10 @@ test('viewport commands use an atomic render-and-settle transaction', () => {
   assert.match(appSource, /createViewportNavigationCoordinator\(\{[\s\S]*?setRenderBlocked[\s\S]*?requestRender/);
   assert.match(appSource, /function navigateToEdge[\s\S]*?viewportNavigation\.run/);
   assert.match(appSource, /function navigateToEdge[\s\S]*?navigationEdge = edge/);
+  assert.match(appSource, /function navigateToEdge[\s\S]*?beginVirtualWindowLoad/);
   assert.match(appSource, /function handleMeasuredHeights[\s\S]*?enforceNavigationEdge\(\)/);
   assert.match(appSource, /function scrollToMessage[\s\S]*?viewportNavigation\.run/);
+  assert.match(appSource, /function scrollToMessage[\s\S]*?beginVirtualWindowLoad/);
   assert.doesNotMatch(commandBody, /behavior:\s*'smooth'/);
   assert.match(appSource, /type: 'viewportMetrics'[\s\S]*?conversationId: renderedConversationId/);
   assert.match(appSource, /const missingSavedAnchor[\s\S]*?messages\.reduce\(\(sum, message\)/);
@@ -597,7 +895,7 @@ test('message composition follows Flutter visual grouping', () => {
   assert.match(appSource, /attachments/);
   assert.match(appSource, /renderSuggestions/);
   assert.doesNotMatch(appSource, /fragment\.append\(suggestions\)/);
-  const messageIndex = appSource.indexOf('slot.append(node)');
+  const messageIndex = appSource.indexOf('slot.append(renderMessage');
   const dividerIndex = appSource.indexOf('slot.append(divider)', messageIndex);
   assert.ok(messageIndex >= 0 && dividerIndex > messageIndex);
   assert.match(styleSource, /\.assistant-text-surface/);

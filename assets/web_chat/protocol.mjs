@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v3';
+export const ASSET_VERSION = 'web-chat-v4';
 
 const transfers = new Map();
 
@@ -241,5 +241,32 @@ export function createFrameCoalescer(callback, schedule = requestAnimationFrame)
       pending = false;
       callback();
     });
+  };
+}
+
+export function createRenderGate(dispatch) {
+  let blocked = false;
+  let pending = false;
+  return {
+    request() {
+      if (blocked) {
+        pending = true;
+        return;
+      }
+      dispatch();
+    },
+
+    setBlocked(value) {
+      const next = Boolean(value);
+      if (blocked === next) return;
+      blocked = next;
+      if (!blocked && pending) {
+        pending = false;
+        dispatch();
+      }
+    },
+
+    get blocked() { return blocked; },
+    get pending() { return pending; },
   };
 }

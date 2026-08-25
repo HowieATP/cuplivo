@@ -23,9 +23,11 @@
   --cuplivo-frosted: Canvas;
   --cuplivo-muted: GrayText;
   --cuplivo-model-icon-background: Canvas;
+  --cuplivo-user-avatar-background: Canvas;
+  --cuplivo-assistant-avatar-background: Canvas;
   --cuplivo-font-scale: 1;
-  --cuplivo-background-mask: transparent;
-  --cuplivo-background-mask-opacity: 0;
+  --cuplivo-background-mask-top: transparent;
+  --cuplivo-background-mask-bottom: transparent;
   --cuplivo-content-top-inset: 8px;
   --cuplivo-content-bottom-inset: 8px;
 }
@@ -39,15 +41,34 @@ body {
   font: calc(15px * var(--cuplivo-font-scale))/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
-body::before {
-  content: "";
+#chat-background {
   position: fixed;
   z-index: 0;
   inset: 0;
-  background: var(--cuplivo-background-mask);
-  opacity: var(--cuplivo-background-mask-opacity);
+  background-position: center;
+  background-size: cover;
   pointer-events: none;
 }
+#chat-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .04);
+}
+body::before {
+  content: "";
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--cuplivo-background-mask-top),
+    var(--cuplivo-background-mask-bottom)
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+body[data-has-background="true"]::before { opacity: 1; }
 button, input, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 .lucide-icon, .disclosure-icon, .disclosure-chevron {
@@ -61,7 +82,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 #timeline {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
@@ -118,12 +139,15 @@ button { -webkit-tap-highlight-color: transparent; }
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: var(--cuplivo-surface-fill);
+  background: var(--cuplivo-assistant-avatar-background);
   color: var(--cuplivo-secondary);
   font-size: 18px;
   font-weight: 650;
 }
-.message.is-user .avatar { color: var(--cuplivo-primary); }
+.message.is-user .avatar {
+  color: var(--cuplivo-primary);
+  background: var(--cuplivo-user-avatar-background);
+}
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .avatar.is-model-icon { background: var(--cuplivo-model-icon-background); }
 .avatar.is-model-icon img { width: 52%; height: 52%; object-fit: contain; }
@@ -133,7 +157,7 @@ body[data-dark="true"] .avatar img.is-monochrome { filter: invert(1); }
   min-width: 0;
   flex-direction: column;
   color: var(--cuplivo-muted);
-  font-size: .73em;
+  font-size: 11px;
   line-height: 1.35;
 }
 .message.is-user .meta { align-items: flex-end; text-align: right; }
@@ -141,7 +165,7 @@ body[data-dark="true"] .avatar img.is-monochrome { filter: invert(1); }
   max-width: min(66vw, 580px);
   overflow: hidden;
   color: var(--cuplivo-muted);
-  font-size: 1.18em;
+  font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -153,10 +177,15 @@ body[data-dark="true"] .avatar img.is-monochrome { filter: invert(1); }
   border-radius: 16px;
   overflow-wrap: anywhere;
 }
+.message.is-assistant .bubble {
+  font-size: calc(15.7px * var(--cuplivo-font-scale));
+  line-height: 1.5;
+}
 .message.is-user .bubble {
   width: auto;
   max-width: 75%;
   font-size: calc(15.5px * var(--cuplivo-font-scale));
+  line-height: 1.45;
 }
 body[data-background-style="defaultStyle"] .message.is-assistant .bubble {
   padding: 0;
@@ -166,14 +195,26 @@ body[data-background-style="defaultStyle"] .message.is-user .bubble {
   padding: 12px;
   background: var(--cuplivo-user);
 }
-body[data-background-style="frosted"] .bubble {
+body[data-background-style="frosted"] :is(
+  .message.is-user .bubble,
+  .assistant-text-surface,
+  .chain-card,
+  .translation,
+  .html-preview
+) {
   padding: 12px;
   border: .8px solid var(--cuplivo-outline-frosted);
   background: var(--cuplivo-frosted);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
-body[data-background-style="solid"] .bubble {
+body[data-background-style="solid"] :is(
+  .message.is-user .bubble,
+  .assistant-text-surface,
+  .chain-card,
+  .translation,
+  .html-preview
+) {
   padding: 12px;
   border: .8px solid var(--cuplivo-outline-solid);
   background: var(--cuplivo-card);
@@ -182,6 +223,13 @@ body[data-background-style="solid"] .bubble {
   outline: 2px solid var(--cuplivo-primary);
   outline-offset: 2px;
 }
+.assistant-text-surface {
+  min-width: 0;
+  width: 100%;
+  border-radius: 16px;
+  overflow-wrap: anywhere;
+}
+.assistant-text-surface + .assistant-text-surface { margin-top: 8px; }
 .context-divider {
   display: flex;
   align-items: center;
@@ -218,49 +266,55 @@ body[data-background-style="solid"] .bubble {
 .markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
 .markdown th, .markdown td { border: 1px solid var(--cuplivo-outline-soft); padding: 6px 9px; }
 .markdown img { max-width: 100%; border-radius: 10px; }
+.attachments {
+  display: flex;
+  max-width: 75%;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 [data-component="attachment-image"] {
   display: block;
-  max-width: min(100%, 560px);
-  max-height: 440px;
-  margin-bottom: 8px;
-  border-radius: 14px;
-  object-fit: contain;
+  width: 112px;
+  height: 112px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+[data-component="attachment-file"] {
+  max-width: min(280px, 75vw);
+  overflow: hidden;
+  border: 1px solid var(--cuplivo-outline-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--cuplivo-surface-fill);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.thinking, .tool, .translation, .html-preview {
+.chain-card, .translation, .html-preview {
   position: relative;
   margin: 8px 0;
   border: 0;
   border-radius: 16px;
   overflow: hidden;
 }
-.thinking, .tool { overflow: visible; }
-body[data-background-style="defaultStyle"] .thinking,
-body[data-background-style="defaultStyle"] .tool {
+.chain-card { padding: 4px 8px; overflow: visible; }
+.thinking, .tool { position: relative; overflow: visible; }
+body[data-background-style="defaultStyle"] .chain-card {
   background: var(--cuplivo-thinking);
 }
 body[data-background-style="defaultStyle"] .translation,
 body[data-background-style="defaultStyle"] .html-preview {
   background: var(--cuplivo-surface-fill);
 }
-body[data-background-style="frosted"] :is(.thinking, .tool, .translation, .html-preview) {
-  border: .8px solid var(--cuplivo-outline-frosted);
-  background: var(--cuplivo-frosted);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-body[data-background-style="solid"] :is(.thinking, .tool, .translation, .html-preview) {
-  border: .8px solid var(--cuplivo-outline-solid);
-  background: var(--cuplivo-card);
-}
-.bubble > .thinking:has(~ .thinking, ~ .tool)::after,
-.bubble > .tool:has(~ .thinking, ~ .tool)::after {
+.chain-card > .thinking:has(~ .thinking, ~ .tool)::after,
+.chain-card > .tool:has(~ .thinking, ~ .tool)::after {
   content: "";
   position: absolute;
   z-index: 0;
   top: 34px;
-  bottom: -10px;
-  left: 24px;
+  bottom: -8px;
+  left: 16px;
   width: 1px;
   background: var(--cuplivo-outline-soft);
 }
@@ -272,7 +326,7 @@ body[data-background-style="solid"] :is(.thinking, .tool, .translation, .html-pr
   align-items: center;
   gap: 9px;
   cursor: pointer;
-  padding: 9px 11px;
+  padding: 7px 3px;
   user-select: none;
   text-align: left;
   color: var(--cuplivo-on-surface);
@@ -317,7 +371,7 @@ body[data-background-style="solid"] :is(.thinking, .tool, .translation, .html-pr
   position: relative;
   z-index: 1;
   border-top: 1px solid var(--cuplivo-outline-soft);
-  padding: 10px 12px 10px 48px;
+  padding: 8px 4px 10px 39px;
   white-space: pre-wrap;
 }
 .thinking-body, .tool-body { font-size: calc(12.5px * var(--cuplivo-font-scale)); line-height: 1.32; }
@@ -395,6 +449,10 @@ body[data-background-style="solid"] :is(.thinking, .tool, .translation, .html-pr
   outline: none;
 }
 .suggestions { justify-content: center; padding: 12px 20px 4px; }
+.message-main > .suggestions {
+  justify-content: flex-start;
+  padding: 8px 0 0;
+}
 .suggestion {
   border: 1px solid var(--cuplivo-outline-soft);
   border-radius: 999px;
@@ -403,6 +461,22 @@ body[data-background-style="solid"] :is(.thinking, .tool, .translation, .html-pr
   color: var(--cuplivo-on-surface);
   cursor: pointer;
 }
+.streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+}
+.streaming-indicator i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cuplivo-muted);
+  animation: streaming-dot 1.1s ease-in-out infinite;
+}
+.streaming-indicator i:nth-child(2) { animation-delay: 120ms; }
+.streaming-indicator i:nth-child(3) { animation-delay: 240ms; }
+@keyframes streaming-dot { 50% { opacity: .28; transform: translateY(-2px); } }
 .block-error {
   padding: 8px 10px;
   border-left: 3px solid var(--cuplivo-primary);

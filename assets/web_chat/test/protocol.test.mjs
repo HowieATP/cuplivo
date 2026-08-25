@@ -6,6 +6,7 @@ import {
   captureViewport,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createRenderGate,
   normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
@@ -17,6 +18,7 @@ import {
 
 const appSource = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+const htmlSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 test('transfer chunks reassemble UTF-8 snapshots', () => {
   const payload = { type: 'snapshot', content: '分片消息' };
@@ -36,14 +38,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v3', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v4', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v3',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v4',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -75,6 +77,23 @@ test('frame coalescer runs once for a burst', () => {
   schedule(); schedule(); schedule();
   assert.equal(frames.length, 1);
   frames[0]();
+  assert.equal(calls, 1);
+});
+
+test('render gate defers DOM work throughout a gesture and flushes once', () => {
+  let calls = 0;
+  const gate = createRenderGate(() => { calls += 1; });
+  gate.setBlocked(true);
+  assert.equal(gate.blocked, true);
+  gate.request();
+  gate.request();
+  assert.equal(calls, 0);
+  assert.equal(gate.pending, true);
+  gate.setBlocked(false);
+  assert.equal(gate.blocked, false);
+  assert.equal(calls, 1);
+  assert.equal(gate.pending, false);
+  gate.setBlocked(false);
   assert.equal(calls, 1);
 });
 
@@ -245,6 +264,37 @@ test('virtual DOM replacement captures scroll state first and applies Flutter in
   assert.match(styleSource, /overflow-anchor:\s*none/);
   assert.match(styleSource, /padding-block:\s*var\(--cuplivo-content-top-inset\)\s+var\(--cuplivo-content-bottom-inset\)/);
   assert.match(styleSource, /scroll-padding-block:\s*var\(--cuplivo-content-top-inset\)\s+var\(--cuplivo-content-bottom-inset\)/);
+});
+
+test('touch and inertial scrolling defer every virtual DOM replacement', () => {
+  assert.match(appSource, /touchstart[\s\S]*?setRenderBlocked\(true\)/);
+  assert.match(appSource, /function markUserScroll[\s\S]*?setRenderBlocked\(true\)/);
+  assert.match(appSource, /messagePatches[\s\S]*?requestRender\(\)/);
+  assert.doesNotMatch(appSource, /messagePatches[^\n]*scheduleRender\(\)/);
+  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?if \(touchActive \|\| userScrolling\)[\s\S]*?requestRender\(\)/);
+});
+
+test('assistant background uses a dedicated fixed layer and Flutter mask gradient', () => {
+  assert.match(htmlSource, /id="chat-background"/);
+  assert.match(appSource, /const backgroundLayer = document\.getElementById\('chat-background'\)/);
+  assert.match(appSource, /backgroundLayer\.style\.backgroundImage/);
+  assert.match(styleSource, /#chat-background\s*\{[^}]*position:\s*fixed/);
+  assert.match(styleSource, /#chat-background::after\s*\{[^}]*rgba\(0,\s*0,\s*0,\s*\.04\)/);
+  assert.match(styleSource, /linear-gradient\([^;]*--cuplivo-background-mask-top[^;]*--cuplivo-background-mask-bottom/);
+});
+
+test('message composition follows Flutter visual grouping', () => {
+  assert.match(appSource, /assistant-text-surface/);
+  assert.match(appSource, /chain-card/);
+  assert.match(appSource, /attachments/);
+  assert.match(appSource, /renderSuggestions/);
+  assert.doesNotMatch(appSource, /fragment\.append\(suggestions\)/);
+  const messageIndex = appSource.indexOf('slot.append(node)');
+  const dividerIndex = appSource.indexOf('slot.append(divider)', messageIndex);
+  assert.ok(messageIndex >= 0 && dividerIndex > messageIndex);
+  assert.match(styleSource, /\.assistant-text-surface/);
+  assert.match(styleSource, /\.chain-card/);
+  assert.match(styleSource, /\.attachments/);
 });
 
 test('message toolbar renders bundled Lucide icons instead of text actions', () => {

@@ -5,6 +5,7 @@ import {
   captureViewport,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createRenderGate,
   normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
@@ -15,6 +16,7 @@ import {
 } from './protocol.mjs';
 
 const timeline = document.getElementById('timeline');
+const backgroundLayer = document.getElementById('chat-background');
 let state = null;
 let requestSequence = 0;
 const heights = new Map();
@@ -30,6 +32,7 @@ let renderedRange = { start: -1, end: -1 };
 let topSpacer = null;
 let bottomSpacer = null;
 let touchStartY = null;
+let touchActive = false;
 let renderedSessionId = null;
 
 const bridge = {
@@ -42,6 +45,9 @@ const bridge = {
 
 function t(key) { return state?.strings?.[key] ?? ''; }
 function messageHeight(message) { return heights.get(message.id) ?? 170; }
+function virtualOverscan(viewportHeight) {
+  return Math.max(6000, Number(viewportHeight) * 8 || 0);
+}
 function isMediaHandle(value) {
   return value?.startsWith('local:') || value?.startsWith('asset:');
 }
@@ -65,10 +71,13 @@ function applyTheme() {
   timeline.setAttribute('aria-label', t('timeline'));
   const background = state.assistant?.background;
   const source = state.media?.[background] ?? background ?? '';
-  document.body.style.backgroundColor = source.startsWith('#') ? source : 'transparent';
-  document.body.style.backgroundImage = /^(data:|https?:)/.test(source) ? `url("${source.replaceAll('"', '%22')}")` : 'none';
-  document.body.style.backgroundSize = 'cover';
-  document.body.style.backgroundPosition = 'center';
+  const isColor = source.startsWith('#');
+  const isImage = /^(data:|https?:)/.test(source);
+  backgroundLayer.style.backgroundColor = isColor ? source : 'transparent';
+  backgroundLayer.style.backgroundImage = isImage
+    ? `url("${source.replaceAll('"', '%22')}")`
+    : 'none';
+  document.body.dataset.hasBackground = String(isColor || isImage);
   if (isMediaHandle(background) && !state.media?.[background]) requestMedia(background);
 }
 
@@ -408,6 +417,19 @@ function renderReasoningSegment(message, segment, index, parent) {
   parent.append(card);
 }
 
+function appendConversationText(message, parent, content) {
+  if (!content) return;
+  const markdown = markdownNode(content, message.isStreaming, message.role);
+  if (message.role === 'user') {
+    parent.append(markdown);
+    return;
+  }
+  const surface = document.createElement('div');
+  surface.className = 'assistant-text-surface';
+  surface.append(markdown);
+  parent.append(surface);
+}
+
 function renderConversationBlocks(message, parent) {
   const reasoning = message.reasoning ?? [];
   const tools = message.tools ?? [];
@@ -417,7 +439,7 @@ function renderConversationBlocks(message, parent) {
   const toolCounts = splits.toolCounts ?? [];
   if (!offsets.length) {
     renderReasoning(message, parent);
-    parent.append(markdownNode(message.content, message.isStreaming, message.role));
+    appendConversationText(message, parent, message.content);
     for (const tool of tools) renderTool(message, tool, parent);
     return;
   }
@@ -426,7 +448,13 @@ function renderConversationBlocks(message, parent) {
   let toolIndex = 0;
   for (let index = 0; index < offsets.length; index += 1) {
     const offset = Math.max(contentOffset, Math.min(message.content.length, offsets[index]));
-    if (offset > contentOffset) parent.append(markdownNode(message.content.slice(contentOffset, offset), message.isStreaming, message.role));
+    if (offset > contentOffset) {
+      appendConversationText(
+        message,
+        parent,
+        message.content.slice(contentOffset, offset),
+      );
+    }
     while (reasoningIndex < Math.min(reasoning.length, reasoningCounts[index] ?? 0)) {
       renderReasoningSegment(message, reasoning[reasoningIndex], reasoningIndex, parent);
       reasoningIndex += 1;
@@ -445,7 +473,27 @@ function renderConversationBlocks(message, parent) {
     renderTool(message, tools[toolIndex], parent);
     toolIndex += 1;
   }
-  if (contentOffset < message.content.length) parent.append(markdownNode(message.content.slice(contentOffset), message.isStreaming, message.role));
+  if (contentOffset < message.content.length) {
+    appendConversationText(message, parent, message.content.slice(contentOffset));
+  }
+}
+
+function groupChainCards(parent) {
+  let chain = null;
+  for (const child of [...parent.children]) {
+    const isStep = child.dataset?.component === 'reasoning' ||
+      child.dataset?.component === 'tool';
+    if (!isStep) {
+      chain = null;
+      continue;
+    }
+    if (!chain) {
+      chain = document.createElement('section');
+      chain.className = 'chain-card';
+      child.before(chain);
+    }
+    chain.append(child);
+  }
 }
 
 function renderTool(message, tool, parent) {
@@ -489,23 +537,25 @@ function renderTool(message, tool, parent) {
 
 function applyThinkingStepCollapse(message, parent) {
   if (state.display?.collapseThinkingSteps !== true) return;
-  const steps = [...parent.children].filter((node) =>
-    node.dataset?.component === 'reasoning' || node.dataset?.component === 'tool');
-  const hiddenCount = steps.length - 2;
-  if (hiddenCount <= 0) return;
-  const key = `${message.id}:thinking-steps`;
-  if (localExpansion(key, false)) return;
-  for (const step of steps.slice(0, hiddenCount)) step.hidden = true;
-  const show = button(
-    message.expandStepsLabel ?? String(hiddenCount),
-    () => {
-      localExpansions.set(key, true);
-      for (const step of steps.slice(0, hiddenCount)) step.hidden = false;
-      show.remove();
-    },
-    'show-thinking-steps',
-  );
-  steps[hiddenCount].before(show);
+  for (const [cardIndex, card] of [...parent.querySelectorAll(':scope > .chain-card')].entries()) {
+    const steps = [...card.children].filter((node) =>
+      node.dataset?.component === 'reasoning' || node.dataset?.component === 'tool');
+    const hiddenCount = steps.length - 2;
+    if (hiddenCount <= 0) continue;
+    const key = `${message.id}:thinking-steps:${cardIndex}`;
+    if (localExpansion(key, false)) continue;
+    for (const step of steps.slice(0, hiddenCount)) step.hidden = true;
+    const show = button(
+      message.expandStepsLabel ?? String(hiddenCount),
+      () => {
+        localExpansions.set(key, true);
+        for (const step of steps.slice(0, hiddenCount)) step.hidden = false;
+        show.remove();
+      },
+      'show-thinking-steps',
+    );
+    steps[hiddenCount].before(show);
+  }
 }
 
 function renderAskUser(message, tool, parent) {
@@ -589,7 +639,7 @@ function renderAttachments(message, parent) {
       requestMedia(attachment.reference);
     } else if (attachment.kind === 'file') {
       const file = document.createElement('div');
-      file.className = 'tool-body';
+      file.className = 'attachment-file';
       file.dataset.component = 'attachment-file';
       file.textContent = attachment.name ?? attachment.mime ?? '';
       parent.append(file);
@@ -718,7 +768,21 @@ function renderMessageActions(message) {
   return actions.childElementCount ? actions : null;
 }
 
-function renderMessage(message) {
+function renderSuggestions() {
+  if (!state.suggestions?.length) return null;
+  const suggestions = document.createElement('div');
+  suggestions.className = 'suggestions';
+  for (const suggestion of state.suggestions.slice(0, 3)) {
+    suggestions.append(button(
+      suggestion,
+      () => sendAction('suggestion', null, { text: suggestion }),
+      'suggestion',
+    ));
+  }
+  return suggestions;
+}
+
+function renderMessage(message, isLast = false) {
   const article = document.createElement('article');
   article.className = `message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`;
   article.dataset.component = 'message';
@@ -730,13 +794,16 @@ function renderMessage(message) {
   main.className = 'message-main';
   const header = renderMessageHeader(message);
 
+  const attachments = document.createElement('div');
+  attachments.className = 'attachments';
+  renderAttachments(message, attachments);
+
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.dataset.component = 'message-bubble';
-  if (message.role === 'user') renderAttachments(message, bubble);
   renderConversationBlocks(message, bubble);
+  groupChainCards(bubble);
   applyThinkingStepCollapse(message, bubble);
-  if (message.role !== 'user') renderAttachments(message, bubble);
   if (message.translation) {
     const key = `${message.id}:translation`;
     bubble.append(disclosure({
@@ -752,10 +819,28 @@ function renderMessage(message) {
       },
     }));
   }
+  if (message.role !== 'user' && message.isStreaming && !bubble.childElementCount) {
+    const streaming = document.createElement('div');
+    streaming.className = 'streaming-indicator';
+    streaming.setAttribute('aria-label', t('assistant'));
+    streaming.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+    bubble.append(streaming);
+  }
   const actions = message.selecting || (message.role !== 'user' && message.isStreaming)
     ? null
     : renderMessageActions(message);
-  main.append(...[header, bubble, actions].filter(Boolean));
+  const suggestions = message.role !== 'user' && isLast && !message.isStreaming
+    ? renderSuggestions()
+    : null;
+  main.append(
+    ...[
+      header,
+      attachments.childElementCount ? attachments : null,
+      bubble.childElementCount ? bubble : null,
+      actions,
+      suggestions,
+    ].filter(Boolean),
+  );
   article.append(main);
   article.addEventListener('contextmenu', (event) => {
     event.preventDefault();
@@ -797,6 +882,7 @@ function render() {
     heights: messages.map(messageHeight),
     scrollTop: viewport.scrollTop,
     viewportHeight: viewport.viewportHeight,
+    overscan: virtualOverscan(viewport.viewportHeight),
   });
   renderedRange = { start: range.start, end: range.end };
   topSpacer = document.createElement('div');
@@ -812,27 +898,22 @@ function render() {
     preset.append(button(state.preset.label, () => sendAction('togglePresets'), 'suggestion'));
     fragment.append(preset);
   }
-  for (const message of messages.slice(range.start, range.end)) {
+  for (const [visibleIndex, message] of messages.slice(range.start, range.end).entries()) {
     const slot = document.createElement('div');
     slot.className = 'message-slot';
     slot.dataset.messageId = message.id;
+    const node = renderMessage(message, range.start + visibleIndex === messages.length - 1);
+    slot.append(node);
     if (message.showContextDivider) {
       const divider = document.createElement('div');
       divider.className = 'context-divider';
       divider.textContent = t('contextDivider');
       slot.append(divider);
     }
-    const node = renderMessage(message);
-    slot.append(node);
     fragment.append(slot);
     observedSlots.push(slot);
   }
   fragment.append(bottomSpacer);
-  if (state.suggestions?.length) {
-    const suggestions = document.createElement('div'); suggestions.className = 'suggestions';
-    for (const suggestion of state.suggestions) suggestions.append(button(suggestion, () => sendAction('suggestion', null, { text: suggestion }), 'suggestion'));
-    fragment.append(suggestions);
-  }
   timeline.replaceChildren(fragment);
   for (const slot of observedSlots) resizeObserver.observe(slot);
   renderedSessionId = state.renderSessionId;
@@ -854,13 +935,18 @@ function handleMeasuredHeights(entries) {
     }
   }
   if (!changed) return;
+  if (touchActive || userScrolling) {
+    requestRender();
+    return;
+  }
   const range = visibleRange({
     heights: state.messages.map(messageHeight),
     scrollTop: viewport.scrollTop,
     viewportHeight: viewport.viewportHeight,
+    overscan: virtualOverscan(viewport.viewportHeight),
   });
   if (rangeChanged(renderedRange, range)) {
-    scheduleRender();
+    requestRender();
     return;
   }
   if (topSpacer) topSpacer.style.height = `${range.top}px`;
@@ -870,6 +956,9 @@ function handleMeasuredHeights(entries) {
 }
 
 const scheduleRender = createFrameCoalescer(render);
+const renderGate = createRenderGate(scheduleRender);
+function requestRender() { renderGate.request(); }
+function setRenderBlocked(value) { renderGate.setBlocked(value); }
 const sendViewportMetrics = createFrameCoalescer(() => {
   const anchor = captureAnchor(timeline);
   bridge.post({
@@ -884,12 +973,19 @@ const sendViewportMetrics = createFrameCoalescer(() => {
 function markUserScroll() {
   const firstIntent = !userScrolling;
   userScrolling = true;
+  setRenderBlocked(true);
   if (firstIntent) sendViewportMetrics();
   clearTimeout(userScrollTimer);
-  userScrollTimer = setTimeout(() => { userScrolling = false; sendViewportMetrics(); }, 800);
+  userScrollTimer = setTimeout(() => {
+    userScrolling = false;
+    sendViewportMetrics();
+    if (!touchActive) setRenderBlocked(false);
+  }, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
 timeline.addEventListener('touchstart', (event) => {
+  touchActive = true;
+  setRenderBlocked(true);
   touchStartY = event.touches[0]?.clientY ?? null;
 }, { passive: true });
 timeline.addEventListener('touchmove', (event) => {
@@ -901,10 +997,14 @@ timeline.addEventListener('touchmove', (event) => {
   }
 }, { passive: true });
 timeline.addEventListener('touchend', () => {
+  touchActive = false;
   touchStartY = null;
+  if (!userScrolling) setRenderBlocked(false);
 }, { passive: true });
 timeline.addEventListener('touchcancel', () => {
+  touchActive = false;
   touchStartY = null;
+  if (!userScrolling) setRenderBlocked(false);
 }, { passive: true });
 timeline.addEventListener('scroll', () => {
   if (userScrolling) markUserScroll();
@@ -913,8 +1013,9 @@ timeline.addEventListener('scroll', () => {
       heights: state.messages.map(messageHeight),
       scrollTop: timeline.scrollTop,
       viewportHeight: timeline.clientHeight,
+      overscan: virtualOverscan(timeline.clientHeight),
     });
-    if (rangeChanged(renderedRange, range)) scheduleRender();
+    if (rangeChanged(renderedRange, range)) requestRender();
   }
   sendViewportMetrics();
   if (timeline.scrollTop < 180 && state?.hasMoreBefore) sendAction('loadMoreBefore');
@@ -938,7 +1039,7 @@ timeline.addEventListener('keydown', (event) => {
     markUserScroll();
   }
 });
-window.addEventListener('resize', scheduleRender);
+window.addEventListener('resize', requestRender);
 
 function handleViewportCommand(envelope) {
   const command = envelope.command;
@@ -950,7 +1051,7 @@ function handleViewportCommand(envelope) {
   else if (command === 'previousQuestion') jumpQuestion(-1);
   else if (command === 'nextQuestion') jumpQuestion(1);
   else if (command === 'restoreAnchor') {
-    scheduleRender();
+    requestRender();
     requestAnimationFrame(() => restoreAnchor(timeline, { id: payload.messageId, offset: payload.offset ?? 0 }));
   }
 }
@@ -960,7 +1061,7 @@ function scrollToMessage(messageId, behavior = 'smooth') {
   if (index < 0) return;
   const top = state.messages.slice(0, index).reduce((sum, message) => sum + messageHeight(message), 0);
   timeline.scrollTo({ top, behavior });
-  scheduleRender();
+  requestRender();
   requestAnimationFrame(() => timeline.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`)?.focus({ preventScroll: true }));
 }
 
@@ -985,7 +1086,7 @@ window.CuplivoWeb = {
           if (state && payload.renderSessionId === state.renderSessionId && payload.conversationId === state.conversationId) {
             state = { ...state, media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl } };
             pendingMedia.delete(payload.handle);
-            scheduleRender();
+            requestRender();
           }
         } else {
           const previousSessionId = state?.renderSessionId;
@@ -997,14 +1098,14 @@ window.CuplivoWeb = {
             pendingMedia.clear();
             heights.clear();
           }
-          scheduleRender();
+          requestRender();
         }
       } else if (envelope.type === 'messagePatches') {
-        state = reduceEnvelope(state, envelope); scheduleRender();
+        state = reduceEnvelope(state, envelope); requestRender();
       } else if (envelope.type === 'actionResult') {
         pendingActions.delete(envelope.requestId);
         if (expansionCoordinator.resolve(envelope.requestId, envelope.ok === true)) {
-          scheduleRender();
+          requestRender();
         }
       }
       else if (envelope.type === 'mediaError') pendingMedia.delete(envelope.handle);

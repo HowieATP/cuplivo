@@ -468,13 +468,16 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         await _sendEnvelope(chunk);
       }
     } catch (error) {
-      debugPrint(
-        'WebConversationViewport: media request failed '
-        '(${error.runtimeType})',
-      );
+      final detail = switch (error) {
+        WebChatProtocolException(:final message) => message,
+        FileSystemException(:final message) => message,
+        _ => error.runtimeType.toString(),
+      };
+      debugPrint('WebConversationViewport: media request failed ($detail)');
       await _sendEnvelope(<String, dynamic>{
         'type': 'mediaError',
         'handle': handle,
+        'code': detail,
       });
     }
   }

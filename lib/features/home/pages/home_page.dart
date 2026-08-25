@@ -1801,12 +1801,24 @@ class _HomePageState extends State<HomePage>
           colors.onSurface.withValues(alpha: isDark ? 0.56 : 0.50),
         ),
         'model-icon-background': _webCssColor(
-          (isDark ? colors.onSurface : colors.primary).withValues(alpha: 0.10),
+          colors.secondary.withValues(alpha: 0.10),
         ),
-        'background-mask': _webCssColor(colors.surface),
-        'background-mask-opacity': settings.chatBackgroundMaskStrength
-            .clamp(0, 1)
-            .toString(),
+        'user-avatar-background': _webCssColor(
+          colors.primary.withValues(alpha: 0.10),
+        ),
+        'assistant-avatar-background': _webCssColor(
+          colors.primary.withValues(alpha: 0.10),
+        ),
+        'background-mask-top': _webCssColor(
+          colors.surface.withValues(
+            alpha: (0.20 * settings.chatBackgroundMaskStrength).clamp(0, 1),
+          ),
+        ),
+        'background-mask-bottom': _webCssColor(
+          colors.surface.withValues(
+            alpha: (0.50 * settings.chatBackgroundMaskStrength).clamp(0, 1),
+          ),
+        ),
       },
       user: buildWebChatUserSnapshot(
         name: user.name,

@@ -70,6 +70,7 @@ void main() {
         id: 'a1',
         name: 'Assistant',
         avatar: r'\\server\share\assistant.png',
+        background: '/private/background.jpg',
         useAssistantAvatar: true,
       ),
       fontScale: 1,
@@ -79,7 +80,7 @@ void main() {
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 2);
-    expect(snapshot['assetVersion'], 'web-chat-v3');
+    expect(snapshot['assetVersion'], 'web-chat-v4');
     expect((snapshot['user'] as Map)['name'], 'Ada');
     expect((snapshot['display'] as Map)['backgroundStyle'], 'frosted');
     expect((snapshot['display'] as Map)['contentInsets'], <String, double>{
@@ -88,6 +89,11 @@ void main() {
     });
     expect((snapshot['assistant'] as Map)['avatar'], startsWith('local:'));
     expect((snapshot['assistant'] as Map)['avatar'], isNot(contains('server')));
+    expect((snapshot['assistant'] as Map)['background'], startsWith('local:'));
+    expect(
+      (snapshot['assistant'] as Map)['background'],
+      isNot(contains('/private')),
+    );
     expect(rendered['content'], 'Visible answer');
     final renderedReasoning = (rendered['reasoning'] as List).single as Map;
     expect(renderedReasoning['text'], 'live thought');
@@ -196,6 +202,7 @@ void main() {
         id: 'assistant',
         name: 'Assistant',
         avatar: r'\\server\share\assistant.png',
+        background: '/private/background.webp',
       ),
       userAvatarType: 'file',
       userAvatarValue: '/private/avatar.png',
@@ -217,6 +224,12 @@ void main() {
     expect(
       registry.values.any(
         (source) => source.value == r'\\server\share\assistant.png',
+      ),
+      isTrue,
+    );
+    expect(
+      registry.values.any(
+        (source) => source.value == '/private/background.webp',
       ),
       isTrue,
     );

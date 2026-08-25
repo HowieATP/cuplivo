@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import {
   captureAnchor,
   captureViewport,
@@ -8,6 +9,7 @@ import {
   createFrameCoalescer,
   createRenderGate,
   formatReasoningElapsed,
+  mountCodeBlock,
   verticalGestureIntent,
   normalizeMeasuredHeight,
   normalizeContentInset,
@@ -22,6 +24,48 @@ import {
 const appSource = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 const htmlSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const markedSource = readFileSync(new URL('../vendor/marked.min.js', import.meta.url), 'utf8');
+const highlightSource = readFileSync(new URL('../vendor/highlight.min.js', import.meta.url), 'utf8');
+
+class TestNode {
+  constructor(name) {
+    this.name = name;
+    this.parent = null;
+    this.children = [];
+  }
+
+  contains(target) {
+    return this === target || this.children.some((child) => child.contains(target));
+  }
+
+  append(...nodes) {
+    for (const node of nodes) {
+      if (node === this || node.contains(this)) throw new Error('HierarchyRequestError');
+      node.parent?._remove(node);
+      this.children.push(node);
+      node.parent = this;
+    }
+  }
+
+  replaceWith(replacement) {
+    const parent = this.parent;
+    if (!parent) return;
+    if (replacement === parent || replacement.contains(parent)) {
+      throw new Error('HierarchyRequestError');
+    }
+    replacement.parent?._remove(replacement);
+    const index = parent.children.indexOf(this);
+    parent.children[index] = replacement;
+    replacement.parent = parent;
+    this.parent = null;
+  }
+
+  _remove(node) {
+    const index = this.children.indexOf(node);
+    if (index >= 0) this.children.splice(index, 1);
+    node.parent = null;
+  }
+}
 
 test('transfer chunks reassemble UTF-8 snapshots', () => {
   const payload = { type: 'snapshot', content: '分片消息' };
@@ -41,14 +85,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v8', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v9', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v8',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v9',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -343,6 +387,38 @@ test('code blocks use the Flutter surface, header, and code-view structure', () 
   assert.match(appSource, /plaintext/);
   assert.match(styleSource, /\.code-block\.is-collapsed/);
   assert.match(appSource, /source\.replace\(\/\(\?:\\r\\n\|\\r\|\\n\)\+\$\//);
+});
+
+test('a fenced Python block mounts without creating a DOM ancestry cycle', () => {
+  const root = new TestNode('root');
+  const pre = new TestNode('pre');
+  const block = new TestNode('block');
+  const header = new TestNode('header');
+  const body = new TestNode('body');
+  root.append(pre);
+
+  mountCodeBlock({ pre, block, header, body });
+
+  assert.deepEqual(root.children, [block]);
+  assert.deepEqual(block.children, [header, body]);
+  assert.deepEqual(body.children, [pre]);
+});
+
+test('bundled Markdown and highlighter accept Python f-strings and Unicode', () => {
+  const source = 'def greet(name):\n    print(f"Hello, {name}!")\n\ngreet("世界")';
+  const fenced = '```python\n' + source + '\n```';
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(markedSource, sandbox);
+  vm.runInContext(highlightSource, sandbox);
+
+  const html = sandbox.marked.parse(fenced);
+  assert.match(html, /<pre><code class="language-python">/);
+  assert.match(html, /世界/);
+  assert.doesNotThrow(() => sandbox.hljs.highlight(source, {
+    language: 'python',
+    ignoreIllegals: true,
+  }));
 });
 
 test('virtual DOM replacement captures scroll state first and applies Flutter insets', () => {

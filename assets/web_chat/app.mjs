@@ -7,6 +7,7 @@ import {
   createFrameCoalescer,
   createRenderGate,
   formatReasoningElapsed,
+  mountCodeBlock,
   normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
@@ -417,9 +418,7 @@ function renderCodeBlock(pre, code, language, source) {
   const body = document.createElement('div');
   body.className = 'code-block-body';
   pre.className = 'code-block-pre';
-  body.append(pre);
-  block.append(header, body);
-  pre.replaceWith(block);
+  mountCodeBlock({ pre, block, header, body });
 
   const applyCodeExpansion = (expanded) => {
     block.classList.toggle('is-collapsed', !expanded);

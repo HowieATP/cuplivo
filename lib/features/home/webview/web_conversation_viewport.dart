@@ -570,9 +570,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   Future<void> _stopWebScrolling() async {
     if (!_ready) return;
     try {
-      await _runWebJavaScript(
-        'window.CuplivoWeb?.stopScrolling?.();',
-      );
+      if (Platform.isAndroid) {
+        await _androidController?.stopScrolling();
+      } else {
+        await _runWebJavaScript('window.CuplivoWeb?.stopScrolling?.();');
+      }
     } catch (error) {
       debugPrint(
         'WebConversationViewport: stop scrolling failed '

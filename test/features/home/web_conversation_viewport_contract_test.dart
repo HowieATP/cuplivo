@@ -13,7 +13,7 @@ void main() {
       expect(source, contains('onPointerDown'));
       expect(source, contains('window.CuplivoWeb?.stopScrolling?.();'));
       expect(source, contains('_windowsController?.executeScript'));
-      expect(source, contains('_androidController?.runJavaScript'));
+      expect(source, contains('_androidController?.stopScrolling()'));
       expect(source, contains('_flutterController?.runJavaScript'));
     },
   );
@@ -44,13 +44,25 @@ void main() {
     },
   );
 
-  test('Android WebView stops scrolling on native pointer down', () {
-    final source = File(
-      'android/app/src/main/kotlin/com/cup11/cuplivo/AndroidWebChatView.kt',
-    ).readAsStringSync();
+  test(
+    'Android WebView cancels compositor fling before the JavaScript lock',
+    () {
+      final nativeSource = File(
+        'android/app/src/main/kotlin/com/cup11/cuplivo/AndroidWebChatView.kt',
+      ).readAsStringSync();
+      final controllerSource = File(
+        'lib/features/home/webview/android_web_chat_view.dart',
+      ).readAsStringSync();
 
-    expect(source, contains('setOnTouchListener'));
-    expect(source, contains('MotionEvent.ACTION_DOWN'));
-    expect(source, contains('window.CuplivoWeb?.stopScrolling?.();'));
-  });
+      expect(nativeSource, contains('setOnTouchListener'));
+      expect(nativeSource, contains('MotionEvent.ACTION_DOWN'));
+      expect(nativeSource, contains('"stopScrolling"'));
+      expect(nativeSource, contains('webView.flingScroll(0, 0)'));
+      expect(nativeSource, contains('window.CuplivoWeb?.stopScrolling?.();'));
+      expect(
+        controllerSource,
+        contains("Future<void> stopScrolling() => _invoke('stopScrolling')"),
+      );
+    },
+  );
 }

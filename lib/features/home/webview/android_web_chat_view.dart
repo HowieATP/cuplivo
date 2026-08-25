@@ -55,6 +55,8 @@ class AndroidWebChatController {
 
   Future<void> runJavaScript(String source) => _invoke('runJavaScript', source);
 
+  Future<void> stopScrolling() => _invoke('stopScrolling');
+
   Future<void> _invoke(String method, [Object? arguments]) async {
     if (_disposed) {
       throw StateError('Android Web chat controller is disposed.');

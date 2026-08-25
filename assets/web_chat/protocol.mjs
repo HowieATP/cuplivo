@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v8';
+export const ASSET_VERSION = 'web-chat-v9';
 
 const transfers = new Map();
 
@@ -113,6 +113,12 @@ export function verticalGestureIntent({
     return 'hold';
   }
   return Math.abs(dy) >= Math.abs(dx) ? 'vertical' : 'horizontal';
+}
+
+export function mountCodeBlock({ pre, block, header, body }) {
+  pre.replaceWith(block);
+  body.append(pre);
+  block.append(header, body);
 }
 
 export function formatReasoningElapsed(startAt, finishedAt, loading, now = Date.now()) {

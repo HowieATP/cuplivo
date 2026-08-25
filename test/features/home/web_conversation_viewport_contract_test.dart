@@ -89,6 +89,8 @@ void main() {
       expect(nativeSource, contains('"stopScrolling"'));
       expect(nativeSource, contains('webView.flingScroll(0, 0)'));
       expect(nativeSource, contains('window.CuplivoWeb?.stopScrolling?.();'));
+      expect(nativeSource, contains('stopScrolling { result.success(null) }'));
+      expect(nativeSource, contains('onComplete?.invoke()'));
       expect(
         controllerSource,
         contains("Future<void> stopScrolling() => _invoke('stopScrolling')"),

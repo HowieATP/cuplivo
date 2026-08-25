@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v10';
+export const ASSET_VERSION = 'web-chat-v11';
 
 const transfers = new Map();
 
@@ -80,6 +80,24 @@ export function visibleRange({ heights, scrollTop, viewportHeight, overscan = 70
     end += 1;
   }
   return { start, end, top: offset, bottom: heights.slice(end).reduce((a, b) => a + b, 0) };
+}
+
+export function messageIndexAtOffset(heights, scrollTop, fallbackHeight = 170) {
+  if (!Array.isArray(heights) || heights.length === 0) return -1;
+  const target = Number.isFinite(Number(scrollTop))
+    ? Math.max(0, Number(scrollTop))
+    : 0;
+  const fallback = Number.isFinite(Number(fallbackHeight)) && Number(fallbackHeight) > 0
+    ? Number(fallbackHeight)
+    : 170;
+  let offset = 0;
+  for (let index = 0; index < heights.length; index += 1) {
+    const rawHeight = Number(heights[index]);
+    const height = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : fallback;
+    if (target < offset + height) return index;
+    offset += height;
+  }
+  return heights.length - 1;
 }
 
 export function rangeChanged(previous, next) {
@@ -343,5 +361,58 @@ export function createRenderGate(dispatch) {
 
     get blocked() { return blocked; },
     get pending() { return pending; },
+  };
+}
+
+export function createViewportNavigationCoordinator({
+  schedule = requestAnimationFrame,
+  setRenderBlocked,
+  requestRender,
+  settleFrames = 3,
+}) {
+  let revision = 0;
+  let active = false;
+  const frameCount = Number.isInteger(settleFrames) && settleFrames > 0
+    ? settleFrames
+    : 3;
+
+  return {
+    run(settle, onComplete = null) {
+      const request = ++revision;
+      active = true;
+      setRenderBlocked(true);
+      requestRender();
+      // Flush exactly one destination render, then keep incidental measurement
+      // and snapshot renders deferred until the target has settled.
+      setRenderBlocked(false);
+      setRenderBlocked(true);
+      let remaining = frameCount;
+      const settleNextFrame = () => {
+        if (request !== revision) return;
+        settle();
+        remaining -= 1;
+        if (remaining > 0) {
+          schedule(settleNextFrame);
+          return;
+        }
+        setRenderBlocked(false);
+        requestRender();
+        schedule(() => {
+          if (request !== revision) return;
+          settle();
+          active = false;
+          onComplete?.();
+        });
+      };
+      schedule(settleNextFrame);
+      return request;
+    },
+
+    cancel() {
+      revision += 1;
+      if (!active) return;
+      active = false;
+      setRenderBlocked(false);
+    },
   };
 }

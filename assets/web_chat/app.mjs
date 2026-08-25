@@ -6,8 +6,10 @@ import {
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  createViewportNavigationCoordinator,
   formatReasoningElapsed,
   mountCodeBlock,
+  messageIndexAtOffset,
   normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
@@ -50,6 +52,8 @@ let gestureIntent = 'idle';
 let renderedSessionId = null;
 let renderedConversationId = null;
 let reasoningElapsedTimer = null;
+let navigationCursorId = null;
+let navigationEdge = null;
 
 const bridge = {
   post(message) {
@@ -1037,6 +1041,7 @@ function render() {
     renderedConversationId = state.conversationId;
     ensureReasoningElapsedTimer();
     restoreViewport(timeline, viewport);
+    enforceNavigationEdge();
     sendViewportMetrics();
     return;
   }
@@ -1082,6 +1087,7 @@ function render() {
   renderedConversationId = state.conversationId;
   ensureReasoningElapsedTimer();
   restoreViewport(timeline, viewport);
+  enforceNavigationEdge();
   sendViewportMetrics();
 }
 
@@ -1117,6 +1123,7 @@ function handleMeasuredHeights(entries) {
   if (topSpacer) topSpacer.style.height = `${range.top}px`;
   if (bottomSpacer) bottomSpacer.style.height = `${range.bottom}px`;
   restoreViewport(timeline, viewport);
+  enforceNavigationEdge();
   sendViewportMetrics();
 }
 
@@ -1136,6 +1143,10 @@ const sendViewportMetrics = createFrameCoalescer(() => {
     anchorMessageId: anchor?.id ?? null,
     anchorOffset: anchor?.offset ?? 0,
   });
+});
+const viewportNavigation = createViewportNavigationCoordinator({
+  setRenderBlocked,
+  requestRender,
 });
 function releaseScrollStopLock() {
   scrollStopLock = false;
@@ -1174,6 +1185,11 @@ function stopScrolling() {
 }
 function markUserScroll() {
   const firstIntent = !userScrolling;
+  if (firstIntent) {
+    viewportNavigation.cancel();
+    navigationCursorId = null;
+    navigationEdge = null;
+  }
   userScrolling = true;
   setRenderBlocked(true);
   if (firstIntent) sendViewportMetrics();
@@ -1294,11 +1310,15 @@ timeline.addEventListener('scroll', () => {
 }, { passive: true });
 timeline.addEventListener('keydown', (event) => {
   if (event.key === 'Home') {
-    markUserScroll();
-    timeline.scrollTo({ top: 0, behavior: 'smooth' });
+    event.preventDefault();
+    prepareProgrammaticNavigation();
+    navigationCursorId = null;
+    navigateToEdge('top');
   } else if (event.key === 'End') {
-    markUserScroll();
-    timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'smooth' });
+    event.preventDefault();
+    prepareProgrammaticNavigation();
+    navigationCursorId = null;
+    navigateToEdge('bottom');
   } else if (event.key === 'PageUp') {
     markUserScroll();
     timeline.scrollBy({ top: -timeline.clientHeight * .85, behavior: 'smooth' });
@@ -1317,24 +1337,63 @@ function prepareProgrammaticNavigation() {
   clearTimeout(userScrollTimer);
   userScrollTimer = null;
   userScrolling = false;
-  setRenderBlocked(false);
 }
 
 function handleViewportCommand(envelope) {
   const command = envelope.command;
   const payload = envelope.payload ?? {};
-  const behavior = payload.animate === false ? 'auto' : 'smooth';
   prepareProgrammaticNavigation();
-  if (command === 'top') timeline.scrollTo({ top: 0, behavior });
-  else if (command === 'bottom') timeline.scrollTo({ top: timeline.scrollHeight, behavior });
-  else if (command === 'message') scrollToMessage(payload.messageId, behavior);
-  else if (command === 'previousQuestion') jumpQuestion(-1);
-  else if (command === 'nextQuestion') jumpQuestion(1);
-  else if (command === 'restoreAnchor') restoreMessageAnchor(payload);
-  sendViewportMetrics();
+  if (command === 'top') {
+    navigationCursorId = null;
+    navigateToEdge('top');
+  } else if (command === 'bottom') {
+    navigationCursorId = null;
+    navigateToEdge('bottom');
+  } else if (command === 'message') {
+    navigationEdge = null;
+    navigationCursorId = payload.messageId ?? null;
+    if (!scrollToMessage(payload.messageId)) {
+      bridge.post({ type: 'diagnostic', code: 'viewport_navigation_target_missing' });
+    }
+  } else if (command === 'previousQuestion') {
+    jumpQuestion(-1);
+  } else if (command === 'nextQuestion') {
+    jumpQuestion(1);
+  } else if (command === 'restoreAnchor') {
+    navigationEdge = null;
+    navigationCursorId = null;
+    if (!restoreMessageAnchor(payload)) {
+      bridge.post({ type: 'diagnostic', code: 'viewport_navigation_target_missing' });
+    }
+  }
+}
+
+function navigateToEdge(edge) {
+  navigationEdge = edge;
+  const settle = edge === 'top'
+    ? () => timeline.scrollTo({ top: 0, behavior: 'auto' })
+    : () => timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'auto' });
+  settle();
+  viewportNavigation.run(settle, () => {
+    const remaining = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop;
+    const settled = edge === 'top' ? timeline.scrollTop <= 1 : remaining <= 1;
+    if (!settled) {
+      bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+    }
+    sendViewportMetrics();
+  });
+}
+
+function enforceNavigationEdge() {
+  if (navigationEdge === 'top') {
+    timeline.scrollTo({ top: 0, behavior: 'auto' });
+  } else if (navigationEdge === 'bottom') {
+    timeline.scrollTo({ top: timeline.scrollHeight, behavior: 'auto' });
+  }
 }
 
 function restoreMessageAnchor(anchor) {
+  navigationEdge = null;
   const viewport = viewportForSavedAnchor({
     messageIds: (state?.messages ?? []).map((message) => message.id),
     heights: (state?.messages ?? []).map(messageHeight),
@@ -1343,32 +1402,61 @@ function restoreMessageAnchor(anchor) {
   });
   if (!viewport) return false;
   timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
-  requestRender();
-  requestAnimationFrame(() => {
-    restoreAnchor(timeline, viewport.anchor);
-    sendViewportMetrics();
-  });
+  viewportNavigation.run(
+    () => restoreAnchor(timeline, viewport.anchor),
+    () => {
+      if (!restoreAnchor(timeline, viewport.anchor)) {
+        bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+      }
+      sendViewportMetrics();
+    },
+  );
   return true;
 }
 
-function scrollToMessage(messageId, behavior = 'smooth') {
-  const index = state?.messages?.findIndex((message) => message.id === messageId) ?? -1;
-  if (index < 0) return;
-  const top = state.messages.slice(0, index).reduce((sum, message) => sum + messageHeight(message), 0);
-  timeline.scrollTo({ top, behavior });
-  requestRender();
-  requestAnimationFrame(() => timeline.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`)?.focus({ preventScroll: true }));
+function scrollToMessage(messageId) {
+  navigationEdge = null;
+  const viewport = viewportForSavedAnchor({
+    messageIds: (state?.messages ?? []).map((message) => message.id),
+    heights: (state?.messages ?? []).map(messageHeight),
+    anchor: { messageId, offset: 0 },
+    viewportHeight: timeline.clientHeight,
+  });
+  if (!viewport) return false;
+  timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
+  viewportNavigation.run(
+    () => restoreAnchor(timeline, viewport.anchor),
+    () => {
+      if (!restoreAnchor(timeline, viewport.anchor)) {
+        bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+      }
+      const target = timeline.querySelector(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+      target?.focus({ preventScroll: true });
+      sendViewportMetrics();
+    },
+  );
+  return true;
 }
 
 function jumpQuestion(delta) {
+  navigationEdge = null;
   const messages = state?.messages ?? [];
   if (!messages.length) return;
   const anchor = captureAnchor(timeline);
-  let index = messages.findIndex((message) => message.id === anchor?.id);
-  if (index < 0) index = delta > 0 ? 0 : messages.length - 1;
+  let index = messages.findIndex((message) => message.id === navigationCursorId);
+  if (index < 0) index = messages.findIndex((message) => message.id === anchor?.id);
+  if (index < 0) {
+    index = messageIndexAtOffset(messages.map(messageHeight), timeline.scrollTop);
+  }
   const next = index + delta;
-  if (next < 0 || next >= messages.length) return;
-  scrollToMessage(messages[next].id);
+  if (next < 0 || next >= messages.length) {
+    navigationCursorId = null;
+    return;
+  }
+  navigationCursorId = messages[next].id;
+  scrollToMessage(navigationCursorId);
 }
 
 window.CuplivoWeb = {
@@ -1389,6 +1477,9 @@ window.CuplivoWeb = {
           const previousSessionId = state?.renderSessionId;
           state = reduceEnvelope(state, payload);
           if (previousSessionId && previousSessionId !== state?.renderSessionId) {
+            viewportNavigation.cancel();
+            navigationCursorId = null;
+            navigationEdge = null;
             expansionCoordinator.clear();
             localExpansions.clear();
             pendingActions.clear();

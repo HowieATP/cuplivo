@@ -7,9 +7,11 @@ import {
   captureViewport,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createViewportNavigationCoordinator,
   createRenderGate,
   formatReasoningElapsed,
   mountCodeBlock,
+  messageIndexAtOffset,
   verticalGestureIntent,
   normalizeMeasuredHeight,
   normalizeContentInset,
@@ -86,14 +88,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v10', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v11', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v10',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v11',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -143,6 +145,95 @@ test('render gate defers DOM work throughout a gesture and flushes once', () => 
   assert.equal(gate.pending, false);
   gate.setBlocked(false);
   assert.equal(calls, 1);
+});
+
+test('viewport navigation renders the destination before settling and unlocks once', () => {
+  const frames = [];
+  const events = [];
+  let blocked = false;
+  let renderPending = false;
+  const coordinator = createViewportNavigationCoordinator({
+    schedule: (callback) => frames.push(callback),
+    setRenderBlocked: (value) => {
+      blocked = value;
+      events.push(value ? 'block' : 'unblock');
+      if (!value && renderPending) {
+        renderPending = false;
+        frames.push(() => events.push('render'));
+      }
+    },
+    requestRender: () => {
+      if (blocked) renderPending = true;
+      else frames.push(() => events.push('render'));
+    },
+    settleFrames: 2,
+  });
+
+  coordinator.run(
+    () => events.push('settle'),
+    () => events.push('complete'),
+  );
+  assert.equal(blocked, true);
+  assert.deepEqual(events, ['block', 'unblock', 'block']);
+
+  frames.shift()();
+  frames.shift()();
+  assert.deepEqual(events, ['block', 'unblock', 'block', 'render', 'settle']);
+  assert.equal(blocked, true);
+
+  frames.shift()();
+  assert.equal(blocked, false);
+  assert.deepEqual(events, [
+    'block', 'unblock', 'block', 'render', 'settle', 'settle', 'unblock',
+  ]);
+
+  frames.shift()();
+  frames.shift()();
+  assert.deepEqual(events, [
+    'block', 'unblock', 'block', 'render', 'settle', 'settle', 'unblock',
+    'render', 'settle', 'complete',
+  ]);
+});
+
+test('a newer viewport navigation supersedes stale settling frames', () => {
+  const frames = [];
+  const settled = [];
+  const coordinator = createViewportNavigationCoordinator({
+    schedule: (callback) => frames.push(callback),
+    setRenderBlocked: () => {},
+    requestRender: () => {},
+    settleFrames: 1,
+  });
+
+  coordinator.run(() => settled.push('old'));
+  coordinator.run(() => settled.push('new'));
+  while (frames.length) frames.shift()();
+
+  assert.deepEqual(settled, ['new', 'new']);
+});
+
+test('canceling an inactive viewport navigation does not release a gesture gate', () => {
+  let unlocks = 0;
+  const coordinator = createViewportNavigationCoordinator({
+    schedule: () => {},
+    setRenderBlocked: (value) => {
+      if (!value) unlocks += 1;
+    },
+    requestRender: () => {},
+  });
+
+  coordinator.cancel();
+
+  assert.equal(unlocks, 0);
+});
+
+test('logical message index resolves when no rendered DOM anchor is available', () => {
+  assert.equal(messageIndexAtOffset([100, 120, 140], 0), 0);
+  assert.equal(messageIndexAtOffset([100, 120, 140], 99), 0);
+  assert.equal(messageIndexAtOffset([100, 120, 140], 100), 1);
+  assert.equal(messageIndexAtOffset([100, 120, 140], 999), 2);
+  assert.equal(messageIndexAtOffset([], 20), -1);
+  assert.equal(messageIndexAtOffset([100, Number.NaN, 140], 150), 1);
 });
 
 test('measured heights rebuild only when the visible range changes', () => {
@@ -469,18 +560,24 @@ test('touch and inertial scrolling defer every virtual DOM replacement', () => {
   assert.match(appSource, /function handleMeasuredHeights[\s\S]*?if \(touchActive \|\| userScrolling\)[\s\S]*?requestRender\(\)/);
 });
 
-test('viewport commands release the stop lock and render gate before navigating', () => {
+test('viewport commands use an atomic render-and-settle transaction', () => {
   const commandStart = appSource.indexOf('function handleViewportCommand');
-  const commandBody = appSource.slice(commandStart, commandStart + 1400);
+  const commandBody = appSource.slice(commandStart, commandStart + 2200);
   const prepareIndex = commandBody.indexOf('prepareProgrammaticNavigation()');
   const topIndex = commandBody.indexOf("command === 'top'");
   assert.ok(prepareIndex >= 0 && topIndex > prepareIndex);
   assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?releaseScrollStopLock\(\)/);
   assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?userScrolling = false/);
-  assert.match(appSource, /function prepareProgrammaticNavigation[\s\S]*?setRenderBlocked\(false\)/);
+  assert.match(appSource, /createViewportNavigationCoordinator\(\{[\s\S]*?setRenderBlocked[\s\S]*?requestRender/);
+  assert.match(appSource, /function navigateToEdge[\s\S]*?viewportNavigation\.run/);
+  assert.match(appSource, /function navigateToEdge[\s\S]*?navigationEdge = edge/);
+  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?enforceNavigationEdge\(\)/);
+  assert.match(appSource, /function scrollToMessage[\s\S]*?viewportNavigation\.run/);
+  assert.doesNotMatch(commandBody, /behavior:\s*'smooth'/);
   assert.match(appSource, /type: 'viewportMetrics'[\s\S]*?conversationId: renderedConversationId/);
   assert.match(appSource, /const missingSavedAnchor[\s\S]*?messages\.reduce\(\(sum, message\)/);
   assert.doesNotMatch(appSource, /filter\(\(message\) => message\.role === 'user'\)/);
+  assert.match(appSource, /messageIndexAtOffset\(messages\.map\(messageHeight\), timeline\.scrollTop\)/);
 });
 
 test('assistant background uses a dedicated fixed layer and Flutter mask gradient', () => {

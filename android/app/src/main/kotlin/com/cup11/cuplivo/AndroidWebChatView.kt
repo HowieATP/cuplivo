@@ -235,19 +235,20 @@ private class AndroidWebChatPlatformView(
         webView.evaluateJavascript(source) { result.success(null) }
       }
       "stopScrolling" -> {
-        stopScrolling()
-        result.success(null)
+        stopScrolling { result.success(null) }
       }
       else -> result.notImplemented()
     }
   }
 
-  private fun stopScrolling() {
+  private fun stopScrolling(onComplete: (() -> Unit)? = null) {
     // Flutter's vertical-drag recognizer buffers the native ACTION_DOWN until
     // the gesture arena resolves. Cancel Chromium's compositor fling from the
     // method channel immediately, then keep the nested timeline fixed in JS.
     webView.flingScroll(0, 0)
-    webView.evaluateJavascript(STOP_WEB_SCROLLING_SCRIPT, null)
+    webView.evaluateJavascript(STOP_WEB_SCROLLING_SCRIPT) {
+      onComplete?.invoke()
+    }
   }
 
   override fun dispose() {

@@ -543,12 +543,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     try {
       if (Platform.isWindows) {
         await _windowsController?.postWebMessage(encoded);
-      } else if (Platform.isAndroid) {
-        await _androidController?.runJavaScript(
-          'window.CuplivoWeb.receive(${jsonEncode(encoded)});',
-        );
       } else {
-        await _flutterController?.runJavaScript(
+        await _runWebJavaScript(
           'window.CuplivoWeb.receive(${jsonEncode(encoded)});',
         );
       }
@@ -558,6 +554,30 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         '(${error.runtimeType})',
       );
       _fail(_generation, 'bridge_send_failed');
+    }
+  }
+
+  Future<void> _runWebJavaScript(String source) async {
+    if (Platform.isWindows) {
+      await _windowsController?.executeScript(source);
+    } else if (Platform.isAndroid) {
+      await _androidController?.runJavaScript(source);
+    } else {
+      await _flutterController?.runJavaScript(source);
+    }
+  }
+
+  Future<void> _stopWebScrolling() async {
+    if (!_ready) return;
+    try {
+      await _runWebJavaScript(
+        'window.CuplivoWeb?.stopScrolling?.();',
+      );
+    } catch (error) {
+      debugPrint(
+        'WebConversationViewport: stop scrolling failed '
+        '(${error.runtimeType})',
+      );
     }
   }
 
@@ -678,21 +698,25 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
           ? const SizedBox.shrink()
           : WebViewWidget(controller: _flutterController!);
     }
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        child,
-        if (!_ready)
-          ColoredBox(
-            color: Theme.of(context).colorScheme.surface,
-            child: Center(
-              child: Semantics(
-                label: AppLocalizations.of(context)!.webChatLoading,
-                child: const CircularProgressIndicator.adaptive(),
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (PointerDownEvent _) => unawaited(_stopWebScrolling()),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          if (!_ready)
+            ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: Center(
+                child: Semantics(
+                  label: AppLocalizations.of(context)!.webChatLoading,
+                  child: const CircularProgressIndicator.adaptive(),
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 

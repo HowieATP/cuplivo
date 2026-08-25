@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v5';
+export const ASSET_VERSION = 'web-chat-v6';
 
 const transfers = new Map();
 
@@ -95,6 +95,26 @@ export function normalizeContentInset(value, fallback = 8) {
 export function normalizeMeasuredHeight(value) {
   const height = Number(value);
   return Number.isFinite(height) && height > 0 ? Math.ceil(height) : null;
+}
+
+export function formatReasoningElapsed(startAt, finishedAt, loading, now = Date.now()) {
+  const start = parseTimestamp(startAt);
+  if (!Number.isFinite(start)) return '';
+  const finished = parseTimestamp(finishedAt);
+  const end = Number.isFinite(finished)
+    ? finished
+    : loading
+      ? Number(now)
+      : start;
+  if (!Number.isFinite(end)) return '';
+  return `(${(Math.max(0, end - start) / 1000).toFixed(1)}s)`;
+}
+
+function parseTimestamp(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  if (typeof value !== 'string' || value.length === 0) return NaN;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : NaN;
 }
 
 export function createExpansionCoordinator() {

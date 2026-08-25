@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 
 void main() {
-  test('Web chat uses protocol v2 and bundled assets v5', () {
+  test('Web chat uses protocol v2 and bundled assets v6', () {
     expect(webChatProtocolVersion, 2);
-    expect(webChatAssetVersion, 'web-chat-v5');
+    expect(webChatAssetVersion, 'web-chat-v6');
   });
 
   group('Web chat transfer protocol', () {

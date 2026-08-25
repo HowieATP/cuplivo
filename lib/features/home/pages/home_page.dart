@@ -1693,6 +1693,7 @@ class _HomePageState extends State<HomePage>
           ? settings.autoCollapseCodeBlockLines
           : null,
       'backgroundStyle': settings.chatMessageBackgroundStyle.name,
+      'backgroundOwner': 'flutter',
       'isDark': isDark,
       'showUserAvatar': settings.showUserAvatar,
       'showUserName': settings.showUserName,

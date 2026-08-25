@@ -6,6 +6,7 @@ import {
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  formatReasoningElapsed,
   normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
@@ -35,6 +36,7 @@ let bottomSpacer = null;
 let touchStartY = null;
 let touchActive = false;
 let renderedSessionId = null;
+let reasoningElapsedTimer = null;
 
 const bridge = {
   post(message) {
@@ -69,17 +71,27 @@ function applyTheme() {
   );
   document.body.dataset.backgroundStyle = state.display?.backgroundStyle ?? 'defaultStyle';
   document.body.dataset.dark = String(Boolean(state.display?.isDark));
+  const backgroundOwner = state.display?.backgroundOwner === 'flutter'
+    ? 'flutter'
+    : 'web';
+  document.body.dataset.backgroundOwner = backgroundOwner;
   timeline.setAttribute('aria-label', t('timeline'));
   const background = state.assistant?.background;
   const source = state.media?.[background] ?? background ?? '';
   const isColor = source.startsWith('#');
   const isImage = /^(data:|https?:)/.test(source);
-  backgroundLayer.style.backgroundColor = isColor ? source : 'transparent';
-  backgroundLayer.style.backgroundImage = isImage
-    ? `url("${source.replaceAll('"', '%22')}")`
-    : 'none';
-  document.body.dataset.hasBackground = String(isColor || isImage);
-  if (isMediaHandle(background) && !state.media?.[background]) requestMedia(background);
+  if (backgroundOwner === 'web') {
+    backgroundLayer.style.backgroundColor = isColor ? source : 'transparent';
+    backgroundLayer.style.backgroundImage = isImage
+      ? `url("${source.replaceAll('"', '%22')}")`
+      : 'none';
+    document.body.dataset.hasBackground = String(isColor || isImage);
+    if (isMediaHandle(background) && !state.media?.[background]) requestMedia(background);
+  } else {
+    backgroundLayer.style.backgroundColor = 'transparent';
+    backgroundLayer.style.backgroundImage = 'none';
+    document.body.dataset.hasBackground = 'false';
+  }
 }
 
 function sendAction(action, messageId = null, payload = {}) {
@@ -203,7 +215,16 @@ function updateDisclosure(root, header, body, expanded) {
   });
 }
 
-function disclosure({ key, label, body, expanded, className, icon = null, onToggle }) {
+function disclosure({
+  key,
+  label,
+  body,
+  expanded,
+  className,
+  icon = null,
+  detailNode = null,
+  onToggle,
+}) {
   const root = document.createElement('section');
   root.className = `disclosure ${className}`;
   root.dataset.expansionKey = key;
@@ -226,7 +247,7 @@ function disclosure({ key, label, body, expanded, className, icon = null, onTogg
   title.textContent = label;
   const leading = icon ? iconNode(icon, 'disclosure-icon') : null;
   const chevron = iconNode('next', 'disclosure-chevron');
-  header.replaceChildren(...[leading, title, chevron].filter(Boolean));
+  header.replaceChildren(...[leading, title, detailNode, chevron].filter(Boolean));
   root.append(header, body);
   updateDisclosure(root, header, body, Boolean(expanded));
   return root;
@@ -379,6 +400,47 @@ function renderReasoning(message, parent) {
   for (const [index, segment] of segments.entries()) renderReasoningSegment(message, segment, index, parent);
 }
 
+function createReasoningElapsedNode(segment) {
+  if (segment.startAt == null) return null;
+  const node = document.createElement('span');
+  node.className = 'disclosure-detail reasoning-elapsed';
+  node.dataset.reasoningElapsed = 'true';
+  node.dataset.reasoningStartAt = String(segment.startAt);
+  node.dataset.reasoningFinishedAt = String(segment.finishedAt ?? '');
+  node.dataset.reasoningLoading = String(Boolean(segment.loading));
+  node.textContent = formatReasoningElapsed(
+    segment.startAt,
+    segment.finishedAt,
+    Boolean(segment.loading),
+  );
+  return node;
+}
+
+function refreshReasoningElapsed() {
+  let hasLoading = false;
+  for (const node of document.querySelectorAll('[data-reasoning-elapsed]')) {
+    const loading = node.dataset.reasoningLoading === 'true';
+    hasLoading ||= loading;
+    node.textContent = formatReasoningElapsed(
+      node.dataset.reasoningStartAt,
+      node.dataset.reasoningFinishedAt,
+      loading,
+    );
+  }
+  if (!hasLoading && reasoningElapsedTimer != null) {
+    clearInterval(reasoningElapsedTimer);
+    reasoningElapsedTimer = null;
+  }
+}
+
+function ensureReasoningElapsedTimer() {
+  refreshReasoningElapsed();
+  if (reasoningElapsedTimer == null &&
+      document.querySelector('[data-reasoning-elapsed][data-reasoning-loading="true"]')) {
+    reasoningElapsedTimer = setInterval(refreshReasoningElapsed, 100);
+  }
+}
+
 function renderReasoningSegment(message, segment, index, parent) {
   const kind = segment.kind ?? 'legacy';
   const segmentIndex = Number.isInteger(segment.index) ? segment.index : index;
@@ -397,6 +459,7 @@ function renderReasoningSegment(message, segment, index, parent) {
     expanded,
     className: 'thinking',
     icon: 'reasoning',
+    detailNode: createReasoningElapsedNode(segment),
     onToggle: (next) => {
       if (kind === 'legacy') {
         localExpansions.set(key, next);
@@ -876,6 +939,7 @@ function render() {
     fragment.append(empty);
     timeline.replaceChildren(fragment);
     renderedSessionId = state.renderSessionId;
+    ensureReasoningElapsedTimer();
     restoreViewport(timeline, viewport);
     return;
   }
@@ -918,6 +982,7 @@ function render() {
   timeline.replaceChildren(fragment);
   for (const slot of observedSlots) resizeObserver.observe(slot);
   renderedSessionId = state.renderSessionId;
+  ensureReasoningElapsedTimer();
   restoreViewport(timeline, viewport);
 }
 
@@ -971,6 +1036,14 @@ const sendViewportMetrics = createFrameCoalescer(() => {
     anchorOffset: anchor?.offset ?? 0,
   });
 });
+function stopScrolling() {
+  const top = timeline.scrollTop;
+  const left = timeline.scrollLeft;
+  timeline.style.scrollBehavior = 'auto';
+  timeline.scrollTo({ left, top, behavior: 'auto' });
+  timeline.scrollLeft = left;
+  timeline.scrollTop = top;
+}
 function markUserScroll() {
   const firstIntent = !userScrolling;
   userScrolling = true;
@@ -984,7 +1057,9 @@ function markUserScroll() {
   }, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
+timeline.addEventListener('pointerdown', stopScrolling, { passive: true });
 timeline.addEventListener('touchstart', (event) => {
+  stopScrolling();
   touchActive = true;
   setRenderBlocked(true);
   touchStartY = event.touches[0]?.clientY ?? null;
@@ -1077,6 +1152,7 @@ function jumpQuestion(delta) {
 }
 
 window.CuplivoWeb = {
+  stopScrolling,
   receive(raw) {
     try {
       const envelope = typeof raw === 'string' ? JSON.parse(raw) : raw;

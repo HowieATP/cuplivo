@@ -69,6 +69,8 @@ body::before {
   pointer-events: none;
 }
 body[data-has-background="true"]::before { opacity: 1; }
+body[data-background-owner="flutter"] #chat-background { display: none; }
+body[data-background-owner="flutter"]::before { opacity: 0; }
 button, input, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 .lucide-icon, .disclosure-icon, .disclosure-chevron {
@@ -344,6 +346,13 @@ body[data-background-style="defaultStyle"] .html-preview {
   font-size: .9em;
   font-weight: 600;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.disclosure-detail {
+  flex: 0 0 auto;
+  color: var(--cuplivo-muted);
+  font-size: .82em;
+  font-weight: 500;
   white-space: nowrap;
 }
 .disclosure-icon {

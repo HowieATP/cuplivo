@@ -7,6 +7,7 @@ import {
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  formatReasoningElapsed,
   normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
@@ -39,14 +40,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v5', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v6', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v5',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v6',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -124,6 +125,19 @@ test('content insets accept finite non-negative values only', () => {
   assert.equal(normalizeContentInset('104'), 8);
   assert.equal(normalizeContentInset(null), 8);
   assert.equal(normalizeContentInset('invalid'), 8);
+});
+
+test('reasoning elapsed time mirrors Flutter formatting for live and finished steps', () => {
+  const start = '2026-08-25T12:00:00.000Z';
+  const finish = '2026-08-25T12:00:01.234Z';
+  assert.equal(formatReasoningElapsed(start, finish, false), '(1.2s)');
+  assert.equal(formatReasoningElapsed(start, null, true, Date.parse(finish)), '(1.2s)');
+  assert.equal(formatReasoningElapsed(start, null, false), '(0.0s)');
+  assert.equal(formatReasoningElapsed(null, finish, false), '');
+  assert.equal(formatReasoningElapsed('invalid', finish, false), '');
+  const replaceIndex = appSource.indexOf('timeline.replaceChildren(fragment)');
+  const timerIndex = appSource.indexOf('ensureReasoningElapsedTimer()', replaceIndex);
+  assert.ok(replaceIndex >= 0 && timerIndex > replaceIndex);
 });
 
 test('controlled expansion coalesces rapid clicks and ignores stale state', () => {
@@ -261,6 +275,9 @@ test('mobile shell owns vertical gestures and uses controlled disclosures', () =
   assert.match(styleSource, /-webkit-overflow-scrolling:\s*touch/);
   assert.doesNotMatch(appSource, /createElement\(['"]details['"]\)/);
   assert.match(appSource, /setReasoningExpanded/);
+  assert.match(appSource, /stopScrolling/);
+  assert.match(appSource, /pointerdown/);
+  assert.match(appSource, /touchstart/);
 });
 
 test('virtual DOM replacement captures scroll state first and applies Flutter insets', () => {
@@ -290,6 +307,8 @@ test('assistant background uses a dedicated fixed layer and Flutter mask gradien
   assert.match(styleSource, /#chat-background\s*\{[^}]*position:\s*fixed/);
   assert.match(styleSource, /#chat-background::after\s*\{[^}]*rgba\(0,\s*0,\s*0,\s*\.04\)/);
   assert.match(styleSource, /linear-gradient\([^;]*--cuplivo-background-mask-top[^;]*--cuplivo-background-mask-bottom/);
+  assert.match(appSource, /backgroundOwner/);
+  assert.match(styleSource, /data-background-owner="flutter"/);
 });
 
 test('message composition follows Flutter visual grouping', () => {

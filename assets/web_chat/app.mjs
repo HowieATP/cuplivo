@@ -6,6 +6,7 @@ import {
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
@@ -926,10 +927,10 @@ function handleMeasuredHeights(entries) {
   let changed = false;
   for (const entry of entries) {
     const id = entry.target.dataset.messageId;
-    const height = Math.ceil(
+    const height = normalizeMeasuredHeight(
       entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
     );
-    if (id && Math.abs((heights.get(id) ?? 0) - height) > 1) {
+    if (id && height != null && Math.abs((heights.get(id) ?? 0) - height) > 1) {
       heights.set(id, height);
       changed = true;
     }

@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v4';
+export const ASSET_VERSION = 'web-chat-v5';
 
 const transfers = new Map();
 
@@ -90,6 +90,11 @@ export function normalizeContentInset(value, fallback = 8) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
     : fallback;
+}
+
+export function normalizeMeasuredHeight(value) {
+  const height = Number(value);
+  return Number.isFinite(height) && height > 0 ? Math.ceil(height) : null;
 }
 
 export function createExpansionCoordinator() {

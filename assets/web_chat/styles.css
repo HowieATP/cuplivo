@@ -110,7 +110,6 @@ button { -webkit-tap-highlight-color: transparent; }
   display: flex;
   width: 100%;
   padding: 12px 20px;
-  content-visibility: auto;
   overflow-anchor: none;
 }
 .message.is-user { justify-content: flex-end; padding-inline: 16px; }

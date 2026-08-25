@@ -7,6 +7,7 @@ import {
   createExpansionCoordinator,
   createFrameCoalescer,
   createRenderGate,
+  normalizeMeasuredHeight,
   normalizeContentInset,
   rangeChanged,
   receiveTransferChunk,
@@ -38,14 +39,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v4', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v5', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v4',
+    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v5',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -106,6 +107,14 @@ test('measured heights rebuild only when the visible range changes', () => {
     rangeChanged({ start: 4, end: 12 }, { start: 3, end: 12 }),
     true,
   );
+});
+
+test('offscreen zero-size observations never replace stable message heights', () => {
+  assert.equal(normalizeMeasuredHeight(128.2), 129);
+  assert.equal(normalizeMeasuredHeight(0), null);
+  assert.equal(normalizeMeasuredHeight(-1), null);
+  assert.equal(normalizeMeasuredHeight(Number.NaN), null);
+  assert.doesNotMatch(styleSource, /content-visibility:\s*auto/);
 });
 
 test('content insets accept finite non-negative values only', () => {

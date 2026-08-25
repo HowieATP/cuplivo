@@ -80,7 +80,7 @@ void main() {
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 2);
-    expect(snapshot['assetVersion'], 'web-chat-v4');
+    expect(snapshot['assetVersion'], 'web-chat-v5');
     expect((snapshot['user'] as Map)['name'], 'Ada');
     expect((snapshot['display'] as Map)['backgroundStyle'], 'frosted');
     expect((snapshot['display'] as Map)['contentInsets'], <String, double>{

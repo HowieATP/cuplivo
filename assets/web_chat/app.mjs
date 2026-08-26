@@ -77,6 +77,11 @@ let virtualWindowLoading = false;
 let lastTimelineScrollTop = 0;
 let programmaticNavigationActive = false;
 let measuredHeightsPending = false;
+let bottomHoldTimer = null;
+let renderAckFrame = 0;
+const rendererLoads = new Map();
+const readyRenderers = new Set();
+const pendingRendererRenders = new Set();
 
 const bridge = {
   post(message) {
@@ -93,6 +98,8 @@ const safeProtocolDiagnostics = new Set([
   'snapshot_version_mismatch',
   'invalid_expansion_request',
 ]);
+const transparentRemoteImage =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 function safeDiagnosticCode(error, fallback) {
   return safeProtocolDiagnostics.has(error?.message) ? error.message : fallback;
@@ -101,10 +108,154 @@ function safeDiagnosticCode(error, fallback) {
 function t(key) { return state?.strings?.[key] ?? ''; }
 function messageHeight(message) { return heights.get(message.id) ?? 170; }
 function isMediaHandle(value) {
-  return value?.startsWith('local:') || value?.startsWith('asset:');
+  return value?.startsWith('local:') || value?.startsWith('asset:') ||
+    value?.startsWith('remote:');
 }
+
+function remoteImagePlaceholder(handle) {
+  return `${transparentRemoteImage}#cuplivo-remote=${encodeURIComponent(handle)}`;
+}
+
+function remoteHandleFromPlaceholder(source) {
+  const marker = '#cuplivo-remote=';
+  const index = String(source ?? '').indexOf(marker);
+  if (index < 0) return null;
+  try {
+    const handle = decodeURIComponent(String(source).slice(index + marker.length));
+    return handle.startsWith('remote:') ? handle : null;
+  } catch {
+    return null;
+  }
+}
+
+function markdownSourceForRender(content) {
+  const replace = (match, prefix, url) => {
+    const handle = state?.remoteMediaHandles?.[url];
+    return handle ? `${prefix}${remoteImagePlaceholder(handle)}` : match;
+  };
+  return String(content ?? '')
+    .replace(/(!\[[^\]]*\]\(\s*<?)(http:\/\/[^\s>)]+)/gi, replace)
+    .replace(/(<img\b[^>]*\bsrc\s*=\s*["'])(http:\/\/[^"']+)/gi, replace);
+}
+
+function rendererAssetUrl(relativePath) {
+  return new URL(relativePath, document.baseURI).toString();
+}
+
+function reportRendererResourceFailure(renderer) {
+  bridge.post({
+    type: 'diagnostic',
+    code: 'renderer_resource_failed',
+    renderer,
+  });
+}
+
+function loadScriptOnce(key, relativePath) {
+  const existing = rendererLoads.get(key);
+  if (existing) return existing;
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = rendererAssetUrl(relativePath);
+    script.async = true;
+    script.addEventListener('load', resolve, { once: true });
+    script.addEventListener('error', () => reject(new Error(key)), { once: true });
+    document.head.append(script);
+  });
+  rendererLoads.set(key, promise);
+  return promise;
+}
+
+function loadStyleOnce(key, relativePath) {
+  const existing = rendererLoads.get(key);
+  if (existing) return existing;
+  const promise = new Promise((resolve, reject) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = rendererAssetUrl(relativePath);
+    link.addEventListener('load', resolve, { once: true });
+    link.addEventListener('error', () => reject(new Error(key)), { once: true });
+    const appStyles = document.querySelector('link[href="styles.css"]');
+    if (appStyles) appStyles.before(link);
+    else document.head.append(link);
+  });
+  rendererLoads.set(key, promise);
+  return promise;
+}
+
+function rendererPromise(renderer, load) {
+  const key = `renderer:${renderer}`;
+  const existing = rendererLoads.get(key);
+  if (existing) return existing;
+  const promise = load().catch((error) => {
+    reportRendererResourceFailure(renderer);
+    throw error;
+  });
+  rendererLoads.set(key, promise);
+  return promise;
+}
+
+function ensureHighlightRenderer() {
+  return rendererPromise('highlight', async () => {
+    await Promise.all([
+      loadStyleOnce('style:highlight', 'vendor/github.min.css'),
+      loadScriptOnce('script:highlight', 'vendor/highlight.min.js'),
+    ]);
+    if (!window.hljs) throw new Error('highlight_unavailable');
+    readyRenderers.add('highlight');
+  });
+}
+
+function ensureMathRenderer() {
+  return rendererPromise('math', async () => {
+    await Promise.all([
+      loadStyleOnce('style:katex', 'vendor/katex.min.css'),
+      loadScriptOnce('script:katex', 'vendor/katex.min.js'),
+    ]);
+    await loadScriptOnce('script:katex-auto-render', 'vendor/auto-render.min.js');
+    if (!window.renderMathInElement) throw new Error('math_unavailable');
+    readyRenderers.add('math');
+  });
+}
+
+function ensureMermaidRenderer() {
+  return rendererPromise('mermaid', async () => {
+    const isWindowsCache = new URL(document.location.href).searchParams.get('platform') === 'windows';
+    await loadScriptOnce(
+      'script:mermaid',
+      isWindowsCache ? 'mermaid.min.js' : '../mermaid.min.js',
+    );
+    if (!window.mermaid) throw new Error('mermaid_unavailable');
+    readyRenderers.add('mermaid');
+  });
+}
+
+function rerenderWhenRendererReady(renderer, promise, messageId) {
+  const key = `${renderer}:${messageId ?? 'timeline'}`;
+  if (pendingRendererRenders.has(key)) return;
+  pendingRendererRenders.add(key);
+  promise.then(() => {
+    pendingRendererRenders.delete(key);
+    if (messageId) updateMountedMessage(messageId);
+    else requestRender();
+  }, () => pendingRendererRenders.delete(key));
+}
+
+function containsMath(root) {
+  const text = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!node.parentElement?.closest('code, pre')) text.push(node.textContent ?? '');
+  }
+  const source = text.join('\n');
+  if (/\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)/.test(source)) return true;
+  return state.display?.dollarMath === true && /(^|[^\\$])\$[^\n$]+\$/.test(source);
+}
+
 function applyTheme() {
   if (!state) return;
+  document.documentElement.lang = state.locale || 'en';
+  document.documentElement.dir = state.textDirection === 'rtl' ? 'rtl' : 'ltr';
   for (const [name, value] of Object.entries(state.theme ?? {})) {
     document.documentElement.style.setProperty(`--cuplivo-${name}`, value);
   }
@@ -128,7 +279,7 @@ function applyTheme() {
   const background = state.assistant?.background;
   const source = state.media?.[background] ?? background ?? '';
   const isColor = source.startsWith('#');
-  const isImage = /^(data:|https?:)/.test(source);
+  const isImage = /^(data:|https?:)/i.test(source);
   if (backgroundOwner === 'web') {
     backgroundLayer.style.backgroundColor = isColor ? source : 'transparent';
     backgroundLayer.style.backgroundImage = isImage
@@ -330,7 +481,8 @@ function patchStreamingMarkdownRoot(root, source, kind) {
     root.style.whiteSpace = 'pre-wrap';
     return;
   }
-  const tokens = window.marked.lexer(source, { gfm: true, breaks: true });
+  const renderSource = markdownSourceForRender(source);
+  const tokens = window.marked.lexer(renderSource, { gfm: true, breaks: true });
   const signatures = tokens.map((token) => `${token.type}\u0000${token.raw ?? ''}`);
   const previous = streamingMarkdownStates.get(root);
   const prefix = longestStablePrefix(previous?.signatures, signatures);
@@ -344,18 +496,24 @@ function patchStreamingMarkdownRoot(root, source, kind) {
     container.innerHTML = sanitizeMarkdownHtml(
       window.marked.parser([tokens[index]], { gfm: true, breaks: true }),
     );
-    enhanceMarkdown(container, true);
+    enhanceMarkdown(container, true, root.dataset.messageId || null);
     const nodes = [...container.childNodes];
     fragment.append(...nodes);
     groups.push(nodes);
   }
   root.append(fragment);
-  streamingMarkdownStates.set(root, { signatures, groups, source, kind });
+  streamingMarkdownStates.set(root, {
+    signatures,
+    groups,
+    source: renderSource,
+    kind,
+  });
 }
 
-function markdownNode(content, streaming = false, kind = 'assistant') {
+function markdownNode(content, streaming = false, kind = 'assistant', messageId = null) {
   const root = document.createElement('div');
   root.className = 'markdown';
+  if (messageId) root.dataset.messageId = messageId;
   const markdownEnabled = kind === 'user' ? state.display?.userMarkdown !== false :
     kind === 'reasoning' ? state.display?.reasoningMarkdown !== false :
     state.display?.assistantMarkdown !== false;
@@ -376,7 +534,10 @@ function markdownNode(content, streaming = false, kind = 'assistant') {
     const cached = cacheKey == null ? null : markdownHtmlCache.get(cacheKey);
     let sanitized = cached?.source === source ? cached.html : null;
     if (sanitized == null) {
-      const html = window.marked.parse(source, { gfm: true, breaks: true });
+      const html = window.marked.parse(markdownSourceForRender(source), {
+        gfm: true,
+        breaks: true,
+      });
       sanitized = sanitizeMarkdownHtml(html);
       if (cacheKey != null) {
         markdownHtmlCache.set(cacheKey, { source, html: sanitized });
@@ -389,7 +550,7 @@ function markdownNode(content, streaming = false, kind = 'assistant') {
       markdownHtmlCache.set(cacheKey, cached);
     }
     root.innerHTML = sanitized;
-    enhanceMarkdown(root, streaming);
+    enhanceMarkdown(root, streaming, messageId);
   } catch (error) {
     bridge.post({ type: 'diagnostic', code: 'markdown_block_failed' });
     root.className = 'block-error';
@@ -421,14 +582,23 @@ function normalizeCodeLanguage(language) {
   }[normalized] ?? normalized) || 'plaintext';
 }
 
-function enhanceMarkdown(root, streaming) {
+function enhanceMarkdown(root, streaming, messageId = null) {
+  enhanceRawCitations(root, messageId);
   for (const link of root.querySelectorAll('a[href]')) {
     const href = link.getAttribute('href');
+    const citation = parseCitationLink(link.textContent, href);
     link.removeAttribute('href');
-    link.setAttribute('role', 'link');
+    link.setAttribute('role', citation ? 'button' : 'link');
     link.tabIndex = 0;
     const open = (event) => {
       event.preventDefault();
+      if (citation && messageId) {
+        sendAction('openCitation', messageId, {
+          citationId: citation.id,
+          index: citation.index,
+        });
+        return;
+      }
       bridge.post({
         type: 'externalLink',
         url: href,
@@ -437,21 +607,69 @@ function enhanceMarkdown(root, streaming) {
         capabilityToken: state.capabilityToken,
       });
     };
+    if (citation) {
+      link.className = 'citation-marker';
+      link.textContent = citation.index;
+      link.setAttribute('aria-label', `${t('sources')} ${citation.index}`.trim());
+    }
     link.addEventListener('click', open);
     link.addEventListener('keydown', (event) => { if (event.key === 'Enter') open(event); });
   }
-  for (const image of root.querySelectorAll('img')) image.referrerPolicy = 'no-referrer';
+  for (const image of root.querySelectorAll('img')) {
+    image.referrerPolicy = 'no-referrer';
+    const source = image.getAttribute('src') ?? '';
+    const handle = state.remoteMediaHandles?.[source] ??
+      remoteHandleFromPlaceholder(source);
+    if (handle) image.dataset.mediaHandle = handle;
+    const resolved = handle ? state.media?.[handle] : null;
+    if (resolved) {
+      image.src = resolved;
+    } else if (/^http:\/\//i.test(source)) {
+      image.removeAttribute('src');
+      if (handle) requestMedia(handle);
+      else bridge.post({ type: 'diagnostic', code: 'http_media_handle_missing' });
+    } else if (handle && remoteHandleFromPlaceholder(source)) {
+      requestMedia(handle);
+    }
+    if (handle && messageId) {
+      image.tabIndex = 0;
+      image.setAttribute('role', 'button');
+      const preview = (event) => {
+        event?.preventDefault();
+        event?.stopPropagation();
+        sendAction('previewImage', messageId, { handle });
+      };
+      image.addEventListener('click', preview);
+      image.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          preview(event);
+        }
+      });
+    }
+  }
   for (const code of root.querySelectorAll('pre > code')) {
     const language = [...code.classList].find((name) => name.startsWith('language-'))?.slice(9) ?? '';
     const highlightLanguage = normalizeCodeLanguage(language);
     const pre = code.parentElement;
     const source = code.textContent ?? '';
     if (highlightLanguage === 'mermaid' && !streaming) {
-      renderMermaid(code.parentElement, code.textContent ?? '');
+      if (readyRenderers.has('mermaid')) {
+        renderMermaid(pre, source);
+      } else {
+        code.textContent = source.replace(/(?:\r\n|\r|\n)+$/, '');
+        renderCodeBlock(pre, code, language, source);
+        rerenderWhenRendererReady('mermaid', ensureMermaidRenderer(), messageId);
+      }
       continue;
     }
     if (highlightLanguage === 'html' && !streaming) addHtmlPreview(pre, code.textContent ?? '');
     const displaySource = source.replace(/(?:\r\n|\r|\n)+$/, '');
+    if (!streaming && !readyRenderers.has('highlight')) {
+      code.textContent = displaySource;
+      renderCodeBlock(pre, code, language, source);
+      rerenderWhenRendererReady('highlight', ensureHighlightRenderer(), messageId);
+      continue;
+    }
     code.classList.add('hljs');
     if (streaming) {
       code.textContent = displaySource;
@@ -469,7 +687,11 @@ function enhanceMarkdown(root, streaming) {
     renderCodeBlock(pre, code, language, source);
   }
   try {
-    if (streaming || state.display?.math === false) return;
+    if (streaming || state.display?.math === false || !containsMath(root)) return;
+    if (!readyRenderers.has('math')) {
+      rerenderWhenRendererReady('math', ensureMathRenderer(), messageId);
+      return;
+    }
     window.renderMathInElement(root, {
       throwOnError: false,
       delimiters: [
@@ -480,6 +702,77 @@ function enhanceMarkdown(root, streaming) {
       ],
     });
   } catch { bridge.post({ type: 'diagnostic', code: 'math_block_failed' }); }
+}
+
+function enhanceRawCitations(root, messageId) {
+  if (!messageId) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!node.parentElement?.closest('code, pre, a, button')) textNodes.push(node);
+  }
+  const pattern = /\[citation:([^\]\r\n]+)\]/gi;
+  for (const node of textNodes) {
+    const source = node.textContent ?? '';
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    let replaced = false;
+    for (const match of source.matchAll(pattern)) {
+      const references = String(match[1]).split(',')
+        .map((part) => parseCitationReference(part.trim()));
+      if (!references.length || references.some((reference) => reference == null)) continue;
+      fragment.append(document.createTextNode(source.slice(cursor, match.index)));
+      for (const [index, reference] of references.entries()) {
+        if (index > 0) fragment.append(document.createTextNode(' '));
+        fragment.append(citationMarker(reference, messageId));
+      }
+      cursor = match.index + match[0].length;
+      replaced = true;
+    }
+    if (!replaced) continue;
+    fragment.append(document.createTextNode(source.slice(cursor)));
+    node.replaceWith(fragment);
+  }
+}
+
+function citationMarker(reference, messageId) {
+  const marker = document.createElement('button');
+  marker.type = 'button';
+  marker.className = 'citation-marker';
+  marker.textContent = reference.index;
+  marker.setAttribute('aria-label', `${t('sources')} ${reference.index}`.trim());
+  marker.addEventListener('click', () => sendAction('openCitation', messageId, {
+    citationId: reference.id,
+    index: reference.index,
+  }));
+  return marker;
+}
+
+function parseCitationReference(raw) {
+  let value = String(raw ?? '').trim();
+  if (value.toLowerCase().startsWith('citation:')) value = value.slice(9).trim();
+  if (!value || /[\s\]\)]/.test(value)) return null;
+  const separator = value.indexOf(':');
+  const index = (separator < 0 ? value : value.slice(0, separator)).trim();
+  const id = (separator < 0 ? index : value.slice(separator + 1)).trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(index) ||
+      (separator >= 0 && !/\d/.test(index)) || !id) return null;
+  return { index, id };
+}
+
+function parseCitationLink(label, href) {
+  const rawHref = String(href ?? '');
+  const prefix = '#cuplivo-citation=';
+  if (rawHref.startsWith(prefix)) {
+    try {
+      return parseCitationReference(decodeURIComponent(rawHref.slice(prefix.length)));
+    } catch {
+      return null;
+    }
+  }
+  if (String(label ?? '').trim().toLowerCase() !== 'citation') return null;
+  return parseCitationReference(rawHref);
 }
 
 function renderCodeBlock(pre, code, language, source) {
@@ -550,8 +843,7 @@ async function renderMermaid(pre, source) {
     pre.replaceWith(wrapper);
   } catch {
     bridge.post({ type: 'diagnostic', code: 'mermaid_block_failed' });
-    pre.className = 'block-error';
-    pre.textContent = t('unsupportedBlock');
+    pre.classList.add('block-error');
   }
 }
 
@@ -630,7 +922,12 @@ function renderReasoningSegment(message, segment, index, parent) {
     : expansionCoordinator.value(key, authoritative);
   const body = document.createElement('div');
   body.className = 'thinking-body';
-  body.append(markdownNode(segment.text ?? '', Boolean(segment.loading), 'reasoning'));
+  body.append(markdownNode(
+    segment.text ?? '',
+    Boolean(segment.loading),
+    'reasoning',
+    message.id,
+  ));
   const card = disclosure({
     key,
     label: segment.loading ? t('thinking') : t('reasoning'),
@@ -662,7 +959,12 @@ function renderReasoningSegment(message, segment, index, parent) {
 
 function appendConversationText(message, parent, content, blockKey) {
   if (!content) return;
-  const markdown = markdownNode(content, message.isStreaming, message.role);
+  const markdown = markdownNode(
+    content,
+    message.isStreaming,
+    message.role,
+    message.id,
+  );
   markdown.dataset.contentBlockKey = blockKey;
   if (message.role === 'user') {
     parent.append(markdown);
@@ -780,7 +1082,9 @@ function renderTool(message, tool, parent) {
   const args = document.createElement('pre');
   args.textContent = JSON.stringify(tool.arguments ?? {}, null, 2);
   body.append(args);
-  if (tool.content != null) body.append(markdownNode(tool.content, tool.loading));
+  if (tool.content != null) {
+    body.append(markdownNode(tool.content, tool.loading, 'assistant', message.id));
+  }
   if (tool.arguments?.approvalRequired === true && tool.content == null) {
     const actions = document.createElement('div');
     actions.className = 'tool-actions';
@@ -901,20 +1205,43 @@ function renderAskUser(message, tool, parent) {
 function renderAttachments(message, parent) {
   for (const attachment of message.attachments ?? []) {
     const source = state.media?.[attachment.reference] ?? attachment.reference;
-    if (attachment.kind === 'image' && /^(data:|https?:)/.test(source)) {
+    const handle = isMediaHandle(attachment.reference)
+      ? attachment.reference
+      : state.remoteMediaHandles?.[attachment.reference];
+    if (attachment.kind === 'image' && /^(data:|https?:)/i.test(source)) {
       const image = document.createElement('img');
       image.dataset.component = 'attachment-image';
       image.src = source;
       image.alt = attachment.name ?? '';
       image.referrerPolicy = 'no-referrer';
+      if (handle) {
+        image.dataset.mediaHandle = handle;
+        image.tabIndex = 0;
+        image.setAttribute('role', 'button');
+        const preview = () => sendAction('previewImage', message.id, { handle });
+        image.addEventListener('click', preview);
+        image.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            preview();
+          }
+        });
+      }
       parent.append(image);
     } else if (attachment.kind === 'image' && isMediaHandle(attachment.reference)) {
       requestMedia(attachment.reference);
     } else if (attachment.kind === 'file') {
-      const file = document.createElement('div');
+      const file = document.createElement('button');
+      file.type = 'button';
       file.className = 'attachment-file';
       file.dataset.component = 'attachment-file';
       file.textContent = attachment.name ?? attachment.mime ?? '';
+      if (handle) {
+        file.addEventListener('click', () =>
+          sendAction('openAttachment', message.id, { handle }));
+      } else {
+        file.disabled = true;
+      }
       parent.append(file);
     }
   }
@@ -922,7 +1249,7 @@ function renderAttachments(message, parent) {
 
 function mediaImage(reference, alt, monochrome = false) {
   const source = state.media?.[reference] ?? reference ?? '';
-  if (!/^(data:|https?:)/.test(source)) {
+  if (!/^(data:|https?:)/i.test(source)) {
     if (isMediaHandle(reference)) requestMedia(reference);
     return null;
   }
@@ -993,9 +1320,7 @@ function renderMessageHeader(message) {
   if ((isUser && display.showUserTimestamp !== false) || (!isUser && display.showModelTimestamp !== false)) {
     const time = document.createElement('time');
     time.dateTime = message.timestamp;
-    time.textContent = new Intl.DateTimeFormat(undefined, {
-      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    }).format(new Date(message.timestamp));
+    time.textContent = message.timestampLabel ?? '';
     meta.append(time);
   }
   const avatar = renderAvatar(message);
@@ -1082,7 +1407,12 @@ function renderMessage(message, isLast = false) {
     bubble.append(disclosure({
       key,
       label: t('translation'),
-      body: markdownNode(message.translation, message.isStreaming),
+      body: markdownNode(
+        message.translation,
+        message.isStreaming,
+        'assistant',
+        message.id,
+      ),
       expanded: localExpansion(key, true),
       className: 'translation',
       icon: 'translate',
@@ -1091,6 +1421,14 @@ function renderMessage(message, isLast = false) {
         return next;
       },
     }));
+  }
+  if (message.role !== 'user' && (message.citations?.length ?? 0) > 0) {
+    const sources = button(
+      `${t('sources')} (${message.citations.length})`,
+      () => sendAction('showCitations', message.id),
+      'sources-summary',
+    );
+    bubble.append(sources);
   }
   if (message.role !== 'user' && message.isStreaming && !bubble.childElementCount) {
     const streaming = document.createElement('div');
@@ -1114,6 +1452,16 @@ function renderMessage(message, isLast = false) {
       suggestions,
     ].filter(Boolean),
   );
+  if (message.selecting) {
+    const checkbox = button(t('select'), (event) => {
+      event.stopPropagation();
+      sendAction('select', message.id);
+    }, 'selection-checkbox');
+    checkbox.setAttribute('role', 'checkbox');
+    checkbox.setAttribute('aria-checked', String(Boolean(message.selected)));
+    checkbox.replaceChildren(message.selected ? '✓' : '');
+    article.append(checkbox);
+  }
   article.append(main);
   article.addEventListener('contextmenu', (event) => {
     event.preventDefault();
@@ -1121,6 +1469,7 @@ function renderMessage(message, isLast = false) {
   });
   if (message.selecting) {
     article.addEventListener('click', (event) => {
+      if (window.getSelection()?.toString().trim()) return;
       if (!event.target.closest('button, a, input, textarea')) sendAction('select', message.id);
     });
   }
@@ -1247,6 +1596,9 @@ function render() {
   cancelVirtualPrefetch();
   const startedAt = performance.now();
   const sameSession = renderedSessionId === state.renderSessionId;
+  if (!sameSession) {
+    navigationEdge = state.initialViewportMode === 'bottom' ? 'bottom' : null;
+  }
   const savedViewport = sameSession
     ? null
     : viewportForSavedAnchor({
@@ -1260,7 +1612,8 @@ function render() {
     state.initialViewportAnchor != null && savedViewport == null;
   const override = forcedViewport;
   forcedViewport = null;
-  const viewport = override ?? savedViewport ?? (missingSavedAnchor
+  const startsAtBottom = !sameSession && state.initialViewportMode === 'bottom';
+  const viewport = override ?? savedViewport ?? (missingSavedAnchor || startsAtBottom
     ? {
       scrollTop: messages.reduce((sum, message) => sum + messageHeight(message), 0),
       viewportHeight: timeline.clientHeight,
@@ -1290,6 +1643,7 @@ function render() {
     pendingMountedUpdates.clear();
     enforceNavigationEdge();
     sendViewportMetrics();
+    acknowledgeCommittedRender();
     reportSlowRender(startedAt, 'virtual_window_render_slow');
     return;
   }
@@ -1332,7 +1686,28 @@ function render() {
   pendingMountedUpdates.clear();
   enforceNavigationEdge();
   sendViewportMetrics();
+  acknowledgeCommittedRender();
   reportSlowRender(startedAt, 'virtual_window_render_slow');
+}
+
+function acknowledgeCommittedRender() {
+  if (!state) return;
+  const session = state.renderSessionId;
+  const conversation = state.conversationId;
+  const revision = state.renderRevision;
+  cancelAnimationFrame(renderAckFrame);
+  renderAckFrame = requestAnimationFrame(() => {
+    renderAckFrame = 0;
+    if (!state || state.renderSessionId !== session ||
+        state.conversationId !== conversation || state.renderRevision !== revision) return;
+    bridge.post({
+      type: 'renderCommitted',
+      renderSessionId: session,
+      conversationId: conversation,
+      renderRevision: revision,
+      capabilityToken: state.capabilityToken,
+    });
+  });
 }
 
 function handleMeasuredHeights(entries) {
@@ -1777,6 +2152,8 @@ function markUserScroll() {
     viewportNavigation.cancel();
     navigationCursorId = null;
     navigationEdge = null;
+    clearTimeout(bottomHoldTimer);
+    bottomHoldTimer = null;
   }
   userScrolling = true;
   setRenderBlocked(true);
@@ -1965,6 +2342,15 @@ function handleViewportCommand(envelope) {
   } else if (command === 'bottom') {
     navigationCursorId = null;
     navigateToEdge('bottom');
+  } else if (command === 'holdBottom') {
+    clearTimeout(bottomHoldTimer);
+    navigationCursorId = null;
+    navigateToEdge('bottom');
+    const duration = Math.max(0, Math.min(2000, Number(payload.durationMs) || 0));
+    bottomHoldTimer = setTimeout(() => {
+      bottomHoldTimer = null;
+      if (!userScrolling && navigationEdge === 'bottom') navigationEdge = null;
+    }, duration);
   } else if (command === 'message') {
     navigationEdge = null;
     navigationCursorId = payload.messageId ?? null;
@@ -2115,11 +2501,24 @@ function jumpQuestion(delta) {
 function handleMessagePatches(envelope) {
   if (!state || envelope.renderSessionId !== state.renderSessionId ||
       envelope.conversationId !== state.conversationId) return;
+  const patches = (envelope.patches ?? []).map((patch) => {
+    const { remoteMediaHandles, ...messagePatch } = patch;
+    if (remoteMediaHandles && typeof remoteMediaHandles === 'object') {
+      state = {
+        ...state,
+        remoteMediaHandles: {
+          ...(state.remoteMediaHandles ?? {}),
+          ...remoteMediaHandles,
+        },
+      };
+    }
+    return messagePatch;
+  });
   const previousById = new Map(state.messages.map((message) => [message.id, message]));
-  const nextState = reduceEnvelope(state, envelope);
+  const nextState = reduceEnvelope(state, { ...envelope, patches });
   state = nextState;
   const nextById = new Map(state.messages.map((message) => [message.id, message]));
-  for (const patch of envelope.patches ?? []) {
+  for (const patch of patches) {
     const id = patch.id?.toString();
     const previous = previousById.get(id);
     const next = nextById.get(id);
@@ -2163,6 +2562,9 @@ function handleMediaResult(payload) {
     media: { ...(state.media ?? {}), [payload.handle]: payload.dataUrl },
   };
   pendingMedia.delete(payload.handle);
+  for (const image of document.querySelectorAll('img[data-media-handle]')) {
+    if (image.dataset.mediaHandle === payload.handle) image.src = payload.dataUrl;
+  }
   applyTheme();
   const userAvatar = state.user?.avatar === payload.handle;
   const assistantAvatar = state.assistant?.avatar === payload.handle;
@@ -2197,6 +2599,8 @@ window.CuplivoWeb = {
             navigationCursorId = null;
             navigationEdge = null;
             programmaticNavigationActive = false;
+            clearTimeout(bottomHoldTimer);
+            bottomHoldTimer = null;
             expansionCoordinator.clear();
             localExpansions.clear();
             pendingActions.clear();
@@ -2226,7 +2630,11 @@ window.CuplivoWeb = {
           requestRender();
         }
       }
-      else if (envelope.type === 'mediaError') pendingMedia.delete(envelope.handle);
+      else if (envelope.type === 'mediaError' && state &&
+          envelope.renderSessionId === state.renderSessionId &&
+          envelope.conversationId === state.conversationId) {
+        pendingMedia.delete(envelope.handle);
+      }
       else if (envelope.type === 'viewportCommand') handleViewportCommand(envelope);
     } catch (error) {
       bridge.post({

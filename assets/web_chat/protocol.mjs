@@ -1,5 +1,5 @@
-export const PROTOCOL_VERSION = 2;
-export const ASSET_VERSION = 'web-chat-v12';
+export const PROTOCOL_VERSION = 3;
+export const ASSET_VERSION = 'web-chat-v13';
 
 const transfers = new Map();
 
@@ -50,19 +50,32 @@ export function reduceEnvelope(state, envelope) {
         media: { ...(state.media ?? {}), ...(envelope.media ?? {}) },
         messages: (envelope.messages ?? []).map((message) => {
           const live = liveById.get(message.id);
-          if (!live?.isStreaming || message.isStreaming !== true ||
-              !Number.isInteger(live.streamRevision)) return message;
-          return {
-            ...message,
-            content: live.content,
-            tokens: live.tokens,
-            reasoning: live.reasoning,
-            contentSplits: live.contentSplits,
-            tools: live.tools,
-            expandStepsLabel: live.expandStepsLabel,
-            translation: live.translation,
-            streamRevision: live.streamRevision,
-          };
+          let next = message;
+          if (live?.isStreaming && message.isStreaming === true &&
+              Number.isInteger(live.streamRevision)) {
+            next = {
+              ...message,
+              content: live.content,
+              tokens: live.tokens,
+              reasoning: live.reasoning,
+              contentSplits: live.contentSplits,
+              tools: live.tools,
+              expandStepsLabel: live.expandStepsLabel,
+              translation: live.translation,
+              streamRevision: live.streamRevision,
+            };
+          }
+          if (message.translationStreaming === true &&
+              live?.patchKind === 'translation' &&
+              Number.isInteger(live.streamRevision)) {
+            next = {
+              ...next,
+              patchKind: 'translation',
+              translation: live.translation,
+              streamRevision: live.streamRevision,
+            };
+          }
+          return next;
         }),
       };
     }

@@ -57,16 +57,19 @@ class NetworkProxyConfig {
 }
 
 class DioHttpClient extends http.BaseClient {
-  DioHttpClient({this._proxy, CancelToken? cancelToken})
-    : _cancelToken = cancelToken ?? CancelToken(),
-      _dio = Dio(
-        BaseOptions(
-          connectTimeout: null,
-          sendTimeout: null,
-          receiveTimeout: null,
-          validateStatus: (_) => true,
-        ),
-      ) {
+  DioHttpClient({
+    this._proxy,
+    CancelToken? cancelToken,
+    this.forceCloseOnDispose = false,
+  }) : _cancelToken = cancelToken ?? CancelToken(),
+       _dio = Dio(
+         BaseOptions(
+           connectTimeout: null,
+           sendTimeout: null,
+           receiveTimeout: null,
+           validateStatus: (_) => true,
+         ),
+       ) {
     _dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
@@ -138,6 +141,12 @@ class DioHttpClient extends http.BaseClient {
   final NetworkProxyConfig? _proxy;
   final CancelToken _cancelToken;
 
+  /// Force-closes active sockets when this one-shot client is disposed.
+  ///
+  /// Shared streaming clients must keep the default so callers that stop
+  /// listening do not interrupt other requests using the same instance.
+  final bool forceCloseOnDispose;
+
   @override
   void close() {
     // 注意：不要在这里取消 CancelToken！
@@ -154,7 +163,7 @@ class DioHttpClient extends http.BaseClient {
     //   _dio.close(force: true);
     // } catch (_) {}
     try {
-      _dio.close();
+      _dio.close(force: forceCloseOnDispose);
     } catch (_) {}
   }
 

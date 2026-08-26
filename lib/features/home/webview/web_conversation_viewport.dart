@@ -20,6 +20,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../controllers/conversation_viewport_port.dart';
 import 'android_web_chat_view.dart';
 import 'web_chat_protocol.dart';
+import 'web_chat_remote_media.dart';
 import 'web_chat_snapshot.dart';
 
 typedef WebChatActionHandler =
@@ -38,6 +39,7 @@ class WebConversationViewport extends StatefulWidget {
     required this.onAction,
     required this.onUseFlutter,
     required this.onUserScrollIntent,
+    required this.remoteMediaClientFactory,
   });
 
   final Map<String, dynamic> snapshot;
@@ -48,6 +50,7 @@ class WebConversationViewport extends StatefulWidget {
   final WebChatActionHandler onAction;
   final VoidCallback onUseFlutter;
   final VoidCallback onUserScrollIntent;
+  final WebChatHttpClientFactory remoteMediaClientFactory;
 
   @override
   State<WebConversationViewport> createState() =>
@@ -76,15 +79,23 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   AndroidWebChatController? _androidController;
   winweb.WebviewController? _windowsController;
   StreamSubscription<dynamic>? _windowsMessageSubscription;
-  final Map<String, VoidCallback> _streamListeners = <String, VoidCallback>{};
+  final Map<String, _StreamingListenerBinding> _streamListeners =
+      <String, _StreamingListenerBinding>{};
   final WebChatStreamingPatchBuffer _streamPatchBuffer =
       WebChatStreamingPatchBuffer();
+  final WebChatSnapshotSendQueue _snapshotQueue = WebChatSnapshotSendQueue();
   Timer? _streamFlushTimer;
   Timer? _initializationTimer;
+  Timer? _renderCommitTimer;
   bool _ready = false;
+  bool _firstRenderCommitted = false;
   bool _initializing = false;
   bool _webView2Missing = false;
   int _generation = 0;
+  int _transportGeneration = 0;
+  int _nextRenderRevision = 0;
+  bool _snapshotTransferActive = false;
+  String? _lastSnapshotSignature;
   String? _errorCode;
   late final String _capabilityToken = _randomCapabilityToken();
   late WebChatActionGate _actionGate = _newActionGate();
@@ -119,24 +130,33 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       _actionGate = _newActionGate();
     }
     if (sessionChanged) {
+      _transportGeneration++;
       _streamFlushTimer?.cancel();
       _streamFlushTimer = null;
       _streamPatchBuffer.clear();
+      _snapshotQueue.clear();
+      _renderCommitTimer?.cancel();
+      _firstRenderCommitted = false;
+      _nextRenderRevision = 0;
+      _lastSnapshotSignature = null;
     }
     if (!identical(oldWidget.viewportPort, widget.viewportPort)) {
       oldWidget.viewportPort.detach(_viewportCommandSender);
       widget.viewportPort.attach(_viewportCommandSender);
     }
     _syncStreamingListeners();
-    if (_ready) unawaited(_sendSnapshot());
+    if (_ready) _enqueueLatestSnapshot();
   }
 
   @override
   void dispose() {
     _generation++;
+    _transportGeneration++;
     _initializationTimer?.cancel();
     _streamFlushTimer?.cancel();
+    _renderCommitTimer?.cancel();
     _streamPatchBuffer.clear();
+    _snapshotQueue.clear();
     _detachStreamingListeners();
     widget.viewportPort.detach(_viewportCommandSender);
     unawaited(_windowsMessageSubscription?.cancel());
@@ -229,7 +249,10 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     );
     final shell = await _prepareWindowsShell();
     _windowsController = controller;
-    await controller.loadUrl(Uri.file(shell.path).toString());
+    final shellUri = Uri.file(
+      shell.path,
+    ).replace(queryParameters: <String, String>{'platform': 'windows'});
+    await controller.loadUrl(shellUri.toString());
   }
 
   Future<void> _initializeFlutterWebView(int generation) async {
@@ -319,7 +342,6 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     final directory = Directory(
       '${temp.path}${Platform.pathSeparator}cuplivo_web_chat_$webChatAssetVersion',
     );
-    await directory.create(recursive: true);
     final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
     final relativeAssets = <String>{
       ..._windowsAssets,
@@ -327,6 +349,15 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         if (asset.startsWith('assets/web_chat/vendor/fonts/'))
           asset.substring('assets/web_chat/'.length),
     };
+    final index = File('${directory.path}${Platform.pathSeparator}index.html');
+    if (await _windowsCacheIsComplete(directory, relativeAssets)) {
+      await _cleanupOldWindowsCaches(directory);
+      return index;
+    }
+    if (await directory.exists()) {
+      await directory.delete(recursive: true);
+    }
+    await directory.create(recursive: true);
     for (final relative in relativeAssets) {
       final data = await rootBundle.load('assets/web_chat/$relative');
       final output = File(
@@ -336,17 +367,76 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       await output.parent.create(recursive: true);
       await output.writeAsBytes(
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-        flush: true,
       );
     }
     final mermaid = await rootBundle.load('assets/mermaid.min.js');
     await File(
-      '${directory.parent.path}${Platform.pathSeparator}mermaid.min.js',
+      '${directory.path}${Platform.pathSeparator}mermaid.min.js',
     ).writeAsBytes(
       mermaid.buffer.asUint8List(mermaid.offsetInBytes, mermaid.lengthInBytes),
-      flush: true,
     );
-    return File('${directory.path}${Platform.pathSeparator}index.html');
+    final marker = File('${directory.path}${Platform.pathSeparator}.complete');
+    final temporaryMarker = File(
+      '${directory.path}${Platform.pathSeparator}.complete.tmp',
+    );
+    await temporaryMarker.writeAsString(webChatAssetVersion, flush: true);
+    await temporaryMarker.rename(marker.path);
+    await _cleanupOldWindowsCaches(directory);
+    return index;
+  }
+
+  Future<bool> _windowsCacheIsComplete(
+    Directory directory,
+    Set<String> relativeAssets,
+  ) async {
+    if (!await directory.exists()) return false;
+    final marker = File('${directory.path}${Platform.pathSeparator}.complete');
+    try {
+      if (!await marker.exists() ||
+          await marker.readAsString() != webChatAssetVersion) {
+        return false;
+      }
+      for (final relative in <String>{...relativeAssets, 'mermaid.min.js'}) {
+        final file = File(
+          '${directory.path}${Platform.pathSeparator}'
+          '${relative.replaceAll('/', Platform.pathSeparator)}',
+        );
+        if (!await file.exists() || await file.length() == 0) return false;
+      }
+      return true;
+    } catch (error) {
+      debugPrint(
+        'WebConversationViewport: Windows cache validation failed '
+        '(${error.runtimeType})',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _cleanupOldWindowsCaches(Directory activeDirectory) async {
+    final parent = activeDirectory.parent;
+    try {
+      await for (final entity in parent.list(followLinks: false)) {
+        if (entity is! Directory || entity.path == activeDirectory.path) {
+          continue;
+        }
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (!name.startsWith('cuplivo_web_chat_')) continue;
+        try {
+          await entity.delete(recursive: true);
+        } catch (error) {
+          debugPrint(
+            'WebConversationViewport: old Windows cache cleanup failed '
+            '(${error.runtimeType})',
+          );
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        'WebConversationViewport: Windows cache scan failed '
+        '(${error.runtimeType})',
+      );
+    }
   }
 
   void _handleBridgeMessage(String raw) {
@@ -371,17 +461,45 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
           _fail(_generation, 'protocol_mismatch');
           return;
         }
+        // `ready` always belongs to a fresh JavaScript document. Re-send even
+        // when Flutter's semantic snapshot has not changed since a reload.
+        _transportGeneration++;
+        _snapshotQueue.clear();
+        _renderCommitTimer?.cancel();
+        _lastSnapshotSignature = null;
         _ready = true;
+        _firstRenderCommitted = false;
         _initializing = false;
         _initializationTimer?.cancel();
         if (mounted) setState(() {});
-        unawaited(
-          _sendSnapshot().whenComplete(() {
-            if (_streamPatchBuffer.hasPending) {
-              _scheduleStreamingPatchFlush();
-            }
-          }),
-        );
+        _enqueueLatestSnapshot();
+        return;
+      case 'renderCommitted':
+        if (!_isAuthorizedBridgeRequest(message)) {
+          debugPrint('WebConversationViewport: rejected render ACK');
+          return;
+        }
+        final revision = (message['renderRevision'] as num?)?.toInt();
+        if (revision == null ||
+            !_snapshotQueue.acknowledge(
+              renderSessionId: _renderSessionId,
+              conversationId: _conversationId,
+              renderRevision: revision,
+            )) {
+          debugPrint('WebConversationViewport: ignored stale render ACK');
+          return;
+        }
+        _renderCommitTimer?.cancel();
+        if (!_firstRenderCommitted) {
+          _firstRenderCommitted = true;
+          if (mounted) setState(() {});
+        }
+        unawaited(_drainSnapshotQueue());
+        scheduleMicrotask(() {
+          if (!_snapshotQueue.hasInFlight && _streamPatchBuffer.hasPending) {
+            _scheduleStreamingPatchFlush();
+          }
+        });
         return;
       case 'action':
         unawaited(_handleAction(message));
@@ -442,42 +560,81 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       return;
     }
     final handle = message['handle']?.toString() ?? '';
-    if (!handle.startsWith('local:') && !handle.startsWith('asset:')) return;
+    if (!handle.startsWith('local:') &&
+        !handle.startsWith('asset:') &&
+        !handle.startsWith('remote:')) {
+      return;
+    }
+    final requestSessionId = _renderSessionId;
+    final requestConversationId = _conversationId;
     try {
       final source = widget.mediaRegistry[handle];
       if (source == null) {
         throw const WebChatProtocolException('unknown media handle');
       }
-      final extension = source.value.toLowerCase().split('.').last;
-      final mime = switch (extension) {
-        'png' => 'image/png',
-        'jpg' || 'jpeg' => 'image/jpeg',
-        'gif' => 'image/gif',
-        'webp' => 'image/webp',
-        'svg' when source.kind == WebChatMediaSourceKind.bundledAsset =>
-          'image/svg+xml',
-        _ => null,
-      };
-      if (mime == null) {
-        throw const WebChatProtocolException('unsupported media type');
+      final _WebChatMediaPayload media;
+      if (source.kind == WebChatMediaSourceKind.remoteImage) {
+        final remote = await WebChatRemoteImageLoader(
+          clientFactory: widget.remoteMediaClientFactory,
+        ).load(source.value);
+        media = _WebChatMediaPayload(mime: remote.mime, bytes: remote.bytes);
+      } else {
+        final extension = source.value.toLowerCase().split('.').last;
+        final mime = switch (extension) {
+          'png' => 'image/png',
+          'jpg' || 'jpeg' => 'image/jpeg',
+          'gif' => 'image/gif',
+          'webp' => 'image/webp',
+          'svg' when source.kind == WebChatMediaSourceKind.bundledAsset =>
+            'image/svg+xml',
+          _ => null,
+        };
+        if (mime == null) {
+          throw const WebChatProtocolException('unsupported media type');
+        }
+        final bytes = switch (source.kind) {
+          WebChatMediaSourceKind.localFile => await _readLocalMedia(
+            source.value,
+          ),
+          WebChatMediaSourceKind.bundledAsset => await _readBundledMedia(
+            source.value,
+          ),
+          WebChatMediaSourceKind.remoteImage => throw StateError(
+            'remote media handled above',
+          ),
+        };
+        media = _WebChatMediaPayload(mime: mime, bytes: bytes);
       }
-      final bytes = switch (source.kind) {
-        WebChatMediaSourceKind.localFile => await _readLocalMedia(source.value),
-        WebChatMediaSourceKind.bundledAsset => await _readBundledMedia(
-          source.value,
-        ),
-      };
+      if (requestSessionId != _renderSessionId ||
+          requestConversationId != _conversationId) {
+        debugPrint('WebConversationViewport: discarded stale media response');
+        return;
+      }
+      final activeSource = widget.mediaRegistry[handle];
+      if (activeSource == null ||
+          activeSource.kind != source.kind ||
+          activeSource.value != source.value) {
+        debugPrint(
+          'WebConversationViewport: discarded inactive media response',
+        );
+        return;
+      }
       final payload = <String, dynamic>{
         'type': 'mediaResult',
-        'renderSessionId': _renderSessionId,
-        'conversationId': _conversationId,
+        'renderSessionId': requestSessionId,
+        'conversationId': requestConversationId,
         'handle': handle,
-        'dataUrl': 'data:$mime;base64,${base64Encode(bytes)}',
+        'dataUrl': 'data:${media.mime};base64,${base64Encode(media.bytes)}',
       };
       for (final chunk in chunkWebChatEnvelope(
         payload: payload,
-        transferId: 'media:$_renderSessionId:${handle.hashCode}',
+        transferId: 'media:$requestSessionId:${handle.hashCode}',
       )) {
+        if (requestSessionId != _renderSessionId ||
+            requestConversationId != _conversationId) {
+          debugPrint('WebConversationViewport: stopped stale media transfer');
+          return;
+        }
         await _sendEnvelope(chunk);
       }
     } catch (error) {
@@ -487,8 +644,14 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         _ => error.runtimeType.toString(),
       };
       debugPrint('WebConversationViewport: media request failed ($detail)');
+      if (requestSessionId != _renderSessionId ||
+          requestConversationId != _conversationId) {
+        return;
+      }
       await _sendEnvelope(<String, dynamic>{
         'type': 'mediaError',
+        'renderSessionId': requestSessionId,
+        'conversationId': requestConversationId,
         'handle': handle,
         'code': detail,
       });
@@ -505,7 +668,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     if (length > 16 * 1024 * 1024) {
       throw const WebChatProtocolException('local media exceeds size limit');
     }
-    return file.readAsBytes();
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 16 * 1024 * 1024) {
+      throw const WebChatProtocolException('local media exceeds size limit');
+    }
+    return bytes;
   }
 
   Future<Uint8List> _readBundledMedia(String path) async {
@@ -526,18 +693,55 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       message['renderSessionId'] == _renderSessionId &&
       message['conversationId'] == _conversationId;
 
-  Future<void> _sendSnapshot() async {
+  void _enqueueLatestSnapshot() {
     if (!_ready) return;
-    final payload = Map<String, dynamic>.of(widget.snapshot)
+    final semantic = Map<String, dynamic>.of(widget.snapshot)
+      ..remove('renderRevision');
+    final signature = jsonEncode(semantic);
+    if (signature == _lastSnapshotSignature) return;
+    _lastSnapshotSignature = signature;
+    final payload = Map<String, dynamic>.of(semantic)
+      ..['renderRevision'] = ++_nextRenderRevision
       ..['capabilityToken'] = _capabilityToken;
-    final transferId =
-        '${widget.snapshot['renderSessionId']}:${widget.snapshot['renderRevision']}';
-    for (final chunk in chunkWebChatEnvelope(
-      payload: payload,
-      transferId: transferId,
-    )) {
-      await _sendEnvelope(chunk);
+    _snapshotQueue.enqueue(payload);
+    unawaited(_drainSnapshotQueue());
+  }
+
+  Future<void> _drainSnapshotQueue() async {
+    if (!_ready || _streamPatchBuffer.inFlight || _snapshotTransferActive) {
+      return;
     }
+    final payload = _snapshotQueue.takeNext();
+    if (payload == null) return;
+    _snapshotTransferActive = true;
+    final transportGeneration = _transportGeneration;
+    final transferId =
+        '${payload['renderSessionId']}:${payload['renderRevision']}';
+    try {
+      for (final chunk in chunkWebChatEnvelope(
+        payload: payload,
+        transferId: transferId,
+      )) {
+        if (!_ready || transportGeneration != _transportGeneration) return;
+        await _sendEnvelope(chunk);
+      }
+    } finally {
+      _snapshotTransferActive = false;
+      if (_ready && transportGeneration != _transportGeneration) {
+        unawaited(_drainSnapshotQueue());
+      }
+    }
+    if (!_ready ||
+        transportGeneration != _transportGeneration ||
+        !_snapshotQueue.hasInFlight) {
+      return;
+    }
+    _renderCommitTimer?.cancel();
+    final generation = _generation;
+    _renderCommitTimer = Timer(_initializationTimeout, () {
+      debugPrint('WebConversationViewport: render commit timed out');
+      _fail(generation, 'render_commit_timeout');
+    });
   }
 
   Future<void> _sendActionResult(
@@ -604,21 +808,26 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   void _syncStreamingListeners() {
     final ids = <String>{
       for (final message in (widget.snapshot['messages'] as List? ?? const []))
-        if (message is Map && message['isStreaming'] == true)
+        if (message is Map &&
+            widget.streamingContentNotifier.hasNotifier(
+              message['id']?.toString() ?? '',
+            ))
           message['id']?.toString() ?? '',
     }..remove('');
     for (final id in _streamListeners.keys.toList()) {
       if (ids.contains(id)) continue;
-      final notifier = widget.streamingContentNotifier.getNotifier(id);
-      notifier.removeListener(_streamListeners.remove(id)!);
+      final binding = _streamListeners.remove(id)!;
+      binding.notifier.removeListener(binding.listener);
       _streamPatchBuffer.remove(id);
     }
     for (final id in ids) {
-      if (_streamListeners.containsKey(id) ||
-          !widget.streamingContentNotifier.hasNotifier(id)) {
-        continue;
-      }
+      if (!widget.streamingContentNotifier.hasNotifier(id)) continue;
       final notifier = widget.streamingContentNotifier.getNotifier(id);
+      final existing = _streamListeners[id];
+      if (existing != null) {
+        if (identical(existing.notifier, notifier)) continue;
+        existing.notifier.removeListener(existing.listener);
+      }
       void listener() {
         final patch = widget.buildStreamingPatch(id, notifier.value);
         if (patch == null) return;
@@ -626,24 +835,27 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         _scheduleStreamingPatchFlush();
       }
 
-      _streamListeners[id] = listener;
+      _streamListeners[id] = _StreamingListenerBinding(
+        notifier: notifier,
+        listener: listener,
+      );
       notifier.addListener(listener);
     }
   }
 
   void _detachStreamingListeners() {
-    for (final entry in _streamListeners.entries) {
-      if (widget.streamingContentNotifier.hasNotifier(entry.key)) {
-        widget.streamingContentNotifier
-            .getNotifier(entry.key)
-            .removeListener(entry.value);
-      }
+    for (final binding in _streamListeners.values) {
+      binding.notifier.removeListener(binding.listener);
     }
     _streamListeners.clear();
   }
 
   void _scheduleStreamingPatchFlush() {
-    if (_streamFlushTimer != null || _streamPatchBuffer.inFlight) return;
+    if (_streamFlushTimer != null ||
+        _streamPatchBuffer.inFlight ||
+        _snapshotQueue.hasInFlight) {
+      return;
+    }
     _streamFlushTimer = Timer(const Duration(milliseconds: 16), () {
       _streamFlushTimer = null;
       unawaited(_flushStreamingPatches());
@@ -651,7 +863,9 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   }
 
   Future<void> _flushStreamingPatches() async {
-    if (!_ready) return;
+    if (!_ready || !_firstRenderCommitted || _snapshotQueue.hasInFlight) {
+      return;
+    }
     final patches = _streamPatchBuffer.takeBatch();
     if (patches == null) return;
     try {
@@ -663,7 +877,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       });
     } finally {
       _streamPatchBuffer.completeBatch();
-      if (_streamPatchBuffer.hasPending) _scheduleStreamingPatchFlush();
+      if (_snapshotQueue.hasPending) {
+        unawaited(_drainSnapshotQueue());
+      } else if (_streamPatchBuffer.hasPending) {
+        _scheduleStreamingPatchFlush();
+      }
     }
   }
 
@@ -680,10 +898,17 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
 
   void _fail(int generation, String code) {
     if (_isStale(generation)) return;
+    _transportGeneration++;
+    _streamFlushTimer?.cancel();
+    _streamFlushTimer = null;
+    _streamPatchBuffer.clear();
     _ready = false;
+    _firstRenderCommitted = false;
     _initializing = false;
     _errorCode = code;
     _initializationTimer?.cancel();
+    _renderCommitTimer?.cancel();
+    _snapshotQueue.clear();
     if (mounted) setState(() {});
   }
 
@@ -691,9 +916,17 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
 
   void _retry() {
     _generation++;
+    _transportGeneration++;
+    _streamFlushTimer?.cancel();
+    _streamFlushTimer = null;
+    _streamPatchBuffer.clear();
     _ready = false;
+    _firstRenderCommitted = false;
     _initializing = false;
     _errorCode = null;
+    _renderCommitTimer?.cancel();
+    _snapshotQueue.clear();
+    _lastSnapshotSignature = null;
     unawaited(_windowsMessageSubscription?.cancel());
     _windowsMessageSubscription = null;
     final windowsController = _windowsController;
@@ -736,7 +969,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         fit: StackFit.expand,
         children: [
           child,
-          if (!_ready)
+          if (!_firstRenderCommitted)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface,
               child: Center(
@@ -846,6 +1079,23 @@ class _ErrorAction extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StreamingListenerBinding {
+  const _StreamingListenerBinding({
+    required this.notifier,
+    required this.listener,
+  });
+
+  final ValueNotifier<StreamingContentData> notifier;
+  final VoidCallback listener;
+}
+
+class _WebChatMediaPayload {
+  const _WebChatMediaPayload({required this.mime, required this.bytes});
+
+  final String mime;
+  final Uint8List bytes;
 }
 
 String _windowsMessageText(dynamic event) {

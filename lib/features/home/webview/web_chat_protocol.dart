@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 
-const int webChatProtocolVersion = 2;
-const String webChatAssetVersion = 'web-chat-v12';
+const int webChatProtocolVersion = 3;
+const String webChatAssetVersion = 'web-chat-v13';
 const int webChatMaxChunkBytes = 128 * 1024;
 const int webChatMaxChunkPayloadBytes = 95 * 1024;
 
@@ -52,6 +52,51 @@ class WebChatStreamingPatchBuffer {
   void clear() {
     _pending.clear();
     _revisions.clear();
+  }
+}
+
+/// Serializes full snapshot delivery until JavaScript acknowledges a committed
+/// render. While one snapshot is in flight, only the newest pending snapshot is
+/// retained.
+class WebChatSnapshotSendQueue {
+  Map<String, dynamic>? _inFlight;
+  Map<String, dynamic>? _pending;
+
+  bool get hasInFlight => _inFlight != null;
+  bool get hasPending => _pending != null;
+  Map<String, dynamic>? get inFlight => _inFlight;
+
+  void enqueue(Map<String, dynamic> snapshot) {
+    _pending = Map<String, dynamic>.of(snapshot);
+  }
+
+  Map<String, dynamic>? takeNext() {
+    if (_inFlight != null || _pending == null) return null;
+    final next = _pending!;
+    _pending = null;
+    _inFlight = next;
+    return next;
+  }
+
+  bool acknowledge({
+    required String renderSessionId,
+    required String conversationId,
+    required int renderRevision,
+  }) {
+    final current = _inFlight;
+    if (current == null ||
+        current['renderSessionId'] != renderSessionId ||
+        current['conversationId'] != conversationId ||
+        current['renderRevision'] != renderRevision) {
+      return false;
+    }
+    _inFlight = null;
+    return true;
+  }
+
+  void clear() {
+    _inFlight = null;
+    _pending = null;
   }
 }
 

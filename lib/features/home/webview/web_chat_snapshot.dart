@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
@@ -11,6 +12,8 @@ import '../../chat/utils/message_visual_content.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import 'web_chat_protocol.dart';
+
+final DateFormat _webChatTimestampFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
 class WebChatSnapshotBuilder {
   const WebChatSnapshotBuilder();
@@ -45,6 +48,10 @@ class WebChatSnapshotBuilder {
     required bool canStartMultiAI,
     required bool autoCollapseThinking,
     Map<String, dynamic>? initialViewportAnchor,
+    String locale = 'en',
+    String textDirection = 'ltr',
+    Map<String, String> remoteMediaHandles = const <String, String>{},
+    Set<String> liveTranslationMessageIds = const <String>{},
   }) {
     final snapshotDisplay = <String, dynamic>{
       ...display,
@@ -61,8 +68,15 @@ class WebChatSnapshotBuilder {
       'conversationId': conversationId,
       'renderRevision': renderRevision,
       'actionEpoch': actionEpoch,
+      'initialViewportMode': initialViewportAnchor == null
+          ? 'bottom'
+          : 'anchor',
       if (initialViewportAnchor != null)
         'initialViewportAnchor': initialViewportAnchor,
+      'locale': locale,
+      'textDirection': textDirection,
+      if (remoteMediaHandles.isNotEmpty)
+        'remoteMediaHandles': remoteMediaHandles,
       'messages': <Map<String, dynamic>>[
         for (var index = 0; index < messages.length; index++)
           _message(
@@ -81,6 +95,9 @@ class WebChatSnapshotBuilder {
             assistant: assistant,
             display: snapshotDisplay,
             autoCollapseThinking: autoCollapseThinking,
+            translationStreaming: liveTranslationMessageIds.contains(
+              messages[index].id,
+            ),
           ),
       ],
       'suggestions': suggestions,
@@ -121,6 +138,7 @@ class WebChatSnapshotBuilder {
     required Assistant? assistant,
     required Map<String, dynamic> display,
     required bool autoCollapseThinking,
+    required bool translationStreaming,
   }) {
     final versions = List<ChatMessage>.of(
       byGroup[message.groupId] ?? <ChatMessage>[message],
@@ -140,6 +158,7 @@ class WebChatSnapshotBuilder {
       'role': message.role,
       'content': visualContent,
       'timestamp': message.timestamp.toIso8601String(),
+      'timestampLabel': _webChatTimestampFormat.format(message.timestamp),
       'modelId': message.modelId,
       'providerId': message.providerId,
       'modelIcon': _modelIconReference(message),
@@ -152,6 +171,7 @@ class WebChatSnapshotBuilder {
       'isStreaming': message.isStreaming,
       'isPreset': message.isPreset,
       'translation': message.translation,
+      'translationStreaming': translationStreaming,
       'reasoning': _reasoning(
         message,
         reasoning,
@@ -169,6 +189,9 @@ class WebChatSnapshotBuilder {
       'tools': (toolParts ?? const <ToolUIPart>[])
           .map((part) => part.toJson())
           .toList(growable: false),
+      'citations': buildWebChatCitationSources(
+        toolParts ?? const <ToolUIPart>[],
+      ),
       'attachments': parseWebChatAttachments(message.content),
       'selected': selected,
       'selecting': selecting,
@@ -357,12 +380,13 @@ List<Map<String, dynamic>> parseWebChatAttachments(String content) {
 String? _safeMediaReference(String? value) {
   final trimmed = value?.trim();
   if (trimmed == null || trimmed.isEmpty) return null;
-  if (trimmed.startsWith('data:') ||
+  final lower = trimmed.toLowerCase();
+  if (lower.startsWith('data:') ||
       trimmed.startsWith('#') ||
-      trimmed.startsWith('https://') ||
-      trimmed.startsWith('http://')) {
+      lower.startsWith('https://')) {
     return trimmed;
   }
+  if (lower.startsWith('http://')) return webChatRemoteMediaHandle(trimmed);
   // Local paths never cross the Web bridge. A later media request must be
   // validated and fulfilled by Dart for this opaque handle.
   return webChatMediaHandle(trimmed);
@@ -374,13 +398,21 @@ String webChatMediaHandle(String path) =>
 String webChatBundledAssetHandle(String assetPath) =>
     'asset:${sha256.convert(utf8.encode(assetPath)).toString()}';
 
-enum WebChatMediaSourceKind { localFile, bundledAsset }
+String webChatRemoteMediaHandle(String url) =>
+    'remote:${sha256.convert(utf8.encode(url)).toString()}';
+
+enum WebChatMediaSourceKind { localFile, bundledAsset, remoteImage }
 
 class WebChatMediaSource {
-  const WebChatMediaSource({required this.kind, required this.value});
+  const WebChatMediaSource({
+    required this.kind,
+    required this.value,
+    this.messageIds = const <String>{},
+  });
 
   final WebChatMediaSourceKind kind;
   final String value;
+  final Set<String> messageIds;
 }
 
 Map<String, dynamic> buildWebChatUserSnapshot({
@@ -405,16 +437,37 @@ Map<String, WebChatMediaSource> buildWebChatMediaRegistry(
   Assistant? assistant,
   String? userAvatarType,
   String? userAvatarValue,
+  Map<String, List<ToolUIPart>> toolParts = const <String, List<ToolUIPart>>{},
 }) {
   final registry = <String, WebChatMediaSource>{};
+  void addRemote(String? url, {String? messageId}) {
+    final value = url?.trim();
+    final lower = value?.toLowerCase();
+    if (value == null ||
+        (!lower!.startsWith('http://') && !lower.startsWith('https://'))) {
+      return;
+    }
+    final handle = webChatRemoteMediaHandle(value);
+    final existing = registry[handle];
+    registry[handle] = WebChatMediaSource(
+      kind: WebChatMediaSourceKind.remoteImage,
+      value: value,
+      messageIds: <String>{
+        ...?existing?.messageIds,
+        if (messageId != null) messageId,
+      },
+    );
+  }
+
   void addFile(String? path) {
     final value = path?.trim();
+    final lower = value?.toLowerCase();
     if (value == null ||
         value.isEmpty ||
-        value.startsWith('data:') ||
+        lower!.startsWith('data:') ||
         value.startsWith('#') ||
-        value.startsWith('http://') ||
-        value.startsWith('https://')) {
+        lower.startsWith('http://') ||
+        lower.startsWith('https://')) {
       return;
     }
     registry[webChatMediaHandle(value)] = WebChatMediaSource(
@@ -439,16 +492,37 @@ Map<String, WebChatMediaSource> buildWebChatMediaRegistry(
 
   final assistantAvatar = assistant?.avatar?.trim();
   if (assistantAvatar != null && _assistantAvatarIsMedia(assistantAvatar)) {
-    if (assistantAvatar.startsWith('assets/icons/')) {
+    final lower = assistantAvatar.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      addRemote(assistantAvatar);
+    } else if (assistantAvatar.startsWith('assets/icons/')) {
       addAsset(assistantAvatar);
     } else {
       addFile(assistantAvatar);
     }
   }
-  addFile(assistant?.background);
-  if (userAvatarType == 'file') addFile(userAvatarValue);
+  final assistantBackground = assistant?.background?.trim();
+  final lowerAssistantBackground = assistantBackground?.toLowerCase();
+  if (lowerAssistantBackground?.startsWith('http://') == true ||
+      lowerAssistantBackground?.startsWith('https://') == true) {
+    addRemote(assistant?.background);
+  } else {
+    addFile(assistant?.background);
+  }
+  if (userAvatarType == 'file') {
+    addFile(userAvatarValue);
+  } else if (userAvatarType == 'url') {
+    addRemote(userAvatarValue);
+  }
   final imagePattern = RegExp(r'\[image:([^\]]+)\]');
   final filePattern = RegExp(r'\[file:([^|\]]+)\|[^\]]*\]');
+  void addRemoteImages(String? content, String messageId) {
+    if (content == null || content.isEmpty) return;
+    for (final url in webChatRemoteImageReferences(content)) {
+      addRemote(url, messageId: messageId);
+    }
+  }
+
   for (final message in messages) {
     addAsset(_modelIconAsset(message));
     for (final match in imagePattern.allMatches(message.content)) {
@@ -457,8 +531,84 @@ Map<String, WebChatMediaSource> buildWebChatMediaRegistry(
     for (final match in filePattern.allMatches(message.content)) {
       addFile(match.group(1));
     }
+    addRemoteImages(message.content, message.id);
+    addRemoteImages(message.translation, message.id);
+    addRemoteImages(message.reasoningText, message.id);
+    for (final part in toolParts[message.id] ?? const <ToolUIPart>[]) {
+      addRemoteImages(part.content, message.id);
+    }
   }
   return registry;
+}
+
+List<Map<String, dynamic>> buildWebChatCitationSources(List<ToolUIPart> parts) {
+  if (parts.isEmpty) return const <Map<String, dynamic>>[];
+  final sources = <Map<String, dynamic>>[];
+  final seen = <String>{};
+  for (var index = parts.length - 1; index >= 0; index--) {
+    final part = parts[index];
+    if ((part.toolName != 'search_web' && part.toolName != 'builtin_search') ||
+        (part.content?.isNotEmpty ?? false) == false) {
+      continue;
+    }
+    try {
+      final decoded = jsonDecode(part.content!);
+      if (decoded is! Map) continue;
+      final items = decoded['items'];
+      if (items is! List) continue;
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final item = raw.map((key, value) => MapEntry(key.toString(), value));
+        final key = (item['id'] ?? item['url'] ?? '').toString();
+        if (key.isNotEmpty && !seen.add(key)) continue;
+        final rawIndex = item['index'];
+        final sourceIndex = rawIndex is num
+            ? rawIndex.toInt()
+            : int.tryParse(rawIndex?.toString() ?? '') ?? sources.length + 1;
+        sources.add(<String, dynamic>{
+          'id': item['id']?.toString(),
+          'index': sourceIndex,
+          'title': (item['title'] ?? '').toString(),
+          'url': (item['url'] ?? '').toString(),
+          'text': (item['text'] ?? item['quote'] ?? item['snippet'] ?? '')
+              .toString(),
+          'sourceName':
+              (item['sourceName'] ??
+                      item['source_name'] ??
+                      item['web_site_name'])
+                  ?.toString(),
+          'webSiteSource': item['webSiteSource']?.toString(),
+          'publishedText': (item['publish_time'] ?? item['publishedText'])
+              ?.toString(),
+          'tags': item['tags'] is List ? item['tags'] : const <dynamic>[],
+        });
+      }
+    } catch (error) {
+      debugPrint(
+        'WebChatSnapshotBuilder: malformed citation payload '
+        '(${error.runtimeType})',
+      );
+    }
+  }
+  return sources;
+}
+
+Iterable<String> webChatRemoteImageReferences(String content) sync* {
+  final seen = <String>{};
+  final patterns = <RegExp>[
+    RegExp(r'\[image:(https?://[^\]]+)\]', caseSensitive: false),
+    RegExp(r'!\[[^\]]*\]\(\s*<?(https?://[^\s>)]+)', caseSensitive: false),
+    RegExp(
+      r'''<img\b[^>]*\bsrc\s*=\s*["'](https?://[^"']+)["']''',
+      caseSensitive: false,
+    ),
+  ];
+  for (final pattern in patterns) {
+    for (final match in pattern.allMatches(content)) {
+      final value = match.group(1)?.trim();
+      if (value != null && value.isNotEmpty && seen.add(value)) yield value;
+    }
+  }
 }
 
 String? _assistantAvatarReference(String? value) {
@@ -482,9 +632,9 @@ String? _assistantAvatarLabel(String? value) {
 }
 
 bool _assistantAvatarIsMedia(String avatar) =>
-    avatar.startsWith('data:') ||
-    avatar.startsWith('http://') ||
-    avatar.startsWith('https://') ||
+    avatar.toLowerCase().startsWith('data:') ||
+    avatar.toLowerCase().startsWith('http://') ||
+    avatar.toLowerCase().startsWith('https://') ||
     avatar.contains('/') ||
     avatar.contains(r'\') ||
     avatar.contains(':');

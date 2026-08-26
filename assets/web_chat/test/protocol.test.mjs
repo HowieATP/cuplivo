@@ -36,6 +36,7 @@ const styleSource = readFileSync(new URL('../styles.css', import.meta.url), 'utf
 const htmlSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const markedSource = readFileSync(new URL('../vendor/marked.min.js', import.meta.url), 'utf8');
 const highlightSource = readFileSync(new URL('../vendor/highlight.min.js', import.meta.url), 'utf8');
+const katexStyleSource = readFileSync(new URL('../vendor/katex.min.css', import.meta.url), 'utf8');
 
 class TestNode {
   constructor(name) {
@@ -84,7 +85,7 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
   let result = null;
   for (const [index, chunk] of chunks.entries()) {
     result = receiveTransferChunk({
-      protocolVersion: 2,
+      protocolVersion: 3,
       transferId: 'utf8-transfer',
       index,
       total: chunks.length,
@@ -95,14 +96,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -154,9 +155,33 @@ test('message patches reject stale stream revisions without breaking legacy patc
   assert.equal(late.messages[0].content, 'final');
 });
 
+test('translation patches preserve completed message content and state', () => {
+  const state = {
+    renderSessionId: 's',
+    conversationId: 'c',
+    messages: [{ id: 'm', content: 'final answer', isStreaming: false }],
+  };
+  const next = reduceEnvelope(state, {
+    type: 'messagePatches',
+    renderSessionId: 's',
+    conversationId: 'c',
+    patches: [{ id: 'm', patchKind: 'translation', translation: '译文' }],
+  });
+
+  assert.equal(next.messages[0].content, 'final answer');
+  assert.equal(next.messages[0].isStreaming, false);
+  assert.equal(next.messages[0].translation, '译文');
+});
+
+test('stream patches can register opaque media without leaking it into messages', () => {
+  assert.match(appSource, /const \{ remoteMediaHandles, \.\.\.messagePatch \} = patch/);
+  assert.match(appSource, /remoteMediaHandles:[\s\S]*?\.\.\.remoteMediaHandles/);
+  assert.match(appSource, /return messagePatch/);
+});
+
 test('same-session streaming snapshots preserve a newer live patch', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 2, assetVersion: 'web-chat-v12',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
   };
@@ -167,6 +192,68 @@ test('same-session streaming snapshots preserve a newer live patch', () => {
   });
   assert.equal(next.messages[0].content, 'new');
   assert.equal(next.messages[0].streamRevision, 7);
+});
+
+test('live translation survives unrelated snapshots until it is finalized', () => {
+  const state = {
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
+    renderSessionId: 's', conversationId: 'c', renderRevision: 2,
+    messages: [{
+      id: 'm', content: 'answer', isStreaming: false,
+      translation: 'new translation', patchKind: 'translation', streamRevision: 4,
+    }],
+  };
+  const whileTranslating = reduceEnvelope(state, {
+    ...state,
+    renderRevision: 3,
+    messages: [{
+      id: 'm', content: 'answer', isStreaming: false,
+      translation: 'Translating…', translationStreaming: true,
+    }],
+  });
+  assert.equal(whileTranslating.messages[0].translation, 'new translation');
+
+  const finalized = reduceEnvelope(whileTranslating, {
+    ...state,
+    renderRevision: 4,
+    messages: [{
+      id: 'm', content: 'answer', isStreaming: false,
+      translation: '', translationStreaming: false,
+    }],
+  });
+  assert.equal(finalized.messages[0].translation, '');
+  assert.equal(finalized.messages[0].patchKind, undefined);
+});
+
+test('heavy Markdown renderers are loaded only when matching content appears', () => {
+  assert.doesNotMatch(htmlSource, /<script[^>]+(?:highlight|katex|auto-render|mermaid)/);
+  assert.doesNotMatch(htmlSource, /<link[^>]+(?:github|katex)/);
+  const imagePolicy = htmlSource.match(/img-src\s+([^;]+)/)?.[1] ?? '';
+  assert.doesNotMatch(imagePolicy, /(?:^|\s)http:(?:\s|$)/);
+  assert.match(appSource, /function loadScriptOnce/);
+  assert.match(appSource, /function loadStyleOnce/);
+  assert.match(appSource, /rendererLoads\.get\(key\)/);
+  assert.match(appSource, /ensureHighlightRenderer/);
+  assert.match(appSource, /ensureMathRenderer/);
+  assert.match(appSource, /ensureMermaidRenderer/);
+  assert.match(appSource, /renderer_resource_failed/);
+  assert.match(appSource, /markdownSourceForRender/);
+  assert.match(appSource, /remoteImagePlaceholder/);
+  assert.doesNotMatch(katexStyleSource, /\.ttf|\.woff\)/);
+});
+
+test('render commit, selection, attachment, and citation bridges stay opaque', () => {
+  assert.match(appSource, /type: 'renderCommitted'/);
+  assert.match(appSource, /role', 'checkbox'/);
+  assert.match(appSource, /aria-checked/);
+  assert.match(appSource, /window\.getSelection\(\)/);
+  assert.match(appSource, /sendAction\('previewImage',[\s\S]*?\{ handle \}/);
+  assert.match(appSource, /sendAction\('openAttachment',[\s\S]*?\{ handle \}/);
+  assert.match(appSource, /sendAction\('openCitation'/);
+  assert.match(appSource, /sendAction\('showCitations'/);
+  assert.match(appSource, /createTreeWalker\(root, NodeFilter\.SHOW_TEXT\)/);
+  assert.match(appSource, /closest\('code, pre, a, button'\)/);
+  assert.doesNotMatch(appSource, /openAttachment[^\n]+reference/);
 });
 
 test('virtual range grows with the viewport rather than total messages', () => {

@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
@@ -36,6 +38,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/chat/external_chat_draft_handoff.dart';
 import '../../../core/services/android_process_text.dart';
+import '../../../core/services/network/dio_http_client.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
@@ -53,8 +56,10 @@ import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../chat/pages/reading_mode_page.dart';
+import '../../chat/pages/image_viewer_page.dart';
 import '../../chat/models/tool_ui_part.dart';
 import '../../chat/utils/message_visual_content.dart';
+import '../../chat/widgets/citation_sources_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -619,9 +624,10 @@ class _HomePageState extends State<HomePage>
   final Set<String> _webMultiAIPromptedConversations = <String>{};
   final WebConversationViewportPort _webViewportPort =
       WebConversationViewportPort();
+  final Map<String, WebChatMediaSource> _webMediaRegistry =
+      <String, WebChatMediaSource>{};
   String? _webRenderConversationId;
   String _webRenderSessionId = '';
-  int _webRenderRevision = 0;
   int _webActionEpoch = 0;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
@@ -715,7 +721,7 @@ class _HomePageState extends State<HomePage>
     final keyboardOpening = nextInset > _lastViewInsetBottom + 0.5;
     _lastViewInsetBottom = nextInset;
     if (!keyboardOpening) return;
-    _controller.scrollCtrl.pinBottomDuringViewportResizeIfNeeded();
+    _controller.pinBottomDuringViewportResizeIfNeeded();
   }
 
   @override
@@ -1497,6 +1503,44 @@ class _HomePageState extends State<HomePage>
       _webViewportPort.activateConversation(conversationId);
       _controller.attachConversationViewportPort(_webViewportPort);
       _ensureWebRenderSession(conversationId);
+      final activeLiveMessageIds = <String>{
+        for (final message in messages)
+          if (_controller.streamingContentNotifier.hasNotifier(message.id))
+            message.id,
+      };
+      final snapshotMediaRegistry = buildWebChatMediaRegistry(
+        messages,
+        assistant: assistant,
+        userAvatarType: user.avatarType,
+        userAvatarValue: user.avatarValue,
+        toolParts: _controller.toolParts,
+      );
+      final retainedLiveMedia = <String, WebChatMediaSource>{
+        for (final entry in _webMediaRegistry.entries)
+          if (entry.value.messageIds.any(activeLiveMessageIds.contains))
+            entry.key: WebChatMediaSource(
+              kind: entry.value.kind,
+              value: entry.value.value,
+              messageIds: entry.value.messageIds
+                  .where(activeLiveMessageIds.contains)
+                  .toSet(),
+            ),
+      };
+      _webMediaRegistry
+        ..clear()
+        ..addAll(snapshotMediaRegistry);
+      for (final entry in retainedLiveMedia.entries) {
+        final current = _webMediaRegistry[entry.key];
+        _webMediaRegistry[entry.key] = WebChatMediaSource(
+          kind: entry.value.kind,
+          value: entry.value.value,
+          messageIds: <String>{
+            ...?current?.messageIds,
+            ...entry.value.messageIds,
+          },
+        );
+      }
+      final mediaRegistry = _webMediaRegistry;
       final snapshot = _buildWebChatSnapshot(
         context: context,
         conversationId: conversationId,
@@ -1511,28 +1555,38 @@ class _HomePageState extends State<HomePage>
         ttsActive: ttsActive,
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
+        activeLiveMessageIds: activeLiveMessageIds,
+        remoteMediaHandles: <String, String>{
+          for (final entry in mediaRegistry.entries)
+            if (entry.value.kind == WebChatMediaSourceKind.remoteImage)
+              entry.value.value: entry.key,
+        },
       );
       return WebConversationViewport(
         key: const ValueKey<String>('web-conversation-viewport'),
         snapshot: snapshot,
-        mediaRegistry: buildWebChatMediaRegistry(
-          messages,
-          assistant: assistant,
-          userAvatarType: user.avatarType,
-          userAvatarValue: user.avatarValue,
-        ),
+        mediaRegistry: mediaRegistry,
         viewportPort: _webViewportPort,
         streamingContentNotifier: _controller.streamingContentNotifier,
-        buildStreamingPatch: (messageId, data) =>
-            _buildWebStreamingPatch(messageId, data, assistant),
-        onAction: (request) =>
-            _handleWebChatAction(request, visibleMessages: messages),
+        buildStreamingPatch: (messageId, data) {
+          final patch = _buildWebStreamingPatch(messageId, data, assistant);
+          if (patch != null) {
+            _registerWebPatchMedia(messageId, patch, mediaRegistry);
+          }
+          return patch;
+        },
+        onAction: (request) => _handleWebChatAction(
+          request,
+          visibleMessages: messages,
+          mediaRegistry: mediaRegistry,
+        ),
         onUseFlutter: () {
           setState(() {
             _webFlutterConversationOverrides.add(conversationId);
           });
         },
         onUserScrollIntent: _controller.scrollCtrl.revealNavButtons,
+        remoteMediaClientFactory: () => _webChatHttpClient(settings),
       );
     }
 
@@ -1642,6 +1696,7 @@ class _HomePageState extends State<HomePage>
     if (!settings.experimentalWebViewRendering) {
       _webFlutterConversationOverrides.clear();
       _webMultiAIPromptedConversations.clear();
+      _webMediaRegistry.clear();
       return false;
     }
     return supportsWebConversationViewport(
@@ -1651,12 +1706,35 @@ class _HomePageState extends State<HomePage>
         !_webFlutterConversationOverrides.contains(conversationId);
   }
 
+  DioHttpClient _webChatHttpClient(SettingsProvider settings) {
+    final host = settings.globalProxyHost.trim();
+    final port = settings.globalProxyPort.trim();
+    if (!settings.globalProxyEnabled || host.isEmpty || port.isEmpty) {
+      return DioHttpClient(forceCloseOnDispose: true);
+    }
+    return DioHttpClient(
+      forceCloseOnDispose: true,
+      proxy: NetworkProxyConfig(
+        enabled: true,
+        type: settings.globalProxyType,
+        host: host,
+        port: int.tryParse(port) ?? 8080,
+        username: settings.globalProxyUsername.trim().isEmpty
+            ? null
+            : settings.globalProxyUsername.trim(),
+        password: settings.globalProxyPassword.isEmpty
+            ? null
+            : settings.globalProxyPassword,
+      ),
+    );
+  }
+
   void _ensureWebRenderSession(String conversationId) {
     if (_webRenderConversationId == conversationId) return;
     _webRenderConversationId = conversationId;
+    _webMediaRegistry.clear();
     _webRenderSessionId =
         '$conversationId:${DateTime.now().microsecondsSinceEpoch}';
-    _webRenderRevision = 0;
     _webActionEpoch++;
   }
 
@@ -1674,6 +1752,8 @@ class _HomePageState extends State<HomePage>
     required bool ttsActive,
     required double topContentPadding,
     required double bottomContentPadding,
+    required Set<String> activeLiveMessageIds,
+    required Map<String, String> remoteMediaHandles,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context).colorScheme;
@@ -1712,7 +1792,8 @@ class _HomePageState extends State<HomePage>
     final snapshot = const WebChatSnapshotBuilder().build(
       renderSessionId: _webRenderSessionId,
       conversationId: conversationId,
-      renderRevision: ++_webRenderRevision,
+      // The viewport assigns a revision only after semantic deduplication.
+      renderRevision: 0,
       actionEpoch: _webActionEpoch,
       messages: messages,
       byGroup: _controller.chatController.groupedMessages,
@@ -1768,6 +1849,7 @@ class _HomePageState extends State<HomePage>
         'skipped': l10n.askUserCardSkipped,
         'previousVersion': l10n.webChatPreviousVersion,
         'nextVersion': l10n.webChatNextVersion,
+        'sources': l10n.chatMessageWidgetSearchResultsTitle,
       },
       theme: <String, String>{
         'surface': _webCssColor(colors.surface),
@@ -1852,6 +1934,16 @@ class _HomePageState extends State<HomePage>
       initialViewportAnchor: _webViewportPort
           .savedAnchorForConversation(conversationId)
           ?.toJson(),
+      locale: Localizations.localeOf(context).toLanguageTag(),
+      textDirection: Directionality.of(context) == TextDirection.rtl
+          ? 'rtl'
+          : 'ltr',
+      remoteMediaHandles: remoteMediaHandles,
+      liveTranslationMessageIds: <String>{
+        for (final message in messages)
+          if (!message.isStreaming && activeLiveMessageIds.contains(message.id))
+            message.id,
+      },
     );
     if (showPresetToggle) {
       snapshot['preset'] = <String, dynamic>{
@@ -1902,6 +1994,14 @@ class _HomePageState extends State<HomePage>
       }
     }
     if (message == null) return null;
+    if (!message.isStreaming) {
+      if (data.translation == null) return null;
+      return <String, dynamic>{
+        'id': messageId,
+        'patchKind': 'translation',
+        'translation': data.translation,
+      };
+    }
     final visual = messageVisualContent(
       message.copyWith(content: data.content),
       assistant: assistant,
@@ -1912,7 +2012,7 @@ class _HomePageState extends State<HomePage>
     return <String, dynamic>{
       'id': messageId,
       'content': visual,
-      'isStreaming': true,
+      'isStreaming': message.isStreaming,
       'tokens': data.totalTokens,
       'reasoning': reasoning,
       'contentSplits': <String, dynamic>{
@@ -1927,6 +2027,35 @@ class _HomePageState extends State<HomePage>
         )!.chainOfThoughtExpandSteps(hiddenStepCount),
       'translation': data.translation,
     };
+  }
+
+  void _registerWebPatchMedia(
+    String messageId,
+    Map<String, dynamic> patch,
+    Map<String, WebChatMediaSource> registry,
+  ) {
+    final content = <String>[
+      if (patch['content'] case final String value) value,
+      if (patch['translation'] case final String value) value,
+      for (final reasoning in patch['reasoning'] as List<dynamic>? ?? const [])
+        if (reasoning is Map && reasoning['text'] is String)
+          reasoning['text'] as String,
+      for (final tool in patch['tools'] as List<dynamic>? ?? const [])
+        if (tool is Map && tool['content'] is String) tool['content'] as String,
+    ];
+    final handles = <String, String>{};
+    for (final text in content) {
+      for (final url in webChatRemoteImageReferences(text)) {
+        final handle = webChatRemoteMediaHandle(url);
+        registry[handle] = WebChatMediaSource(
+          kind: WebChatMediaSourceKind.remoteImage,
+          value: url,
+          messageIds: <String>{...?registry[handle]?.messageIds, messageId},
+        );
+        handles[url] = handle;
+      }
+    }
+    if (handles.isNotEmpty) patch['remoteMediaHandles'] = handles;
   }
 
   List<Map<String, dynamic>> _webStreamingToolParts(String messageId) {
@@ -1995,6 +2124,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _handleWebChatAction(
     WebChatActionRequest request, {
     required List<ChatMessage> visibleMessages,
+    required Map<String, WebChatMediaSource> mediaRegistry,
   }) async {
     final message = request.messageId == null
         ? null
@@ -2103,6 +2233,18 @@ class _HomePageState extends State<HomePage>
           message.groupId ?? message.id,
           versions[next].version,
         );
+        return;
+      case 'previewImage':
+        await _previewWebImage(message, request.payload, mediaRegistry);
+        return;
+      case 'openAttachment':
+        await _openWebAttachment(message, request.payload, mediaRegistry);
+        return;
+      case 'openCitation':
+        await _openWebCitation(message, request.payload);
+        return;
+      case 'showCitations':
+        _showWebCitations(message);
         return;
       case 'setReasoningExpanded':
         final target = WebChatReasoningTarget.fromPayload(request.payload);
@@ -2226,6 +2368,249 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _previewWebImage(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatMediaSource> mediaRegistry,
+  ) async {
+    final handle = payload['handle']?.toString() ?? '';
+    final source = mediaRegistry[handle];
+    if (source == null || source.kind == WebChatMediaSourceKind.bundledAsset) {
+      throw const WebChatProtocolException('image handle is not active');
+    }
+    final imageAttachments = parseWebChatAttachments(
+      message.content,
+    ).where((item) => item['kind'] == 'image').toList(growable: false);
+    final allowed =
+        imageAttachments.any(
+          (item) => _webMediaReferenceMatches(
+            item['reference']?.toString(),
+            handle,
+            source,
+          ),
+        ) ||
+        source.messageIds.contains(message.id);
+    if (!allowed) {
+      throw const WebChatProtocolException('image handle is not in message');
+    }
+    final images = <String>[
+      for (final attachment in imageAttachments)
+        if (_resolveWebMediaValue(
+              attachment['reference']?.toString(),
+              mediaRegistry,
+            )
+            case final value?)
+          value,
+    ];
+    if (!images.contains(source.value)) images.add(source.value);
+    if (!mounted || images.isEmpty) return;
+    final initialIndex = images
+        .indexOf(source.value)
+        .clamp(0, images.length - 1);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ImageViewerPage(images: images, initialIndex: initialIndex),
+      ),
+    );
+  }
+
+  Future<void> _openWebAttachment(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatMediaSource> mediaRegistry,
+  ) async {
+    final handle = payload['handle']?.toString() ?? '';
+    final source = mediaRegistry[handle];
+    if (source == null || source.kind != WebChatMediaSourceKind.localFile) {
+      throw const WebChatProtocolException('file handle is not active');
+    }
+    Map<String, dynamic>? attachment;
+    for (final candidate in parseWebChatAttachments(message.content)) {
+      if (candidate['kind'] == 'file' &&
+          _webMediaReferenceMatches(
+            candidate['reference']?.toString(),
+            handle,
+            source,
+          )) {
+        attachment = candidate;
+        break;
+      }
+    }
+    if (attachment == null) {
+      throw const WebChatProtocolException('file handle is not in message');
+    }
+    final l10n = AppLocalizations.of(context)!;
+    final name = attachment['name']?.toString() ?? '';
+    try {
+      final path = SandboxPathResolver.fix(source.value);
+      final file = File(path);
+      if (!await file.exists()) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetFileNotFound(name),
+          type: NotificationType.error,
+        );
+        return;
+      }
+      final result = await OpenFilex.open(
+        path,
+        type: attachment['mime']?.toString(),
+      );
+      if (result.type != ResultType.done && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenFile(
+            result.message.isNotEmpty ? result.message : result.type.toString(),
+          ),
+          type: NotificationType.error,
+        );
+      }
+    } catch (error) {
+      debugPrint('HomePage: Web attachment open failed ($error)');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenFileError(error.toString()),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  bool _webMediaReferenceMatches(
+    String? reference,
+    String handle,
+    WebChatMediaSource source,
+  ) => reference == handle || reference == source.value;
+
+  String? _resolveWebMediaValue(
+    String? reference,
+    Map<String, WebChatMediaSource> registry,
+  ) {
+    if (reference == null || reference.isEmpty) return null;
+    final direct = registry[reference];
+    if (direct != null) return direct.value;
+    for (final source in registry.values) {
+      if (source.value == reference) return source.value;
+    }
+    if (reference.startsWith('https://')) return reference;
+    return null;
+  }
+
+  Future<void> _openWebCitation(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+  ) async {
+    final citationId = payload['citationId']?.toString() ?? '';
+    final requestedIndex = payload['index']?.toString() ?? '';
+    final sources = buildWebChatCitationSources(
+      _controller.toolParts[message.id] ?? const <ToolUIPart>[],
+    );
+    Map<String, dynamic>? match;
+    for (final source in sources) {
+      if ((source['id']?.toString() ?? '') == citationId) {
+        match = source;
+        break;
+      }
+    }
+    final fallbackIndex = int.tryParse(
+      citationId.isEmpty ? requestedIndex : citationId.trim(),
+    );
+    if (match == null && fallbackIndex != null) {
+      for (final source in sources) {
+        if (source['index']?.toString() == fallbackIndex.toString()) {
+          match = source;
+          break;
+        }
+      }
+    }
+    var url = match?['url']?.toString() ?? '';
+    if (url.isEmpty && (citationId.contains('/') || citationId.contains('.'))) {
+      url = citationId;
+    }
+    if (url.isEmpty) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetCitationNotFound,
+          type: NotificationType.warning,
+        );
+      }
+      return;
+    }
+    await _openWebCitationUrl(url);
+  }
+
+  void _showWebCitations(ChatMessage message) {
+    final items = buildWebChatCitationSources(
+      _controller.toolParts[message.id] ?? const <ToolUIPart>[],
+    );
+    if (items.isEmpty || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final sources = <CitationSourceItem>[
+      for (var index = 0; index < items.length; index++)
+        CitationSourceItem.fromMap(items[index], fallbackIndex: index + 1),
+    ];
+    unawaited(
+      showCitationSourcesBottomSheet(
+        context: context,
+        title: l10n.chatMessageWidgetSearchResultsTitle,
+        closeSemanticLabel: l10n.mcpPageClose,
+        items: sources,
+        onOpen: (item) => unawaited(_openWebCitationUrl(item.url)),
+      ),
+    );
+  }
+
+  Future<void> _openWebCitationUrl(String raw) async {
+    final l10n = AppLocalizations.of(context)!;
+    var value = raw.trim();
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.substring(1, value.length - 1).trim();
+    }
+    if (value.startsWith('//')) {
+      value = 'https:$value';
+    } else if (!RegExp(r'^[A-Za-z][A-Za-z0-9+.-]*:').hasMatch(value)) {
+      value = 'https://$value';
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetOpenLinkError,
+          type: NotificationType.error,
+        );
+      }
+      return;
+    }
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
+          type: NotificationType.error,
+        );
+      }
+    } catch (error) {
+      debugPrint('HomePage: Web citation open failed ($error)');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetOpenLinkError,
+          type: NotificationType.error,
+        );
+      }
+    }
+  }
+
   Future<void> _startWebMultiAI(ChatMessage message) async {
     if (!await _confirmWebMultiAIFallback() || !mounted) return;
     final conversationId =
@@ -2242,11 +2627,6 @@ class _HomePageState extends State<HomePage>
   ) {
     for (final message in visibleMessages) {
       if (message.id == messageId) return message;
-    }
-    for (final versions in _controller.chatController.groupedMessages.values) {
-      for (final message in versions) {
-        if (message.id == messageId) return message;
-      }
     }
     return null;
   }
@@ -2271,6 +2651,10 @@ class _HomePageState extends State<HomePage>
       'select',
       'delete',
       'version',
+      'previewImage',
+      'openAttachment',
+      'openCitation',
+      'showCitations',
     };
     if (common.contains(action)) return true;
     if (action == 'edit' || action == 'resend') return message.role == 'user';

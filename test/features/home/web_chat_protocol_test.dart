@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 
 void main() {
-  test('Web chat uses protocol v2 and bundled assets v12', () {
-    expect(webChatProtocolVersion, 2);
-    expect(webChatAssetVersion, 'web-chat-v12');
+  test('Web chat uses protocol v3 and bundled assets v13', () {
+    expect(webChatProtocolVersion, 3);
+    expect(webChatAssetVersion, 'web-chat-v13');
   });
 
   group('Web streaming patch buffer', () {
@@ -53,6 +53,59 @@ void main() {
       expect(next, hasLength(1));
       expect(next!.single['id'], 'new');
       expect(next.single['streamRevision'], 1);
+    });
+  });
+
+  group('Web snapshot send queue', () {
+    test('keeps one in flight and replaces pending with the latest', () {
+      final queue = WebChatSnapshotSendQueue();
+      queue.enqueue(<String, dynamic>{
+        'renderSessionId': 's',
+        'conversationId': 'c',
+        'renderRevision': 1,
+      });
+      expect(queue.takeNext()?['renderRevision'], 1);
+
+      queue.enqueue(<String, dynamic>{
+        'renderSessionId': 's',
+        'conversationId': 'c',
+        'renderRevision': 2,
+      });
+      queue.enqueue(<String, dynamic>{
+        'renderSessionId': 's',
+        'conversationId': 'c',
+        'renderRevision': 3,
+      });
+      expect(queue.takeNext(), isNull);
+      expect(
+        queue.acknowledge(
+          renderSessionId: 's',
+          conversationId: 'c',
+          renderRevision: 1,
+        ),
+        isTrue,
+      );
+      expect(queue.takeNext()?['renderRevision'], 3);
+    });
+
+    test('ignores stale acknowledgements', () {
+      final queue = WebChatSnapshotSendQueue()
+        ..enqueue(<String, dynamic>{
+          'renderSessionId': 'new',
+          'conversationId': 'c',
+          'renderRevision': 1,
+        });
+      queue.takeNext();
+
+      expect(
+        queue.acknowledge(
+          renderSessionId: 'old',
+          conversationId: 'c',
+          renderRevision: 1,
+        ),
+        isFalse,
+      );
+      expect(queue.hasInFlight, isTrue);
     });
   });
 

@@ -415,7 +415,11 @@ class HomePageController extends ChangeNotifier {
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
-      onStreamTick: () => _activeViewportPort.onStreamTick(),
+      onStreamTick: () {
+        if (_context.read<SettingsProvider>().autoScrollEnabled) {
+          _activeViewportPort.onStreamTick();
+        }
+      },
     );
   }
 
@@ -512,8 +516,8 @@ class HomePageController extends ChangeNotifier {
       }
     };
     _viewModel.onScrollToBottom = () {
-      _scrollCtrl.resetUserScrolling();
-      _scrollCtrl.scrollToBottom(
+      _activeViewportPort.resetUserScrolling();
+      _activeViewportPort.scrollToBottom(
         animate: !_chatController.isCurrentConversationLoading,
       );
     };
@@ -525,12 +529,14 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollCtrl.positionAtBottomOnNextLayout();
+      _activeViewportPort.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
       notifyListeners();
-      _scrollCtrl.stickToBottomAfterGeneration();
+      if (_context.read<SettingsProvider>().autoScrollEnabled) {
+        _activeViewportPort.stickToBottomAfterGeneration();
+      }
     };
     _viewModel.onAssistantMessageFinished = _handleAssistantMessageFinished;
   }
@@ -2638,10 +2644,13 @@ class HomePageController extends ChangeNotifier {
   void scrollToBottom({bool animate = true}) =>
       _scrollToBottom(animate: animate);
   void forceScrollToBottomSoon({bool animate = true}) =>
-      _scrollCtrl.forceScrollToBottomSoon(
+      _activeViewportPort.forceScrollToBottomSoon(
         animate: animate,
         postSwitchDelay: _postSwitchScrollDelay,
       );
+
+  bool pinBottomDuringViewportResizeIfNeeded() =>
+      _activeViewportPort.pinBottomDuringViewportResizeIfNeeded();
 
   bool loadMoreBefore() => _viewModel.loadMoreBefore();
 
@@ -2786,7 +2795,7 @@ class HomePageController extends ChangeNotifier {
   void _scrollToBottom({bool animate = true}) =>
       _activeViewportPort.scrollToBottom(animate: animate);
   void _scrollToBottomSoon({bool animate = true}) =>
-      _scrollCtrl.scrollToBottomSoon(animate: animate);
+      _activeViewportPort.scrollToBottomSoon(animate: animate);
 
   // _getViewportBounds removed: ListObserverController handles visibility.
 

@@ -47,7 +47,56 @@ void main() {
     expect(source, contains('WebChatStreamingPatchBuffer'));
     expect(source, contains('completeBatch()'));
     expect(source, contains('hasPending'));
+    expect(source, contains('_snapshotQueue.hasInFlight'));
+    expect(source, contains('_streamPatchBuffer.inFlight'));
     expect(protocolSource, contains("'streamRevision'"));
+  });
+
+  test(
+    'translation listeners detach from the notifier instance they bound',
+    () {
+      final source = File(
+        'lib/features/home/webview/web_conversation_viewport.dart',
+      ).readAsStringSync();
+      final homeSource = File(
+        'lib/features/home/pages/home_page.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('_StreamingListenerBinding'));
+      expect(
+        source,
+        contains('binding.notifier.removeListener(binding.listener)'),
+      );
+      final detachStart = source.indexOf('void _detachStreamingListeners()');
+      final detachBody = source.substring(detachStart, detachStart + 300);
+      expect(detachBody, isNot(contains('getNotifier')));
+      expect(homeSource, contains("'patchKind': 'translation'"));
+    },
+  );
+
+  test('remote media and message actions stay behind opaque registries', () {
+    final viewportSource = File(
+      'lib/features/home/webview/web_conversation_viewport.dart',
+    ).readAsStringSync();
+    final homeSource = File(
+      'lib/features/home/pages/home_page.dart',
+    ).readAsStringSync();
+
+    expect(viewportSource, contains("handle.startsWith('remote:')"));
+    expect(viewportSource, contains('WebChatRemoteImageLoader'));
+    expect(viewportSource, contains('unknown media handle'));
+    expect(homeSource, contains('remoteMediaClientFactory'));
+    expect(homeSource, contains('NetworkProxyConfig'));
+    expect(homeSource, contains('settings.globalProxyEnabled'));
+    expect(homeSource, contains('forceCloseOnDispose: true'));
+    expect(homeSource, contains('ImageViewerPage'));
+    expect(homeSource, contains('OpenFilex.open'));
+    expect(homeSource, contains('buildWebChatCitationSources'));
+    final targetLookup = homeSource.substring(
+      homeSource.indexOf('ChatMessage? _findWebActionMessage'),
+      homeSource.indexOf('bool _webMessageActionAllowed'),
+    );
+    expect(targetLookup, isNot(contains('groupedMessages')));
   });
 
   test(
@@ -98,6 +147,23 @@ void main() {
       expect(source, contains("'loading': l10n.webChatLoading"));
     },
   );
+
+  test('Windows Web assets reuse only complete versioned caches', () {
+    final source = File(
+      'lib/features/home/webview/web_conversation_viewport.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('.complete'));
+    expect(source, contains('.complete.tmp'));
+    expect(source, contains('_windowsCacheIsComplete'));
+    expect(source, contains('_cleanupOldWindowsCaches'));
+    expect(source, contains("'mermaid.min.js'"));
+    expect(
+      source,
+      contains("queryParameters: <String, String>{'platform': 'windows'}"),
+    );
+    expect(RegExp(r'flush: true').allMatches(source), hasLength(1));
+  });
 
   test(
     'Android WebView cancels compositor fling before the JavaScript lock',

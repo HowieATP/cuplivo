@@ -25,11 +25,16 @@ void main() {
 
       port.scrollToTop(animate: false);
       await port.scrollToMessageId(targetId: 'm3', targetIndex: 3);
+      port.onStreamTick();
       await Future<void>.delayed(Duration.zero);
 
       expect(commands.first['command'], 'top');
       expect(commands.last['command'], 'message');
       expect((commands.last['payload'] as Map)['messageId'], 'm3');
+      expect(
+        commands.where((command) => command['command'] == 'bottom'),
+        isEmpty,
+      );
     },
   );
 
@@ -80,4 +85,29 @@ void main() {
     expect(port.savedAnchorForConversation('conversation-a'), isNotNull);
     expect(port.savedAnchorForConversation('conversation-b'), isNull);
   });
+
+  test(
+    'Web viewport reset and lifecycle commands keep the active tail pinned',
+    () async {
+      final commands = <Map<String, dynamic>>[];
+      final port = WebConversationViewportPort()
+        ..attach((command) async => commands.add(command))
+        ..activateConversation('conversation-a')
+        ..handleUserScrollIntent();
+
+      expect(port.isUserScrolling, isTrue);
+      port
+        ..resetUserScrolling()
+        ..onStreamTick()
+        ..stickToBottomAfterGeneration();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(port.isUserScrolling, isFalse);
+      expect(commands.map((command) => command['command']), contains('bottom'));
+      expect(
+        commands.map((command) => command['command']),
+        contains('holdBottom'),
+      );
+    },
+  );
 }

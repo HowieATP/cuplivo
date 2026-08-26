@@ -22,7 +22,16 @@ abstract interface class ConversationViewportPort {
   bool isNearBottom([double tolerance = 56]);
   bool hasEnoughContentToScroll([double minimumExtent = 56]);
   void handleUserScrollIntent();
+  void resetUserScrolling();
   void onStreamTick();
+  bool pinBottomDuringViewportResizeIfNeeded();
+  void positionAtBottomOnNextLayout();
+  void scrollToBottomSoon({bool animate = true});
+  void forceScrollToBottomSoon({
+    bool animate = true,
+    Duration postSwitchDelay = const Duration(milliseconds: 220),
+  });
+  void stickToBottomAfterGeneration();
   void scrollToTop({bool animate = true});
   void scrollToBottom({bool animate = true});
   Future<void> scrollToMessageId({
@@ -62,7 +71,35 @@ class FlutterConversationViewportPort implements ConversationViewportPort {
   void handleUserScrollIntent() => controller.handleUserScrollIntent();
 
   @override
+  void resetUserScrolling() => controller.resetUserScrolling();
+
+  @override
   void onStreamTick() => controller.autoScrollToBottomIfNeeded();
+
+  @override
+  bool pinBottomDuringViewportResizeIfNeeded() =>
+      controller.pinBottomDuringViewportResizeIfNeeded();
+
+  @override
+  void positionAtBottomOnNextLayout() =>
+      controller.positionAtBottomOnNextLayout();
+
+  @override
+  void scrollToBottomSoon({bool animate = true}) =>
+      controller.scrollToBottomSoon(animate: animate);
+
+  @override
+  void forceScrollToBottomSoon({
+    bool animate = true,
+    Duration postSwitchDelay = const Duration(milliseconds: 220),
+  }) => controller.forceScrollToBottomSoon(
+    animate: animate,
+    postSwitchDelay: postSwitchDelay,
+  );
+
+  @override
+  void stickToBottomAfterGeneration() =>
+      controller.stickToBottomAfterGeneration();
 
   @override
   void scrollToTop({bool animate = true}) =>
@@ -131,23 +168,34 @@ typedef WebViewportCommandSender =
 class WebConversationViewportPort implements ConversationViewportPort {
   WebViewportCommandSender? _sender;
   bool _isUserScrolling = false;
+  bool _followBottom = true;
   double _pixels = 0;
   double _maxExtent = 0;
   ConversationViewportAnchor? _anchor;
   String? _activeConversationId;
   final Map<String, ConversationViewportAnchor> _savedAnchors =
       <String, ConversationViewportAnchor>{};
+  Timer? _deferredBottomTimer;
+  int _deferredBottomRequest = 0;
 
   void attach(WebViewportCommandSender sender) => _sender = sender;
 
   void detach(WebViewportCommandSender sender) {
-    if (identical(_sender, sender)) _sender = null;
+    if (!identical(_sender, sender)) return;
+    _sender = null;
+    _deferredBottomTimer?.cancel();
+    _deferredBottomTimer = null;
+    _deferredBottomRequest++;
   }
 
   void activateConversation(String conversationId) {
     if (_activeConversationId == conversationId) return;
+    _deferredBottomTimer?.cancel();
+    _deferredBottomTimer = null;
+    _deferredBottomRequest++;
     _activeConversationId = conversationId;
     _isUserScrolling = false;
+    _followBottom = _savedAnchors[conversationId] == null;
     _pixels = 0;
     _maxExtent = 0;
     _anchor = _savedAnchors[conversationId];
@@ -182,6 +230,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     _pixels = (metrics['pixels'] as num?)?.toDouble() ?? _pixels;
     _maxExtent = (metrics['maxExtent'] as num?)?.toDouble() ?? _maxExtent;
     _anchor = measuredAnchor;
+    if (!_isUserScrolling && isNearBottom()) _followBottom = true;
   }
 
   Future<void> _command(String command, [Map<String, dynamic>? payload]) async {
@@ -208,28 +257,93 @@ class WebConversationViewportPort implements ConversationViewportPort {
   @override
   void handleUserScrollIntent() {
     _isUserScrolling = true;
+    _followBottom = false;
+  }
+
+  @override
+  void resetUserScrolling() {
+    _isUserScrolling = false;
+    _followBottom = true;
   }
 
   @override
   void onStreamTick() {
-    if (!_isUserScrolling && isNearBottom()) {
+    if (!_isUserScrolling && _followBottom) {
       unawaited(_command('bottom', <String, dynamic>{'animate': false}));
     }
   }
 
   @override
-  void scrollToTop({bool animate = true}) =>
-      unawaited(_command('top', <String, dynamic>{'animate': animate}));
+  bool pinBottomDuringViewportResizeIfNeeded() {
+    if (_isUserScrolling || !isNearBottom(24)) return false;
+    _followBottom = true;
+    unawaited(_command('holdBottom', <String, dynamic>{'durationMs': 300}));
+    return true;
+  }
 
   @override
-  void scrollToBottom({bool animate = true}) =>
-      unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+  void positionAtBottomOnNextLayout() {
+    if (_anchor != null) return;
+    _isUserScrolling = false;
+    _followBottom = true;
+    unawaited(_command('bottom', <String, dynamic>{'animate': false}));
+  }
+
+  @override
+  void scrollToBottomSoon({bool animate = true}) {
+    _followBottom = true;
+    scheduleMicrotask(
+      () =>
+          unawaited(_command('bottom', <String, dynamic>{'animate': animate})),
+    );
+  }
+
+  @override
+  void forceScrollToBottomSoon({
+    bool animate = true,
+    Duration postSwitchDelay = const Duration(milliseconds: 220),
+  }) {
+    resetUserScrolling();
+    final request = ++_deferredBottomRequest;
+    scheduleMicrotask(() {
+      if (request == _deferredBottomRequest) {
+        unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+      }
+    });
+    _deferredBottomTimer?.cancel();
+    _deferredBottomTimer = Timer(postSwitchDelay, () {
+      if (request == _deferredBottomRequest) {
+        unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+      }
+    });
+  }
+
+  @override
+  void stickToBottomAfterGeneration() {
+    if (_isUserScrolling || !_followBottom) return;
+    unawaited(_command('holdBottom', <String, dynamic>{'durationMs': 450}));
+  }
+
+  @override
+  void scrollToTop({bool animate = true}) {
+    _followBottom = false;
+    unawaited(_command('top', <String, dynamic>{'animate': animate}));
+  }
+
+  @override
+  void scrollToBottom({bool animate = true}) {
+    _followBottom = true;
+    unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+  }
 
   @override
   Future<void> scrollToMessageId({
     required String targetId,
     required int targetIndex,
-  }) => _command('message', <String, dynamic>{'messageId': targetId});
+  }) {
+    _followBottom = false;
+    return _command('message', <String, dynamic>{'messageId': targetId});
+  }
 
   @override
   Future<bool> jumpToPreviousQuestion({
@@ -237,6 +351,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     required int Function(String id) indexOfId,
   }) async {
     if (_sender == null) return false;
+    _followBottom = false;
     await _command('previousQuestion');
     return true;
   }
@@ -247,6 +362,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     required int Function(String id) indexOfId,
   }) async {
     if (_sender == null) return false;
+    _followBottom = false;
     await _command('nextQuestion');
     return true;
   }
@@ -257,6 +373,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
   @override
   Future<void> restoreAnchor(ConversationViewportAnchor anchor) {
     _anchor = anchor;
+    _followBottom = false;
     return _command('restoreAnchor', anchor.toJson());
   }
 

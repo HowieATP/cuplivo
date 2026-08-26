@@ -1,6 +1,7 @@
 import 'package:Cuplivo/shared/widgets/incremental_markdown_document.dart';
 import 'package:Cuplivo/shared/widgets/markdown_line_lexer.dart';
 import 'package:Cuplivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Cuplivo/utils/markdown_code_scanner.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String _unmatchedBacktickRuns({int maxRun = 200}) {
@@ -711,7 +712,7 @@ void _expectFenceWhitespace(String indent, {required bool isFence}) {
     reason: 'scanner indent ${indent.codeUnits}',
   );
   expect(
-    FencedCodeBlockMd(streaming: false).exp.matchAsPrefix(probed) != null,
+    markdownCodeScan(probed).segments.isNotEmpty,
     isFence,
     reason: 'renderer indent ${indent.codeUnits}',
   );

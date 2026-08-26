@@ -3611,12 +3611,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
 
   @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳间隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
-
-  @override
   String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
@@ -12201,12 +12195,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
 
   @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳间隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
-
-  @override
   String get mcpServerEditSheetAdvancedLabel => '高级设置';
 
   @override
@@ -20788,12 +20776,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetSseRetryHint => '如果SSE連線失敗，請多試幾次';
-
-  @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳間隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若頻繁遇到 429 (限流) 錯誤，建議延長心跳間隔。';
 
   @override
   String get mcpServerEditSheetAdvancedLabel => '進階設定';

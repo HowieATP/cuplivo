@@ -36,7 +36,22 @@ void main() {
     );
     addTearDown(transport.close);
 
-    transport.send({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'});
+    // Invariants of the redesigned transport: send errors are delivered on
+    // the operation's `done` future — the message stream is only for
+    // server-sent messages — and no late error is pushed onto a closed
+    // broadcast controller.
+    final operation = transport.send({
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'ping',
+    });
+    final errorReceived = Completer<Object>();
+    operation.done.then<void>(
+      (_) {},
+      onError: (Object e, StackTrace _) {
+        if (!errorReceived.isCompleted) errorReceived.complete(e);
+      },
+    );
     await client.requestStarted.future;
 
     // Close the transport while the request is still in flight, then let
@@ -46,6 +61,7 @@ void main() {
     transport.close();
     client.release.complete();
 
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    final err = await errorReceived.future.timeout(const Duration(seconds: 5));
+    expect(err, isA<http.ClientException>());
   });
 }

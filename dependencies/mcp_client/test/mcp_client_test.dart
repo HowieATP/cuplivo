@@ -707,27 +707,5 @@ void main() {
       expect(disconnectEvents.length, equals(1));
       expect(disconnectEvents[0], equals(DisconnectReason.clientDisconnected));
     });
-
-    test('errors on the message stream are handled, not unhandled', () async {
-      mockTransport.queueResponse({
-        'jsonrpc': McpProtocol.jsonRpcVersion,
-        'id': 1,
-        'result': {
-          'protocolVersion': McpProtocol.v2025_03_26,
-          'serverInfo': {'name': 'Mock Server', 'version': '1.0.0'},
-          'capabilities': {},
-        },
-      });
-
-      await client.connect(mockTransport);
-
-      // Transports push errors onto the message stream (e.g. OAuth auth
-      // failures). Without an onError handler on the client's subscription
-      // these become unhandled zone exceptions, failing this test.
-      mockTransport.sendMockError(McpError('auth failure'));
-      mockTransport.sendMockError(StateError('boom'));
-
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    });
   });
 }

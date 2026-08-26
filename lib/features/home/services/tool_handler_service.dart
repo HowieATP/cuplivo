@@ -737,14 +737,13 @@ class ToolHandlerService {
           return localResult;
         }
 
-        // Handoff tools (kelivo_handoff / kelivo_handoff_sync) need chat /
-        // headless providers, so they are dispatched here instead of inside
+        // Handoff tool (kelivo_handoff, sub-agent delegation) needs chat /
+        // generation providers, so it is dispatched here instead of inside
         // LocalToolsService (same precedent as ask_user). The providers are
         // read lazily — only when the tool actually fires — so harnesses
         // without chat/headless providers can still exercise other
         // built-in tools.
-        if (name == LocalToolNames.handoff ||
-            name == LocalToolNames.handoffSync) {
+        if (name == LocalToolNames.handoff) {
           if (assistant == null || !assistant.localToolIds.contains(name)) {
             return _toolError(
               error: 'handoff_disabled',
@@ -753,7 +752,6 @@ class ToolHandlerService {
             );
           }
           return await HandoffToolService.execute(
-            toolName: name,
             args: args,
             assistants: assistantProvider,
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)

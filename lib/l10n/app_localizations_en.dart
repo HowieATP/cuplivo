@@ -6620,18 +6620,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Calendar permission was denied. Enable calendar access in system settings, then toggle the tool again.';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => 'Task Handoff';
+  String get assistantEditLocalToolHandoffTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditLocalToolHandoffSubtitle =>
-      'Delegate a task to another assistant in a new conversation without waiting for the result.';
+      'Hand a task to a delegated sub-agent and wait for its full output; watch progress in the sub-agent panel.';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => 'Sync Handoff';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.';
+  String get assistantEditLocalToolHandoffSyncTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditSkillDownloadTitle => 'Download Skills';
@@ -8041,11 +8037,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetSpeak => 'Speak';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -8054,18 +8045,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get handoffBadgeTooltip => 'Spawned from handoff';
 
   @override
-  String get assistantEditHandoffSectionTitle => 'Handoff / Delegation';
+  String get assistantEditHandoffSectionTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditHandoffDiscoverable =>
-      'Discoverable by other assistants';
+      'Delegateable as a sub-agent by other assistants';
 
   @override
-  String get assistantEditHandoffId => 'Handoff ID';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      'Other assistants can delegate tasks to this assistant via Sub-agent Delegation.';
+
+  @override
+  String get assistantEditHandoffId => 'Delegation ID';
 
   @override
   String get assistantEditHandoffDescription =>
-      'Description for other assistants';
+      'Describe your specialty so other assistants know when to delegate to you.';
 
   @override
   String get assistantEditHandoffIdInvalid =>
@@ -8073,10 +8068,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditHandoffIdUnique =>
-      'This Handoff ID is already in use';
-
-  @override
-  String get handoffForwardChipTooltip => 'Open the spawned conversation';
+      'This Delegation ID is already in use';
 
   @override
   String get handoffBackwardChipTooltip => 'Back to the parent conversation';
@@ -8145,6 +8137,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupChatMyGroupChats => 'My group chats';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sub-agent targets',
+      one: '1 sub-agent target',
+      zero: 'No sub-agent targets available',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count targets',
+      one: '1 target',
+      zero: '0 targets',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      'Sub-agent delegation is on, but no sub-agent targets are available. Enable “Delegateable as a sub-agent” on another assistant first.';
+
+  @override
+  String get subagentGoSetup => 'Set up';
+
+  @override
+  String get subagentTargetListTitle => 'Delegatable assistants';
+
+  @override
+  String get subagentTargetListEmpty => 'No delegatable assistants yet.';
 
   @override
   String get groupChatCreate => 'New group chat';

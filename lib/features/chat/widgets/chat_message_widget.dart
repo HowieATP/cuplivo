@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/services/storage/message_locate_bus.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'dart:ui' as ui;
@@ -4306,15 +4305,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             ),
           );
 
-    // Handoff forward bar
-    final Widget? handoffChip = _buildHandoffForwardChip(context, fg, cs);
-    final Widget? mergedContent = (content != null && handoffChip != null)
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [content, const SizedBox(height: 4), handoffChip],
-          )
-        : handoffChip ?? content;
+    final Widget? mergedContent = content;
 
     final extra = approvalRequest != null
         ? Row(
@@ -4366,63 +4357,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
           : Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
       content: mergedContent,
       contentVisible: mergedContent != null && (!_isAskUser || askUserExpanded),
-    );
-  }
-
-  Widget? _buildHandoffForwardChip(
-    BuildContext context,
-    _ChatSurfaceForegroundPalette fg,
-    ColorScheme cs,
-  ) {
-    // v1 handoff only: its tool event content deterministically contains the
-    // child conversation UUID ("Handoff dispatched. Conversation: …"). The
-    // wait-mode handoff's event content is the child's FULL output — scanning
-    // it for a UUID would navigate to a wrong conversation, so sync cards get
-    // no chip (the 子代理面板's 查看子对话 covers navigation during the wait).
-    if (widget.part.toolName != 'kelivo_handoff' || widget.part.loading) {
-      return null;
-    }
-    final contentRaw = widget.part.content?.trim() ?? '';
-    if (contentRaw.isEmpty) return null;
-
-    // Parse conversation UUID from result "Handoff complete. Conversation: uuid"
-    final uuidMatch = RegExp(r'([a-f0-9\-]{36})').firstMatch(contentRaw);
-    if (uuidMatch == null) return null;
-    final convId = uuidMatch.group(1)!;
-    final prefix = convId.substring(0, 4);
-
-    // Resolve target assistant name from arguments['assistant']
-    final handoffId = (widget.part.arguments['assistant'] ?? '').toString();
-    final assistants = context.read<AssistantProvider>();
-    final target = assistants.assistants.where((a) => a.handoffId == handoffId);
-    final targetName = target.isNotEmpty ? target.first.name : handoffId;
-
-    return IosCardPress(
-      onTap: () =>
-          MessageLocateBus.instance.fire(conversationId: convId, messageId: ''),
-      borderRadius: BorderRadius.circular(999),
-      baseColor: Colors.transparent,
-      pressedScale: 0.97,
-      padding: EdgeInsets.zero,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: cs.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Lucide.ArrowRight, size: 14, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(
-              '$targetName · $prefix',
-              style: TextStyle(fontSize: 12, color: cs.primary),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

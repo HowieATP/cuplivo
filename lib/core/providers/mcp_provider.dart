@@ -531,8 +531,8 @@ class McpProvider extends ChangeNotifier {
   /// - `kelivo_fetch`: replaced by the search-layer `web_fetch` tool.
   /// - `kelivo_filesystem`: filesystem tools moved into per-workspace local
   ///   tools (see WorkspaceToolsService).
-  /// - `kelivo_subagent`: handoff is now the local `kelivo_handoff` /
-  ///   `kelivo_handoff_sync` tools (see HandoffToolService).
+  /// - `kelivo_subagent`: handoff is the single wait-mode local tool
+  ///   `kelivo_handoff` (see HandoffToolService; ADR-0041).
   static bool _isRetiredServer(McpServerConfig server) =>
       server.id == 'kelivo_fetch' ||
       server.id == 'kelivo_filesystem' ||

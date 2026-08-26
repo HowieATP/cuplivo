@@ -162,8 +162,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Task Handoff'), findsOneWidget);
-    expect(find.text('Sync Handoff'), findsOneWidget);
+    expect(find.text('Sub-agent Delegation'), findsOneWidget);
+    expect(find.text('No sub-agent targets available'), findsOneWidget);
   });
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {

@@ -184,12 +184,10 @@ void main() {
   });
 
   Future<String> callTool(
-    String name,
     Map<String, dynamic> args, {
     Assistant? delegatingAssistant,
   }) {
     return HandoffToolService.execute(
-      toolName: name,
       args: args,
       assistants: assistants,
       chatService: chatService,
@@ -204,7 +202,7 @@ void main() {
 
   group('HandoffToolService', () {
     test('rejects an empty task', () async {
-      final result = await callTool(LocalToolNames.handoffSync, {
+      final result = await callTool({
         'assistant': 'research-bot',
         'task': '  ',
       });
@@ -215,7 +213,7 @@ void main() {
     });
 
     test('rejects an empty assistant target', () async {
-      final result = await callTool(LocalToolNames.handoffSync, {
+      final result = await callTool({
         'assistant': '  ',
         'task': 'do the thing',
       });
@@ -224,7 +222,7 @@ void main() {
     });
 
     test('rejects an unknown target and lists available ones', () async {
-      final result = await callTool(LocalToolNames.handoffSync, {
+      final result = await callTool({
         'assistant': 'nope',
         'task': 'do the thing',
       });
@@ -239,7 +237,7 @@ void main() {
       final self = discoverable('self-bot');
       assistants = _FakeAssistantProvider([self, discoverable('research-bot')]);
 
-      final result = await callTool(LocalToolNames.handoffSync, {
+      final result = await callTool({
         'assistant': 'self-bot',
         'task': 'do the thing',
       }, delegatingAssistant: self);
@@ -251,49 +249,32 @@ void main() {
       expect(message, contains('Available: [research-bot].'));
     });
 
-    test(
-      'wait-mode handoff creates the child with the task as first message',
-      () async {
-        final result = await callTool(LocalToolNames.handoffSync, {
-          'assistant': 'research-bot',
-          'task': 'research flutter drift',
-        });
-
-        // In this test env the generation pipeline fails synchronously (the
-        // fake BuildContext throws on the first provider read); failRound
-        // resolves the waiter, so execute returns a subagent_error marker
-        // instead of hanging.
-        final err = decoded(result);
-        expect(err['type'], 'tool_error');
-        expect(err['error'], 'subagent_error');
-
-        // The child conversation got the task as its first user message.
-        final childId = chatService.lastCreatedId;
-        expect(childId, isNotNull);
-        expect(chatService.getMessages(childId!), isNotEmpty);
-        final messages = chatService.getMessages(childId);
-        expect(messages.first.role, 'user');
-        expect(messages.first.content, 'research flutter drift');
-      },
-    );
-
-    test('v1 handoff keeps its prose result shape', () async {
-      final result = await callTool(LocalToolNames.handoff, {
+    test('handoff creates the child with the task as first message', () async {
+      final result = await callTool({
         'assistant': 'research-bot',
-        'task': 'quick task',
+        'task': 'research flutter drift',
       });
-      expect(result, contains('Handoff dispatched. Conversation:'));
+
+      // In this test env the generation pipeline fails synchronously (the
+      // fake BuildContext throws on the first provider read); failRound
+      // resolves the waiter, so execute returns a subagent_error marker
+      // instead of hanging.
+      final err = decoded(result);
+      expect(err['type'], 'tool_error');
+      expect(err['error'], 'subagent_error');
+
+      // The child conversation got the task as its first user message.
       final childId = chatService.lastCreatedId;
       expect(childId, isNotNull);
-      expect(
-        chatService.messagesByConversation[childId]!.first.content,
-        'quick task',
-      );
+      expect(chatService.getMessages(childId!), isNotEmpty);
+      final messages = chatService.getMessages(childId);
+      expect(messages.first.role, 'user');
+      expect(messages.first.content, 'research flutter drift');
     });
 
-    test('wait-mode waiter resolves with an error when generation fails before '
-        'starting — never hangs', () async {
-      final result = await callTool(LocalToolNames.handoffSync, {
+    test('waiter resolves with an error when generation fails before starting '
+        '— never hangs', () async {
+      final result = await callTool({
         'assistant': 'research-bot',
         'task': 'research flutter drift',
       });
@@ -363,7 +344,6 @@ void main() {
       final context = tester.element(find.byType(SizedBox));
 
       final future = HandoffToolService.execute(
-        toolName: LocalToolNames.handoffSync,
         args: {'assistant': 'research-bot', 'task': 'research flutter drift'},
         assistants: assistants,
         chatService: chatService,

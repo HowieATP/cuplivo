@@ -18,7 +18,6 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
-import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
@@ -1955,8 +1954,7 @@ class _HomePageState extends State<HomePage>
     final pk = modelIds.providerKey;
     final mid = modelIds.modelId;
     final supportsReasoning = pk != null && mid != null;
-    final toolsGate =
-        supportsReasoning && _toolsHubAvailable(settings, a, pk, mid);
+    final toolsGate = _toolsHubAvailable(pk, mid);
     final quickPhraseGate = _hasQuickPhrases(a);
     await showModalBottomSheet(
       context: context,
@@ -2043,18 +2041,9 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  bool _toolsHubAvailable(
-    SettingsProvider settings,
-    Assistant? a,
-    String? pk,
-    String? mid,
-  ) {
+  bool _toolsHubAvailable(String? pk, String? mid) {
     if (pk == null || mid == null) return false;
-    if (!_controller.isToolModel(pk, mid)) return false;
-    final hasEnabledMcp = context.read<McpProvider>().hasAnyEnabled;
-    final hasLocalTools = a?.localToolIds.isNotEmpty ?? false;
-    final workspaceOn = a?.workspaceEnabled ?? false;
-    return hasEnabledMcp || hasLocalTools || workspaceOn;
+    return _controller.isToolModel(pk, mid);
   }
 
   bool _hasQuickPhrases(Assistant? a) {

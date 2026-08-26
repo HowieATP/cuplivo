@@ -45,6 +45,7 @@ class _FakeChatService extends ChatService {
     int? version,
     bool isPreset = false,
     String? speakerAssistantId,
+    String? quoteJson,
   }) async {
     final message = ChatMessage(
       id: 'msg-${_nextMessageId++}',

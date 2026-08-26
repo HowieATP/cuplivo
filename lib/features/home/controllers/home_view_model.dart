@@ -590,6 +590,7 @@ class HomeViewModel extends ChangeNotifier {
       documents: List<DocumentAttachment>.of(input.documents),
       allowImagesApiRouting: input.allowImagesApiRouting,
       extraBody: Map<String, dynamic>.of(input.extraBody),
+      quote: input.quote,
     );
   }
 

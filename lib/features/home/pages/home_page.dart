@@ -1529,6 +1529,9 @@ class _HomePageState extends State<HomePage>
       onSpeakMessage: (message) => _controller.speakMessage(message),
       onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
       onQuoteSelection: (text) => _controller.insertQuote(text),
+      onReplyMessage: (message) => _controller.startReplyTo(message),
+      onReplySelectionMessage: (message, selected) =>
+          _controller.startReplyToSelection(message, selected),
       onRecoveredAskUserAnswer: (message, part, result) =>
           _controller.submitRecoveredAskUserAnswer(message, part, result),
       onToggleSelection: (messageId, selected) {

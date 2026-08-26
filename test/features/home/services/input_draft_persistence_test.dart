@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/models/chat_input_data.dart';
+import 'package:Cuplivo/core/models/message_quote.dart';
 import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
 
 void main() {
@@ -191,6 +192,61 @@ void main() {
       final draft = service.takeDraftForRestore();
       expect(draft?.text, '');
       expect(draft?.imagePaths, isEmpty);
+    });
+
+    test('pending reply quote rides the draft blob round-trip', () async {
+      final service = buildService();
+      service.save(
+        ChatInputData(
+          text: 'reply text',
+          quote: const MessageQuote(id: 'msg-9', start: 2, end: 7),
+          quoteSnippet: 'some snippet…',
+        ),
+      );
+      await Future<void>.delayed(
+        InputDraftPersistence.debounceDuration +
+            const Duration(milliseconds: 100),
+      );
+      final decoded =
+          jsonDecode(prefs.getString(InputDraftPersistence.key)!)
+              as Map<String, dynamic>;
+      expect(decoded['quote'], {'id': 'msg-9', 'start': 2, 'end': 7});
+      expect(decoded['quoteSnippet'], 'some snippet…');
+
+      final restored = buildService().takeDraftForRestore();
+      expect(restored?.text, 'reply text');
+      expect(restored?.quote?.id, 'msg-9');
+      expect(restored?.quote?.start, 2);
+      expect(restored?.quoteSnippet, 'some snippet…');
+    });
+
+    test(
+      'malformed quote field degrades to null, draft still restores',
+      () async {
+        prefs.setString(
+          InputDraftPersistence.key,
+          jsonEncode({'text': 'x', 'quote': 'bad'}).toString(),
+        );
+        final service = buildService();
+        final draft = service.takeDraftForRestore();
+        expect(draft?.text, 'x');
+        expect(draft?.quote, isNull);
+      },
+    );
+
+    test('quote-only draft is not considered empty', () async {
+      final service = buildService();
+      service.save(
+        ChatInputData(
+          text: '',
+          quote: const MessageQuote(id: 'msg-1'),
+        ),
+      );
+      await Future<void>.delayed(
+        InputDraftPersistence.debounceDuration +
+            const Duration(milliseconds: 100),
+      );
+      expect(prefs.getString(InputDraftPersistence.key), isNotNull);
     });
   });
 

@@ -76,6 +76,25 @@ class RestoreProgress {
 /// that do not surface progress (backup page/pane, S3, BackupProvider).
 typedef RestoreProgressCallback = void Function(RestoreProgress progress);
 
+/// Stage of a backup build/upload in progress, for UI progress display.
+enum BackupStage {
+  /// Building the intermediate files (settings.json / chats.json /
+  /// deleted.json) on the main isolate.
+  generating,
+
+  /// ZIP packing inside the isolate (`_packZipSync` — indeterminate).
+  packing,
+
+  /// Uploading the finished staging ZIP (WebDAV PUT / S3 PUT). Local
+  /// `exportToFile` never enters this stage — delivery is the user's own
+  /// save dialog.
+  uploading,
+}
+
+/// Optional stage callback threaded through a backup. Null for callers that
+/// do not surface progress (LAN sync, tests).
+typedef BackupStageCallback = void Function(BackupStage stage);
+
 class DataSync {
   final ChatService chatService;
   final Future<Set<String>> Function(String type)? _localIdResolver;
@@ -226,7 +245,9 @@ class DataSync {
   Future<File> prepareBackupFile(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
+    BackupStageCallback? onStage,
   }) async {
+    onStage?.call(BackupStage.generating);
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
     final now = DateTime.now();
@@ -291,6 +312,7 @@ class DataSync {
           : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      onStage?.call(BackupStage.packing);
       final packSince = incremental?.since;
       final packIncludeFilePaths = incremental?.includeFilePaths;
       await Isolate.run(() {
@@ -558,39 +580,34 @@ class DataSync {
   }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
-    final entries = dir.listSync(recursive: true, followLinks: false);
-    for (final ent in entries) {
-      if (ent is File) {
-        final rel = p.relative(ent.path, from: srcDirPath);
-        // ZIP entries must use forward slashes regardless of platform
-        final relPosix = rel.replaceAll('\\', '/');
-        if (skipDotEntries &&
-            relPosix.split('/').any((s) => s.startsWith('.'))) {
-          continue;
+    // Pruned depth-first walk (dot dirs are never descended into; ZIP entry
+    // names use forward slashes because _listFiles returns POSIX paths).
+    // Output set is identical to the old full-recursive walk + per-file dot
+    // filter — only traversal work differs.
+    for (final ent in _listFiles(dir, skipDot: skipDotEntries)) {
+      final relPosix = ent.rel;
+      final entryName = '$zipPrefix/$relPosix';
+      if (includeFilePaths != null) {
+        if (!includeFilePaths.contains(entryName)) continue;
+      } else if (since != null) {
+        try {
+          if (ent.file.lastModifiedSync().isBefore(since)) continue;
+        } catch (_) {
+          // Cannot read modification time — include conservatively
         }
-        final entryName = '$zipPrefix/$relPosix';
-        if (includeFilePaths != null) {
-          if (!includeFilePaths.contains(entryName)) continue;
-        } else if (since != null) {
-          try {
-            if (ent.lastModifiedSync().isBefore(since)) continue;
-          } catch (_) {
-            // Cannot read modification time — include conservatively
-          }
-        }
-        if (manifestOut != null) {
-          try {
-            final stat = ent.statSync();
-            manifestOut[entryName] = (
-              size: stat.size,
-              mtimeMs: stat.modified.millisecondsSinceEpoch,
-            );
-          } catch (_) {
-            // Cannot stat — the pack call below surfaces a real error later.
-          }
-        }
-        _addFileToZip(writer, ent.path, entryName);
       }
+      if (manifestOut != null) {
+        try {
+          final stat = ent.file.statSync();
+          manifestOut[entryName] = (
+            size: stat.size,
+            mtimeMs: stat.modified.millisecondsSinceEpoch,
+          );
+        } catch (_) {
+          // Cannot stat — the pack call below surfaces a real error later.
+        }
+      }
+      _addFileToZip(writer, ent.file.path, entryName);
     }
   }
 
@@ -598,28 +615,43 @@ class DataSync {
     return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
   }
 
-  /// Lists the files of [dir] with their root-relative POSIX paths.
+  /// Lists the files of [dir] depth-first in name-sorted order, with their
+  /// root-relative POSIX paths.
   ///
   /// Mirrors the dot-entry rule of [_addDirectoryToZip]: when [skipDot] is
-  /// set, any relative path with a dot-prefixed segment is excluded. Returns
-  /// empty when the directory does not exist.
+  /// set, any entry whose name starts with `.` is pruned at walk time — dot
+  /// DIRECTORIES are never descended into, so `.sandbox`-style trees are not
+  /// traversed at all. The output set is identical to a full-recursive walk
+  /// with a per-file dot filter; only the traversal work differs. Symlinks
+  /// are never followed. Returns empty when the directory does not exist.
   static List<({File file, String rel})> _listFiles(
     Directory dir, {
     bool skipDot = false,
   }) {
     if (!dir.existsSync()) return const [];
     final out = <({File file, String rel})>[];
-    for (final ent in dir.listSync(recursive: true, followLinks: false)) {
-      if (ent is File) {
-        final rel = p.relative(ent.path, from: dir.path);
-        if (skipDot &&
-            rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-          continue;
-        }
+    _listFilesInto(dir, '', skipDot, out);
+    return out;
+  }
+
+  static void _listFilesInto(
+    Directory dir,
+    String prefix,
+    bool skipDot,
+    List<({File file, String rel})> out,
+  ) {
+    final children = dir.listSync(recursive: false, followLinks: false)
+      ..sort((a, b) => a.path.compareTo(b.path));
+    for (final ent in children) {
+      final name = p.basename(ent.path);
+      if (skipDot && name.startsWith('.')) continue;
+      final rel = prefix.isEmpty ? name : '$prefix/$name';
+      if (ent is Directory) {
+        _listFilesInto(ent, rel, skipDot, out);
+      } else if (ent is File) {
         out.add((file: ent, rel: rel));
       }
     }
-    return out;
   }
 
   /// Sets [target]'s mtime, preferring the LAN-sync manifest's ms precision
@@ -837,9 +869,15 @@ class DataSync {
   Future<void> backupToWebDav(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
+    BackupStageCallback? onStage,
   }) async {
-    final file = await prepareBackupFile(cfg, incremental: incremental);
+    final file = await prepareBackupFile(
+      cfg,
+      incremental: incremental,
+      onStage: onStage,
+    );
     try {
+      onStage?.call(BackupStage.uploading);
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
       final fileLen = await file.length();
@@ -1041,7 +1079,8 @@ class DataSync {
   Future<File> exportToFile(
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
-  }) => prepareBackupFile(cfg, incremental: incremental);
+    BackupStageCallback? onStage,
+  }) => prepareBackupFile(cfg, incremental: incremental, onStage: onStage);
 
   Future<void> restoreFromLocalFile(
     File file,
@@ -1274,23 +1313,19 @@ class DataSync {
     Future<void> countDir(Directory dir, {required bool skipDot}) async {
       if (!await dir.exists()) return;
       try {
-        await for (final ent in dir.list(recursive: true, followLinks: false)) {
-          if (ent is! File) continue;
-          if (skipDot) {
-            final rel = p.relative(ent.path, from: dir.path);
-            if (rel.split(RegExp(r'[\\/]')).any((s) => s.startsWith('.'))) {
-              continue;
-            }
-          }
+        // Pruned walk with the same dot rule as the pack: dot dirs (e.g.
+        // .sandbox rootfs) are never descended into, so the preview matches
+        // the actual zip payload without paying for a full traversal.
+        for (final ent in _listFiles(dir, skipDot: skipDot)) {
           try {
-            final mod = await ent.lastModified();
+            final mod = await ent.file.lastModified();
             if (mod.isBefore(since)) continue;
           } catch (_) {
             // Cannot read modification time — include conservatively
           }
           fileCount++;
           try {
-            totalBytes += await ent.length();
+            totalBytes += await ent.file.length();
           } catch (_) {
             // Cannot read size — counted with unknown size
           }
@@ -1338,16 +1373,9 @@ class DataSync {
       // A tree that has never been created is legitimately empty — skip it.
       // Any other failure while listing/stat-ing throws (strict manifest).
       if (!await Directory(dirPath).exists()) return;
-      await for (final ent in Directory(
-        dirPath,
-      ).list(recursive: true, followLinks: false)) {
-        if (ent is! File) continue;
-        final rel = p.relative(ent.path, from: dirPath).replaceAll('\\', '/');
-        if (skipDot && rel.split('/').any((s) => s.startsWith('.'))) {
-          continue;
-        }
-        final stat = await ent.stat();
-        result['$zipPrefix/$rel'] = FileManifestEntry(
+      for (final ent in _listFiles(Directory(dirPath), skipDot: skipDot)) {
+        final stat = await ent.file.stat();
+        result['$zipPrefix/${ent.rel}'] = FileManifestEntry(
           size: stat.size,
           mtimeMs: stat.modified.millisecondsSinceEpoch,
         );

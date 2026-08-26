@@ -92,13 +92,17 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> backup() async {
+  Future<bool> backup({BackupStageCallback? onStage}) async {
     _busy = true;
     _message = null;
     notifyListeners();
     File? file;
     try {
-      file = await _dataSync.prepareBackupFile(_scopeAsWebdavConfig());
+      file = await _dataSync.prepareBackupFile(
+        _scopeAsWebdavConfig(),
+        onStage: onStage,
+      );
+      onStage?.call(BackupStage.uploading);
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';
       // Use file-stream upload to avoid loading entire ZIP into memory.
@@ -119,7 +123,10 @@ class S3BackupProvider extends ChangeNotifier {
     IncrementalBackupConfig config,
   ) => _dataSync.analyzeIncrementalScope(config);
 
-  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
+  Future<bool> incrementalBackup(
+    IncrementalBackupConfig config, {
+    BackupStageCallback? onStage,
+  }) async {
     _busy = true;
     _message = null;
     notifyListeners();
@@ -128,7 +135,9 @@ class S3BackupProvider extends ChangeNotifier {
       file = await _dataSync.prepareBackupFile(
         _scopeAsWebdavConfig(),
         incremental: config,
+        onStage: onStage,
       );
+      onStage?.call(BackupStage.uploading);
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';
       await _client.uploadFile(_cfg, key: key, file: file);

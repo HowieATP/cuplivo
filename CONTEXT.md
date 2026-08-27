@@ -740,6 +740,15 @@
 
 - "显示公式" / "display formula" was used in issue #218 to mean block-level math as opposed to inline — resolved: the domain term is **Display math** (block-level TeX forms `$$...$$` and `\[...\]`); "inline math" is the flow-level counterpart.
 
+## Markdown Code Recognition (Markdown 代码识别)
+
+- **Code span (行内代码)**: a pair of equal-length backtick runs on one logical line. The opener run must NOT be preceded by an odd number of backslashes (the app's escape convention: `\`code\`` stays literal prose); the closer is the next equal-length run even when immediately preceded by a backslash (issue #544: `` `D:\ComfyUI\` `` renders chip `D:\ComfyUI\` — CommonMark: no escapes inside code spans). Content is normalized for display: CR/LF→space, one leading+trailing space peeled when both ends are spaces (CommonMark 6.1). Backslashes inside stay literal. Multi-line spans are NOT supported (documented deviation).
+- **Fence (围栏)**: `` ``` ``/`~~~` runs ≥3 after arbitrary horizontal indent (app widens CommonMark's 0-3 spaces — LLM-indented fences); closer = same marker, run ≥ opener, horizontal whitespace only — an info-string closer (` ``` not-a-closer`) never closes. Unclosed fences at text end are streaming interrupts (`closed=false`). Quote fences (`^[ \t]*>...`) and list fences (`^[ \t]*(?:[*+-]|\d+\.)[ \t]+` + backtick run, info without whitespace or backticks) are app extensions ported from the legacy preprocessor. The "}```" **inline closing** extension (a line merely ENDING with a run ≥ opener after non-backtick content closes the fence) is in-fence only — it never OPENS a fence from prose (the legacy rewrite could).
+- **One rule set**: `lib/utils/markdown_code_scanner.dart` (`markdownCodeScan`, `markdownCodePairInline`, `markdownCodeFenceMark`, `markdownCodeSpanNormalize`). Consumers: render tokenizer, details-walker hiding, display-math scanner fencing, lexer fence state, chat API image skip. See `docs/adr/0042-markdown-code-scanner.md`.
+- **Detail-walker hiding is one step wider**: the walker pairs runs with `escapeSensitive: false` so `\`<details>`-style prose never becomes a details card.
+- **Render tokens**: `_preprocessFences` replaces code regions with opaque `\uE020C|F<id>-<len>-<hash>\uE021` tokens; `FencedCodeTokenMd`/`InlineCodeTokenMd` resolve via `MarkdownCodeRegistry` shipped with the cached payload. The hash makes token equality imply content equality (refresh on stream growth).
+- **Parallel consumers of raw backtick walks are unified**: `chat_api_service` image-skip no longer duplicates the fence/spans walk (bug fix: it now honors ≥-run closers, indents, quote/list fences); the old `__CODE_MASK_n__`, `_codeDollarMask`, blockquote-marker (`\uE000/\uE001`) and `_fencedHtmlTagStartMask` (`\uE002`) machinery is deleted (tokens hide content from every later rewrite, including the `<details>` walker).
+
 ## Mini Map Search (迷你地图搜索)
 
 - **Model**: filter-navigation (过滤导航) — 搜索是地图的定位工具，不是结果列表。输入关键词 → 消息级命中行（单消息一行，hit-centered 片段 + 高亮），点击跳转原消息；清空 → 恢复 Q/A 对鸟瞰图。

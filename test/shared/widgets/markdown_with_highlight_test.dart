@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:Cuplivo/shared/widgets/markdown_line_lexer.dart';
+import 'package:Cuplivo/utils/markdown_code_scanner.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:Cuplivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Cuplivo/shared/widgets/markdown_with_highlight.dart';
@@ -2611,12 +2612,14 @@ $$
       final spans = _resolvedTextSpansFromRichText(tester);
       final plainText = spans.map((span) => span.text).join();
 
-      expect(
-        plainText,
-        contains(
-          r'*literal* and **strong** and `code` and [label](https://example.com)',
-        ),
-      );
+      // Backslashes escape delimiters outside code: \* and \[label\] render
+      // as literal punctuation.
+      expect(plainText, contains(r'*literal* and **strong** and '));
+      expect(plainText, contains(' and [label](https://example.com)'));
+      // Inside a code span there is no escape: the closer stays a closer even
+      // when preceded by a backslash (#544 rule), so `code\` is one chip whose
+      // content keeps the backslash.
+      expect(find.textContaining(r'code\', findRichText: true), findsWidgets);
       expect(
         spans.where(
           (span) =>
@@ -4957,6 +4960,10 @@ $$
           .join('\n');
       expect(find.byType(GptMarkdown), findsWidgets);
       expect(data, isNot(contains('\uE002')));
+      // Code spans are tokenized before parsing: the source text's visible
+      // content reaches the renderer through the registry, so the GptMarkdown
+      // data contains a token, never the raw text.
+      expect(data, isNot(contains(visible)));
       final details = find.byWidgetPredicate(
         (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
       );
@@ -4965,8 +4972,6 @@ $$
         expect(find.textContaining(visible, findRichText: true), findsNothing);
         await tester.tap(find.text('s'));
         await tester.pumpAndSettle();
-      } else {
-        expect(data, contains(visible));
       }
       expect(find.textContaining(visible, findRichText: true), findsWidgets);
     }
@@ -5001,27 +5006,93 @@ $$
     await tester.pumpWidget(_markdownHarness('Use `a \uE002 b` now'));
     await tester.pump();
     expect(find.text('a \uE002 b'), findsWidgets);
-    expect(
-      tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data,
-      contains('\uE002'),
-    );
+    final tokenized = tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data;
+    // The code span is tokenized before parsing: the private marker is no
+    // longer baked into the text; the content lives in the registry.
+    expect(tokenized, contains('\uE020'));
+    expect(tokenized, isNot(contains('\uE002')));
   });
 
-  test('FencedCodeBlockMd does not close on an info-string fence line', () {
-    for (final item in const [
-      ('```', '```', '```dart\na\n``` not-a-closer\nfollowing\n```'),
-      ('~~~', '~~~', '~~~\na\n~~~ not-a-closer\nfollowing\n~~~'),
-      ('````', '````', '````dart\na\n```` not-a-closer\nfollowing\n````'),
-      ('~~~~', '~~~~', '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~'),
-      ('````', '```', '````dart\na\n``` not-a-closer\nfollowing\n````'),
-    ]) {
-      final match = FencedCodeBlockMd(streaming: false).exp.firstMatch(item.$3);
-      expect(match, isNotNull, reason: item.$3);
-      expect(match!.group(0), item.$3, reason: item.$3);
-      expect(match.group(4), contains('not-a-closer'), reason: item.$3);
-      expect(match.group(4), contains('following'), reason: item.$3);
-    }
-  });
+  testWidgets(
+    'issue #544: windows paths with trailing backslashes stay one code chip',
+    (tester) async {
+      const source =
+          '包）：`D:\\ComfyUI\\` 为环境层（含 `python_embedded`、'
+          '`run_nvidia_gpu.bat`），模型路径：`D:\\ComfyUI\\ComfyUI\\models\\...`。';
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+
+      expect(
+        find.textContaining(r'D:\ComfyUI\', findRichText: true),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining('python_embedded', findRichText: true),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining('run_nvidia_gpu.bat', findRichText: true),
+        findsWidgets,
+      );
+      // The sentence fragment must not be swallowed into the chip.
+      expect(find.textContaining('为环境层（含', findRichText: true), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'indented powershell fence with trailing-backslash path renders no extra line',
+    (tester) async {
+      const source = r'''1. **PowerShell / CMD 中的命令**  
+   当你给某个命令传入路径参数，但该命令期望的是**文件**路径，而你给的是**文件夹**路径时，系统会提示这个。  
+   例如：
+   ```powershell
+   Get-Content D:\ComfyUI\    # Get-Content 期望文件，但你给了目录
+   ```
+   或者有些工具会检查路径类型后输出 `"D:\ComfyUI\" is a dir`。
+
+2. **脚本 / 程序的参数校验**  
+   某个脚本或程序（比如 ComfyUI 相关的安装/启动脚本）在运行前检查 `D:\ComfyUI\` 路径，发现它确实是一个存在的目录，于是告诉你这个信息。''';
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+
+      final codeText = tester
+          .widgetList<SelectableText>(
+            find.descendant(
+              of: find.byType(SelectableHighlightView),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '')
+          .join('\n');
+
+      expect(codeText, contains(r'Get-Content D:\ComfyUI\'));
+      // The rendered code text must end at the code line: the indented
+      // full-line closer must not leak its indent into the content.
+      expect(codeText, endsWith('目录'), reason: 'code text: $codeText');
+      expect(codeText, isNot(endsWith('\n')), reason: 'code text: $codeText');
+    },
+  );
+
+  test(
+    'FencedCodeTokenMd keeps an info-string fence line inside the block',
+    () {
+      for (final source in const [
+        '```dart\na\n``` not-a-closer\nfollowing\n```',
+        '~~~\na\n~~~ not-a-closer\nfollowing\n~~~',
+        '````dart\na\n```` not-a-closer\nfollowing\n````',
+        '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~',
+        '````dart\na\n``` not-a-closer\nfollowing\n````',
+      ]) {
+        final scan = markdownCodeScan(source);
+        expect(scan.segments, hasLength(1), reason: source);
+        final seg = scan.segments.single;
+        expect(seg.kind, MarkdownCodeSegmentKind.codeBlock, reason: source);
+        expect(seg.closed, isTrue, reason: source);
+        expect(seg.content, contains('not-a-closer'), reason: source);
+        expect(seg.content, contains('following'), reason: source);
+      }
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight keeps an info-string fence line inside the code block',
@@ -5031,6 +5102,15 @@ $$
         '~~~\na\n~~~ not-a-closer\nfollowing\n~~~',
         '````dart\na\n```` not-a-closer\nfollowing\n````',
       ]) {
+        final probe = markdownCodeScan(source);
+        for (final seg in probe.segments) {
+          if (seg.kind == MarkdownCodeSegmentKind.codeBlock) {
+            debugPrint(
+              'POWERSHELL_SCAN_SEG_BEGIN>>>${seg.content}<<<END '
+              'ids=${seg.content.codeUnits}',
+            );
+          }
+        }
         await tester.pumpWidget(_markdownHarness(source));
         await tester.pump();
         expect(

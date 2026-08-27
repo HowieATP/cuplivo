@@ -1,3 +1,5 @@
+import '../../utils/markdown_code_scanner.dart';
+
 /// Line-level fence / details / inline-code rules.
 ///
 /// Display-math pairing lives in [markdownScanDisplayMath] so the splitter,
@@ -617,50 +619,33 @@ final class _LineBackticks {
 
   int advance(int i) => _jump![i] ?? i + 1;
 
+  /// Pairs backtick runs with the shared rule set
+  /// ([markdownCodePairInline], hiding policy: every run participates).
+  /// Every run keeps a jump slot, exactly like the legacy table: paired
+  /// opens jump past their closer, unmatched runs jump past themselves.
   static _LineBackticks of(String line) {
-    final starts = <int>[];
-    final lengths = <int>[];
+    final pairs = markdownCodePairInline(line, escapeSensitive: false);
+    final jump = <int, int>{};
+    final pairedStarts = <int>{};
+    for (final pair in pairs) {
+      jump[pair.openStart] = pair.closeEnd;
+      pairedStarts.add(pair.openStart);
+      pairedStarts.add(pair.closeStart);
+    }
     var i = 0;
     while (i < line.length) {
-      _noteScanVisit();
       if (line.codeUnitAt(i) != 0x60) {
         i++;
         continue;
       }
       final start = i;
-      i++;
       while (i < line.length && line.codeUnitAt(i) == 0x60) {
-        _noteScanVisit();
         i++;
       }
-      starts.add(start);
-      lengths.add(i - start);
+      if (pairedStarts.contains(start)) continue;
+      jump.putIfAbsent(start, () => i);
     }
-    if (starts.isEmpty) return empty;
-
-    final runCount = starts.length;
-    final nextSame = List<int>.filled(runCount, -1);
-    final lastByLength = <int, int>{};
-    for (var r = runCount - 1; r >= 0; r--) {
-      nextSame[r] = lastByLength[lengths[r]] ?? -1;
-      lastByLength[lengths[r]] = r;
-    }
-
-    final jump = <int, int>{};
-    final consumed = List<bool>.filled(runCount, false);
-    for (var r = 0; r < runCount; r++) {
-      if (consumed[r]) continue;
-      final closer = nextSame[r];
-      if (closer >= 0) {
-        jump[starts[r]] = starts[closer] + lengths[closer];
-        for (var k = r; k <= closer; k++) {
-          consumed[k] = true;
-        }
-      } else {
-        jump[starts[r]] = starts[r] + lengths[r];
-        consumed[r] = true;
-      }
-    }
+    if (jump.isEmpty) return empty;
     return _LineBackticks._(jump);
   }
 }
@@ -725,43 +710,14 @@ final class _FenceMark {
   final bool canClose;
 }
 
-int _skipHorizontalIndent(String line, [int start = 0]) {
-  var i = start;
-  while (i < line.length) {
-    final unit = line.codeUnitAt(i);
-    if (unit != 0x20 && unit != 0x09) break;
-    _noteScanVisit();
-    i++;
-  }
-  return i;
-}
-
 _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
-  final indent = _skipHorizontalIndent(rawLine);
-  if (indent >= rawLine.length) return null;
-  final marker = rawLine.codeUnitAt(indent);
-  if (marker != 0x60 && marker != 0x7E) return null;
-  var n = indent + 1;
-  while (n < rawLine.length && rawLine.codeUnitAt(n) == marker) {
-    _noteScanVisit();
-    n++;
-  }
-  final length = n - indent;
-  if (length < 3) return null;
-  var canClose = true;
-  for (var i = n; i < rawLine.length; i++) {
-    _noteScanVisit();
-    final unit = rawLine.codeUnitAt(i);
-    if (unit != 0x20 && unit != 0x09) {
-      canClose = false;
-      break;
-    }
-  }
+  final mark = markdownCodeFenceMark(rawLine);
+  if (mark == null) return null;
   return _FenceMark(
-    start: lineStart + indent,
-    marker: marker,
-    length: length,
-    canClose: canClose,
+    start: lineStart + mark.start,
+    marker: mark.marker == MarkdownCodeFenceMarker.backtick ? 0x60 : 0x7E,
+    length: mark.length,
+    canClose: mark.canClose,
   );
 }
 

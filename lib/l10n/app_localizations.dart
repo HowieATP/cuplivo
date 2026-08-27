@@ -4048,6 +4048,60 @@ abstract class AppLocalizations {
   /// **'Import from Other Apps'**
   String get backupPageImportFromOtherApps;
 
+  /// No description provided for @backupPageImportFromKelivo.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from New Kelivo'**
+  String get backupPageImportFromKelivo;
+
+  /// No description provided for @backupPageKelivoImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups from newer versions of Kelivo can be converted to a Cuplivo-compatible backup via the Kelivo-helper website:'**
+  String get backupPageKelivoImportHint;
+
+  /// No description provided for @backupPageKelivoImportUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/compat'**
+  String get backupPageKelivoImportUrl;
+
+  /// No description provided for @backupPageKelivoImportTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageKelivoImportTutorialTitle;
+
+  /// No description provided for @backupPageKelivoImportStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Kelivo-helper website below.'**
+  String get backupPageKelivoImportStep1;
+
+  /// No description provided for @backupPageKelivoImportStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the backup file exported from the newer version of Kelivo and follow the instructions on the webpage.'**
+  String get backupPageKelivoImportStep2;
+
+  /// No description provided for @backupPageKelivoImportStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the conversion to complete.'**
+  String get backupPageKelivoImportStep3;
+
+  /// No description provided for @backupPageKelivoImportStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the converted backup file.'**
+  String get backupPageKelivoImportStep4;
+
+  /// No description provided for @backupPageKelivoImportStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File”, and select the converted file to complete the import.'**
+  String get backupPageKelivoImportStep5;
+
   /// No description provided for @backupPageImportFromRikkaHub.
   ///
   /// In en, this message translates to:

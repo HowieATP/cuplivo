@@ -2118,6 +2118,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromOtherApps => '从其他APP导入';
 
   @override
+  String get backupPageImportFromKelivo => '从新版 Kelivo 导入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的备份可通过 Kelivo-helper 网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageKelivoImportStep1 => '打开下方的 Kelivo-helper 网站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '选择从新版 Kelivo 导出的备份文件，并按照网页提示进行转换。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待转换完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下载转换后的备份文件。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，点击“备份文件导入”，选择转换后的文件即可完成导入。';
+
+  @override
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
@@ -10707,6 +10737,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromOtherApps => '从其他APP导入';
 
   @override
+  String get backupPageImportFromKelivo => '从新版 Kelivo 导入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的备份可通过 Kelivo-helper 网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageKelivoImportStep1 => '打开下方的 Kelivo-helper 网站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '选择从新版 Kelivo 导出的备份文件，并按照网页提示进行转换。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待转换完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下载转换后的备份文件。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，点击“备份文件导入”，选择转换后的文件即可完成导入。';
+
+  @override
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
 
   @override
@@ -19294,6 +19354,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromOtherApps => '從其他APP匯入';
+
+  @override
+  String get backupPageImportFromKelivo => '從新版 Kelivo 匯入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的備份可透過 Kelivo-helper 網站轉換為 Cuplivo 相容的備份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教學';
+
+  @override
+  String get backupPageKelivoImportStep1 => '開啟下方的 Kelivo-helper 網站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '選擇從新版 Kelivo 匯出的備份檔案，並按照網頁提示進行轉換。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待轉換完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下載轉換後的備份檔案。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，點擊「備份檔案匯入」，選擇轉換後的檔案即可完成匯入。';
 
   @override
   String get backupPageImportFromRikkaHub => '從 RikkaHub 匯入';

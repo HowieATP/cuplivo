@@ -23,6 +23,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../shared/dialogs/restart_required_dialog.dart';
 import '../../shared/dialogs/rikkahub_migrate_dialog.dart';
+import '../../shared/dialogs/kelivo_import_dialog.dart';
 import '../../shared/dialogs/kelivo_compat_dialog.dart';
 import '../../utils/format.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
@@ -1085,7 +1086,15 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 },
               ),
               _DeskIosButton(
+                label: l10n.backupPageImportFromKelivo,
+                icon: lucide.Lucide.Box,
+                filled: false,
+                dense: true,
+                onTap: () => showKelivoImportDialog(context: context),
+              ),
+              _DeskIosButton(
                 label: l10n.backupPageImportFromRikkaHub,
+                icon: lucide.Lucide.Box,
                 filled: false,
                 dense: true,
                 onTap: () => showRikkaHubMigrateDialog(context: context),
@@ -2005,11 +2014,13 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
 class _DeskIosButton extends StatefulWidget {
   const _DeskIosButton({
     required this.label,
+    this.icon,
     required this.filled,
     required this.dense,
     required this.onTap,
   });
   final String label;
+  final IconData? icon;
   final bool filled;
   final bool dense;
   final VoidCallback onTap;
@@ -2060,13 +2071,22 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor),
             ),
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: AppFontWeights.semibold,
-                fontSize: widget.dense ? 13 : 14,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, size: 16, color: textColor),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: AppFontWeights.semibold,
+                    fontSize: widget.dense ? 13 : 14,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

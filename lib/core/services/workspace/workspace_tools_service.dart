@@ -18,6 +18,14 @@ import 'workspace_path_presentation.dart';
 class WorkspaceToolsService {
   const WorkspaceToolsService._();
 
+  static const String shellToolDescription =
+      'Run a shell command inside the Linux sandbox for the bound workspace. '
+      'Prefer the workspace filesystem tools for file reads, writes, search, '
+      'moves, archives, and downloads; use shell only when Linux command or '
+      'package semantics are required. Working directory defaults to '
+      '/workspace (the workspace root). Output is truncated. Requires base '
+      'dependency installed.';
+
   /// Workspace root plus the Android SAF mounts owned by this workspace.
   static List<FilesystemMount> combinedMounts(
     WorkspaceProvider workspaces,
@@ -118,11 +126,7 @@ class WorkspaceToolsService {
     'type': 'function',
     'function': {
       'name': WorkspaceToolNames.shell,
-      'description':
-          'Run a shell command inside the Linux sandbox for the bound '
-          'workspace. Working directory defaults to /workspace (the '
-          'workspace root). Output is truncated. Requires base dependency '
-          'installed.',
+      'description': shellToolDescription,
       'parameters': {
         'type': 'object',
         'properties': {

@@ -14,6 +14,48 @@ if (typeof globalThis.WebAssembly === "undefined") {
     const https = require("https");
     const {URL} = require("url");
     const zlib = require("zlib");
+    const bodyHeaders = new Set([
+      "content-encoding",
+      "content-language",
+      "content-length",
+      "content-location",
+      "content-type",
+      "transfer-encoding",
+    ]);
+    const crossOriginHeaders = new Set([
+      "authorization",
+      "cookie",
+      "cookie2",
+      "host",
+      "proxy-authorization",
+    ]);
+
+    function removeHeaders(headers, names) {
+      Object.keys(headers).forEach((key) => {
+        if (names.has(key.toLowerCase())) delete headers[key];
+      });
+    }
+
+    function optionsForRedirect(url, redirectUrl, options, statusCode) {
+      const redirected = Object.assign({}, options, {
+        headers: Object.assign({}, options.headers || {}),
+      });
+      const method = (redirected.method || "GET").toUpperCase();
+      const switchToGet =
+        (statusCode === 303 && method !== "GET" && method !== "HEAD") ||
+        ((statusCode === 301 || statusCode === 302) && method === "POST");
+
+      if (switchToGet) {
+        redirected.method = "GET";
+        delete redirected.body;
+        removeHeaders(redirected.headers, bodyHeaders);
+      }
+      if (url.origin !== redirectUrl.origin) {
+        removeHeaders(redirected.headers, crossOriginHeaders);
+      }
+
+      return redirected;
+    }
 
     class Response {
       constructor(body, status, statusText, headers, url) {
@@ -77,7 +119,11 @@ if (typeof globalThis.WebAssembly === "undefined") {
             response.statusCode <= 308 &&
             response.headers.location
           ) {
-            implementation(new URL(response.headers.location, url).href, init).then(
+            const redirectUrl = new URL(response.headers.location, url);
+            implementation(
+              redirectUrl.href,
+              optionsForRedirect(url, redirectUrl, options, response.statusCode),
+            ).then(
               resolve,
               reject,
             );

@@ -39,6 +39,8 @@ NSNotificationName const CuplivoISHProcessExitedNotification = @"CuplivoISHProce
 static NSString *const kDnsSubdir = @"CuplivoSandbox/dns";
 static NSString *const kNodeFetchPolyfillResource = @"node-fetch-jitless-polyfill";
 static NSString *const kNodeFetchPolyfillGuestPath = @"/lib/cuplivo-fetch-jitless-polyfill.js";
+static NSString *const kNodeFetchPolyfillGuestTempPath =
+    @"/lib/.cuplivo-fetch-jitless-polyfill.js.tmp";
 
 // Fallback nameservers appended after the system resolver servers. System
 // DNS may be absent (airplane mode) or unusable from the guest (a loopback
@@ -245,11 +247,15 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
         NSLog(@"CuplivoISHKernel: node fetch polyfill read failed: %@", readError);
         return;
     }
+    if (contents.length == 0) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill bundle resource is empty");
+        return;
+    }
 
-    struct fd *fd = generic_open(kNodeFetchPolyfillGuestPath.UTF8String,
+    struct fd *fd = generic_open(kNodeFetchPolyfillGuestTempPath.UTF8String,
                                  O_WRONLY_ | O_CREAT_ | O_TRUNC_, 0644);
     if (IS_ERR(fd)) {
-        NSLog(@"CuplivoISHKernel: node fetch polyfill guest write open failed: %ld",
+        NSLog(@"CuplivoISHKernel: node fetch polyfill guest temp write open failed: %ld",
               PTR_ERR(fd));
         return;
     }
@@ -268,9 +274,29 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
     }
     fd_close(fd);
 
-    if (offset == length) {
-        NSLog(@"CuplivoISHKernel: installed node fetch polyfill");
+    if (offset != length) {
+        int unlinkErr = generic_unlinkat(AT_PWD, kNodeFetchPolyfillGuestTempPath.UTF8String);
+        if (unlinkErr < 0) {
+            NSLog(@"CuplivoISHKernel: node fetch polyfill temp cleanup failed: %d", unlinkErr);
+        }
+        return;
     }
+
+    int renameErr = generic_renameat(AT_PWD,
+                                     kNodeFetchPolyfillGuestTempPath.UTF8String,
+                                     AT_PWD,
+                                     kNodeFetchPolyfillGuestPath.UTF8String);
+    if (renameErr < 0) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill guest install rename failed: %d",
+              renameErr);
+        int unlinkErr = generic_unlinkat(AT_PWD, kNodeFetchPolyfillGuestTempPath.UTF8String);
+        if (unlinkErr < 0) {
+            NSLog(@"CuplivoISHKernel: node fetch polyfill temp cleanup failed: %d", unlinkErr);
+        }
+        return;
+    }
+
+    NSLog(@"CuplivoISHKernel: installed node fetch polyfill");
 }
 
 - (void)mountDnsConfig {

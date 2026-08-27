@@ -15,6 +15,12 @@ class Assistant {
     50,
   ];
 
+  /// Legacy local-tool ids fused into the single wait-mode handoff tool
+  /// (ADR-0041). Mirror of `LocalToolNames.handoff` / `LocalToolNames.handoffSync`
+  /// wire names — kept frozen; the feature library owns the active constant.
+  static const String _handoffToolId = 'kelivo_handoff';
+  static const String _legacyHandoffSyncToolId = 'kelivo_handoff_sync';
+
   /// Default prompt for guiding the model on how to actively record user info.
   static const String defaultMemoryRecordPrompt =
       '''Act as a proactive personal secretary. Automatically record and manage user information in your memory during conversations without waiting for explicit requests.
@@ -122,7 +128,7 @@ Do **not** store sensitive information, including:
     this.messageTemplate = '{{ message }}',
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
-    this.localToolIds = const <String>[],
+    List<String>? localToolIds,
     this.skillIds = const <String>[],
     this.workspaceEnabled = false,
     this.workspaceId,
@@ -151,7 +157,19 @@ Do **not** store sensitive information, including:
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? DateTime.now();
+       updatedAt = updatedAt ?? DateTime.now(),
+       localToolIds = _normalizeLocalToolIds(localToolIds ?? const <String>[]);
+
+  /// Normalizes legacy local-tool ids onto the single wait-mode handoff tool
+  /// (ADR-0041). Storage is untouched — every read path (DB row, backup JSON,
+  /// copyWith/fromJson, this constructor) converges here, so a next save writes
+  /// the normalized id and a backup round-trips with the frozen wire name only.
+  static List<String> _normalizeLocalToolIds(List<String> ids) {
+    if (!ids.contains(_legacyHandoffSyncToolId)) return ids;
+    final set = ids.toSet()..remove(_legacyHandoffSyncToolId);
+    set.add(_handoffToolId);
+    return set.toList(growable: false);
+  }
 
   Assistant copyWith({
     String? id,

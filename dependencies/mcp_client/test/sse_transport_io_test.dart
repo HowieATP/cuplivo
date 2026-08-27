@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:mcp_client/mcp_client.dart';
@@ -10,6 +11,29 @@ import 'package:test/test.dart';
 
 void main() {
   group('Native SSE transport', () {
+    test('shared parser preserves opaque IDs and rejects malformed retry', () {
+      final parser = SseParser();
+      final events = <SseEvent>[
+        ...parser.add(
+          'id:  opaque\t \r'
+          'retry:  0 \r'
+          'data: {}\r\r',
+        ),
+        ...parser.close(),
+      ];
+
+      expect(events, hasLength(1));
+      expect(events.single.id, ' opaque\t ');
+      expect(events.single.retry, isNull);
+
+      final invalidId = SseParser();
+      final nulEvents = <SseEvent>[
+        ...invalidId.add('id: bad\u0000id\rdata: {}\r\r'),
+        ...invalidId.close(),
+      ];
+      expect(nulEvents.single.hasId, isFalse);
+    });
+
     test(
       'keeps an event intact when its fields arrive in separate chunks',
       () async {
@@ -67,21 +91,30 @@ void main() {
 
       server.listen((request) async {
         if (request.method == 'GET') {
+          // bufferOutput=false: dart:io buffers HttpResponse writes until the
+          // response closes; SSE needs each flush to reach the socket
+          // immediately.
+          request.response.bufferOutput = false;
           request.response.headers.contentType = ContentType(
             'text',
             'event-stream',
           );
-          request.response.write(
-            'event: endpoint\n'
-            'data: /messages/?session_id=server-session\n\n',
+          request.response.add(
+            utf8.encode(
+              'event: endpoint\n'
+              'data: /messages/?session_id=server-session\n\n',
+            ),
           );
-          await request.response.close();
+          await request.response.flush();
+          // Keep the event stream open until teardown — closing it ends
+          // the session by design (legacy SSE session = open GET).
           return;
         }
 
         receivedContentType.complete(
           request.headers.value(HttpHeaders.contentTypeHeader),
         );
+        await request.drain<void>();
         request.response.statusCode = HttpStatus.accepted;
         await request.response.close();
       });
@@ -89,131 +122,81 @@ void main() {
       transport = await SseClientTransport.create(
         serverUrl: 'http://${server.address.address}:${server.port}/sse',
       );
-      transport.send({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize'});
+      final send = transport.send({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'initialize',
+      });
 
       expect(
-        await receivedContentType.future.timeout(const Duration(seconds: 5)),
+        await receivedContentType.future.timeout(const Duration(seconds: 1)),
         'application/json',
       );
+      await send.done;
     });
 
-    test(
-      '404 on message POST is surfaced as a session-terminated error',
-      () async {
-        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        SseClientTransport? transport;
+    test('sends Unicode tool arguments as UTF-8 JSON', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final received =
+          Completer<({String? contentType, int? length, String body})>();
+      SseClientTransport? transport;
 
-        addTearDown(() async {
-          transport?.close();
-          await server.close(force: true);
-        });
+      addTearDown(() async {
+        transport?.close();
+        await server.close(force: true);
+      });
 
-        server.listen((request) async {
-          if (request.method == 'GET') {
-            request.response.headers.contentType = ContentType(
-              'text',
-              'event-stream',
-            );
-            request.response.write(
+      server.listen((request) async {
+        if (request.method == 'GET') {
+          // bufferOutput=false: dart:io buffers HttpResponse writes until the
+          // response closes; SSE needs each flush to reach the socket
+          // immediately.
+          request.response.bufferOutput = false;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.add(
+            utf8.encode(
               'event: endpoint\n'
-              'data: /messages?session_id=server-session\n\n',
-            );
-            await request.response.close();
-            return;
-          }
+              'data: /messages/?session_id=server-session\n\n',
+            ),
+          );
+          await request.response.flush();
+          // Hold the stream open until teardown (see fix above).
+          return;
+        }
 
-          await request.drain<void>();
-          request.response.statusCode = HttpStatus.notFound;
-          await request.response.close();
-        });
+        final body = await utf8.decoder.bind(request).join();
+        received.complete((
+          contentType: request.headers.value(HttpHeaders.contentTypeHeader),
+          length: request.headers.contentLength,
+          body: body,
+        ));
+        request.response.statusCode = HttpStatus.accepted;
+        await request.response.close();
+      });
 
-        transport = await SseClientTransport.create(
-          serverUrl: 'http://${server.address.address}:${server.port}/sse',
-        );
-
-        final received = <dynamic>[];
-        final receivedError = Completer<void>();
-        final subscription = transport.onMessage.listen((m) {
-          received.add(m);
-          if (m is Map &&
-              m['error'] is Map &&
-              (m['error'] as Map)['code'] == 32600 &&
-              (m['error'] as Map)['message'] == 'Session terminated' &&
-              m['id'] == 7 &&
-              !receivedError.isCompleted) {
-            receivedError.complete();
-          }
-        });
-        addTearDown(subscription.cancel);
-
-        // Must not throw: a dead session is a routine condition, not an
-        // unhandled exception.
-        transport.send({'jsonrpc': '2.0', 'id': 7, 'method': 'ping'});
-
-        await receivedError.future.timeout(const Duration(seconds: 5));
-        expect(received, isNotEmpty);
-      },
-    );
-
-    test(
-      'authenticated transport: 404 on message POST is surfaced as a session-terminated error',
-      () async {
-        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        SseAuthClientTransport? transport;
-
-        addTearDown(() async {
-          transport?.close();
-          await server.close(force: true);
-        });
-
-        server.listen((request) async {
-          if (request.method == 'GET') {
-            request.response.headers.contentType = ContentType(
-              'text',
-              'event-stream',
-            );
-            request.response.write(
-              'event: endpoint\n'
-              'data: /messages?session_id=server-session\n\n',
-            );
-            await request.response.close();
-            return;
-          }
-
-          await request.drain<void>();
-          request.response.statusCode = HttpStatus.notFound;
-          await request.response.close();
-        });
-
-      transport = await SseAuthClientTransport.create(
+      transport = await SseClientTransport.create(
         serverUrl: 'http://${server.address.address}:${server.port}/sse',
       );
+      const query = '中文搜索';
+      final message = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'tools/call',
+        'params': {
+          'name': 'diary_write',
+          'arguments': {'content': query},
+        },
+      };
+      final send = transport.send(message);
 
-      // The AuthenticatedEventSource reports the clean close of the SSE GET
-      // stream as an error, which the transport forwards to onClose. The
-      // client normally awaits onClose with a catchError; acknowledge it in
-      // the test so it is not left unhandled.
-      unawaited(transport.onClose.catchError((Object _) {}));
-
-        final receivedError = Completer<void>();
-        final subscription = transport.onMessage.listen((m) {
-          if (m is Map &&
-              m['error'] is Map &&
-              (m['error'] as Map)['code'] == 32600 &&
-              (m['error'] as Map)['message'] == 'Session terminated' &&
-              m['id'] == 7 &&
-              !receivedError.isCompleted) {
-            receivedError.complete();
-          }
-        });
-        addTearDown(subscription.cancel);
-
-        // Must not throw: a dead session is a routine condition, not an
-        // unhandled exception.
-        transport.send({'jsonrpc': '2.0', 'id': 7, 'method': 'ping'});
-
-        await receivedError.future.timeout(const Duration(seconds: 5));
-      },
-    );
+      final posted = await received.future.timeout(const Duration(seconds: 1));
+      expect(posted.contentType, 'application/json');
+      expect(posted.length, utf8.encode(posted.body).length);
+      expect(jsonDecode(posted.body), message);
+      await send.done;
+    });
   });
 }

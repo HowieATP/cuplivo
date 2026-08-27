@@ -2084,6 +2084,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExporting => '正在导出...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗时 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在生成文件...';
+
+  @override
+  String get backupStagePacking => '正在整合压缩...';
+
+  @override
+  String get backupStageUploading => '正在上传...';
+
+  @override
   String get backupPageExportToFile => '导出为文件';
 
   @override
@@ -2097,6 +2116,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
+
+  @override
+  String get backupPageImportFromKelivo => '从新版 Kelivo 导入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的备份可通过 Kelivo-helper 网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageKelivoImportStep1 => '打开下方的 Kelivo-helper 网站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '选择从新版 Kelivo 导出的备份文件，并按照网页提示进行转换。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待转换完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下载转换后的备份文件。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，点击“备份文件导入”，选择转换后的文件即可完成导入。';
 
   @override
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
@@ -2729,6 +2778,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
+  String get messageMoreSheetReply => '回复';
+
+  @override
+  String get messageQuoteDeletedErrorMessage => '原消息已被删除';
+
+  @override
+  String get messageQuotePreviewDismiss => '移除回复引用';
 
   @override
   String get messageMoreSheetCreateBranch => '创建分支';
@@ -3590,12 +3648,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
-
-  @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳间隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
 
   @override
   String get mcpServerEditSheetAdvancedLabel => '高级设置';
@@ -4569,8 +4621,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '为无 Fetch 功能的提供商启用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '为无浏览功能的提供商增加浏览功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
@@ -6329,17 +6380,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任务交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任务交给可被委派的子代理，等待完整输出；可在子代理面板查看进度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任务并等待子助手的完整输出作为工具结果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下载技能';
@@ -7685,11 +7733,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetSpeak => '朗读';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -7698,25 +7741,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get handoffBadgeTooltip => '从交接创建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+  String get assistantEditHandoffDiscoverable => '可作为子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接标识';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '开启后，其他助手的「子代理委派」可以把任务交给你。';
 
   @override
-  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派标识';
+
+  @override
+  String get assistantEditHandoffDescription => '描述你的专长，供其他助手判断是否委派。';
 
   @override
   String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
-
-  @override
-  String get handoffForwardChipTooltip => '打开创建的新对话';
+  String get assistantEditHandoffIdUnique => '此委派标识已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
@@ -7784,6 +7828,35 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目标：$count 个',
+      zero: '还没有可委派的目标助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 个目标';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已开启，但还没有可委派的目标助手。请在另一个助手上开启「可作为子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去设置';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目标助手';
+
+  @override
+  String get subagentTargetListEmpty => '还没有可委派的目标助手。';
 
   @override
   String get groupChatCreate => '新建群聊';
@@ -8347,6 +8420,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepQueued => '排队中…';
 
   @override
+  String get workspaceDepStatusUnknown => '状态不可用';
+
+  @override
+  String get workspaceDepProbeFailed => '无法刷新依赖状态，已保留此前的探测结果。';
+
+  @override
+  String get workspaceDepRetry => '重试';
+
+  @override
   String get workspaceDepStageDownloading => '正在下载…';
 
   @override
@@ -8366,6 +8448,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepGitPrerequisite => '请先安装 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '请先安装 Python 和 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
@@ -8425,11 +8513,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '通过命令行使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '通过 HTTP、HTTPS 等协议传输数据';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 客户端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 与密钥管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 压缩工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '创建和解压 ZIP 文件（zip 与 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文档办公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+      '建议搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
 
   @override
   String get workspaceDepBuildTitle => '编译工具链';
@@ -10662,6 +10774,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExporting => '正在导出...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗时 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在生成文件...';
+
+  @override
+  String get backupStagePacking => '正在整合压缩...';
+
+  @override
+  String get backupStageUploading => '正在上传...';
+
+  @override
   String get backupPageExportToFile => '导出为文件';
 
   @override
@@ -10675,6 +10806,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
+
+  @override
+  String get backupPageImportFromKelivo => '从新版 Kelivo 导入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的备份可通过 Kelivo-helper 网站转换为 Cuplivo 兼容的备份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教程';
+
+  @override
+  String get backupPageKelivoImportStep1 => '打开下方的 Kelivo-helper 网站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '选择从新版 Kelivo 导出的备份文件，并按照网页提示进行转换。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待转换完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下载转换后的备份文件。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，点击“备份文件导入”，选择转换后的文件即可完成导入。';
 
   @override
   String get backupPageImportFromRikkaHub => '从 RikkaHub 导入';
@@ -11307,6 +11468,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
+  String get messageMoreSheetReply => '回复';
+
+  @override
+  String get messageQuoteDeletedErrorMessage => '原消息已被删除';
+
+  @override
+  String get messageQuotePreviewDismiss => '移除回复引用';
 
   @override
   String get messageMoreSheetCreateBranch => '创建分支';
@@ -12168,12 +12338,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
-
-  @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳间隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若频繁遇到 429 (限流) 错误，建议延长心跳间隔。';
 
   @override
   String get mcpServerEditSheetAdvancedLabel => '高级设置';
@@ -13147,8 +13311,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '为无 Fetch 功能的提供商启用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '为无浏览功能的提供商增加浏览功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
@@ -14907,17 +15070,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任务交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任务交给可被委派的子代理，等待完整输出；可在子代理面板查看进度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任务并等待子助手的完整输出作为工具结果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下载技能';
@@ -16263,11 +16423,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetSpeak => '朗读';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -16276,25 +16431,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get handoffBadgeTooltip => '从交接创建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+  String get assistantEditHandoffDiscoverable => '可作为子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接标识';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '开启后，其他助手的「子代理委派」可以把任务交给你。';
 
   @override
-  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派标识';
+
+  @override
+  String get assistantEditHandoffDescription => '描述你的专长，供其他助手判断是否委派。';
 
   @override
   String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
-
-  @override
-  String get handoffForwardChipTooltip => '打开创建的新对话';
+  String get assistantEditHandoffIdUnique => '此委派标识已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
@@ -16362,6 +16518,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目标：$count 个',
+      zero: '还没有可委派的目标助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 个目标';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已开启，但还没有可委派的目标助手。请在另一个助手上开启「可作为子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去设置';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目标助手';
+
+  @override
+  String get subagentTargetListEmpty => '还没有可委派的目标助手。';
 
   @override
   String get groupChatCreate => '新建群聊';
@@ -16925,6 +17110,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepQueued => '排队中…';
 
   @override
+  String get workspaceDepStatusUnknown => '状态不可用';
+
+  @override
+  String get workspaceDepProbeFailed => '无法刷新依赖状态，已保留此前的探测结果。';
+
+  @override
+  String get workspaceDepRetry => '重试';
+
+  @override
   String get workspaceDepStageDownloading => '正在下载…';
 
   @override
@@ -16944,6 +17138,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepGitPrerequisite => '请先安装 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '请先安装 Python 和 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
@@ -17003,11 +17203,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '通过命令行使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '通过 HTTP、HTTPS 等协议传输数据';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 客户端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 与密钥管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 压缩工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '创建和解压 ZIP 文件（zip 与 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文档办公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+      '建议搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
 
   @override
   String get workspaceDepBuildTitle => '编译工具链';
@@ -19240,6 +19464,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageExporting => '正在匯出...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return '匯出失敗：$error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return '已耗時 $seconds 秒';
+  }
+
+  @override
+  String get backupStageGenerating => '正在產生檔案...';
+
+  @override
+  String get backupStagePacking => '正在整合壓縮...';
+
+  @override
+  String get backupStageUploading => '正在上傳...';
+
+  @override
   String get backupPageExportToFile => '匯出為檔案';
 
   @override
@@ -19253,6 +19496,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromOtherApps => '從其他APP匯入';
+
+  @override
+  String get backupPageImportFromKelivo => '從新版 Kelivo 匯入';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      '新版 Kelivo 的備份可透過 Kelivo-helper 網站轉換為 Cuplivo 相容的備份：';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => '使用教學';
+
+  @override
+  String get backupPageKelivoImportStep1 => '開啟下方的 Kelivo-helper 網站。';
+
+  @override
+  String get backupPageKelivoImportStep2 => '選擇從新版 Kelivo 匯出的備份檔案，並按照網頁提示進行轉換。';
+
+  @override
+  String get backupPageKelivoImportStep3 => '等待轉換完成。';
+
+  @override
+  String get backupPageKelivoImportStep4 => '下載轉換後的備份檔案。';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      '回到 Cuplivo，點擊「備份檔案匯入」，選擇轉換後的檔案即可完成匯入。';
 
   @override
   String get backupPageImportFromRikkaHub => '從 RikkaHub 匯入';
@@ -19884,6 +20157,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageMoreSheetSelectMessages => '選擇訊息';
+
+  @override
+  String get messageMoreSheetReply => '回覆';
+
+  @override
+  String get messageQuoteDeletedErrorMessage => '原訊息已被刪除';
+
+  @override
+  String get messageQuotePreviewDismiss => '移除回覆引用';
 
   @override
   String get messageMoreSheetCreateBranch => '建立分支';
@@ -20745,12 +21027,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetSseRetryHint => '如果SSE連線失敗，請多試幾次';
-
-  @override
-  String get mcpServerEditSheetHeartbeatLabel => '心跳間隔';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint => '若頻繁遇到 429 (限流) 錯誤，建議延長心跳間隔。';
 
   @override
   String get mcpServerEditSheetAdvancedLabel => '進階設定';
@@ -21723,8 +21999,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用選項';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '為不支援 Fetch 的提供商啟用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '為無瀏覽功能的提供商增加瀏覽功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '啟動時自動測試連線';
@@ -23486,17 +23761,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '行事曆權限已被拒絕。請在系統設定中開啟行事曆權限，然後重新開啟該工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任務交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '將任務委派給另一個助手的新對話，無需等待結果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任務交給可被委派的子代理，等待完整輸出；可在子代理面板查看進度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任務並等待子助手的完整輸出作為工具結果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下載技能';
@@ -24842,11 +25114,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetSpeak => '朗讀';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -24855,25 +25122,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get handoffBadgeTooltip => '從交接創建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手發現';
+  String get assistantEditHandoffDiscoverable => '可作為子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接標識';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '開啟後，其他助手的「子代理委派」可以把任務交給你。';
 
   @override
-  String get assistantEditHandoffDescription => '對其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派標識';
 
   @override
-  String get assistantEditHandoffIdInvalid => '只允許小寫字母、數字和連字符';
+  String get assistantEditHandoffDescription => '描述你的專長，供其他助手判斷是否委派。';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接標識已被使用';
+  String get assistantEditHandoffIdInvalid => '只允許小寫字母、數字和連字號';
 
   @override
-  String get handoffForwardChipTooltip => '打開創建的新對話';
+  String get assistantEditHandoffIdUnique => '此委派標識已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一級對話';
@@ -24941,6 +25209,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目標：$count 個',
+      zero: '還沒有可委派的目標助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 個目標';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已開啟，但還沒有可委派的目標助手。請在另一個助手上開啟「可作為子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去設定';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目標助手';
+
+  @override
+  String get subagentTargetListEmpty => '還沒有可委派的目標助手。';
 
   @override
   String get groupChatCreate => '新建群聊';
@@ -25505,6 +25802,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceDepQueued => '排隊中…';
 
   @override
+  String get workspaceDepStatusUnknown => '狀態無法使用';
+
+  @override
+  String get workspaceDepProbeFailed => '無法重新整理依賴狀態，已保留先前的探測結果。';
+
+  @override
+  String get workspaceDepRetry => '重試';
+
+  @override
   String get workspaceDepStageDownloading => '正在下載…';
 
   @override
@@ -25524,6 +25830,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceSandboxBaseRequired => '請先安裝基礎相依元件';
+
+  @override
+  String get workspaceDepGitPrerequisite => '請先安裝 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '請先安裝 Python 與 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系統目錄';
@@ -25583,11 +25895,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '透過命令列使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '透過 HTTP、HTTPS 等通訊協定傳輸資料';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 用戶端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 與金鑰管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 壓縮工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '建立和解壓縮 ZIP 檔案（zip 與 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文件辦公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 處理（LibreOffice、pandoc、Poppler）；約 550MB，安裝較慢';
+      '建議搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；約 550MB，安裝較慢';
 
   @override
   String get workspaceDepBuildTitle => '編譯工具鏈';

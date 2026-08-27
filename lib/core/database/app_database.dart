@@ -82,6 +82,10 @@ class MessageRows extends Table {
   BoolColumn get requestAllowImagesApiRouting => boolean().nullable()();
   TextColumn get requestExtraBodyJson => text().nullable()();
 
+  /// JSON-encoded MessageQuote citation reference (schema v20, issue #312).
+  /// Nullable TEXT so existing rows and non-reply messages stay untouched.
+  TextColumn get quoteJson => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -378,7 +382,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0019-schema-self-heal.md.
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -557,6 +561,12 @@ class AppDatabase extends _$AppDatabase {
       'message_rows',
       'request_extra_body_json',
       'ALTER TABLE message_rows ADD COLUMN request_extra_body_json TEXT NULL',
+    );
+    // message reply citation (schema v20)
+    await _ensureColumn(
+      'message_rows',
+      'quote_json',
+      'ALTER TABLE message_rows ADD COLUMN quote_json TEXT NULL',
     );
 
     // --- conversation_rows ---
@@ -826,6 +836,15 @@ class AppDatabase extends _$AppDatabase {
         try {
           await migrator.addColumn(assistantRows, assistantRows.workspaceId);
         } catch (_) {}
+      }
+      if (from < 20) {
+        // Message reply citation (issue #312, docs/adr/0042). Nullable TEXT —
+        // no backfill, non-reply rows stay NULL.
+        try {
+          await migrator.addColumn(messageRows, messageRows.quoteJson);
+        } catch (_) {
+          // The column may already exist (migration replay / partial retry).
+        }
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

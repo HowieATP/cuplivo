@@ -18,6 +18,74 @@ void main() {
     expect(ws.alias, Workspace.defaultAlias);
   });
 
+  group('workspace dependency prerequisites', () {
+    test('keeps the dependency catalog in the required install order', () {
+      expect(WorkspaceDependencyIds.ordered, <String>[
+        WorkspaceDependencyIds.base,
+        WorkspaceDependencyIds.python,
+        WorkspaceDependencyIds.nodejs,
+        WorkspaceDependencyIds.git,
+        WorkspaceDependencyIds.githubCli,
+        WorkspaceDependencyIds.curl,
+        WorkspaceDependencyIds.opensshClient,
+        WorkspaceDependencyIds.archive,
+        WorkspaceDependencyIds.office,
+        WorkspaceDependencyIds.buildEssential,
+      ]);
+    });
+
+    test('office requires both Python and Node.js', () {
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.office,
+          const <String, bool>{},
+        ),
+        <String>[WorkspaceDependencyIds.python, WorkspaceDependencyIds.nodejs],
+      );
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.office,
+          const <String, bool>{WorkspaceDependencyIds.nodejs: true},
+        ),
+        <String>[WorkspaceDependencyIds.python],
+      );
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.office,
+          const <String, bool>{WorkspaceDependencyIds.python: true},
+        ),
+        <String>[WorkspaceDependencyIds.nodejs],
+      );
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.office,
+          const <String, bool>{
+            WorkspaceDependencyIds.python: true,
+            WorkspaceDependencyIds.nodejs: true,
+          },
+        ),
+        isEmpty,
+      );
+    });
+
+    test('GitHub CLI requires Git', () {
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.githubCli,
+          const <String, bool>{},
+        ),
+        <String>[WorkspaceDependencyIds.git],
+      );
+      expect(
+        WorkspaceDependencyIds.missingPrerequisites(
+          WorkspaceDependencyIds.githubCli,
+          const <String, bool>{WorkspaceDependencyIds.git: true},
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   test('json roundtrip preserves tools prefs and approvals', () {
     final ws = Workspace.createDefault().copyWith(
       displayName: '测试',

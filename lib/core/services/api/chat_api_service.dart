@@ -18,6 +18,7 @@ import 'google_service_account_auth.dart';
 import '../../services/api_key_manager.dart';
 import 'package:Cuplivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
+import '../../../utils/markdown_code_scanner.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
 import 'gemini_tool_config.dart';
@@ -287,73 +288,24 @@ class ChatApiService {
     // Match custom inline image markers like: [image:/absolute/path.png]
     // Use a single backslash in a raw string to escape '[' and ']' in regex.
     final customImg = RegExp(r"\[image:(.+?)\]");
+    // Code regions (fenced blocks + inline spans) come from the shared
+    // markdown code scanner: content inside code is never an image.
+    final codeSegments = markdownCodeScan(raw).segments;
     final images = <_ImageRef>[];
     final buf = StringBuffer();
     int i = 0;
+    int segIndex = 0;
     while (i < raw.length) {
-      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
-      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
-          (i == 0 || raw[i - 1] == '\n')) {
-        final fence = raw.substring(i, i + 3);
-        buf.write(fence);
-        i += 3;
-        // Skip the rest of the opening fence line (language tag, etc.)
-        while (i < raw.length && raw[i] != '\n') {
-          buf.write(raw[i]);
-          i++;
-        }
-        // Advance until the matching closing fence at the start of a line.
-        bool closed = false;
-        while (i < raw.length) {
-          if (raw[i] == '\n') {
-            buf.write(raw[i]);
-            i++;
-            if (raw.startsWith(fence, i)) {
-              buf.write(fence);
-              i += 3;
-              // Skip trailing content on the closing fence line.
-              while (i < raw.length && raw[i] != '\n') {
-                buf.write(raw[i]);
-                i++;
-              }
-              closed = true;
-              break;
-            }
-          } else {
-            buf.write(raw[i]);
-            i++;
-          }
-        }
-        if (!closed) {
-          // Unclosed fence: rest of text was written as-is already.
-        }
-        continue;
+      while (segIndex < codeSegments.length &&
+          codeSegments[segIndex].end <= i) {
+        segIndex++;
       }
-      // Skip inline code spans (backtick sequences).
-      if (raw[i] == '`') {
-        // Determine the length of the opening backtick sequence.
-        int tickLen = 0;
-        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
-          tickLen++;
-        }
-        final openTicks = raw.substring(i, i + tickLen);
-        buf.write(openTicks);
-        i += tickLen;
-        // Advance until the matching closing backtick sequence.
-        bool closedTick = false;
-        while (i < raw.length) {
-          if (raw.startsWith(openTicks, i)) {
-            buf.write(openTicks);
-            i += tickLen;
-            closedTick = true;
-            break;
-          }
-          buf.write(raw[i]);
-          i++;
-        }
-        if (!closedTick) {
-          // Unclosed inline code: content was already written.
-        }
+      if (segIndex < codeSegments.length &&
+          codeSegments[segIndex].start <= i &&
+          i < codeSegments[segIndex].end) {
+        final seg = codeSegments[segIndex];
+        buf.write(raw.substring(i, seg.end));
+        i = seg.end;
         continue;
       }
 

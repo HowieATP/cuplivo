@@ -25,5 +25,72 @@ void main() {
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
       expect(find.text('正在加载'), findsOneWidget);
     });
+
+    testWidgets(
+      'elapsedTextBuilder ticks every second and cancels on dispose',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: LoadingDialogCard(
+                label: 'Exporting',
+                elapsedTextBuilder: _tickLabel,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('tick 0'), findsOneWidget);
+        expect(find.text('Exporting'), findsOneWidget);
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('tick 1'), findsOneWidget);
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('tick 2'), findsOneWidget);
+
+        // Unmount — dispose must cancel the periodic timer, otherwise the test
+        // framework reports a pending Timer.
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets('without elapsedTextBuilder no timer and no elapsed line', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: LoadingDialogCard(label: 'Hi')),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Hi'), findsOneWidget);
+      expect(find.textContaining('tick'), findsNothing);
+    });
+
+    testWidgets('labelListenable wins over static label and updates live', (
+      tester,
+    ) async {
+      final label = ValueNotifier<String>('stage one');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LoadingDialogCard(label: 'static', labelListenable: label),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('stage one'), findsOneWidget);
+      expect(find.text('static'), findsNothing);
+
+      label.value = 'stage two';
+      await tester.pump();
+      expect(find.text('stage two'), findsOneWidget);
+      expect(find.text('stage one'), findsNothing);
+
+      label.dispose();
+    });
   });
 }
+
+String _tickLabel(int seconds) => 'tick $seconds';

@@ -1,7 +1,50 @@
+import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/services/workspace/linux_sandbox_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('Alpine dependency package mapping', () {
+    test('maps common packages to apk names', () {
+      expect(
+        LinuxSandboxService.packageNamesForDependency(
+          WorkspaceDependencyIds.githubCli,
+          ios: true,
+        ),
+        'github-cli',
+      );
+      expect(
+        LinuxSandboxService.packageNamesForDependency(
+          WorkspaceDependencyIds.curl,
+          ios: true,
+        ),
+        'curl',
+      );
+      expect(
+        LinuxSandboxService.packageNamesForDependency(
+          WorkspaceDependencyIds.opensshClient,
+          ios: true,
+        ),
+        'openssh-client-default',
+      );
+      expect(
+        LinuxSandboxService.packageNamesForDependency(
+          WorkspaceDependencyIds.archive,
+          ios: true,
+        ),
+        'zip unzip',
+      );
+    });
+
+    test('office mapping includes both zip tools', () {
+      final packages = LinuxSandboxService.packageNamesForDependency(
+        WorkspaceDependencyIds.office,
+        ios: true,
+      );
+
+      expect(packages.split(' '), containsAll(<String>['zip', 'unzip']));
+    });
+  });
+
   group('LinuxSandboxService.buildApkInstallSteps', () {
     test('runs recover before update before install', () {
       final steps = LinuxSandboxService.buildApkInstallSteps(packages: 'git');

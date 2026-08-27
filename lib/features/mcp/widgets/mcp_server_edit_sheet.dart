@@ -62,7 +62,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
-  int _heartbeatIntervalSeconds = 12;
   final _toolPrefixCtrl = TextEditingController();
   bool _advancedExpanded = false;
   // OAuth section: shared logic lives in McpOAuthSectionController
@@ -83,7 +82,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _nameCtrl.text = server.name;
       _transport = server.transport;
       _urlCtrl.text = server.url;
-      _heartbeatIntervalSeconds = server.heartbeatIntervalSeconds ?? 12;
       _toolPrefixCtrl.text = server.toolPrefix;
       server.headers.forEach((k, v) {
         _headers.add(
@@ -190,9 +188,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           if (h.key.text.trim().isNotEmpty)
             h.key.text.trim(): h.value.text.trim(),
       },
-      heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
-          ? null
-          : _heartbeatIntervalSeconds,
       toolPrefix: _toolPrefixCtrl.text.trim(),
       oauth: oauth,
     );
@@ -334,20 +329,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     );
   }
 
-  static const _heartbeatOptions = [12, 30, 60, 120, 300];
-
-  Widget _heartbeatPicker() {
-    final labels = _heartbeatOptions.map((s) => '${s}s').toList();
-    final idx = _heartbeatOptions.indexOf(_heartbeatIntervalSeconds);
-    final selected = idx >= 0 ? idx : 0;
-    return _SegChoiceBar(
-      labels: labels,
-      selectedIndex: selected,
-      onSelected: (i) =>
-          setState(() => _heartbeatIntervalSeconds = _heartbeatOptions[i]),
-    );
-  }
-
   Widget _basicForm() {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
@@ -460,26 +441,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           ),
           if (_advancedExpanded) ...[
             const SizedBox(height: 12),
-            Text(
-              l10n.mcpServerEditSheetHeartbeatLabel,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: AppFontWeights.semibold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            _heartbeatPicker(),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                l10n.mcpServerEditSheetHeartbeatHint,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             _inputRow(
               label: l10n.mcpServerEditSheetToolPrefixLabel,
               controller: _toolPrefixCtrl,
@@ -589,8 +550,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           transport: _transport,
           url: url,
           headers: headers,
-          heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
-          clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
           toolPrefix: toolPrefix,
           oauth: oauth,
           clearOauth: oauth == null,
@@ -610,8 +569,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           transport: _transport,
           url: url,
           headers: headers,
-          heartbeatIntervalSeconds: _heartbeatIntervalSeconds,
-          clearHeartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12,
           toolPrefix: toolPrefix,
           oauth: oauth,
           clearOauth: oauth == null,
@@ -625,9 +582,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         transport: _transport,
         url: url,
         headers: headers,
-        heartbeatIntervalSeconds: _heartbeatIntervalSeconds == 12
-            ? null
-            : _heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
         oauth: oauth,
       );

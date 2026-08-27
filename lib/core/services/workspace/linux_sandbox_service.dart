@@ -160,6 +160,19 @@ class SandboxInstallProgress {
   });
 }
 
+/// A single readiness check and command probe for every sandbox dependency.
+/// The workspace dependency panel refreshes all rows together, so launching a
+/// guest shell once is materially cheaper than probing each command separately.
+class SandboxDependencyStatusSnapshot {
+  SandboxDependencyStatusSnapshot({
+    required this.hasRuntime,
+    required Map<String, bool> installed,
+  }) : installed = Map<String, bool>.unmodifiable(installed);
+
+  final bool hasRuntime;
+  final Map<String, bool> installed;
+}
+
 /// One staged package-manager operation inside the sandbox rootfs.
 class PackageInstallStep {
   /// 'recover' (self-heal package state), 'update' or 'install'.
@@ -568,6 +581,131 @@ class LinuxSandboxService {
     );
   }
 
+  static const String _dependencyProbePrefix = '__cuplivo_dependency__:';
+  // Importing the Office Python stack is intentionally functional rather
+  // than file-based and can be slow under the iSH interpreter.
+  static const int _dependencyProbeTimeoutSeconds = 60;
+
+  static const Map<String, String> _dependencyProbes = <String, String>{
+    WorkspaceDependencyIds.python:
+        'command -v python3 >/dev/null 2>&1 && '
+        'python3 -m pip --version >/dev/null 2>&1',
+    WorkspaceDependencyIds.nodejs:
+        'command -v node >/dev/null 2>&1 && '
+        'command -v npm >/dev/null 2>&1',
+    WorkspaceDependencyIds.git: 'command -v git >/dev/null 2>&1',
+    WorkspaceDependencyIds.githubCli: 'command -v gh >/dev/null 2>&1',
+    WorkspaceDependencyIds.curl: 'command -v curl >/dev/null 2>&1',
+    WorkspaceDependencyIds.opensshClient:
+        'command -v ssh >/dev/null 2>&1 && '
+        'command -v scp >/dev/null 2>&1 && '
+        'command -v sftp >/dev/null 2>&1 && '
+        'command -v ssh-keygen >/dev/null 2>&1',
+    WorkspaceDependencyIds.archive:
+        'command -v zip >/dev/null 2>&1 && '
+        'command -v unzip >/dev/null 2>&1',
+    // The Office install is a toolchain; LibreOffice alone is insufficient.
+    WorkspaceDependencyIds.office:
+        'command -v soffice >/dev/null 2>&1 && '
+        'command -v pandoc >/dev/null 2>&1 && '
+        'command -v pdftoppm >/dev/null 2>&1 && '
+        'command -v zip >/dev/null 2>&1 && '
+        'command -v unzip >/dev/null 2>&1 && '
+        "python3 -c 'import lxml, PIL, reportlab, openpyxl, pandas, "
+        "defusedxml' >/dev/null 2>&1",
+    WorkspaceDependencyIds.buildEssential:
+        'command -v gcc >/dev/null 2>&1 && '
+        'command -v make >/dev/null 2>&1',
+  };
+
+  /// A fixed shell script: no model or user input enters this command.
+  static String dependencyProbeCommand() {
+    final buffer = StringBuffer();
+    for (final entry in _dependencyProbes.entries) {
+      buffer.writeln(
+        'if ${entry.value}; then '
+        "printf '%s\\n' '$_dependencyProbePrefix${entry.key}=1'; "
+        'else '
+        "printf '%s\\n' '$_dependencyProbePrefix${entry.key}=0'; "
+        'fi',
+      );
+    }
+    return buffer.toString();
+  }
+
+  @visibleForTesting
+  static Map<String, bool> parseDependencyProbeOutput(String stdout) {
+    final statuses = <String, bool>{};
+    for (final line in stdout.split(RegExp(r'\r?\n'))) {
+      if (!line.startsWith(_dependencyProbePrefix)) continue;
+      final payload = line.substring(_dependencyProbePrefix.length);
+      final match = RegExp(r'^([a-z0-9_]+)=([01])$').firstMatch(payload);
+      if (match == null) {
+        throw const FormatException('Malformed dependency probe marker');
+      }
+      final id = match.group(1)!;
+      if (!_dependencyProbes.containsKey(id) || statuses.containsKey(id)) {
+        throw const FormatException('Unexpected dependency probe marker');
+      }
+      statuses[id] = match.group(2) == '1';
+    }
+    if (statuses.length != _dependencyProbes.length) {
+      throw const FormatException('Incomplete dependency probe output');
+    }
+    return statuses;
+  }
+
+  @visibleForTesting
+  static Map<String, bool> parseDependencyProbeResult(
+    SandboxExecResult result,
+  ) {
+    if (result.exitCode != 0 ||
+        result.timedOut ||
+        result.cancelled ||
+        result.stdoutTruncated) {
+      throw StateError('Dependency probe execution failed');
+    }
+    return parseDependencyProbeOutput(result.stdout);
+  }
+
+  Future<SandboxDependencyStatusSnapshot> dependencyStatus(
+    String workspaceHostPath,
+  ) async {
+    final installed = <String, bool>{
+      for (final id in WorkspaceDependencyIds.ordered) id: false,
+    };
+    final rootfs = await hasRootfs(workspaceHostPath);
+    installed[WorkspaceDependencyIds.base] = rootfs;
+    final runtime = await hasRuntime();
+    if (!rootfs || !runtime) {
+      return SandboxDependencyStatusSnapshot(
+        hasRuntime: runtime,
+        installed: installed,
+      );
+    }
+
+    final result = await exec(
+      workspaceHostPath: workspaceHostPath,
+      command: dependencyProbeCommand(),
+      timeoutSeconds: _dependencyProbeTimeoutSeconds,
+    );
+    try {
+      installed.addAll(parseDependencyProbeResult(result));
+    } on Object catch (e) {
+      debugPrint(
+        'LinuxSandboxService.dependencyStatus probe failed '
+        '(exit ${result.exitCode}, timedOut ${result.timedOut}, '
+        'cancelled ${result.cancelled}, truncated ${result.stdoutTruncated}): '
+        '$e',
+      );
+      throw StateError('Dependency probe execution failed');
+    }
+    return SandboxDependencyStatusSnapshot(
+      hasRuntime: runtime,
+      installed: installed,
+    );
+  }
+
   Future<bool> isDependencyInstalled(
     String workspaceHostPath,
     String depId,
@@ -578,25 +716,16 @@ class LinuxSandboxService {
     }
     final status = await statusFor(workspaceHostPath);
     if (status != SandboxStatus.ready) return false;
-    final probe = switch (depId) {
-      WorkspaceDependencyIds.python => 'command -v python3 >/dev/null 2>&1',
-      WorkspaceDependencyIds.nodejs => 'command -v node >/dev/null 2>&1',
-      WorkspaceDependencyIds.git => 'command -v git >/dev/null 2>&1',
-      // The office step installs a whole toolchain; LibreOffice alone is not
-      // enough, so require every component the document skills rely on.
-      WorkspaceDependencyIds.office =>
-        'command -v soffice >/dev/null 2>&1 && '
-            'command -v pandoc >/dev/null 2>&1 && '
-            'command -v pdftoppm >/dev/null 2>&1',
-      WorkspaceDependencyIds.buildEssential => 'command -v gcc >/dev/null 2>&1',
-      _ => null,
-    };
+    final probe = _dependencyProbes[depId];
     if (probe == null) return false;
     final r = await exec(
       workspaceHostPath: workspaceHostPath,
       command: probe,
-      timeoutSeconds: 15,
+      timeoutSeconds: _dependencyProbeTimeoutSeconds,
     );
+    if (r.timedOut || r.cancelled) {
+      throw StateError('Dependency probe execution failed');
+    }
     return r.exitCode == 0;
   }
 
@@ -931,6 +1060,31 @@ class LinuxSandboxService {
         "'$mirrorUrl/v$alpineVersion/community' > /etc/apk/repositories && ";
   }
 
+  static String packageNamesForDependency(
+    String dependencyId, {
+    required bool ios,
+  }) => switch (dependencyId) {
+    WorkspaceDependencyIds.python =>
+      ios ? 'python3 py3-pip' : 'python3 python3-pip',
+    WorkspaceDependencyIds.nodejs => 'nodejs npm',
+    WorkspaceDependencyIds.git => 'git',
+    WorkspaceDependencyIds.githubCli => ios ? 'github-cli' : 'gh',
+    WorkspaceDependencyIds.curl => 'curl',
+    WorkspaceDependencyIds.opensshClient =>
+      ios ? 'openssh-client-default' : 'openssh-client',
+    WorkspaceDependencyIds.archive => 'zip unzip',
+    WorkspaceDependencyIds.office =>
+      ios
+          ? 'libreoffice pandoc poppler-utils zip unzip py3-lxml py3-pillow '
+                'py3-reportlab py3-openpyxl py3-pandas py3-defusedxml'
+          : 'libreoffice pandoc poppler-utils zip unzip python3-lxml '
+                'python3-pil python3-reportlab python3-openpyxl '
+                'python3-pandas python3-defusedxml',
+    WorkspaceDependencyIds.buildEssential =>
+      ios ? 'build-base' : 'build-essential',
+    _ => throw StateError('Unknown dependency: $dependencyId'),
+  };
+
   Future<void> installPackage({
     required String workspaceHostPath,
     required String depId,
@@ -958,22 +1112,7 @@ class LinuxSandboxService {
     }
     onProgress?.call(const SandboxInstallProgress(stage: 'installing'));
     final ios = Platform.isIOS;
-    final packages = switch (depId) {
-      WorkspaceDependencyIds.python =>
-        ios ? 'python3 py3-pip' : 'python3 python3-pip',
-      WorkspaceDependencyIds.nodejs => 'nodejs npm',
-      WorkspaceDependencyIds.git => 'git',
-      WorkspaceDependencyIds.office =>
-        ios
-            ? 'libreoffice pandoc poppler-utils py3-lxml py3-pillow '
-                  'py3-reportlab py3-openpyxl py3-pandas py3-defusedxml'
-            : 'libreoffice pandoc poppler-utils python3-lxml python3-pil '
-                  'python3-reportlab python3-openpyxl python3-pandas '
-                  'python3-defusedxml',
-      WorkspaceDependencyIds.buildEssential =>
-        ios ? 'build-base' : 'build-essential',
-      _ => throw StateError('Unknown dependency: $depId'),
-    };
+    final packages = packageNamesForDependency(depId, ios: ios);
     var mirrorSetup = '';
     if (pref.sourceId == 'custom' &&
         pref.customUrl != null &&

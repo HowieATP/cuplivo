@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -275,6 +276,7 @@ class MessageGenerationService {
         assistant: assistant,
       ),
       groupId: groupId,
+      quoteJson: input.quote == null ? null : jsonEncode(input.quote!.toJson()),
     );
     // Persist per-message request metadata (routing decision + image options
     // body) so regenerate/continue can replay them. See

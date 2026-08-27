@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/services/storage/message_locate_bus.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'dart:ui' as ui;
@@ -16,6 +15,7 @@ import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
+import 'quote_block.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 // import '../../../theme/design_tokens.dart';
@@ -758,6 +758,15 @@ class ChatMessageWidget extends StatefulWidget {
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
   final ValueChanged<String>? onQuoteSelection;
+
+  /// Selection-driven reply entry (ranged quote); receives the selected plain
+  /// text. Hidden while the message is streaming.
+  final ValueChanged<String>? onReplySelection;
+
+  /// Resolved target of [ChatMessage.quote] (same conversation, current
+  /// display list); null renders the deleted-target stub in [QuoteBlock].
+  final ChatMessage? quoteTarget;
+
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
 
@@ -804,6 +813,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onQuoteSelection,
+    this.onReplySelection,
+    this.quoteTarget,
     this.onRecoveredAskUserAnswer,
   });
 
@@ -1442,6 +1453,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 key: ValueKey('user-message-content:${widget.message.id}'),
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (widget.message.quote != null) ...[
+                    QuoteBlock(
+                      key: ValueKey('user-message-quote:${widget.message.id}'),
+                      quote: widget.message.quote!,
+                      target: widget.quoteTarget,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (mediaPreview != null) mediaPreview,
                   if (mediaPreview != null && textBubble != null)
                     const SizedBox(height: 8),
@@ -2039,6 +2058,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     ContextMenuController.removeAny();
                     selectableRegionState.clearSelection();
                     widget.onQuoteSelection!.call(selected);
+                  },
+                ),
+              if (widget.onReplySelection != null &&
+                  !widget.message.isStreaming)
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(context)!.messageMoreSheetReply,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    widget.onReplySelection!.call(selected);
                   },
                 ),
               ContextMenuButtonItem(
@@ -4306,15 +4337,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             ),
           );
 
-    // Handoff forward bar
-    final Widget? handoffChip = _buildHandoffForwardChip(context, fg, cs);
-    final Widget? mergedContent = (content != null && handoffChip != null)
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [content, const SizedBox(height: 4), handoffChip],
-          )
-        : handoffChip ?? content;
+    final Widget? mergedContent = content;
 
     final extra = approvalRequest != null
         ? Row(
@@ -4366,63 +4389,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
           : Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
       content: mergedContent,
       contentVisible: mergedContent != null && (!_isAskUser || askUserExpanded),
-    );
-  }
-
-  Widget? _buildHandoffForwardChip(
-    BuildContext context,
-    _ChatSurfaceForegroundPalette fg,
-    ColorScheme cs,
-  ) {
-    // v1 handoff only: its tool event content deterministically contains the
-    // child conversation UUID ("Handoff dispatched. Conversation: …"). The
-    // wait-mode handoff's event content is the child's FULL output — scanning
-    // it for a UUID would navigate to a wrong conversation, so sync cards get
-    // no chip (the 子代理面板's 查看子对话 covers navigation during the wait).
-    if (widget.part.toolName != 'kelivo_handoff' || widget.part.loading) {
-      return null;
-    }
-    final contentRaw = widget.part.content?.trim() ?? '';
-    if (contentRaw.isEmpty) return null;
-
-    // Parse conversation UUID from result "Handoff complete. Conversation: uuid"
-    final uuidMatch = RegExp(r'([a-f0-9\-]{36})').firstMatch(contentRaw);
-    if (uuidMatch == null) return null;
-    final convId = uuidMatch.group(1)!;
-    final prefix = convId.substring(0, 4);
-
-    // Resolve target assistant name from arguments['assistant']
-    final handoffId = (widget.part.arguments['assistant'] ?? '').toString();
-    final assistants = context.read<AssistantProvider>();
-    final target = assistants.assistants.where((a) => a.handoffId == handoffId);
-    final targetName = target.isNotEmpty ? target.first.name : handoffId;
-
-    return IosCardPress(
-      onTap: () =>
-          MessageLocateBus.instance.fire(conversationId: convId, messageId: ''),
-      borderRadius: BorderRadius.circular(999),
-      baseColor: Colors.transparent,
-      pressedScale: 0.97,
-      padding: EdgeInsets.zero,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: cs.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Lucide.ArrowRight, size: 14, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(
-              '$targetName · $prefix',
-              style: TextStyle(fontSize: 12, color: cs.primary),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

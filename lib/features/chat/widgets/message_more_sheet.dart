@@ -22,6 +22,7 @@ import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum MessageMoreAction {
   edit,
+  reply,
   fork,
   deleteCurrentVersion,
   deleteAllVersions,
@@ -124,6 +125,15 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           label: l10n.messageMoreSheetEdit,
           onTap: () {
             selected = MessageMoreAction.edit;
+          },
+        ),
+      if (!message.isStreaming &&
+          !(hideActions?.contains(MessageMoreAction.reply) ?? false))
+        DesktopContextMenuItem(
+          icon: Lucide.Reply,
+          label: l10n.messageMoreSheetReply,
+          onTap: () {
+            selected = MessageMoreAction.reply;
           },
         ),
       if (!(hideActions?.contains(MessageMoreAction.share) ?? false))
@@ -363,6 +373,15 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         label: l10n.messageMoreSheetEdit,
                         onTap: () {
                           Navigator.of(context).pop(MessageMoreAction.edit);
+                        },
+                      ),
+                    if (!widget.message.isStreaming &&
+                        !_hid(MessageMoreAction.reply))
+                      _actionItem(
+                        icon: Lucide.Reply,
+                        label: l10n.messageMoreSheetReply,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.reply);
                         },
                       ),
                     if (!_hid(MessageMoreAction.share))

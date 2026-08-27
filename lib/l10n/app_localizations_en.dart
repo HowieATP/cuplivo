@@ -2162,6 +2162,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExporting => 'Exporting...';
 
   @override
+  String backupPageExportFailed(Object error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String backupPageExportElapsed(Object seconds) {
+    return 'Elapsed ${seconds}s';
+  }
+
+  @override
+  String get backupStageGenerating => 'Preparing files...';
+
+  @override
+  String get backupStagePacking => 'Packing backup...';
+
+  @override
+  String get backupStageUploading => 'Uploading...';
+
+  @override
   String get backupPageExportToFile => 'Export to File';
 
   @override
@@ -2175,6 +2194,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageImportFromOtherApps => 'Import from Other Apps';
+
+  @override
+  String get backupPageImportFromKelivo => 'Import from New Kelivo';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      'Backups from newer versions of Kelivo can be converted to a Cuplivo-compatible backup via the Kelivo-helper website:';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => 'Usage Tutorial';
+
+  @override
+  String get backupPageKelivoImportStep1 =>
+      'Open the Kelivo-helper website below.';
+
+  @override
+  String get backupPageKelivoImportStep2 =>
+      'Select the backup file exported from the newer version of Kelivo and follow the instructions on the webpage.';
+
+  @override
+  String get backupPageKelivoImportStep3 =>
+      'Wait for the conversion to complete.';
+
+  @override
+  String get backupPageKelivoImportStep4 =>
+      'Download the converted backup file.';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      'Return to Cuplivo, tap “Import Backup File”, and select the converted file to complete the import.';
 
   @override
   String get backupPageImportFromRikkaHub => 'Import from RikkaHub';
@@ -2825,6 +2878,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageMoreSheetSelectMessages => 'Select Messages';
+
+  @override
+  String get messageMoreSheetReply => 'Reply';
+
+  @override
+  String get messageQuoteDeletedErrorMessage =>
+      'The original message has been deleted';
+
+  @override
+  String get messageQuotePreviewDismiss => 'Dismiss reply quote';
 
   @override
   String get messageMoreSheetCreateBranch => 'Create Branch';
@@ -3724,13 +3787,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetSseRetryHint => 'If SSE fails, try a few times';
-
-  @override
-  String get mcpServerEditSheetHeartbeatLabel => 'Heartbeat Interval';
-
-  @override
-  String get mcpServerEditSheetHeartbeatHint =>
-      'If you encounter frequent 429 (rate limit) errors, try increasing this interval.';
 
   @override
   String get mcpServerEditSheetAdvancedLabel => 'Advanced Settings';
@@ -4749,7 +4805,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServicesPageEnableFallbackFetchTitle =>
-      'Enable fetch for providers without native fetch';
+      'Add browsing for providers without native browsing';
 
   @override
   String get searchServicesPageAutoTestTitle =>
@@ -6609,18 +6665,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Calendar permission was denied. Enable calendar access in system settings, then toggle the tool again.';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => 'Task Handoff';
+  String get assistantEditLocalToolHandoffTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditLocalToolHandoffSubtitle =>
-      'Delegate a task to another assistant in a new conversation without waiting for the result.';
+      'Hand a task to a delegated sub-agent and wait for its full output; watch progress in the sub-agent panel.';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => 'Sync Handoff';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.';
+  String get assistantEditLocalToolHandoffSyncTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditSkillDownloadTitle => 'Download Skills';
@@ -8030,11 +8082,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetSpeak => 'Speak';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -8043,18 +8090,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get handoffBadgeTooltip => 'Spawned from handoff';
 
   @override
-  String get assistantEditHandoffSectionTitle => 'Handoff / Delegation';
+  String get assistantEditHandoffSectionTitle => 'Sub-agent Delegation';
 
   @override
   String get assistantEditHandoffDiscoverable =>
-      'Discoverable by other assistants';
+      'Delegateable as a sub-agent by other assistants';
 
   @override
-  String get assistantEditHandoffId => 'Handoff ID';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      'Other assistants can delegate tasks to this assistant via Sub-agent Delegation.';
+
+  @override
+  String get assistantEditHandoffId => 'Delegation ID';
 
   @override
   String get assistantEditHandoffDescription =>
-      'Description for other assistants';
+      'Describe your specialty so other assistants know when to delegate to you.';
 
   @override
   String get assistantEditHandoffIdInvalid =>
@@ -8062,10 +8113,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditHandoffIdUnique =>
-      'This Handoff ID is already in use';
-
-  @override
-  String get handoffForwardChipTooltip => 'Open the spawned conversation';
+      'This Delegation ID is already in use';
 
   @override
   String get handoffBackwardChipTooltip => 'Back to the parent conversation';
@@ -8134,6 +8182,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupChatMyGroupChats => 'My group chats';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sub-agent targets',
+      one: '1 sub-agent target',
+      zero: 'No sub-agent targets available',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count targets',
+      one: '1 target',
+      zero: '0 targets',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      'Sub-agent delegation is on, but no sub-agent targets are available. Enable “Delegateable as a sub-agent” on another assistant first.';
+
+  @override
+  String get subagentGoSetup => 'Set up';
+
+  @override
+  String get subagentTargetListTitle => 'Delegatable assistants';
+
+  @override
+  String get subagentTargetListEmpty => 'No delegatable assistants yet.';
 
   @override
   String get groupChatCreate => 'New group chat';
@@ -8731,6 +8816,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepQueued => 'Queued…';
 
   @override
+  String get workspaceDepStatusUnknown => 'Status unavailable';
+
+  @override
+  String get workspaceDepProbeFailed =>
+      'Couldn’t refresh dependency status. Any previous results were preserved.';
+
+  @override
+  String get workspaceDepRetry => 'Retry';
+
+  @override
   String get workspaceDepStageDownloading => 'Downloading…';
 
   @override
@@ -8752,6 +8847,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceSandboxBaseRequired =>
       'Install the base dependency first';
+
+  @override
+  String get workspaceDepGitPrerequisite => 'Install Git first';
+
+  @override
+  String get workspaceDepOfficePrerequisites =>
+      'Install Python and Node.js first';
 
   @override
   String get workspaceSandboxDirEntryTitle => 'Sandbox system';
@@ -8812,11 +8914,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepGitDesc => 'Version control tools';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc =>
+      'Use GitHub from the command line (gh)';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc =>
+      'Transfer data over HTTP, HTTPS, and other protocols';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH Client';
+
+  @override
+  String get workspaceDepOpenSshDesc =>
+      'SSH, SCP, SFTP, and key-management tools';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP archive tools';
+
+  @override
+  String get workspaceDepArchiveDesc =>
+      'Create and extract ZIP archives (zip and unzip)';
+
+  @override
   String get workspaceDepOfficeTitle => 'Document & Office Tools';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
+      'Recommended with Anthropic’s official docx, pptx, and xlsx Skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
 
   @override
   String get workspaceDepBuildTitle => 'Build tools';

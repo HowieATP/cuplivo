@@ -1177,6 +1177,7 @@ class ChatService extends ChangeNotifier {
     int? version,
     bool isPreset = false,
     String? speakerAssistantId,
+    String? quoteJson,
   }) async {
     if (!_initialized) await init();
 
@@ -1222,6 +1223,7 @@ class ChatService extends ChangeNotifier {
       version: version,
       isPreset: isPreset,
       speakerAssistantId: speakerAssistantId,
+      quoteJson: quoteJson,
     );
 
     if (!temporary) {
@@ -1583,6 +1585,7 @@ class ChatService extends ChangeNotifier {
         isPreset: src.isPreset,
         requestAllowImagesApiRouting: src.requestAllowImagesApiRouting,
         requestExtraBodyJson: src.requestExtraBodyJson,
+        quoteJson: src.quoteJson,
       );
       await _repo.putMessage(clone, messageOrder: ids.length);
       ids.add(clone.id);
@@ -1811,6 +1814,9 @@ class ChatService extends ChangeNotifier {
       speakerAssistantId: original.speakerAssistantId,
       requestAllowImagesApiRouting: original.requestAllowImagesApiRouting,
       requestExtraBodyJson: original.requestExtraBodyJson,
+      // Quote is part of the user message's content identity: a retry/edit
+      // version carries the citation with it (docs/adr/0042).
+      quoteJson: original.quoteJson,
       timestamp: timestamp,
     );
     // Append to conversation order at the end (we'll group when rendering)

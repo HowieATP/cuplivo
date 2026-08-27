@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:Cuplivo/shared/widgets/markdown_line_lexer.dart';
+import 'package:Cuplivo/utils/markdown_code_scanner.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:Cuplivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Cuplivo/shared/widgets/markdown_with_highlight.dart';
@@ -2611,12 +2612,14 @@ $$
       final spans = _resolvedTextSpansFromRichText(tester);
       final plainText = spans.map((span) => span.text).join();
 
-      expect(
-        plainText,
-        contains(
-          r'*literal* and **strong** and `code` and [label](https://example.com)',
-        ),
-      );
+      // Backslashes escape delimiters outside code: \* and \[label\] render
+      // as literal punctuation.
+      expect(plainText, contains(r'*literal* and **strong** and '));
+      expect(plainText, contains(' and [label](https://example.com)'));
+      // Inside a code span there is no escape: the closer stays a closer even
+      // when preceded by a backslash (#544 rule), so `code\` is one chip whose
+      // content keeps the backslash.
+      expect(find.textContaining(r'code\', findRichText: true), findsWidgets);
       expect(
         spans.where(
           (span) =>
@@ -3971,6 +3974,141 @@ void main() {
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps single-\$ literals inside display math '
+    'export',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      const source = r'''
+$$
+\text{total } $x+y$ \text{ yuan}
+$$
+''';
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+
+      // The renderer receives the original body: the single-$ literals inside
+      // the display-math body were never rewritten to \( ... \).
+      final renderedData = tester
+          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
+          .map((widget) => widget.data)
+          .join('\n');
+      expect(renderedData, contains(r'$x+y$'));
+      expect(renderedData, isNot(contains(r'\(x+y\)')));
+
+      await tester.longPress(
+        find.byType(Math),
+        warnIfMissed: false, // Math's RenderLine is paint-only; the gesture
+        // lands on the enclosing export GestureDetector.
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      // Copy LaTeX hands back the model-emitted source, stray dollars intact.
+      expect(clipboardText, r'\text{total } $x+y$ \text{ yuan}');
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight copies multi-line aligned LaTeX with rows '
+    'intact',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      const source = r'''
+$$
+\begin{aligned}
+E &= mc^2 \\
+p &= mv
+\end{aligned}
+$$
+''';
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+
+      await tester.longPress(find.byType(Math), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      const expected =
+          '\\begin{aligned}\nE &= mc^2 \\\\\np &= mv\n\\end{aligned}';
+      expect(clipboardText, expected);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight copies bracket-delimited LaTeX source',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      await tester.pumpWidget(
+        _markdownHarness(r'\[E_{tot} = \sum_i q_i\]', width: 360),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.byType(Math), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(clipboardText, r'E_{tot} = \sum_i q_i');
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight opens math menu on desktop right click',
     (tester) async {
       markdownMathTargetPlatformOverride = TargetPlatform.windows;
@@ -4227,6 +4365,80 @@ void main() {
 
       expect(find.text('Copy LaTeX'), findsOneWidget);
       expect(find.text('SELECTION_TOOLBAR_MARKER'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight scales an oversized formula to fit message export',
+    (tester) async {
+      // Far wider than the 320px export canvas: the formula must be captured
+      // complete (scaled down), not truncated at a scroll viewport.
+      final wideTex =
+          r'\[' + List.generate(40, (i) => 'x_{${i + 1}}').join(' + ') + r'\]';
+
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: SizedBox(
+            width: 320,
+            child: ExportCaptureScope(
+              enabled: true,
+              child: MarkdownWithCodeHighlight(text: wideTex),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      // The formula is oversized input: wider than the export canvas.
+      final mathBox = tester.renderObject<RenderBox>(_findMathWidget());
+      expect(mathBox.size.width, greaterThan(320));
+      // Message export has no scroll interaction: the scroll viewport that
+      // clips the formula must be gone during capture.
+      expect(
+        find.ancestor(
+          of: _findMathWidget(),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsNothing,
+      );
+      // The full formula stays in the capture via a scale-down fit.
+      final fitters = find.ancestor(
+        of: _findMathWidget(),
+        matching: find.byType(FittedBox),
+      );
+      expect(fitters, findsOneWidget);
+      expect(tester.widget<FittedBox>(fitters).fit, BoxFit.scaleDown);
+      expect(
+        tester.renderObject<RenderBox>(fitters).size.width,
+        lessThanOrEqualTo(320),
+      );
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps the scrollable viewport for wide formulas in chat',
+    (tester) async {
+      final wideTex =
+          r'\[' + List.generate(40, (i) => 'x_{${i + 1}}').join(' + ') + r'\]';
+
+      await tester.pumpWidget(_markdownHarness(wideTex, width: 320));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      // Chat keeps horizontal scroll interaction; no export fit wrapper.
+      expect(
+        find.ancestor(
+          of: _findMathWidget(),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(of: _findMathWidget(), matching: find.byType(FittedBox)),
+        findsNothing,
+      );
     },
   );
 
@@ -4748,6 +4960,10 @@ void main() {
           .join('\n');
       expect(find.byType(GptMarkdown), findsWidgets);
       expect(data, isNot(contains('\uE002')));
+      // Code spans are tokenized before parsing: the source text's visible
+      // content reaches the renderer through the registry, so the GptMarkdown
+      // data contains a token, never the raw text.
+      expect(data, isNot(contains(visible)));
       final details = find.byWidgetPredicate(
         (widget) => widget.runtimeType.toString() == '_DetailsHtmlBlock',
       );
@@ -4756,8 +4972,6 @@ void main() {
         expect(find.textContaining(visible, findRichText: true), findsNothing);
         await tester.tap(find.text('s'));
         await tester.pumpAndSettle();
-      } else {
-        expect(data, contains(visible));
       }
       expect(find.textContaining(visible, findRichText: true), findsWidgets);
     }
@@ -4792,27 +5006,93 @@ void main() {
     await tester.pumpWidget(_markdownHarness('Use `a \uE002 b` now'));
     await tester.pump();
     expect(find.text('a \uE002 b'), findsWidgets);
-    expect(
-      tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data,
-      contains('\uE002'),
-    );
+    final tokenized = tester.widget<GptMarkdown>(find.byType(GptMarkdown)).data;
+    // The code span is tokenized before parsing: the private marker is no
+    // longer baked into the text; the content lives in the registry.
+    expect(tokenized, contains('\uE020'));
+    expect(tokenized, isNot(contains('\uE002')));
   });
 
-  test('FencedCodeBlockMd does not close on an info-string fence line', () {
-    for (final item in const [
-      ('```', '```', '```dart\na\n``` not-a-closer\nfollowing\n```'),
-      ('~~~', '~~~', '~~~\na\n~~~ not-a-closer\nfollowing\n~~~'),
-      ('````', '````', '````dart\na\n```` not-a-closer\nfollowing\n````'),
-      ('~~~~', '~~~~', '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~'),
-      ('````', '```', '````dart\na\n``` not-a-closer\nfollowing\n````'),
-    ]) {
-      final match = FencedCodeBlockMd(streaming: false).exp.firstMatch(item.$3);
-      expect(match, isNotNull, reason: item.$3);
-      expect(match!.group(0), item.$3, reason: item.$3);
-      expect(match.group(4), contains('not-a-closer'), reason: item.$3);
-      expect(match.group(4), contains('following'), reason: item.$3);
-    }
-  });
+  testWidgets(
+    'issue #544: windows paths with trailing backslashes stay one code chip',
+    (tester) async {
+      const source =
+          '包）：`D:\\ComfyUI\\` 为环境层（含 `python_embedded`、'
+          '`run_nvidia_gpu.bat`），模型路径：`D:\\ComfyUI\\ComfyUI\\models\\...`。';
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+
+      expect(
+        find.textContaining(r'D:\ComfyUI\', findRichText: true),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining('python_embedded', findRichText: true),
+        findsWidgets,
+      );
+      expect(
+        find.textContaining('run_nvidia_gpu.bat', findRichText: true),
+        findsWidgets,
+      );
+      // The sentence fragment must not be swallowed into the chip.
+      expect(find.textContaining('为环境层（含', findRichText: true), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'indented powershell fence with trailing-backslash path renders no extra line',
+    (tester) async {
+      const source = r'''1. **PowerShell / CMD 中的命令**  
+   当你给某个命令传入路径参数，但该命令期望的是**文件**路径，而你给的是**文件夹**路径时，系统会提示这个。  
+   例如：
+   ```powershell
+   Get-Content D:\ComfyUI\    # Get-Content 期望文件，但你给了目录
+   ```
+   或者有些工具会检查路径类型后输出 `"D:\ComfyUI\" is a dir`。
+
+2. **脚本 / 程序的参数校验**  
+   某个脚本或程序（比如 ComfyUI 相关的安装/启动脚本）在运行前检查 `D:\ComfyUI\` 路径，发现它确实是一个存在的目录，于是告诉你这个信息。''';
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+
+      final codeText = tester
+          .widgetList<SelectableText>(
+            find.descendant(
+              of: find.byType(SelectableHighlightView),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '')
+          .join('\n');
+
+      expect(codeText, contains(r'Get-Content D:\ComfyUI\'));
+      // The rendered code text must end at the code line: the indented
+      // full-line closer must not leak its indent into the content.
+      expect(codeText, endsWith('目录'), reason: 'code text: $codeText');
+      expect(codeText, isNot(endsWith('\n')), reason: 'code text: $codeText');
+    },
+  );
+
+  test(
+    'FencedCodeTokenMd keeps an info-string fence line inside the block',
+    () {
+      for (final source in const [
+        '```dart\na\n``` not-a-closer\nfollowing\n```',
+        '~~~\na\n~~~ not-a-closer\nfollowing\n~~~',
+        '````dart\na\n```` not-a-closer\nfollowing\n````',
+        '~~~~\na\n~~~~ not-a-closer\nfollowing\n~~~~',
+        '````dart\na\n``` not-a-closer\nfollowing\n````',
+      ]) {
+        final scan = markdownCodeScan(source);
+        expect(scan.segments, hasLength(1), reason: source);
+        final seg = scan.segments.single;
+        expect(seg.kind, MarkdownCodeSegmentKind.codeBlock, reason: source);
+        expect(seg.closed, isTrue, reason: source);
+        expect(seg.content, contains('not-a-closer'), reason: source);
+        expect(seg.content, contains('following'), reason: source);
+      }
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight keeps an info-string fence line inside the code block',
@@ -4822,6 +5102,15 @@ void main() {
         '~~~\na\n~~~ not-a-closer\nfollowing\n~~~',
         '````dart\na\n```` not-a-closer\nfollowing\n````',
       ]) {
+        final probe = markdownCodeScan(source);
+        for (final seg in probe.segments) {
+          if (seg.kind == MarkdownCodeSegmentKind.codeBlock) {
+            debugPrint(
+              'POWERSHELL_SCAN_SEG_BEGIN>>>${seg.content}<<<END '
+              'ids=${seg.content.codeUnits}',
+            );
+          }
+        }
         await tester.pumpWidget(_markdownHarness(source));
         await tester.pump();
         expect(

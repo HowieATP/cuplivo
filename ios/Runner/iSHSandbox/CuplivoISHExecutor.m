@@ -37,6 +37,15 @@ enum {
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 /// Grace period for the exit notification to arrive after a timeout kill.
 static const NSTimeInterval kKillGraceSeconds = 2.0;
+static const char *kNodeFetchPolyfillGuestPath =
+    "/lib/cuplivo-fetch-jitless-polyfill.js";
+
+static BOOL CuplivoGuestFileExists(const char *path) {
+    struct fd *fd = generic_open(path, O_RDONLY_, 0);
+    if (IS_ERR(fd)) return NO;
+    fd_close(fd);
+    return YES;
+}
 
 #pragma mark - Execution context
 
@@ -52,6 +61,7 @@ static const NSTimeInterval kKillGraceSeconds = 2.0;
 @property (nonatomic, readonly) CuplivoISHBoundedData *stdoutData;
 @property (nonatomic, readonly) CuplivoISHBoundedData *stderrData;
 @property (nonatomic, readonly) dispatch_semaphore_t waitSemaphore;
+@property (nonatomic, readonly) dispatch_group_t readersGroup;
 @property (atomic) int exitCode;
 @property (atomic) BOOL exited;
 @property (atomic) BOOL cancelled;
@@ -240,6 +250,7 @@ toCircularOffset:(NSUInteger)offset {
         _stdoutData = [[CuplivoISHBoundedData alloc] init];
         _stderrData = [[CuplivoISHBoundedData alloc] init];
         _waitSemaphore = dispatch_semaphore_create(0);
+        _readersGroup = dispatch_group_create();
         _stdoutPipe[0] = _stdoutPipe[1] = -1;
         _stderrPipe[0] = _stderrPipe[1] = -1;
         _exitCode = -1;
@@ -509,7 +520,7 @@ static dispatch_queue_t _readerQueue;
 
     ENVP_APPEND("TERM=xterm-256color");
     ENVP_APPEND("HOME=/root");
-    ENVP_APPEND("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    ENVP_APPEND("PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     ENVP_APPEND("LANG=C.UTF-8");
     ENVP_APPEND("CHARSET=UTF-8");
     ENVP_APPEND("DEBIAN_FRONTEND=noninteractive");
@@ -517,8 +528,19 @@ static dispatch_queue_t _readerQueue;
     ENVP_APPEND("NO_COLOR=1");
     ENVP_APPEND("PYTHONMALLOC=malloc");
     ENVP_APPEND("PYTHONDONTWRITEBYTECODE=1");
-    // V8 cannot JIT under emulation; node honours NODE_OPTIONS.
-    ENVP_APPEND("NODE_OPTIONS=--jitless --max-old-space-size=512");
+    // V8 cannot JIT under emulation. --no-experimental-fetch prevents Node
+    // 22 from loading undici's WASM llhttp parser; when the bundled fallback
+    // is present, it restores fetch through core http/https instead.
+    if (CuplivoGuestFileExists(kNodeFetchPolyfillGuestPath)) {
+        ENVP_APPEND("NODE_OPTIONS=--jitless --no-experimental-fetch "
+                    "--require=/lib/cuplivo-fetch-jitless-polyfill.js "
+                    "--max-old-space-size=512");
+    } else {
+        NSLog(@"CuplivoISHExecutor: node fetch polyfill unavailable; "
+              "disabling built-in fetch to avoid undici WASM crash");
+        ENVP_APPEND("NODE_OPTIONS=--jitless --no-experimental-fetch "
+                    "--max-old-space-size=512");
+    }
     // Go tuning (ported from OpenMinis): cap the scheduler to one core-pair
     // so it does not spin extra threads under the interpreter, and disable
     // async preemption which is expensive under emulation.
@@ -592,18 +614,18 @@ static dispatch_queue_t _readerQueue;
             dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kKillGraceSeconds * NSEC_PER_SEC)));
     }
 
-    // Let readers drain remaining pipe data before decoding.
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:kDrainGraceSeconds];
-    while ((!ctx.stdoutReaderDone || !ctx.stderrReaderDone) &&
-           [deadline timeIntervalSinceNow] > 0) {
-        [NSThread sleepForTimeInterval:0.05];
-    }
+    // Let readers drain remaining pipe data before decoding. This must be a
+    // completion wait, not a polling loop on _execQueue: the latter made the
+    // next shell command wait in 50ms increments after every exit.
+    BOOL readersDrained = dispatch_group_wait(
+        ctx.readersGroup,
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDrainGraceSeconds * NSEC_PER_SEC))) == 0;
 
     // A guest child that inherited the pipes keeps the write ends open, so
     // the readers stay blocked after the shell task exited. Reap those
     // descendants first: their fds close, the readers hit EOF and terminate
     // on their own.
-    if (ctx.exited || !ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
+    if (ctx.exited || !readersDrained) {
         // The shell may already have exited while a background child either
         // owns the pipe or redirected its output elsewhere. Keep the original
         // process-group id so that child is still terminated after the shell
@@ -612,15 +634,13 @@ static dispatch_queue_t _readerQueue;
     }
     // Last resort: closing the read ends unblocks the poll() loops (kqueue
     // based on Darwin). Only then join the readers.
-    if (!ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
+    if (!readersDrained) {
         [ctx closePipeEnds];
-        NSDate *closeDeadline = [NSDate dateWithTimeIntervalSinceNow:1.0];
-        while ((!ctx.stdoutReaderDone || !ctx.stderrReaderDone) &&
-               [closeDeadline timeIntervalSinceNow] > 0) {
-            [NSThread sleepForTimeInterval:0.05];
-        }
+        readersDrained = dispatch_group_wait(
+            ctx.readersGroup,
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDrainGraceSeconds * NSEC_PER_SEC))) == 0;
     }
-    if (!ctx.stdoutReaderDone || !ctx.stderrReaderDone) {
+    if (!readersDrained) {
         NSLog(@"CuplivoISHExecutor: reader(s) still alive for request %@ "
               "(stdout=%d stderr=%d); decoding captured data anyway",
               requestId, ctx.stdoutReaderDone, ctx.stderrReaderDone);
@@ -693,18 +713,19 @@ static dispatch_queue_t _readerQueue;
 
     ctx.exitCode = exitCode;
     ctx.exited = YES;
-    // Give pipe readers a moment to drain before waking the waiter.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(200 * NSEC_PER_MSEC)),
-                   dispatch_get_main_queue(), ^{
-        dispatch_semaphore_signal(ctx.waitSemaphore);
-    });
+    // Wake the executor as soon as the process exits. It separately waits on
+    // readersGroup with a bounded drain grace, so every successful command no
+    // longer pays an unconditional 200ms latency tax.
+    dispatch_semaphore_signal(ctx.waitSemaphore);
 }
 
 #pragma mark - Pipe reading
 
 + (void)startReaderForPipe:(int)fd context:(CuplivoISHExecutionContext *)ctx isStdErr:(BOOL)isStdErr {
+    dispatch_group_enter(ctx.readersGroup);
     dispatch_async(_readerQueue, ^{
         [self readPipe:fd context:ctx isStdErr:isStdErr];
+        dispatch_group_leave(ctx.readersGroup);
     });
 }
 
@@ -747,14 +768,39 @@ static dispatch_queue_t _readerQueue;
 
 #pragma mark - Kill
 
-static BOOL CuplivoTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
-    int hops = 0;
-    while (t != NULL && hops < MAX_PID) {
-        if (t->pid == rootPid) return YES;
-        t = t->parent;
-        hops++;
+static void CuplivoSignalThreadGroup(struct tgroup *group, int signal,
+                                     struct siginfo_ info) {
+    struct task *task;
+    list_for_each_entry(&group->threads, task, group_links) {
+        send_signal(task, signal, info);
     }
-    return NO;
+}
+
+/// Signals descendants that moved to a different process group. The original
+/// group is handled separately, so this avoids signalling its tasks twice.
+static void CuplivoSignalTaskTreeOutsideProcessGroup(
+    struct task *task, pid_t_ pgid, int signal, struct siginfo_ info) {
+    if (task->group->pgid != pgid && task_is_leader(task)) {
+        CuplivoSignalThreadGroup(task->group, signal, info);
+    }
+    struct task *child;
+    list_for_each_entry(&task->children, child, siblings) {
+        CuplivoSignalTaskTreeOutsideProcessGroup(child, pgid, signal, info);
+    }
+}
+
+/// Signal all threads in a process group directly through iSH's pgroup list.
+/// Scanning the whole 32K PID table under pids_lock made timeout/cancellation
+/// stalls proportional to the maximum PID instead of the command's process
+/// tree size.
+static void CuplivoSignalProcessGroup(pid_t_ pgid, int signal, struct siginfo_ info) {
+    struct pid *groupPid = pid_get((dword_t)pgid);
+    if (groupPid == NULL) return;
+
+    struct tgroup *group;
+    list_for_each_entry(&groupPid->pgroup, group, pgroup) {
+        CuplivoSignalThreadGroup(group, signal, info);
+    }
 }
 
 /// SIGTERM the process group (pgid match or ancestry), then SIGKILL
@@ -778,14 +824,11 @@ static BOOL CuplivoTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
         unlock(&pids_lock);
         return;
     }
-    for (int i = 2; i < MAX_PID; i++) {
-        struct task *t = pid_get_task(i);
-        if (!t) continue;
-        BOOL byPgid = (t->group->pgid == pgid);
-        BOOL byAncestry = rootTask && CuplivoTaskIsDescendantOf(t, (pid_t_)pid);
-        if (byPgid || byAncestry) {
-            send_signal(t, rootTask ? SIGTERM_ : SIGKILL_, info);
-        }
+    int immediateSignal = rootTask ? SIGTERM_ : SIGKILL_;
+    CuplivoSignalProcessGroup(pgid, immediateSignal, info);
+    if (rootTask != NULL) {
+        CuplivoSignalTaskTreeOutsideProcessGroup(rootTask, pgid,
+                                                  immediateSignal, info);
     }
     unlock(&pids_lock);
 
@@ -807,15 +850,11 @@ static BOOL CuplivoTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
             unlock(&pids_lock);
             return;
         }
-        for (int i = 2; i < MAX_PID; i++) {
-            struct task *t = pid_get_task(i);
-            if (!t) continue;
-            BOOL byPgid = (capturedPgid != 0 && t->group->pgid == capturedPgid);
-            BOOL byAncestry = CuplivoTaskIsDescendantOf(t, (pid_t_)capturedPid);
-            if (byPgid || byAncestry) {
-                send_signal(t, SIGKILL_, info);
-            }
+        if (capturedPgid != 0) {
+            CuplivoSignalProcessGroup(capturedPgid, SIGKILL_, info);
         }
+        CuplivoSignalTaskTreeOutsideProcessGroup(still, capturedPgid,
+                                                  SIGKILL_, info);
         unlock(&pids_lock);
     });
 }

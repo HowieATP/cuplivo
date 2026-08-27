@@ -1128,6 +1128,17 @@ class $MessageRowsTable extends MessageRows
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _quoteJsonMeta = const VerificationMeta(
+    'quoteJson',
+  );
+  @override
+  late final GeneratedColumn<String> quoteJson = GeneratedColumn<String>(
+    'quote_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1157,6 +1168,7 @@ class $MessageRowsTable extends MessageRows
     speakerAssistantId,
     requestAllowImagesApiRouting,
     requestExtraBodyJson,
+    quoteJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1389,6 +1401,12 @@ class $MessageRowsTable extends MessageRows
         ),
       );
     }
+    if (data.containsKey('quote_json')) {
+      context.handle(
+        _quoteJsonMeta,
+        quoteJson.isAcceptableOrUnknown(data['quote_json']!, _quoteJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -1506,6 +1524,10 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.string,
         data['${effectivePrefix}request_extra_body_json'],
       ),
+      quoteJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quote_json'],
+      ),
     );
   }
 
@@ -1549,6 +1571,10 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   /// image generation options. See docs/adr/0033-per-message-request-metadata.md.
   final bool? requestAllowImagesApiRouting;
   final String? requestExtraBodyJson;
+
+  /// JSON-encoded MessageQuote citation reference (schema v20, issue #312).
+  /// Nullable TEXT so existing rows and non-reply messages stay untouched.
+  final String? quoteJson;
   const MessageRow({
     required this.id,
     required this.conversationId,
@@ -1577,6 +1603,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.speakerAssistantId,
     this.requestAllowImagesApiRouting,
     this.requestExtraBodyJson,
+    this.quoteJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1645,6 +1672,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     }
     if (!nullToAbsent || requestExtraBodyJson != null) {
       map['request_extra_body_json'] = Variable<String>(requestExtraBodyJson);
+    }
+    if (!nullToAbsent || quoteJson != null) {
+      map['quote_json'] = Variable<String>(quoteJson);
     }
     return map;
   }
@@ -1715,6 +1745,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       requestExtraBodyJson: requestExtraBodyJson == null && nullToAbsent
           ? const Value.absent()
           : Value(requestExtraBodyJson),
+      quoteJson: quoteJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteJson),
     );
   }
 
@@ -1763,6 +1796,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       requestExtraBodyJson: serializer.fromJson<String?>(
         json['requestExtraBodyJson'],
       ),
+      quoteJson: serializer.fromJson<String?>(json['quoteJson']),
     );
   }
   @override
@@ -1800,6 +1834,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
         requestAllowImagesApiRouting,
       ),
       'requestExtraBodyJson': serializer.toJson<String?>(requestExtraBodyJson),
+      'quoteJson': serializer.toJson<String?>(quoteJson),
     };
   }
 
@@ -1831,6 +1866,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<String?> speakerAssistantId = const Value.absent(),
     Value<bool?> requestAllowImagesApiRouting = const Value.absent(),
     Value<String?> requestExtraBodyJson = const Value.absent(),
+    Value<String?> quoteJson = const Value.absent(),
   }) => MessageRow(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
@@ -1877,6 +1913,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     requestExtraBodyJson: requestExtraBodyJson.present
         ? requestExtraBodyJson.value
         : this.requestExtraBodyJson,
+    quoteJson: quoteJson.present ? quoteJson.value : this.quoteJson,
   );
   MessageRow copyWithCompanion(MessageRowsCompanion data) {
     return MessageRow(
@@ -1945,6 +1982,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       requestExtraBodyJson: data.requestExtraBodyJson.present
           ? data.requestExtraBodyJson.value
           : this.requestExtraBodyJson,
+      quoteJson: data.quoteJson.present ? data.quoteJson.value : this.quoteJson,
     );
   }
 
@@ -1979,7 +2017,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write(
             'requestAllowImagesApiRouting: $requestAllowImagesApiRouting, ',
           )
-          ..write('requestExtraBodyJson: $requestExtraBodyJson')
+          ..write('requestExtraBodyJson: $requestExtraBodyJson, ')
+          ..write('quoteJson: $quoteJson')
           ..write(')'))
         .toString();
   }
@@ -2013,6 +2052,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     speakerAssistantId,
     requestAllowImagesApiRouting,
     requestExtraBodyJson,
+    quoteJson,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2045,7 +2085,8 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.speakerAssistantId == this.speakerAssistantId &&
           other.requestAllowImagesApiRouting ==
               this.requestAllowImagesApiRouting &&
-          other.requestExtraBodyJson == this.requestExtraBodyJson);
+          other.requestExtraBodyJson == this.requestExtraBodyJson &&
+          other.quoteJson == this.quoteJson);
 }
 
 class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
@@ -2076,6 +2117,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   final Value<String?> speakerAssistantId;
   final Value<bool?> requestAllowImagesApiRouting;
   final Value<String?> requestExtraBodyJson;
+  final Value<String?> quoteJson;
   final Value<int> rowid;
   const MessageRowsCompanion({
     this.id = const Value.absent(),
@@ -2105,6 +2147,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.speakerAssistantId = const Value.absent(),
     this.requestAllowImagesApiRouting = const Value.absent(),
     this.requestExtraBodyJson = const Value.absent(),
+    this.quoteJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageRowsCompanion.insert({
@@ -2135,6 +2178,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.speakerAssistantId = const Value.absent(),
     this.requestAllowImagesApiRouting = const Value.absent(),
     this.requestExtraBodyJson = const Value.absent(),
+    this.quoteJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
@@ -2170,6 +2214,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<String>? speakerAssistantId,
     Expression<bool>? requestAllowImagesApiRouting,
     Expression<String>? requestExtraBodyJson,
+    Expression<String>? quoteJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2205,6 +2250,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
         'request_allow_images_api_routing': requestAllowImagesApiRouting,
       if (requestExtraBodyJson != null)
         'request_extra_body_json': requestExtraBodyJson,
+      if (quoteJson != null) 'quote_json': quoteJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2237,6 +2283,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Value<String?>? speakerAssistantId,
     Value<bool?>? requestAllowImagesApiRouting,
     Value<String?>? requestExtraBodyJson,
+    Value<String?>? quoteJson,
     Value<int>? rowid,
   }) {
     return MessageRowsCompanion(
@@ -2269,6 +2316,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       requestAllowImagesApiRouting:
           requestAllowImagesApiRouting ?? this.requestAllowImagesApiRouting,
       requestExtraBodyJson: requestExtraBodyJson ?? this.requestExtraBodyJson,
+      quoteJson: quoteJson ?? this.quoteJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2365,6 +2413,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
         requestExtraBodyJson.value,
       );
     }
+    if (quoteJson.present) {
+      map['quote_json'] = Variable<String>(quoteJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2403,6 +2454,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
             'requestAllowImagesApiRouting: $requestAllowImagesApiRouting, ',
           )
           ..write('requestExtraBodyJson: $requestExtraBodyJson, ')
+          ..write('quoteJson: $quoteJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9182,6 +9234,7 @@ typedef $$MessageRowsTableCreateCompanionBuilder =
       Value<String?> speakerAssistantId,
       Value<bool?> requestAllowImagesApiRouting,
       Value<String?> requestExtraBodyJson,
+      Value<String?> quoteJson,
       Value<int> rowid,
     });
 typedef $$MessageRowsTableUpdateCompanionBuilder =
@@ -9213,6 +9266,7 @@ typedef $$MessageRowsTableUpdateCompanionBuilder =
       Value<String?> speakerAssistantId,
       Value<bool?> requestAllowImagesApiRouting,
       Value<String?> requestExtraBodyJson,
+      Value<String?> quoteJson,
       Value<int> rowid,
     });
 
@@ -9419,6 +9473,11 @@ class $$MessageRowsTableFilterComposer
 
   ColumnFilters<String> get requestExtraBodyJson => $composableBuilder(
     column: $table.requestExtraBodyJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quoteJson => $composableBuilder(
+    column: $table.quoteJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9637,6 +9696,11 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get quoteJson => $composableBuilder(
+    column: $table.quoteJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationRowsTableOrderingComposer get conversationId {
     final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9784,6 +9848,9 @@ class $$MessageRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get quoteJson =>
+      $composableBuilder(column: $table.quoteJson, builder: (column) => column);
+
   $$ConversationRowsTableAnnotationComposer get conversationId {
     final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -9922,6 +9989,7 @@ class $$MessageRowsTableTableManager
                 Value<bool?> requestAllowImagesApiRouting =
                     const Value.absent(),
                 Value<String?> requestExtraBodyJson = const Value.absent(),
+                Value<String?> quoteJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion(
                 id: id,
@@ -9951,6 +10019,7 @@ class $$MessageRowsTableTableManager
                 speakerAssistantId: speakerAssistantId,
                 requestAllowImagesApiRouting: requestAllowImagesApiRouting,
                 requestExtraBodyJson: requestExtraBodyJson,
+                quoteJson: quoteJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9983,6 +10052,7 @@ class $$MessageRowsTableTableManager
                 Value<bool?> requestAllowImagesApiRouting =
                     const Value.absent(),
                 Value<String?> requestExtraBodyJson = const Value.absent(),
+                Value<String?> quoteJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion.insert(
                 id: id,
@@ -10012,6 +10082,7 @@ class $$MessageRowsTableTableManager
                 speakerAssistantId: speakerAssistantId,
                 requestAllowImagesApiRouting: requestAllowImagesApiRouting,
                 requestExtraBodyJson: requestExtraBodyJson,
+                quoteJson: quoteJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -55,6 +55,21 @@ typedef OnSelectMessages =
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
 typedef OnSuggestionTap = void Function(String suggestion);
 typedef OnQuoteSelection = void Function(String text);
+typedef OnReplyMessage = void Function(ChatMessage message);
+typedef OnReplySelectionMessage =
+    void Function(ChatMessage message, String selected);
+
+/// Resolves a message by id inside the current display list. Returns null when
+/// the id is absent or unresolvable (deleted target → QuoteBlock renders the
+/// stub).
+ChatMessage? _findMessageById(List<ChatMessage> messages, String? id) {
+  if (id == null) return null;
+  for (final m in messages) {
+    if (m.id == id) return m;
+  }
+  return null;
+}
+
 typedef OnRecoveredAskUserAnswer =
     Future<void> Function(
       ChatMessage message,
@@ -138,6 +153,8 @@ class MessageListView extends StatefulWidget {
     this.afterMessageWidgets,
     this.onSuggestionTap,
     this.onQuoteSelection,
+    this.onReplyMessage,
+    this.onReplySelectionMessage,
     this.onRecoveredAskUserAnswer,
     this.onToggleSelection,
     this.onToggleReasoning,
@@ -231,6 +248,8 @@ class MessageListView extends StatefulWidget {
 
   final OnSuggestionTap? onSuggestionTap;
   final OnQuoteSelection? onQuoteSelection;
+  final OnReplyMessage? onReplyMessage;
+  final OnReplySelectionMessage? onReplySelectionMessage;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
   final void Function(String messageId)? onToggleReasoning;
@@ -1818,6 +1837,8 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onDeleteAllVersions?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.edit) {
           widget.onEditMessage?.call(message);
+        } else if (action == MessageMoreAction.reply) {
+          widget.onReplyMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {
           await widget.onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {
@@ -1878,6 +1899,10 @@ class _MessageListViewState extends State<MessageListView> {
       suggestions: suggestions,
       onSuggestionTap: widget.onSuggestionTap,
       onQuoteSelection: widget.onQuoteSelection,
+      onReplySelection: widget.onReplySelectionMessage == null
+          ? null
+          : (selected) => widget.onReplySelectionMessage!(message, selected),
+      quoteTarget: _findMessageById(widget.messages, message.quote?.id),
       onRecoveredAskUserAnswer: widget.onRecoveredAskUserAnswer == null
           ? null
           : (part, result) =>

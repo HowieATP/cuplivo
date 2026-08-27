@@ -73,6 +73,9 @@ Do **not** store sensitive information, including:
 
   /// Default guest working directory per workspace entity id.
   final Map<String, String> workspaceDefaultDirectories;
+
+  /// Whether project-level AGENTS.md files are added to the system prompt.
+  final bool autoLoadAgentsMd;
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -136,6 +139,7 @@ Do **not** store sensitive information, including:
     this.workspaceEnabled = false,
     this.workspaceId,
     Map<String, String>? workspaceDefaultDirectories,
+    this.autoLoadAgentsMd = true,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -204,6 +208,7 @@ Do **not** store sensitive information, including:
     bool? workspaceEnabled,
     String? workspaceId,
     Map<String, String>? workspaceDefaultDirectories,
+    bool? autoLoadAgentsMd,
     bool clearWorkspaceId = false,
     String? background,
     List<Map<String, String>>? customHeaders,
@@ -269,6 +274,7 @@ Do **not** store sensitive information, including:
       workspaceId: clearWorkspaceId ? null : (workspaceId ?? this.workspaceId),
       workspaceDefaultDirectories:
           workspaceDefaultDirectories ?? this.workspaceDefaultDirectories,
+      autoLoadAgentsMd: autoLoadAgentsMd ?? this.autoLoadAgentsMd,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -327,6 +333,7 @@ Do **not** store sensitive information, including:
     'workspaceEnabled': workspaceEnabled,
     'workspaceId': workspaceId,
     'workspaceDefaultDirectories': workspaceDefaultDirectories,
+    'autoLoadAgentsMd': autoLoadAgentsMd,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -386,6 +393,7 @@ Do **not** store sensitive information, including:
         (key, value) => MapEntry(key.toString(), value.toString()),
       );
     })(),
+    autoLoadAgentsMd: json['autoLoadAgentsMd'] as bool? ?? true,
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

@@ -15839,6 +15839,30 @@ abstract class AppLocalizations {
   /// **'Failed to save working directory: {error}'**
   String workspaceDirectorySaveFailed(String error);
 
+  /// No description provided for @workspaceAutoLoadAgentsMdTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically load AGENTS.md'**
+  String get workspaceAutoLoadAgentsMdTitle;
+
+  /// No description provided for @workspaceAutoLoadAgentsMdSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Load project instructions from this directory up to the workspace root'**
+  String get workspaceAutoLoadAgentsMdSubtitle;
+
+  /// No description provided for @workspaceAgentsMdLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load AGENTS.md instructions. Fix the file or turn off automatic loading.'**
+  String get workspaceAgentsMdLoadFailed;
+
+  /// No description provided for @workspaceAgentsMdSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the AGENTS.md loading setting.'**
+  String get workspaceAgentsMdSaveFailed;
+
   /// No description provided for @workspaceDirectoryPickerTitle.
   ///
   /// In en, this message translates to:

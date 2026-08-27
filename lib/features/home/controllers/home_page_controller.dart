@@ -29,6 +29,7 @@ import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
+import '../../../core/services/workspace/workspace_execution_context.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -532,6 +533,8 @@ class HomePageController extends ChangeNotifier {
     switch (error) {
       case 'audio_attachment_unsupported':
         return l10n.homePageAudioAttachmentUnsupported;
+      case workspaceAgentsMdLoadErrorCode:
+        return l10n.workspaceAgentsMdLoadFailed;
       default:
         return '${l10n.generationInterrupted}: $error';
     }

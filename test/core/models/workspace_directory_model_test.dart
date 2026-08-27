@@ -16,6 +16,7 @@ void main() {
     final restored = Assistant.fromJson(assistant.toJson());
     expect(restored.workspaceDefaultDirectories['workspace-a'], '/workspace/a');
     expect(restored.workspaceDefaultDirectories['workspace-b'], '/workspace/b');
+    expect(restored.autoLoadAgentsMd, isTrue);
     expect(
       restored
           .copyWith(
@@ -25,6 +26,12 @@ void main() {
           )
           .workspaceDefaultDirectories,
       {'workspace-a': '/workspace/other'},
+    );
+    expect(
+      Assistant.fromJson(
+        assistant.copyWith(autoLoadAgentsMd: false).toJson(),
+      ).autoLoadAgentsMd,
+      isFalse,
     );
   });
 
@@ -60,6 +67,7 @@ void main() {
     });
 
     expect(assistant.workspaceDefaultDirectories, isEmpty);
+    expect(assistant.autoLoadAgentsMd, isTrue);
     expect(conversation.workspaceDirectoryOverrides, isEmpty);
   });
 }

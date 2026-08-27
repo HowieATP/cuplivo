@@ -3890,6 +3890,10 @@
       }
     }
   },
+  "workspaceAutoLoadAgentsMdTitle": "Automatically load AGENTS.md",
+  "workspaceAutoLoadAgentsMdSubtitle": "Load project instructions from this directory up to the workspace root",
+  "workspaceAgentsMdLoadFailed": "Couldn't load AGENTS.md instructions. Fix the file or turn off automatic loading.",
+  "workspaceAgentsMdSaveFailed": "Couldn't save the AGENTS.md loading setting.",
   "workspaceDirectoryPickerTitle": "Choose working directory",
   "workspaceDirectorySelectCurrent": "Use this folder",
   "workspaceShellMobileOnly": "Shell is only available on Android or iOS",

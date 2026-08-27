@@ -902,6 +902,8 @@ class ProactiveCareHeadlessChatStore {
       'workspaceDefaultDirectories': jsonDecode(
         _readOptionalString(row, 'workspace_default_directories_json') ?? '{}',
       ),
+      'autoLoadAgentsMd':
+          (_readOptionalString(row, 'auto_load_agents_md') ?? '1') != '0',
       'customHeaders': jsonDecode(row['custom_headers_json'] as String),
       'customBody': jsonDecode(row['custom_body_json'] as String),
       'enableMemory': (row['enable_memory'] as int) != 0,

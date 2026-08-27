@@ -326,11 +326,11 @@ CREATE TABLE group_chat_rows (
     await repo.close();
   });
 
-  test('heal adds workspace directory maps before assistant and conversation '
-      'inserts (v20 column shape)', () async {
+  test('heal adds workspace directory maps and AGENTS.md loading before '
+      'assistant and conversation inserts (v21 column shape)', () async {
     _createLegacyDb(
       dbFile,
-      userVersion: 20,
+      userVersion: 21,
       missingIsPreset: false,
       missingHandoffColumns: false,
       missingContextTokens: false,
@@ -344,6 +344,7 @@ CREATE TABLE group_chat_rows (
         id: 'a1',
         name: 'Alpha',
         workspaceDefaultDirectories: const {'w1': '/workspace/project'},
+        autoLoadAgentsMd: false,
       ),
       sortOrder: 0,
     );
@@ -360,6 +361,7 @@ CREATE TABLE group_chat_rows (
     expect(assistants.single.workspaceDefaultDirectories, {
       'w1': '/workspace/project',
     });
+    expect(assistants.single.autoLoadAgentsMd, isFalse);
     expect(conversations.single.workspaceDirectoryOverrides, {
       'w1': '/workspace/project/session',
     });

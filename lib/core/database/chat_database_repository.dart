@@ -1058,6 +1058,7 @@ class ChatDatabaseRepository {
       'workspaceDefaultDirectories': jsonDecode(
         row.workspaceDefaultDirectoriesJson,
       ),
+      'autoLoadAgentsMd': row.autoLoadAgentsMd,
       'customHeaders': jsonDecode(row.customHeadersJson),
       'customBody': jsonDecode(row.customBodyJson),
       'enableMemory': row.enableMemory,
@@ -1113,6 +1114,7 @@ class ChatDatabaseRepository {
       workspaceDefaultDirectoriesJson: Value(
         jsonEncode(a.workspaceDefaultDirectories),
       ),
+      autoLoadAgentsMd: Value(a.autoLoadAgentsMd),
       customHeadersJson: Value(jsonEncode(a.customHeaders)),
       customBodyJson: Value(jsonEncode(a.customBody)),
       enableMemory: Value(a.enableMemory),

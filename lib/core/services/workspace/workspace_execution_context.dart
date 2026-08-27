@@ -16,6 +16,19 @@ class WorkspacePathException implements Exception {
   String toString() => message;
 }
 
+/// Stable error code surfaced when project AGENTS.md instructions cannot be
+/// loaded safely for a generation request.
+const String workspaceAgentsMdLoadErrorCode = 'workspace_agents_md_load_failed';
+
+class WorkspaceAgentsMdLoadException implements Exception {
+  const WorkspaceAgentsMdLoadException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => workspaceAgentsMdLoadErrorCode;
+}
+
 /// Immutable workspace state captured for one model generation.
 class WorkspaceExecutionContext {
   const WorkspaceExecutionContext({
@@ -261,6 +274,118 @@ Future<String> ensureWorkspaceDirectoryAtHostRoot({
     );
   }
   return canonicalTarget;
+}
+
+/// Loads all project-level AGENTS.md files from [context.workingDirectory]
+/// upward through the workspace root, closest directory first.
+///
+/// The returned prompt uses guest paths only. AGENTS.md files must resolve to
+/// regular files inside the workspace root; this prevents a project symlink
+/// from causing unrelated host data to be sent to the model provider.
+Future<String?> loadWorkspaceAgentsMdInstructions({
+  required WorkspaceExecutionContext context,
+  required WorkspaceProvider workspaces,
+}) async {
+  try {
+    final hostRoot = workspaces.hostPathFor(context.workspace);
+    if (hostRoot == null || hostRoot.isEmpty) {
+      throw const WorkspaceAgentsMdLoadException(
+        'Workspace host path is not ready.',
+      );
+    }
+
+    final canonicalRoot = await _resolveDirectoryLinks(
+      Directory(hostRoot),
+      description: 'workspace root',
+    );
+    final segments = _workspaceSegments(
+      context.workingDirectory,
+      allowRelative: false,
+    );
+    final workingDirectory = Directory(
+      p.joinAll(<String>[canonicalRoot, ...segments]),
+    );
+    if (await FileSystemEntity.type(workingDirectory.path) !=
+        FileSystemEntityType.directory) {
+      throw const WorkspaceAgentsMdLoadException(
+        'The workspace working directory no longer exists.',
+      );
+    }
+    final canonicalWorkingDirectory = await _resolveDirectoryLinks(
+      workingDirectory,
+      description: 'workspace working directory',
+    );
+    if (!p.equals(canonicalRoot, canonicalWorkingDirectory) &&
+        !p.isWithin(canonicalRoot, canonicalWorkingDirectory)) {
+      throw const WorkspaceAgentsMdLoadException(
+        'The workspace working directory escapes the workspace root.',
+      );
+    }
+
+    final instructions = <String>[];
+    var current = canonicalWorkingDirectory;
+    while (true) {
+      final candidatePath = p.join(current, 'AGENTS.md');
+      final candidateType = await FileSystemEntity.type(
+        candidatePath,
+        followLinks: false,
+      );
+      if (candidateType != FileSystemEntityType.notFound) {
+        if (candidateType != FileSystemEntityType.file &&
+            candidateType != FileSystemEntityType.link) {
+          throw WorkspaceAgentsMdLoadException(
+            'AGENTS.md is not a file: ${_guestDirectoryPath(canonicalRoot, current)}',
+          );
+        }
+
+        final file = File(candidatePath);
+        final canonicalFile = p.normalize(await file.resolveSymbolicLinks());
+        if (!p.isWithin(canonicalRoot, canonicalFile) ||
+            await FileSystemEntity.type(canonicalFile, followLinks: false) !=
+                FileSystemEntityType.file) {
+          throw WorkspaceAgentsMdLoadException(
+            'AGENTS.md resolves outside the workspace root: '
+            '${_guestDirectoryPath(canonicalRoot, current)}',
+          );
+        }
+
+        final content = await file.readAsString();
+        instructions.add(
+          'Instructions from: '
+          '${_guestDirectoryPath(canonicalRoot, current)}/AGENTS.md\n$content',
+        );
+      }
+
+      if (p.equals(current, canonicalRoot)) break;
+      final parent = p.dirname(current);
+      if (!p.equals(parent, canonicalRoot) &&
+          !p.isWithin(canonicalRoot, parent)) {
+        throw const WorkspaceAgentsMdLoadException(
+          'Instruction discovery escaped the workspace root.',
+        );
+      }
+      current = parent;
+    }
+
+    return instructions.isEmpty ? null : instructions.join('\n\n');
+  } on WorkspaceAgentsMdLoadException {
+    rethrow;
+  } on WorkspacePathException catch (error) {
+    throw WorkspaceAgentsMdLoadException(
+      'Unable to resolve the workspace for AGENTS.md loading: '
+      '${error.message}',
+    );
+  } on FileSystemException catch (error) {
+    throw WorkspaceAgentsMdLoadException(
+      'Unable to load workspace AGENTS.md instructions: ${error.message}',
+    );
+  }
+}
+
+String _guestDirectoryPath(String canonicalRoot, String directory) {
+  final relative = p.relative(directory, from: canonicalRoot);
+  if (relative == '.' || relative.isEmpty) return '/workspace';
+  return '/workspace/${relative.replaceAll('\\', '/')}';
 }
 
 Future<String> _resolveDirectoryLinks(

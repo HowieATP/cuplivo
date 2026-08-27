@@ -8421,6 +8421,18 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get workspaceAutoLoadAgentsMdTitle => '自动加载 AGENTS.md';
+
+  @override
+  String get workspaceAutoLoadAgentsMdSubtitle => '从此目录向上到工作区根目录加载项目指令';
+
+  @override
+  String get workspaceAgentsMdLoadFailed => '无法加载 AGENTS.md 指令。请修复该文件或关闭自动加载。';
+
+  @override
+  String get workspaceAgentsMdSaveFailed => '无法保存 AGENTS.md 加载设置。';
+
+  @override
   String get workspaceDirectoryPickerTitle => '选择工作目录';
 
   @override
@@ -17147,6 +17159,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String workspaceDirectorySaveFailed(String error) {
     return '保存工作目录失败：$error';
   }
+
+  @override
+  String get workspaceAutoLoadAgentsMdTitle => '自动加载 AGENTS.md';
+
+  @override
+  String get workspaceAutoLoadAgentsMdSubtitle => '从此目录向上到工作区根目录加载项目指令';
+
+  @override
+  String get workspaceAgentsMdLoadFailed => '无法加载 AGENTS.md 指令。请修复该文件或关闭自动加载。';
+
+  @override
+  String get workspaceAgentsMdSaveFailed => '无法保存 AGENTS.md 加载设置。';
 
   @override
   String get workspaceDirectoryPickerTitle => '选择工作目录';
@@ -25877,6 +25901,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String workspaceDirectorySaveFailed(String error) {
     return '儲存工作目錄失敗：$error';
   }
+
+  @override
+  String get workspaceAutoLoadAgentsMdTitle => '自動載入 AGENTS.md';
+
+  @override
+  String get workspaceAutoLoadAgentsMdSubtitle => '從此目錄向上至工作區根目錄載入專案指令';
+
+  @override
+  String get workspaceAgentsMdLoadFailed => '無法載入 AGENTS.md 指令。請修正該檔案或關閉自動載入。';
+
+  @override
+  String get workspaceAgentsMdSaveFailed => '無法儲存 AGENTS.md 載入設定。';
 
   @override
   String get workspaceDirectoryPickerTitle => '選擇工作目錄';

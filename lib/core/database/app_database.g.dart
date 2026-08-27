@@ -2858,6 +2858,21 @@ class $AssistantRowsTable extends AssistantRows
         requiredDuringInsert: false,
         defaultValue: const Constant('{}'),
       );
+  static const VerificationMeta _autoLoadAgentsMdMeta = const VerificationMeta(
+    'autoLoadAgentsMd',
+  );
+  @override
+  late final GeneratedColumn<bool> autoLoadAgentsMd = GeneratedColumn<bool>(
+    'auto_load_agents_md',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("auto_load_agents_md" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _regexRulesJsonMeta = const VerificationMeta(
     'regexRulesJson',
   );
@@ -3146,6 +3161,7 @@ class $AssistantRowsTable extends AssistantRows
     workspaceEnabled,
     workspaceId,
     workspaceDefaultDirectoriesJson,
+    autoLoadAgentsMd,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -3403,6 +3419,15 @@ class $AssistantRowsTable extends AssistantRows
         workspaceDefaultDirectoriesJson.isAcceptableOrUnknown(
           data['workspace_default_directories_json']!,
           _workspaceDefaultDirectoriesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('auto_load_agents_md')) {
+      context.handle(
+        _autoLoadAgentsMdMeta,
+        autoLoadAgentsMd.isAcceptableOrUnknown(
+          data['auto_load_agents_md']!,
+          _autoLoadAgentsMdMeta,
         ),
       );
     }
@@ -3694,6 +3719,10 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}workspace_default_directories_json'],
       )!,
+      autoLoadAgentsMd: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}auto_load_agents_md'],
+      )!,
       regexRulesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}regex_rules_json'],
@@ -3815,6 +3844,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final bool workspaceEnabled;
   final String? workspaceId;
   final String workspaceDefaultDirectoriesJson;
+  final bool autoLoadAgentsMd;
   final String regexRulesJson;
   final bool enableProactiveCare;
   final DateTime? proactiveCareNextMessageAt;
@@ -3864,6 +3894,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.workspaceEnabled,
     this.workspaceId,
     required this.workspaceDefaultDirectoriesJson,
+    required this.autoLoadAgentsMd,
     required this.regexRulesJson,
     required this.enableProactiveCare,
     this.proactiveCareNextMessageAt,
@@ -3936,6 +3967,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['workspace_default_directories_json'] = Variable<String>(
       workspaceDefaultDirectoriesJson,
     );
+    map['auto_load_agents_md'] = Variable<bool>(autoLoadAgentsMd);
     map['regex_rules_json'] = Variable<String>(regexRulesJson);
     map['enable_proactive_care'] = Variable<bool>(enableProactiveCare);
     if (!nullToAbsent || proactiveCareNextMessageAt != null) {
@@ -4019,6 +4051,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ? const Value.absent()
           : Value(workspaceId),
       workspaceDefaultDirectoriesJson: Value(workspaceDefaultDirectoriesJson),
+      autoLoadAgentsMd: Value(autoLoadAgentsMd),
       regexRulesJson: Value(regexRulesJson),
       enableProactiveCare: Value(enableProactiveCare),
       proactiveCareNextMessageAt:
@@ -4091,6 +4124,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       workspaceDefaultDirectoriesJson: serializer.fromJson<String>(
         json['workspaceDefaultDirectoriesJson'],
       ),
+      autoLoadAgentsMd: serializer.fromJson<bool>(json['autoLoadAgentsMd']),
       regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
       enableProactiveCare: serializer.fromJson<bool>(
         json['enableProactiveCare'],
@@ -4165,6 +4199,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'workspaceDefaultDirectoriesJson': serializer.toJson<String>(
         workspaceDefaultDirectoriesJson,
       ),
+      'autoLoadAgentsMd': serializer.toJson<bool>(autoLoadAgentsMd),
       'regexRulesJson': serializer.toJson<String>(regexRulesJson),
       'enableProactiveCare': serializer.toJson<bool>(enableProactiveCare),
       'proactiveCareNextMessageAt': serializer.toJson<DateTime?>(
@@ -4225,6 +4260,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     bool? workspaceEnabled,
     Value<String?> workspaceId = const Value.absent(),
     String? workspaceDefaultDirectoriesJson,
+    bool? autoLoadAgentsMd,
     String? regexRulesJson,
     bool? enableProactiveCare,
     Value<DateTime?> proactiveCareNextMessageAt = const Value.absent(),
@@ -4279,6 +4315,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     workspaceId: workspaceId.present ? workspaceId.value : this.workspaceId,
     workspaceDefaultDirectoriesJson:
         workspaceDefaultDirectoriesJson ?? this.workspaceDefaultDirectoriesJson,
+    autoLoadAgentsMd: autoLoadAgentsMd ?? this.autoLoadAgentsMd,
     regexRulesJson: regexRulesJson ?? this.regexRulesJson,
     enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
     proactiveCareNextMessageAt: proactiveCareNextMessageAt.present
@@ -4382,6 +4419,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           data.workspaceDefaultDirectoriesJson.present
           ? data.workspaceDefaultDirectoriesJson.value
           : this.workspaceDefaultDirectoriesJson,
+      autoLoadAgentsMd: data.autoLoadAgentsMd.present
+          ? data.autoLoadAgentsMd.value
+          : this.autoLoadAgentsMd,
       regexRulesJson: data.regexRulesJson.present
           ? data.regexRulesJson.value
           : this.regexRulesJson,
@@ -4467,6 +4507,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write(
             'workspaceDefaultDirectoriesJson: $workspaceDefaultDirectoriesJson, ',
           )
+          ..write('autoLoadAgentsMd: $autoLoadAgentsMd, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -4523,6 +4564,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     workspaceEnabled,
     workspaceId,
     workspaceDefaultDirectoriesJson,
+    autoLoadAgentsMd,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -4577,6 +4619,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.workspaceId == this.workspaceId &&
           other.workspaceDefaultDirectoriesJson ==
               this.workspaceDefaultDirectoriesJson &&
+          other.autoLoadAgentsMd == this.autoLoadAgentsMd &&
           other.regexRulesJson == this.regexRulesJson &&
           other.enableProactiveCare == this.enableProactiveCare &&
           other.proactiveCareNextMessageAt == this.proactiveCareNextMessageAt &&
@@ -4630,6 +4673,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<bool> workspaceEnabled;
   final Value<String?> workspaceId;
   final Value<String> workspaceDefaultDirectoriesJson;
+  final Value<bool> autoLoadAgentsMd;
   final Value<String> regexRulesJson;
   final Value<bool> enableProactiveCare;
   final Value<DateTime?> proactiveCareNextMessageAt;
@@ -4680,6 +4724,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.workspaceEnabled = const Value.absent(),
     this.workspaceId = const Value.absent(),
     this.workspaceDefaultDirectoriesJson = const Value.absent(),
+    this.autoLoadAgentsMd = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -4731,6 +4776,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.workspaceEnabled = const Value.absent(),
     this.workspaceId = const Value.absent(),
     this.workspaceDefaultDirectoriesJson = const Value.absent(),
+    this.autoLoadAgentsMd = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -4786,6 +4832,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<bool>? workspaceEnabled,
     Expression<String>? workspaceId,
     Expression<String>? workspaceDefaultDirectoriesJson,
+    Expression<bool>? autoLoadAgentsMd,
     Expression<String>? regexRulesJson,
     Expression<bool>? enableProactiveCare,
     Expression<DateTime>? proactiveCareNextMessageAt,
@@ -4842,6 +4889,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (workspaceId != null) 'workspace_id': workspaceId,
       if (workspaceDefaultDirectoriesJson != null)
         'workspace_default_directories_json': workspaceDefaultDirectoriesJson,
+      if (autoLoadAgentsMd != null) 'auto_load_agents_md': autoLoadAgentsMd,
       if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
       if (enableProactiveCare != null)
         'enable_proactive_care': enableProactiveCare,
@@ -4903,6 +4951,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<bool>? workspaceEnabled,
     Value<String?>? workspaceId,
     Value<String>? workspaceDefaultDirectoriesJson,
+    Value<bool>? autoLoadAgentsMd,
     Value<String>? regexRulesJson,
     Value<bool>? enableProactiveCare,
     Value<DateTime?>? proactiveCareNextMessageAt,
@@ -4956,6 +5005,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       workspaceDefaultDirectoriesJson:
           workspaceDefaultDirectoriesJson ??
           this.workspaceDefaultDirectoriesJson,
+      autoLoadAgentsMd: autoLoadAgentsMd ?? this.autoLoadAgentsMd,
       regexRulesJson: regexRulesJson ?? this.regexRulesJson,
       enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
       proactiveCareNextMessageAt:
@@ -5073,6 +5123,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
         workspaceDefaultDirectoriesJson.value,
       );
     }
+    if (autoLoadAgentsMd.present) {
+      map['auto_load_agents_md'] = Variable<bool>(autoLoadAgentsMd.value);
+    }
     if (regexRulesJson.present) {
       map['regex_rules_json'] = Variable<String>(regexRulesJson.value);
     }
@@ -5184,6 +5237,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write(
             'workspaceDefaultDirectoriesJson: $workspaceDefaultDirectoriesJson, ',
           )
+          ..write('autoLoadAgentsMd: $autoLoadAgentsMd, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -10405,6 +10459,7 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<bool> workspaceEnabled,
       Value<String?> workspaceId,
       Value<String> workspaceDefaultDirectoriesJson,
+      Value<bool> autoLoadAgentsMd,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -10457,6 +10512,7 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<bool> workspaceEnabled,
       Value<String?> workspaceId,
       Value<String> workspaceDefaultDirectoriesJson,
+      Value<bool> autoLoadAgentsMd,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -10625,6 +10681,11 @@ class $$AssistantRowsTableFilterComposer
         column: $table.workspaceDefaultDirectoriesJson,
         builder: (column) => ColumnFilters(column),
       );
+
+  ColumnFilters<bool> get autoLoadAgentsMd => $composableBuilder(
+    column: $table.autoLoadAgentsMd,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
@@ -10877,6 +10938,11 @@ class $$AssistantRowsTableOrderingComposer
         builder: (column) => ColumnOrderings(column),
       );
 
+  ColumnOrderings<bool> get autoLoadAgentsMd => $composableBuilder(
+    column: $table.autoLoadAgentsMd,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => ColumnOrderings(column),
@@ -11119,6 +11185,11 @@ class $$AssistantRowsTableAnnotationComposer
         builder: (column) => column,
       );
 
+  GeneratedColumn<bool> get autoLoadAgentsMd => $composableBuilder(
+    column: $table.autoLoadAgentsMd,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => column,
@@ -11271,6 +11342,7 @@ class $$AssistantRowsTableTableManager
                 Value<String?> workspaceId = const Value.absent(),
                 Value<String> workspaceDefaultDirectoriesJson =
                     const Value.absent(),
+                Value<bool> autoLoadAgentsMd = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -11325,6 +11397,7 @@ class $$AssistantRowsTableTableManager
                 workspaceId: workspaceId,
                 workspaceDefaultDirectoriesJson:
                     workspaceDefaultDirectoriesJson,
+                autoLoadAgentsMd: autoLoadAgentsMd,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,
@@ -11378,6 +11451,7 @@ class $$AssistantRowsTableTableManager
                 Value<String?> workspaceId = const Value.absent(),
                 Value<String> workspaceDefaultDirectoriesJson =
                     const Value.absent(),
+                Value<bool> autoLoadAgentsMd = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -11432,6 +11506,7 @@ class $$AssistantRowsTableTableManager
                 workspaceId: workspaceId,
                 workspaceDefaultDirectoriesJson:
                     workspaceDefaultDirectoriesJson,
+                autoLoadAgentsMd: autoLoadAgentsMd,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,

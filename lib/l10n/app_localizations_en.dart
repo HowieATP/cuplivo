@@ -8818,6 +8818,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get workspaceAutoLoadAgentsMdTitle => 'Automatically load AGENTS.md';
+
+  @override
+  String get workspaceAutoLoadAgentsMdSubtitle =>
+      'Load project instructions from this directory up to the workspace root';
+
+  @override
+  String get workspaceAgentsMdLoadFailed =>
+      'Couldn\'t load AGENTS.md instructions. Fix the file or turn off automatic loading.';
+
+  @override
+  String get workspaceAgentsMdSaveFailed =>
+      'Couldn\'t save the AGENTS.md loading setting.';
+
+  @override
   String get workspaceDirectoryPickerTitle => 'Choose working directory';
 
   @override

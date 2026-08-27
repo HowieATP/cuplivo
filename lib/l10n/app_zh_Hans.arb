@@ -3293,6 +3293,10 @@
       }
     }
   },
+  "workspaceAutoLoadAgentsMdTitle": "自动加载 AGENTS.md",
+  "workspaceAutoLoadAgentsMdSubtitle": "从此目录向上到工作区根目录加载项目指令",
+  "workspaceAgentsMdLoadFailed": "无法加载 AGENTS.md 指令。请修复该文件或关闭自动加载。",
+  "workspaceAgentsMdSaveFailed": "无法保存 AGENTS.md 加载设置。",
   "workspaceDirectoryPickerTitle": "选择工作目录",
   "workspaceDirectorySelectCurrent": "选择当前文件夹",
   "workspaceShellMobileOnly": "Shell 仅在 Android 或 iOS 可用",

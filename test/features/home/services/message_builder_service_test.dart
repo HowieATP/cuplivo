@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
+import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/workspace/workspace_execution_context.dart';
 import 'package:Cuplivo/features/home/services/message_builder_service.dart';
 
 class _FakeBuildContext implements BuildContext {
@@ -781,4 +783,32 @@ void main() {
       );
     });
   });
+
+  test(
+    'skips AGENTS.md loading before accessing the workspace when disabled',
+    () async {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'system', 'content': 'assistant instructions'},
+      ];
+
+      await service.injectWorkspaceAgentsMdInstructions(
+        apiMessages,
+        assistant: Assistant(
+          id: 'assistant-1',
+          name: 'Assistant',
+          autoLoadAgentsMd: false,
+        ),
+        workspaceExecutionContext: WorkspaceExecutionContext(
+          workspace: Workspace.createDefault(),
+          workingDirectory: '/workspace',
+        ),
+      );
+
+      expect(apiMessages.single['content'], 'assistant instructions');
+    },
+  );
 }

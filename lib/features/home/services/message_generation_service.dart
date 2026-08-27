@@ -174,6 +174,13 @@ class MessageGenerationService {
 
     // Inject prompts
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    final workspaceExecutionContext = generationController
+        .resolveWorkspaceExecutionContext(assistant, currentConversation);
+    await messageBuilderService.injectWorkspaceAgentsMdInstructions(
+      apiMessages,
+      assistant: assistant,
+      workspaceExecutionContext: workspaceExecutionContext,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -201,8 +208,6 @@ class MessageGenerationService {
     );
     await messageBuilderService.injectSkillListPrompt(apiMessages, assistantId);
 
-    final workspaceExecutionContext = generationController
-        .resolveWorkspaceExecutionContext(assistant, currentConversation);
     messageBuilderService.injectWorkspacePrompt(
       apiMessages,
       generationController.buildWorkspacePromptReminder(

@@ -216,22 +216,27 @@ class HandoffToolService {
         providerKey: providerKey,
         modelId: modelId,
       );
+      // ignore: use_build_context_synchronously (root context)
+      final toolHandler = ToolHandlerService(contextProvider: context);
+      final workspaceExecutionContext = toolHandler
+          .resolveWorkspaceExecutionContext(target, conversation);
       messageBuilder.injectSystemPrompt(apiMessages, target, modelId);
+      await messageBuilder.injectWorkspaceAgentsMdInstructions(
+        apiMessages,
+        assistant: target,
+        workspaceExecutionContext: workspaceExecutionContext,
+      );
       await messageBuilder.injectMemoryAndRecentChats(
         apiMessages,
         target,
         currentConversationId: conversation.id,
       );
-      messageBuilder.injectInstructionPrompts(apiMessages, target.id);
+      await messageBuilder.injectInstructionPrompts(apiMessages, target.id);
       await messageBuilder.injectWorldBookPrompts(apiMessages, target.id);
       messageBuilder.injectSkillListPrompt(apiMessages, target.id);
       messageBuilder.injectTimeNote(apiMessages, target);
       messageBuilder.applyContextLimit(apiMessages, target);
 
-      // ignore: use_build_context_synchronously (root context)
-      final toolHandler = ToolHandlerService(contextProvider: context);
-      final workspaceExecutionContext = toolHandler
-          .resolveWorkspaceExecutionContext(target, conversation);
       messageBuilder.injectWorkspacePrompt(
         apiMessages,
         toolHandler.buildWorkspacePromptReminder(

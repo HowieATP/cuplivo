@@ -16,6 +16,7 @@ import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
+import 'quote_block.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 // import '../../../theme/design_tokens.dart';
@@ -758,6 +759,15 @@ class ChatMessageWidget extends StatefulWidget {
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
   final ValueChanged<String>? onQuoteSelection;
+
+  /// Selection-driven reply entry (ranged quote); receives the selected plain
+  /// text. Hidden while the message is streaming.
+  final ValueChanged<String>? onReplySelection;
+
+  /// Resolved target of [ChatMessage.quote] (same conversation, current
+  /// display list); null renders the deleted-target stub in [QuoteBlock].
+  final ChatMessage? quoteTarget;
+
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
 
@@ -804,6 +814,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onQuoteSelection,
+    this.onReplySelection,
+    this.quoteTarget,
     this.onRecoveredAskUserAnswer,
   });
 
@@ -1442,6 +1454,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 key: ValueKey('user-message-content:${widget.message.id}'),
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (widget.message.quote != null) ...[
+                    QuoteBlock(
+                      key: ValueKey('user-message-quote:${widget.message.id}'),
+                      quote: widget.message.quote!,
+                      target: widget.quoteTarget,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (mediaPreview != null) mediaPreview,
                   if (mediaPreview != null && textBubble != null)
                     const SizedBox(height: 8),
@@ -2039,6 +2059,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     ContextMenuController.removeAny();
                     selectableRegionState.clearSelection();
                     widget.onQuoteSelection!.call(selected);
+                  },
+                ),
+              if (widget.onReplySelection != null &&
+                  !widget.message.isStreaming)
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(context)!.messageMoreSheetReply,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    widget.onReplySelection!.call(selected);
                   },
                 ),
               ContextMenuButtonItem(

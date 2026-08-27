@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
+import 'message_quote.dart';
+
 class ChatMessage {
   final String id;
 
@@ -75,6 +77,28 @@ class ChatMessage {
 
   final String? requestExtraBodyJson;
 
+  /// JSON-encoded [`MessageQuote`] citation reference of this message
+  /// (user-originated replies only, schema v20). Null = no reply.
+  final String? quoteJson;
+
+  /// Parsed representation of [quoteJson]; null if absent or malformed.
+  /// Malformed historical rows are treated as absent — never throw.
+  MessageQuote? get quote => _parseQuote();
+
+  MessageQuote? _parseQuote() {
+    final raw = quoteJson?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return MessageQuote.fromJson(decoded.cast<String, dynamic>());
+      }
+    } catch (_) {
+      // Malformed metadata is treated as absent; never throw on bad rows.
+    }
+    return null;
+  }
+
   Map<String, dynamic> get requestExtraBody {
     final raw = requestExtraBodyJson?.trim();
     if (raw == null || raw.isEmpty) return const <String, dynamic>{};
@@ -117,6 +141,7 @@ class ChatMessage {
     String? speakerAssistantId,
     bool? requestAllowImagesApiRouting,
     String? requestExtraBodyJson,
+    String? quoteJson,
   }) {
     final resolvedId = id ?? const Uuid().v4();
     return ChatMessage._(
@@ -146,6 +171,7 @@ class ChatMessage {
       speakerAssistantId: speakerAssistantId,
       requestAllowImagesApiRouting: requestAllowImagesApiRouting,
       requestExtraBodyJson: requestExtraBodyJson,
+      quoteJson: quoteJson,
     );
   }
 
@@ -176,6 +202,7 @@ class ChatMessage {
     this.speakerAssistantId,
     this.requestAllowImagesApiRouting,
     this.requestExtraBodyJson,
+    this.quoteJson,
   });
 
   // Sentinel for copyWith — not passed vs explicitly null.
@@ -208,6 +235,7 @@ class ChatMessage {
     Object? speakerAssistantId = sentinel,
     Object? requestAllowImagesApiRouting = sentinel,
     Object? requestExtraBodyJson = sentinel,
+    Object? quoteJson = sentinel,
   }) {
     return ChatMessage(
       id: identical(id, sentinel) ? this.id : id as String,
@@ -277,6 +305,9 @@ class ChatMessage {
       requestExtraBodyJson: identical(requestExtraBodyJson, sentinel)
           ? this.requestExtraBodyJson
           : requestExtraBodyJson as String?,
+      quoteJson: identical(quoteJson, sentinel)
+          ? this.quoteJson
+          : quoteJson as String?,
     );
   }
 
@@ -308,6 +339,7 @@ class ChatMessage {
       'speakerAssistantId': speakerAssistantId,
       'requestAllowImagesApiRouting': requestAllowImagesApiRouting,
       'requestExtraBodyJson': requestExtraBodyJson,
+      'quoteJson': quoteJson,
     };
   }
 
@@ -344,6 +376,7 @@ class ChatMessage {
       requestAllowImagesApiRouting:
           json['requestAllowImagesApiRouting'] as bool?,
       requestExtraBodyJson: json['requestExtraBodyJson'] as String?,
+      quoteJson: json['quoteJson'] as String?,
     );
   }
 }

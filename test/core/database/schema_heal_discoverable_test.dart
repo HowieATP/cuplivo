@@ -235,6 +235,42 @@ void main() {
     },
   );
 
+  test(
+    'heal adds quote_json before message insert (v20 column shape)',
+    () async {
+      _createLegacyDb(
+        dbFile,
+        userVersion: 20,
+        missingIsPreset: false,
+        missingHandoffColumns: false,
+        missingV15RequestMetadata: false,
+        missingQuoteJson: true,
+      );
+
+      final repo = ChatDatabaseRepository.open(file: dbFile);
+      await repo.ensureReady();
+
+      // Must succeed: heal adds quote_json before Drift INSERT, and the
+      // citation round-trips through the repository.
+      final conv = Conversation(title: 'Conv', assistantId: 'a1');
+      await repo.putConversation(conv);
+      await repo.putMessage(
+        ChatMessage(
+          role: 'user',
+          content: 'reply',
+          conversationId: conv.id,
+          quoteJson: '{"id":"msg-1","start":3,"end":9}',
+        ),
+      );
+
+      final rows = await repo.db.select(repo.db.messageRows).get();
+      expect(rows, hasLength(1));
+      expect(rows.first.quoteJson, '{"id":"msg-1","start":3,"end":9}');
+
+      await repo.close();
+    },
+  );
+
   test('heal adds inject_group_members column on group_chat_rows '
       '(v17 column shape)', () async {
     _createLegacyDb(
@@ -303,6 +339,7 @@ void _createLegacyDb(
   bool missingOcrMode = false,
   bool missingContextTokens = true,
   bool missingV15RequestMetadata = false,
+  bool missingQuoteJson = true,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -397,6 +434,11 @@ CREATE TABLE conversation_rows (
   request_allow_images_api_routing INTEGER NULL,
   request_extra_body_json TEXT NULL,
 ''';
+  final quoteJsonColumn = missingQuoteJson
+      ? ''
+      : '''
+  quote_json TEXT NULL,
+''';
   raw.execute('''
 CREATE TABLE message_rows (
   id TEXT NOT NULL PRIMARY KEY,
@@ -424,6 +466,7 @@ CREATE TABLE message_rows (
   $contextTokensColumn
   $isPresetColumn
   $v15Columns
+  $quoteJsonColumn
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );
 ''');

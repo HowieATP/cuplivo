@@ -3971,6 +3971,141 @@ void main() {
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps single-\$ literals inside display math '
+    'export',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      const source = r'''
+$$
+\text{total } $x+y$ \text{ yuan}
+$$
+''';
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+
+      // The renderer receives the original body: the single-$ literals inside
+      // the display-math body were never rewritten to \( ... \).
+      final renderedData = tester
+          .widgetList<GptMarkdown>(find.byType(GptMarkdown))
+          .map((widget) => widget.data)
+          .join('\n');
+      expect(renderedData, contains(r'$x+y$'));
+      expect(renderedData, isNot(contains(r'\(x+y\)')));
+
+      await tester.longPress(
+        find.byType(Math),
+        warnIfMissed: false, // Math's RenderLine is paint-only; the gesture
+        // lands on the enclosing export GestureDetector.
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      // Copy LaTeX hands back the model-emitted source, stray dollars intact.
+      expect(clipboardText, r'\text{total } $x+y$ \text{ yuan}');
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight copies multi-line aligned LaTeX with rows '
+    'intact',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      const source = r'''
+$$
+\begin{aligned}
+E &= mc^2 \\
+p &= mv
+\end{aligned}
+$$
+''';
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+
+      await tester.longPress(find.byType(Math), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      const expected =
+          '\\begin{aligned}\nE &= mc^2 \\\\\np &= mv\n\\end{aligned}';
+      expect(clipboardText, expected);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight copies bracket-delimited LaTeX source',
+    (tester) async {
+      markdownMathTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => markdownMathTargetPlatformOverride = null);
+
+      String? clipboardText;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              final data = Map<String, dynamic>.from(call.arguments as Map);
+              clipboardText = data['text'] as String?;
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      await tester.pumpWidget(
+        _markdownHarness(r'\[E_{tot} = \sum_i q_i\]', width: 360),
+      );
+      await tester.pump();
+
+      await tester.longPress(find.byType(Math), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Copy LaTeX'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(clipboardText, r'E_{tot} = \sum_i q_i');
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight opens math menu on desktop right click',
     (tester) async {
       markdownMathTargetPlatformOverride = TargetPlatform.windows;
@@ -4227,6 +4362,80 @@ void main() {
 
       expect(find.text('Copy LaTeX'), findsOneWidget);
       expect(find.text('SELECTION_TOOLBAR_MARKER'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight scales an oversized formula to fit message export',
+    (tester) async {
+      // Far wider than the 320px export canvas: the formula must be captured
+      // complete (scaled down), not truncated at a scroll viewport.
+      final wideTex =
+          r'\[' + List.generate(40, (i) => 'x_{${i + 1}}').join(' + ') + r'\]';
+
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: SizedBox(
+            width: 320,
+            child: ExportCaptureScope(
+              enabled: true,
+              child: MarkdownWithCodeHighlight(text: wideTex),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      // The formula is oversized input: wider than the export canvas.
+      final mathBox = tester.renderObject<RenderBox>(_findMathWidget());
+      expect(mathBox.size.width, greaterThan(320));
+      // Message export has no scroll interaction: the scroll viewport that
+      // clips the formula must be gone during capture.
+      expect(
+        find.ancestor(
+          of: _findMathWidget(),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsNothing,
+      );
+      // The full formula stays in the capture via a scale-down fit.
+      final fitters = find.ancestor(
+        of: _findMathWidget(),
+        matching: find.byType(FittedBox),
+      );
+      expect(fitters, findsOneWidget);
+      expect(tester.widget<FittedBox>(fitters).fit, BoxFit.scaleDown);
+      expect(
+        tester.renderObject<RenderBox>(fitters).size.width,
+        lessThanOrEqualTo(320),
+      );
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps the scrollable viewport for wide formulas in chat',
+    (tester) async {
+      final wideTex =
+          r'\[' + List.generate(40, (i) => 'x_{${i + 1}}').join(' + ') + r'\]';
+
+      await tester.pumpWidget(_markdownHarness(wideTex, width: 320));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      // Chat keeps horizontal scroll interaction; no export fit wrapper.
+      expect(
+        find.ancestor(
+          of: _findMathWidget(),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(of: _findMathWidget(), matching: find.byType(FittedBox)),
+        findsNothing,
+      );
     },
   );
 

@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 3;
-export const ASSET_VERSION = 'web-chat-v14';
+export const ASSET_VERSION = 'web-chat-v15';
 
 const transfers = new Map();
 
@@ -602,9 +602,35 @@ export function createExpansionCoordinator() {
   };
 }
 
-export function captureAnchor(container) {
+function messageSlots(container) {
+  return [...container.querySelectorAll('[data-message-slot="true"]')];
+}
+
+export function captureAnchor(container, { granular = true } = {}) {
   const top = container.getBoundingClientRect().top;
-  for (const node of container.querySelectorAll('[data-message-id]')) {
+  const bottom = top + Number(container.clientHeight ?? 0);
+  if (granular) {
+    for (const node of container.querySelectorAll('[data-viewport-anchor-key]')) {
+      const rect = node.getBoundingClientRect();
+      // Descendants of collapsed chain steps remain queryable, but Chromium
+      // reports a zero-sized rectangle for them. Treating one as visible
+      // installs an anchor that suddenly becomes real when the step expands.
+      if (rect.bottom <= rect.top) continue;
+      if (rect.bottom < top || rect.top > bottom) continue;
+      const message = node.closest?.('[data-message-slot="true"]');
+      const id = message?.dataset?.messageId;
+      const key = node.dataset?.viewportAnchorKey;
+      if (id && key) {
+        return {
+          id,
+          key,
+          offset: rect.top - top,
+          messageOffset: message.getBoundingClientRect().top - top,
+        };
+      }
+    }
+  }
+  for (const node of messageSlots(container)) {
     const rect = node.getBoundingClientRect();
     if (rect.bottom >= top) {
       return { id: node.dataset.messageId, offset: rect.top - top };
@@ -615,53 +641,54 @@ export function captureAnchor(container) {
 
 export function restoreAnchor(container, anchor) {
   if (!anchor) return false;
-  const node = [...container.querySelectorAll('[data-message-id]')]
+  const message = messageSlots(container)
     .find((item) => item.dataset.messageId === anchor.id);
-  if (!node) return false;
+  if (!message) return false;
+  const granular = anchor.key == null
+    ? null
+    : [...message.querySelectorAll('[data-viewport-anchor-key]')]
+      .find((item) => item.dataset?.viewportAnchorKey === anchor.key);
+  const node = granular ?? message;
+  const offset = granular == null && anchor.key != null
+    ? Number(anchor.messageOffset)
+    : Number(anchor.offset);
+  if (!Number.isFinite(offset)) return false;
   const top = container.getBoundingClientRect().top;
-  container.scrollTop += node.getBoundingClientRect().top - top - anchor.offset;
+  container.scrollTop += node.getBoundingClientRect().top - top - offset;
   return true;
 }
 
-export function captureInteractionAnchor(container, header, bottomTolerance = 2) {
-  const message = header?.closest?.('[data-message-id]');
-  const disclosure = header?.closest?.('[data-expansion-key]');
+export function captureInteractionAnchor(container, element) {
+  const message = element?.closest?.('[data-message-slot="true"]') ??
+    element?.closest?.('[data-message-id]');
+  const disclosure = element?.closest?.('[data-expansion-key]');
   const messageId = message?.dataset?.messageId;
   const expansionKey = disclosure?.dataset?.expansionKey;
   if (!messageId || !expansionKey) return null;
   const containerTop = Number(container?.getBoundingClientRect?.().top);
-  const headerTop = Number(header?.getBoundingClientRect?.().top);
-  if (!Number.isFinite(containerTop) || !Number.isFinite(headerTop)) return null;
-  const remaining = Number(container.scrollHeight) - Number(container.clientHeight) -
-    Number(container.scrollTop);
+  const elementTop = Number(element?.getBoundingClientRect?.().top);
+  if (!Number.isFinite(containerTop) || !Number.isFinite(elementTop)) return null;
   return {
     messageId,
     expansionKey,
-    offset: headerTop - containerTop,
-    pinnedToBottom: Number.isFinite(remaining) && remaining <= bottomTolerance,
+    offset: elementTop - containerTop,
   };
 }
 
 export function restoreInteractionAnchor(container, anchor) {
   if (!anchor) return false;
-  if (anchor.pinnedToBottom) {
-    container.scrollTop = Math.max(
-      0,
-      Number(container.scrollHeight) - Number(container.clientHeight),
-    );
-    return true;
-  }
-  const message = [...container.querySelectorAll('[data-message-id]')]
+  const message = messageSlots(container)
     .find((node) => node.dataset?.messageId === anchor.messageId);
   const disclosure = [...(message?.querySelectorAll?.('[data-expansion-key]') ?? [])]
     .find((node) => node.dataset?.expansionKey === anchor.expansionKey);
-  const header = disclosure?.querySelector?.('.disclosure-header');
-  if (!header) return false;
+  const element = disclosure?.querySelector?.('[data-interaction-anchor="true"]') ??
+    disclosure?.querySelector?.('.disclosure-header');
+  if (!element) return false;
   const containerTop = Number(container.getBoundingClientRect().top);
-  const headerTop = Number(header.getBoundingClientRect().top);
+  const elementTop = Number(element.getBoundingClientRect().top);
   const offset = Number(anchor.offset);
-  if (![containerTop, headerTop, offset].every(Number.isFinite)) return false;
-  container.scrollTop += headerTop - containerTop - offset;
+  if (![containerTop, elementTop, offset].every(Number.isFinite)) return false;
+  container.scrollTop += elementTop - containerTop - offset;
   return true;
 }
 

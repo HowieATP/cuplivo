@@ -100,14 +100,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -185,7 +185,7 @@ test('stream patches can register opaque media without leaking it into messages'
 
 test('same-session streaming snapshots preserve a newer live patch', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
   };
@@ -200,7 +200,7 @@ test('same-session streaming snapshots preserve a newer live patch', () => {
 
 test('live translation survives unrelated snapshots until it is finalized', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{
       id: 'm', content: 'answer', isStreaming: false,
@@ -702,7 +702,7 @@ test('anchor capture and restore preserve the message offset', () => {
   assert.equal(container.scrollTop, 106);
 });
 
-test('interaction anchors preserve a disclosure header and honor bottom pinning', () => {
+test('interaction anchors preserve a disclosure header even at the bottom', () => {
   let headerTop = 140;
   const header = {
     getBoundingClientRect: () => ({ top: headerTop, bottom: headerTop + 42 }),
@@ -722,7 +722,7 @@ test('interaction anchors preserve a disclosure header and honor bottom pinning'
     getBoundingClientRect: () => ({ top: 20 }),
     querySelectorAll: () => [message],
   };
-  header.closest = (selector) => selector === '[data-message-id]'
+  header.closest = (selector) => selector.includes('data-message')
     ? message
     : disclosure;
 
@@ -731,7 +731,6 @@ test('interaction anchors preserve a disclosure header and honor bottom pinning'
     messageId: 'm',
     expansionKey: 'm:tool:t1',
     offset: 120,
-    pinnedToBottom: false,
   });
   headerTop = 205;
   assert.equal(restoreInteractionAnchor(container, anchor), true);
@@ -742,7 +741,101 @@ test('interaction anchors preserve a disclosure header and honor bottom pinning'
   container.scrollHeight = 1100;
   container.scrollTop = 350;
   assert.equal(restoreInteractionAnchor(container, bottomAnchor), true);
-  assert.equal(container.scrollTop, 500);
+  assert.equal(container.scrollTop, 350);
+});
+
+test('granular viewport anchors survive a message-local redraw', () => {
+  let blockTop = 24;
+  const block = {
+    dataset: { viewportAnchorKey: 'm:reasoning:0:block:2' },
+    closest: () => message,
+    getBoundingClientRect: () => ({ top: blockTop, bottom: blockTop + 80 }),
+  };
+  const message = {
+    dataset: { messageId: 'm', messageSlot: 'true' },
+    querySelectorAll: () => [block],
+    getBoundingClientRect: () => ({ top: -600, bottom: 900 }),
+  };
+  const container = {
+    scrollTop: 700,
+    clientHeight: 600,
+    getBoundingClientRect: () => ({ top: 0, bottom: 600 }),
+    querySelectorAll: (selector) => selector.includes('viewport')
+      ? [block]
+      : [message],
+  };
+
+  const anchor = captureAnchor(container);
+  assert.deepEqual(anchor, {
+    id: 'm',
+    key: 'm:reasoning:0:block:2',
+    offset: 24,
+    messageOffset: -600,
+  });
+  blockTop = 79;
+  assert.equal(restoreAnchor(container, anchor), true);
+  assert.equal(container.scrollTop, 755);
+});
+
+test('granular viewport anchors ignore collapsed zero-size descendants', () => {
+  const hidden = {
+    dataset: { viewportAnchorKey: 'm:hidden-step' },
+    getBoundingClientRect: () => ({ top: 0, bottom: 0 }),
+  };
+  const visible = {
+    dataset: { viewportAnchorKey: 'm:visible-block' },
+    closest: () => message,
+    getBoundingClientRect: () => ({ top: 32, bottom: 92 }),
+  };
+  const message = {
+    dataset: { messageId: 'm', messageSlot: 'true' },
+    getBoundingClientRect: () => ({ top: -400, bottom: 400 }),
+  };
+  const container = {
+    clientHeight: 600,
+    getBoundingClientRect: () => ({ top: 0 }),
+    querySelectorAll: (selector) => selector.includes('viewport')
+      ? [hidden, visible]
+      : [message],
+  };
+
+  assert.deepEqual(captureAnchor(container), {
+    id: 'm',
+    key: 'm:visible-block',
+    offset: 32,
+    messageOffset: -400,
+  });
+});
+
+test('granular viewport anchors fall back to the captured message offset', () => {
+  let messageTop = -500;
+  let anchors;
+  const message = {
+    dataset: { messageId: 'm', messageSlot: 'true' },
+    querySelectorAll: () => anchors,
+    getBoundingClientRect: () => ({ top: messageTop, bottom: messageTop + 900 }),
+  };
+  const block = {
+    dataset: { viewportAnchorKey: 'm:content:block:3' },
+    closest: () => message,
+    getBoundingClientRect: () => ({ top: 30, bottom: 110 }),
+  };
+  anchors = [block];
+  const container = {
+    scrollTop: 800,
+    clientHeight: 600,
+    getBoundingClientRect: () => ({ top: 0 }),
+    querySelectorAll: (selector) => selector.includes('viewport')
+      ? anchors
+      : [message],
+  };
+
+  const anchor = captureAnchor(container);
+  anchors = [];
+  messageTop = -440;
+
+  assert.equal(restoreAnchor(container, anchor), true);
+  assert.equal(container.scrollTop, 860);
 });
 
 test('render commit coordinator does not starve an ACK on same-revision renders', () => {
@@ -820,7 +913,7 @@ test('a conversation switch clears staged layout and render transaction state', 
 
   assert.match(resetBody, /previousConversationId !== state\?\.conversationId/);
   assert.match(resetBody, /pendingMeasuredHeights\.clear\(\)/);
-  assert.match(resetBody, /pendingInteractionAnchor = null/);
+  assert.match(resetBody, /cancelInteractionLayout\(\)/);
   assert.match(resetBody, /renderCommitCoordinator\.clear\(\)/);
 });
 
@@ -1078,6 +1171,42 @@ test('touch and inertial scrolling defer every virtual DOM replacement', () => {
   assert.ok(restoreIndex > spacerIndex && coverageIndex > restoreIndex);
 });
 
+test('layout interactions cancel stale anchors and delayed renderer redraws stay local', () => {
+  assert.match(appSource, /let interactionRevision = 0/);
+  assert.match(
+    appSource,
+    /function cancelInteractionLayout[\s\S]*?interactionRevision \+= 1[\s\S]*?pendingInteractionAnchor = null/,
+  );
+  assert.match(
+    appSource,
+    /function markUserScroll[\s\S]*?cancelInteractionLayout\(\)/,
+  );
+  assert.match(appSource, /if \(userScrolling\) markUserScroll\(false\)/);
+  assert.match(
+    appSource,
+    /function queueInteractionLayoutReconcile[\s\S]*?isCurrentInteraction/,
+  );
+  const rendererStart = appSource.indexOf('function rerenderWhenRendererReady');
+  const rendererEnd = appSource.indexOf('function containsMath', rendererStart);
+  const rendererBody = appSource.slice(rendererStart, rendererEnd);
+  assert.match(rendererBody, /queueRendererRefresh/);
+  assert.doesNotMatch(rendererBody, /updateMountedMessage/);
+  const mermaidStart = appSource.indexOf('function commitMermaidRender');
+  const mermaidEnd = appSource.indexOf('function flushRendererUpdates', mermaidStart);
+  assert.match(appSource.slice(mermaidStart, mermaidEnd), /runViewportMutation/);
+});
+
+test('thinking step toggle stays above every step and supports collapse', () => {
+  const collapseStart = appSource.indexOf('function applyThinkingStepCollapse');
+  const collapseEnd = appSource.indexOf('function renderAskUser', collapseStart);
+  const collapseBody = appSource.slice(collapseStart, collapseEnd);
+  assert.match(collapseBody, /card\.prepend\(toggle\)/);
+  assert.match(collapseBody, /collapseThinkingSteps/);
+  assert.match(collapseBody, /aria-expanded/);
+  assert.doesNotMatch(collapseBody, /show\.remove\(\)/);
+  assert.match(collapseBody, /beginLayoutInteraction\(toggle\)/);
+});
+
 test('virtual boundaries show a localized loader and use budgeted detached work', () => {
   assert.match(htmlSource, /id="virtual-window-loader"/);
   assert.match(htmlSource, /id="virtual-window-loader-label"/);
@@ -1112,7 +1241,14 @@ test('viewport commands use an atomic render-and-settle transaction', () => {
   assert.match(appSource, /createViewportNavigationCoordinator\(\{[\s\S]*?setRenderBlocked[\s\S]*?requestRender/);
   assert.match(appSource, /function navigateToEdge[\s\S]*?viewportNavigation\.run/);
   assert.match(appSource, /function navigateToEdge[\s\S]*?navigationEdge = edge/);
+  assert.match(appSource, /function navigateToEdge\(edge, \{ hold = false \} = \{\}\)/);
+  assert.match(appSource, /if \(!hold && navigationEdge === edge\)[\s\S]*?navigationEdge = null/);
+  assert.match(appSource, /command === 'holdBottom'[\s\S]*?navigateToEdge\('bottom', \{ hold: true \}\)/);
   assert.match(appSource, /function navigateToEdge[\s\S]*?beginVirtualWindowLoad/);
+  assert.match(
+    commandBody,
+    /command === 'bottom'[\s\S]*?touchActive \|\| gestureActive \|\| pendingInteractionAnchor[\s\S]*?userScrolling && payload\.force !== true/,
+  );
   assert.match(appSource, /function handleMeasuredHeights[\s\S]*?enforceNavigationEdge\(\)/);
   assert.match(appSource, /function scrollToMessage[\s\S]*?viewportNavigation\.run/);
   assert.match(appSource, /function scrollToMessage[\s\S]*?beginVirtualWindowLoad/);
@@ -1146,6 +1282,10 @@ test('message composition follows Flutter visual grouping', () => {
   assert.match(styleSource, /\.assistant-text-surface/);
   assert.match(styleSource, /\.chain-card/);
   assert.match(styleSource, /\.attachments/);
+  assert.match(appSource, /dataset\.viewportAnchorKey/);
+  assert.match(appSource, /markMarkdownViewportAnchors/);
+  assert.match(appSource, /type: 'viewportInteraction'/);
+  assert.match(appSource, /viewportGroupKey}:code:\$\{codeIndex\}/);
 });
 
 test('message toolbar renders bundled Lucide icons instead of text actions', () => {

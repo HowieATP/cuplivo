@@ -1822,6 +1822,7 @@ class _HomePageState extends State<HomePage>
         'htmlPreview': l10n.webChatHtmlPreview,
         'thinking': l10n.chatMessageWidgetThinking,
         'reasoning': l10n.chatMessageWidgetDeepThinking,
+        'collapseThinkingSteps': l10n.chainOfThoughtCollapse,
         'toolCall': l10n.webChatToolCall,
         'toolResult': l10n.webChatToolResult,
         'translation': l10n.webChatTranslation,

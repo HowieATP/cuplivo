@@ -123,6 +123,20 @@ void main() {
     },
   );
 
+  test('layout interaction bridge is authorized before detaching follow', () {
+    final source = File(
+      'lib/features/home/webview/web_conversation_viewport.dart',
+    ).readAsStringSync();
+    final interactionStart = source.indexOf("case 'viewportInteraction':");
+    final nextCase = source.indexOf("case 'action':", interactionStart);
+    final interactionBody = source.substring(interactionStart, nextCase);
+
+    expect(interactionStart, isNonNegative);
+    expect(interactionBody, contains('_isAuthorizedBridgeRequest(message)'));
+    expect(interactionBody, contains('viewportPort.cancelAutoFollow()'));
+    expect(interactionBody, contains('widget.onUserScrollIntent()'));
+  });
+
   test('remote media and message actions stay behind opaque registries', () {
     final viewportSource = File(
       'lib/features/home/webview/web_conversation_viewport.dart',

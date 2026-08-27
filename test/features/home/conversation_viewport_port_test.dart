@@ -110,4 +110,126 @@ void main() {
       );
     },
   );
+
+  test('Web viewport interaction and real scrolling detach auto-follow until '
+      'the user returns to the bottom', () async {
+    final commands = <Map<String, dynamic>>[];
+    final port = WebConversationViewportPort()
+      ..attach((command) async => commands.add(command))
+      ..activateConversation('conversation-a')
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 1000,
+        'maxExtent': 1000,
+        'isUserScrolling': false,
+      })
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 1000,
+        'maxExtent': 1000,
+        'isUserScrolling': true,
+      })
+      ..cancelAutoFollow()
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 1000,
+        'maxExtent': 1000,
+        'isUserScrolling': false,
+      })
+      ..onStreamTick();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      commands.where((command) => command['command'] == 'bottom'),
+      isEmpty,
+    );
+
+    port
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 400,
+        'maxExtent': 1000,
+        'isUserScrolling': true,
+      })
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 400,
+        'maxExtent': 1000,
+        'isUserScrolling': false,
+      })
+      ..onStreamTick();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      commands.where((command) => command['command'] == 'bottom'),
+      isEmpty,
+    );
+
+    port
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 970,
+        'maxExtent': 1000,
+        'isUserScrolling': true,
+      })
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 970,
+        'maxExtent': 1000,
+        'isUserScrolling': false,
+      })
+      ..onStreamTick();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      commands.where((command) => command['command'] == 'bottom'),
+      isEmpty,
+    );
+
+    port
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 1000,
+        'maxExtent': 1000,
+        'isUserScrolling': true,
+      })
+      ..updateMetrics(<String, dynamic>{
+        'conversationId': 'conversation-a',
+        'pixels': 1000,
+        'maxExtent': 1000,
+        'isUserScrolling': false,
+      })
+      ..onStreamTick();
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      commands.where((command) => command['command'] == 'bottom').length,
+      1,
+    );
+  });
+
+  test('Web viewport interaction cancels a queued bottom request', () async {
+    final commands = <Map<String, dynamic>>[];
+    final port = WebConversationViewportPort()
+      ..attach((command) async => commands.add(command))
+      ..activateConversation('conversation-a')
+      ..scrollToBottomSoon()
+      ..cancelAutoFollow();
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(port.isUserScrolling, isFalse);
+    expect(commands, isEmpty);
+  });
+
+  test('Web viewport explicit bottom overrides an idle scroll state', () async {
+    final commands = <Map<String, dynamic>>[];
+    final port = WebConversationViewportPort()
+      ..attach((command) async => commands.add(command))
+      ..activateConversation('conversation-a')
+      ..handleUserScrollIntent()
+      ..scrollToBottom(animate: false);
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(port.isUserScrolling, isFalse);
+    expect(commands.single['command'], 'bottom');
+    expect((commands.single['payload'] as Map)['force'], isTrue);
+  });
 }

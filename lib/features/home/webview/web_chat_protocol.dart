@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 const int webChatProtocolVersion = 3;
-const String webChatAssetVersion = 'web-chat-v14';
+const String webChatAssetVersion = 'web-chat-v15';
 const int webChatMaxChunkBytes = 128 * 1024;
 const int webChatMaxChunkPayloadBytes = 95 * 1024;
 

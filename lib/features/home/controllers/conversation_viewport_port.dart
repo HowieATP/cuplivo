@@ -169,6 +169,8 @@ class WebConversationViewportPort implements ConversationViewportPort {
   WebViewportCommandSender? _sender;
   bool _isUserScrolling = false;
   bool _followBottom = true;
+  bool _autoFollowDetached = false;
+  bool _layoutInteractionDetached = false;
   double _pixels = 0;
   double _maxExtent = 0;
   ConversationViewportAnchor? _anchor;
@@ -178,24 +180,42 @@ class WebConversationViewportPort implements ConversationViewportPort {
   Timer? _deferredBottomTimer;
   int _deferredBottomRequest = 0;
 
-  void attach(WebViewportCommandSender sender) => _sender = sender;
-
-  void detach(WebViewportCommandSender sender) {
-    if (!identical(_sender, sender)) return;
-    _sender = null;
+  void _cancelDeferredBottom() {
     _deferredBottomTimer?.cancel();
     _deferredBottomTimer = null;
     _deferredBottomRequest++;
   }
 
+  void _detachAutoFollow({bool layoutInteraction = false}) {
+    _followBottom = false;
+    _autoFollowDetached = true;
+    if (layoutInteraction) _layoutInteractionDetached = true;
+    _cancelDeferredBottom();
+  }
+
+  void _engageAutoFollow() {
+    _followBottom = true;
+    _autoFollowDetached = false;
+    _layoutInteractionDetached = false;
+  }
+
+  void attach(WebViewportCommandSender sender) => _sender = sender;
+
+  void detach(WebViewportCommandSender sender) {
+    if (!identical(_sender, sender)) return;
+    _sender = null;
+    _cancelDeferredBottom();
+  }
+
   void activateConversation(String conversationId) {
     if (_activeConversationId == conversationId) return;
-    _deferredBottomTimer?.cancel();
-    _deferredBottomTimer = null;
-    _deferredBottomRequest++;
+    _cancelDeferredBottom();
     _activeConversationId = conversationId;
     _isUserScrolling = false;
-    _followBottom = _savedAnchors[conversationId] == null;
+    final hasSavedAnchor = _savedAnchors[conversationId] != null;
+    _followBottom = !hasSavedAnchor;
+    _autoFollowDetached = hasSavedAnchor;
+    _layoutInteractionDetached = false;
     _pixels = 0;
     _maxExtent = 0;
     _anchor = _savedAnchors[conversationId];
@@ -226,11 +246,21 @@ class WebConversationViewportPort implements ConversationViewportPort {
         conversationId != _activeConversationId) {
       return;
     }
+    final wasUserScrolling = _isUserScrolling;
     _isUserScrolling = metrics['isUserScrolling'] == true;
     _pixels = (metrics['pixels'] as num?)?.toDouble() ?? _pixels;
     _maxExtent = (metrics['maxExtent'] as num?)?.toDouble() ?? _maxExtent;
     _anchor = measuredAnchor;
-    if (!_isUserScrolling && isNearBottom()) _followBottom = true;
+    if (_isUserScrolling) {
+      if (!wasUserScrolling) _layoutInteractionDetached = false;
+      _detachAutoFollow();
+    } else if (wasUserScrolling &&
+        !_layoutInteractionDetached &&
+        isNearBottom(2)) {
+      _engageAutoFollow();
+    } else if (!_autoFollowDetached && isNearBottom()) {
+      _followBottom = true;
+    }
   }
 
   Future<void> _command(String command, [Map<String, dynamic>? payload]) async {
@@ -257,13 +287,18 @@ class WebConversationViewportPort implements ConversationViewportPort {
   @override
   void handleUserScrollIntent() {
     _isUserScrolling = true;
-    _followBottom = false;
+    _layoutInteractionDetached = false;
+    _detachAutoFollow();
   }
+
+  /// Detaches stream auto-follow for a Web layout interaction without
+  /// pretending that a scroll gesture is still active.
+  void cancelAutoFollow() => _detachAutoFollow(layoutInteraction: true);
 
   @override
   void resetUserScrolling() {
     _isUserScrolling = false;
-    _followBottom = true;
+    _engageAutoFollow();
   }
 
   @override
@@ -275,8 +310,10 @@ class WebConversationViewportPort implements ConversationViewportPort {
 
   @override
   bool pinBottomDuringViewportResizeIfNeeded() {
-    if (_isUserScrolling || !isNearBottom(24)) return false;
-    _followBottom = true;
+    if (_isUserScrolling || _autoFollowDetached || !isNearBottom(24)) {
+      return false;
+    }
+    _engageAutoFollow();
     unawaited(_command('holdBottom', <String, dynamic>{'durationMs': 300}));
     return true;
   }
@@ -285,17 +322,26 @@ class WebConversationViewportPort implements ConversationViewportPort {
   void positionAtBottomOnNextLayout() {
     if (_anchor != null) return;
     _isUserScrolling = false;
-    _followBottom = true;
-    unawaited(_command('bottom', <String, dynamic>{'animate': false}));
+    _engageAutoFollow();
+    unawaited(
+      _command('bottom', <String, dynamic>{'animate': false, 'force': true}),
+    );
   }
 
   @override
   void scrollToBottomSoon({bool animate = true}) {
-    _followBottom = true;
-    scheduleMicrotask(
-      () =>
-          unawaited(_command('bottom', <String, dynamic>{'animate': animate})),
-    );
+    _engageAutoFollow();
+    final request = ++_deferredBottomRequest;
+    scheduleMicrotask(() {
+      if (request == _deferredBottomRequest) {
+        unawaited(
+          _command('bottom', <String, dynamic>{
+            'animate': animate,
+            'force': true,
+          }),
+        );
+      }
+    });
   }
 
   @override
@@ -307,33 +353,46 @@ class WebConversationViewportPort implements ConversationViewportPort {
     final request = ++_deferredBottomRequest;
     scheduleMicrotask(() {
       if (request == _deferredBottomRequest) {
-        unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+        unawaited(
+          _command('bottom', <String, dynamic>{
+            'animate': animate,
+            'force': true,
+          }),
+        );
       }
     });
     _deferredBottomTimer?.cancel();
     _deferredBottomTimer = Timer(postSwitchDelay, () {
       if (request == _deferredBottomRequest) {
-        unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+        unawaited(
+          _command('bottom', <String, dynamic>{
+            'animate': animate,
+            'force': true,
+          }),
+        );
       }
     });
   }
 
   @override
   void stickToBottomAfterGeneration() {
-    if (_isUserScrolling || !_followBottom) return;
+    if (_isUserScrolling || _autoFollowDetached || !_followBottom) return;
     unawaited(_command('holdBottom', <String, dynamic>{'durationMs': 450}));
   }
 
   @override
   void scrollToTop({bool animate = true}) {
-    _followBottom = false;
+    _detachAutoFollow();
     unawaited(_command('top', <String, dynamic>{'animate': animate}));
   }
 
   @override
   void scrollToBottom({bool animate = true}) {
-    _followBottom = true;
-    unawaited(_command('bottom', <String, dynamic>{'animate': animate}));
+    _isUserScrolling = false;
+    _engageAutoFollow();
+    unawaited(
+      _command('bottom', <String, dynamic>{'animate': animate, 'force': true}),
+    );
   }
 
   @override
@@ -341,7 +400,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     required String targetId,
     required int targetIndex,
   }) {
-    _followBottom = false;
+    _detachAutoFollow();
     return _command('message', <String, dynamic>{'messageId': targetId});
   }
 
@@ -351,7 +410,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     required int Function(String id) indexOfId,
   }) async {
     if (_sender == null) return false;
-    _followBottom = false;
+    _detachAutoFollow();
     await _command('previousQuestion');
     return true;
   }
@@ -362,7 +421,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
     required int Function(String id) indexOfId,
   }) async {
     if (_sender == null) return false;
-    _followBottom = false;
+    _detachAutoFollow();
     await _command('nextQuestion');
     return true;
   }
@@ -373,7 +432,7 @@ class WebConversationViewportPort implements ConversationViewportPort {
   @override
   Future<void> restoreAnchor(ConversationViewportAnchor anchor) {
     _anchor = anchor;
-    _followBottom = false;
+    _detachAutoFollow();
     return _command('restoreAnchor', anchor.toJson());
   }
 

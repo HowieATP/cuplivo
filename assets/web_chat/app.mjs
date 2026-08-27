@@ -47,6 +47,7 @@ const presentedStreamContent = new Map();
 const pendingMountedUpdates = new Set();
 const markdownHtmlCache = new Map();
 const streamingMarkdownStates = new WeakMap();
+const staticMarkdownStates = new WeakMap();
 const streamStructureSignatureCache = new WeakMap();
 const expansionCoordinator = createExpansionCoordinator();
 const disclosureAnimations = new WeakMap();
@@ -84,10 +85,16 @@ let programmaticNavigationActive = false;
 let measuredHeightsPending = false;
 let pendingInteractionAnchor = null;
 let interactionMeasureFrame = 0;
+let interactionRevision = 0;
+let interactionExpiryTimer = null;
 let bottomHoldTimer = null;
+let initialBottomPin = false;
 const rendererLoads = new Map();
 const readyRenderers = new Set();
-const pendingRendererRenders = new Set();
+const pendingRendererRenders = new Map();
+const pendingRendererRefreshes = new Map();
+const pendingMermaidCommits = new Map();
+let rendererRefreshFrame = 0;
 
 const bridge = {
   post(message) {
@@ -249,15 +256,111 @@ function ensureMermaidRenderer() {
   });
 }
 
-function rerenderWhenRendererReady(renderer, promise, messageId) {
-  const key = `${renderer}:${messageId ?? 'timeline'}`;
-  if (pendingRendererRenders.has(key)) return;
-  pendingRendererRenders.add(key);
+function rerenderWhenRendererReady(renderer, promise, root) {
+  const metadata = staticMarkdownStates.get(root);
+  const key = `${renderer}:${metadata?.renderSessionId ?? 'session'}:` +
+    `${metadata?.messageId ?? 'timeline'}:${metadata?.anchorKey ?? 'root'}`;
+  if (pendingRendererRenders.has(key)) {
+    pendingRendererRenders.set(key, root);
+    return;
+  }
+  pendingRendererRenders.set(key, root);
   promise.then(() => {
+    const latestRoot = pendingRendererRenders.get(key);
     pendingRendererRenders.delete(key);
-    if (messageId) updateMountedMessage(messageId);
-    else requestRender();
+    if (latestRoot) queueRendererRefresh(latestRoot);
   }, () => pendingRendererRenders.delete(key));
+}
+
+function rendererUpdatesBlocked() {
+  return touchActive || userScrolling || virtualWindowLoading;
+}
+
+function scheduleRendererUpdateFlush() {
+  if (rendererRefreshFrame || rendererUpdatesBlocked()) return;
+  rendererRefreshFrame = requestAnimationFrame(() => {
+    rendererRefreshFrame = 0;
+    flushRendererUpdates();
+  });
+}
+
+function queueRendererRefresh(root) {
+  const metadata = staticMarkdownStates.get(root);
+  if (!metadata) return;
+  pendingRendererRefreshes.set(root, metadata);
+  scheduleRendererUpdateFlush();
+}
+
+function runViewportMutation(messageId, mutate) {
+  const viewport = captureViewport(timeline);
+  mutate();
+  restorePreferredViewport(viewport);
+  const slot = mountedSlots.get(messageId);
+  if (slot?.isConnected) {
+    stageMeasuredHeight(messageId, slot.getBoundingClientRect().height);
+    scheduleMeasuredHeightReconcile();
+  }
+  sendViewportMetrics();
+}
+
+function refreshStaticMarkdownRoot(root, metadata) {
+  if (!root.isConnected || metadata.renderSessionId !== state?.renderSessionId) {
+    return false;
+  }
+  const replacement = markdownNode(
+    metadata.source,
+    false,
+    metadata.kind,
+    metadata.messageId,
+    metadata.anchorKey,
+  );
+  if (root.dataset.contentBlockKey) {
+    replacement.dataset.contentBlockKey = root.dataset.contentBlockKey;
+  }
+  runViewportMutation(metadata.messageId, () => root.replaceWith(replacement));
+  return true;
+}
+
+function commitMermaidRender(pre, wrapper, messageId, renderSessionId) {
+  if (!pre.isConnected || renderSessionId !== state?.renderSessionId) return false;
+  if (pre.dataset.viewportAnchorKey) {
+    wrapper.dataset.viewportAnchorKey = pre.dataset.viewportAnchorKey;
+  }
+  runViewportMutation(messageId, () => pre.replaceWith(wrapper));
+  return true;
+}
+
+function flushRendererUpdates() {
+  if (rendererUpdatesBlocked()) return;
+  for (const [root, metadata] of pendingRendererRefreshes) {
+    if (metadata.renderSessionId !== state?.renderSessionId) {
+      pendingRendererRefreshes.delete(root);
+      continue;
+    }
+    if (!root.isConnected) {
+      pendingRendererRefreshes.delete(root);
+      continue;
+    }
+    pendingRendererRefreshes.delete(root);
+    refreshStaticMarkdownRoot(root, metadata);
+  }
+  for (const [pre, pending] of pendingMermaidCommits) {
+    if (pending.renderSessionId !== state?.renderSessionId) {
+      pendingMermaidCommits.delete(pre);
+      continue;
+    }
+    if (!pre.isConnected) {
+      pendingMermaidCommits.delete(pre);
+      continue;
+    }
+    pendingMermaidCommits.delete(pre);
+    commitMermaidRender(
+      pre,
+      pending.wrapper,
+      pending.messageId,
+      pending.renderSessionId,
+    );
+  }
 }
 
 function containsMath(root) {
@@ -453,17 +556,14 @@ function disclosure({
   root.dataset.expansionKey = key;
   const header = button(label, () => {
     const previous = header.getAttribute('aria-expanded') === 'true';
-    let interactionAnchor = captureInteractionAnchor(timeline, header);
+    const interactionAnchor = beginLayoutInteraction(header);
     try {
       const requested = !previous;
       const resolved = onToggle?.(requested) ?? requested;
-      interactionAnchor = interactionAnchor == null
-        ? null
-        : {
-          ...interactionAnchor,
-          controlled: expansionCoordinator.isPending(key),
-          releaseRequested: false,
-        };
+      updateInteractionControl(
+        interactionAnchor,
+        expansionCoordinator.isPending(key),
+      );
       const layoutSettled = () => queueInteractionLayoutReconcile(
         interactionAnchor,
         true,
@@ -477,21 +577,20 @@ function disclosure({
       );
       queueInteractionLayoutReconcile(interactionAnchor);
     } catch (error) {
-      const rollbackAnchor = interactionAnchor == null
-        ? null
-        : { ...interactionAnchor, releaseRequested: false };
       const rollbackSettled = () => queueInteractionLayoutReconcile(
-        rollbackAnchor,
+        interactionAnchor,
         true,
       );
       updateDisclosure(root, header, body, previous, rollbackSettled);
-      queueInteractionLayoutReconcile(rollbackAnchor);
+      queueInteractionLayoutReconcile(interactionAnchor);
       bridge.post({
         type: 'diagnostic',
         code: safeDiagnosticCode(error, 'disclosure_toggle_failed'),
       });
     }
   }, 'disclosure-header');
+  header.dataset.interactionAnchor = 'true';
+  header.dataset.viewportAnchorKey = `${key}:header`;
   const title = document.createElement('span');
   title.className = 'disclosure-title';
   title.textContent = label;
@@ -521,6 +620,19 @@ function sanitizeMarkdownHtml(html) {
   });
 }
 
+function markMarkdownViewportAnchors(root, anchorKey) {
+  if (!anchorKey) return;
+  const children = [...root.children];
+  if (children.length === 0) {
+    root.dataset.viewportAnchorKey = `${anchorKey}:root`;
+    return;
+  }
+  delete root.dataset.viewportAnchorKey;
+  for (const [index, child] of children.entries()) {
+    child.dataset.viewportAnchorKey = `${anchorKey}:block:${index}`;
+  }
+}
+
 function patchStreamingMarkdownRoot(root, source, kind) {
   const markdownEnabled = kind === 'user' ? state.display?.userMarkdown !== false :
     kind === 'reasoning' ? state.display?.reasoningMarkdown !== false :
@@ -543,6 +655,8 @@ function patchStreamingMarkdownRoot(root, source, kind) {
   const fragment = document.createDocumentFragment();
   for (let index = prefix; index < tokens.length; index += 1) {
     const container = document.createElement('div');
+    container.dataset.viewportGroupKey =
+      `${root.dataset.viewportGroupKey}:token:${index}`;
     container.innerHTML = sanitizeMarkdownHtml(
       window.marked.parser([tokens[index]], { gfm: true, breaks: true }),
     );
@@ -552,6 +666,7 @@ function patchStreamingMarkdownRoot(root, source, kind) {
     groups.push(nodes);
   }
   root.append(fragment);
+  markMarkdownViewportAnchors(root, root.dataset.viewportGroupKey);
   streamingMarkdownStates.set(root, {
     signatures,
     groups,
@@ -560,20 +675,30 @@ function patchStreamingMarkdownRoot(root, source, kind) {
   });
 }
 
-function markdownNode(content, streaming = false, kind = 'assistant', messageId = null) {
+function markdownNode(
+  content,
+  streaming = false,
+  kind = 'assistant',
+  messageId = null,
+  anchorKey = null,
+) {
   const root = document.createElement('div');
   root.className = 'markdown';
   if (messageId) root.dataset.messageId = messageId;
+  const source = content ?? '';
+  const resolvedAnchorKey = anchorKey ??
+    `${messageId ?? 'timeline'}:${stableTextKey(`markdown:${kind}`, source)}`;
+  root.dataset.viewportGroupKey = resolvedAnchorKey;
   const markdownEnabled = kind === 'user' ? state.display?.userMarkdown !== false :
     kind === 'reasoning' ? state.display?.reasoningMarkdown !== false :
     state.display?.assistantMarkdown !== false;
   if (!markdownEnabled) {
-    root.textContent = content ?? '';
+    root.textContent = source;
     root.style.whiteSpace = 'pre-wrap';
+    markMarkdownViewportAnchors(root, resolvedAnchorKey);
     return root;
   }
   try {
-    const source = content ?? '';
     if (streaming) {
       patchStreamingMarkdownRoot(root, source, kind);
       return root;
@@ -600,11 +725,20 @@ function markdownNode(content, streaming = false, kind = 'assistant', messageId 
       markdownHtmlCache.set(cacheKey, cached);
     }
     root.innerHTML = sanitized;
+    staticMarkdownStates.set(root, {
+      source,
+      kind,
+      messageId,
+      anchorKey: resolvedAnchorKey,
+      renderSessionId: state?.renderSessionId,
+    });
     enhanceMarkdown(root, streaming, messageId);
+    markMarkdownViewportAnchors(root, resolvedAnchorKey);
   } catch (error) {
     bridge.post({ type: 'diagnostic', code: 'markdown_block_failed' });
     root.className = 'block-error';
     root.textContent = t('unsupportedBlock');
+    markMarkdownViewportAnchors(root, resolvedAnchorKey);
   }
   return root;
 }
@@ -697,27 +831,30 @@ function enhanceMarkdown(root, streaming, messageId = null) {
       });
     }
   }
-  for (const code of root.querySelectorAll('pre > code')) {
+  for (const [codeIndex, code] of [...root.querySelectorAll('pre > code')].entries()) {
     const language = [...code.classList].find((name) => name.startsWith('language-'))?.slice(9) ?? '';
     const highlightLanguage = normalizeCodeLanguage(language);
     const pre = code.parentElement;
     const source = code.textContent ?? '';
+    const expansionKey = `${root.dataset.viewportGroupKey}:code:${codeIndex}`;
     if (highlightLanguage === 'mermaid' && !streaming) {
       if (readyRenderers.has('mermaid')) {
-        renderMermaid(pre, source);
+        renderMermaid(pre, source, messageId);
       } else {
         code.textContent = source.replace(/(?:\r\n|\r|\n)+$/, '');
-        renderCodeBlock(pre, code, language, source);
-        rerenderWhenRendererReady('mermaid', ensureMermaidRenderer(), messageId);
+        renderCodeBlock(pre, code, language, source, expansionKey);
+        rerenderWhenRendererReady('mermaid', ensureMermaidRenderer(), root);
       }
       continue;
     }
-    if (highlightLanguage === 'html' && !streaming) addHtmlPreview(pre, code.textContent ?? '');
+    if (highlightLanguage === 'html' && !streaming) {
+      addHtmlPreview(pre, code.textContent ?? '', `${expansionKey}:preview`);
+    }
     const displaySource = source.replace(/(?:\r\n|\r|\n)+$/, '');
     if (!streaming && !readyRenderers.has('highlight')) {
       code.textContent = displaySource;
-      renderCodeBlock(pre, code, language, source);
-      rerenderWhenRendererReady('highlight', ensureHighlightRenderer(), messageId);
+      renderCodeBlock(pre, code, language, source, expansionKey);
+      rerenderWhenRendererReady('highlight', ensureHighlightRenderer(), root);
       continue;
     }
     code.classList.add('hljs');
@@ -734,12 +871,12 @@ function enhanceMarkdown(root, streaming, messageId = null) {
         bridge.post({ type: 'diagnostic', code: 'highlight_block_failed' });
       }
     }
-    renderCodeBlock(pre, code, language, source);
+    renderCodeBlock(pre, code, language, source, expansionKey);
   }
   try {
     if (streaming || state.display?.math === false || !containsMath(root)) return;
     if (!readyRenderers.has('math')) {
-      rerenderWhenRendererReady('math', ensureMathRenderer(), messageId);
+      rerenderWhenRendererReady('math', ensureMathRenderer(), root);
       return;
     }
     window.renderMathInElement(root, {
@@ -825,15 +962,15 @@ function parseCitationLink(label, href) {
   return parseCitationReference(rawHref);
 }
 
-function renderCodeBlock(pre, code, language, source) {
+function renderCodeBlock(pre, code, language, source, expansionKey) {
   const displaySource = code.textContent ?? '';
   const threshold = Number(state.display?.collapsedCodeLines ?? 0);
   const lineCount = (displaySource.match(/\n/g)?.length ?? 0) + 1;
   const collapsible = threshold > 0 && lineCount > threshold;
-  const expansionKey = stableTextKey('code', source);
   const block = document.createElement('section');
   block.className = 'code-block';
   block.dataset.component = 'code-block';
+  block.dataset.expansionKey = expansionKey;
   block.classList.toggle('is-wrapped', state.display?.wrapCode === true);
   if (collapsible) block.style.setProperty('--collapsed-lines', String(threshold));
 
@@ -842,6 +979,8 @@ function renderCodeBlock(pre, code, language, source) {
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'code-block-toggle';
+  toggle.dataset.interactionAnchor = 'true';
+  toggle.dataset.viewportAnchorKey = `${expansionKey}:header`;
   toggle.setAttribute('aria-label', collapsible ? t('expandCode') : t('code'));
   toggle.setAttribute('aria-expanded', String(!collapsible));
   const languageLabel = document.createElement('span');
@@ -872,37 +1011,47 @@ function renderCodeBlock(pre, code, language, source) {
   };
   if (collapsible) {
     toggle.addEventListener('click', () => {
+      const interactionAnchor = beginLayoutInteraction(toggle);
       const expanded = !localExpansion(expansionKey, false);
       localExpansions.set(expansionKey, expanded);
       applyCodeExpansion(expanded);
+      queueInteractionLayoutReconcile(interactionAnchor, true);
     });
     applyCodeExpansion(localExpansion(expansionKey, false));
   }
 }
 
-async function renderMermaid(pre, source) {
+async function renderMermaid(pre, source, messageId) {
+  const renderSessionId = state?.renderSessionId;
   try {
     window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' });
     const { svg } = await window.mermaid.render(`m-${Date.now()}-${requestSequence += 1}`, source);
-    if (!pre.isConnected) return;
     const wrapper = document.createElement('div');
     wrapper.innerHTML = window.DOMPurify.sanitize(svg, {
       USE_PROFILES: { svg: true, svgFilters: true },
       FORBID_TAGS: ['style', 'foreignObject', 'script'],
     });
-    pre.replaceWith(wrapper);
+    if (rendererUpdatesBlocked() || !pre.isConnected) {
+      pendingMermaidCommits.set(pre, {
+        wrapper,
+        messageId,
+        renderSessionId,
+      });
+      scheduleRendererUpdateFlush();
+      return;
+    }
+    commitMermaidRender(pre, wrapper, messageId, renderSessionId);
   } catch {
     bridge.post({ type: 'diagnostic', code: 'mermaid_block_failed' });
     pre.classList.add('block-error');
   }
 }
 
-function addHtmlPreview(pre, source) {
+function addHtmlPreview(pre, source, key) {
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.referrerPolicy = 'no-referrer';
   frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">${source}`;
-  const key = stableTextKey('html-preview', source);
   pre.after(disclosure({
     key,
     label: t('htmlPreview'),
@@ -977,6 +1126,7 @@ function renderReasoningSegment(message, segment, index, parent) {
     Boolean(segment.loading),
     'reasoning',
     message.id,
+    `${key}:body`,
   ));
   const card = disclosure({
     key,
@@ -1014,6 +1164,7 @@ function appendConversationText(message, parent, content, blockKey) {
     message.isStreaming,
     message.role,
     message.id,
+    `${message.id}:${blockKey}`,
   );
   markdown.dataset.contentBlockKey = blockKey;
   if (message.role === 'user') {
@@ -1133,7 +1284,13 @@ function renderTool(message, tool, parent) {
   args.textContent = JSON.stringify(tool.arguments ?? {}, null, 2);
   body.append(args);
   if (tool.content != null) {
-    body.append(markdownNode(tool.content, tool.loading, 'assistant', message.id));
+    body.append(markdownNode(
+      tool.content,
+      tool.loading,
+      'assistant',
+      message.id,
+      `${key}:body`,
+    ));
   }
   if (tool.arguments?.approvalRequired === true && tool.content == null) {
     const actions = document.createElement('div');
@@ -1170,18 +1327,32 @@ function applyThinkingStepCollapse(message, parent) {
     const hiddenCount = steps.length - 2;
     if (hiddenCount <= 0) continue;
     const key = `${message.id}:thinking-steps:${cardIndex}`;
-    if (localExpansion(key, false)) continue;
-    for (const step of steps.slice(0, hiddenCount)) step.hidden = true;
-    const show = button(
-      message.expandStepsLabel ?? String(hiddenCount),
+    const collapsibleSteps = steps.slice(0, hiddenCount);
+    const toggle = button(
+      '',
       () => {
-        localExpansions.set(key, true);
-        for (const step of steps.slice(0, hiddenCount)) step.hidden = false;
-        show.remove();
+        const interactionAnchor = beginLayoutInteraction(toggle);
+        const expanded = !localExpansion(key, false);
+        localExpansions.set(key, expanded);
+        applyExpanded(expanded);
+        queueInteractionLayoutReconcile(interactionAnchor, true);
       },
       'show-thinking-steps',
     );
-    steps[hiddenCount].before(show);
+    card.dataset.expansionKey = key;
+    toggle.dataset.interactionAnchor = 'true';
+    toggle.dataset.viewportAnchorKey = `${key}:toggle`;
+    const applyExpanded = (expanded) => {
+      for (const step of collapsibleSteps) step.hidden = !expanded;
+      const label = expanded
+        ? t('collapseThinkingSteps')
+        : message.expandStepsLabel ?? String(hiddenCount);
+      toggle.textContent = label;
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('aria-expanded', String(expanded));
+    };
+    applyExpanded(localExpansion(key, false));
+    card.prepend(toggle);
   }
 }
 
@@ -1449,6 +1620,8 @@ function renderMessage(message, isLast = false) {
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.dataset.component = 'message-bubble';
+  if (header) header.dataset.viewportAnchorKey = `${message.id}:header`;
+  attachments.dataset.viewportAnchorKey = `${message.id}:attachments`;
   renderConversationBlocks(message, bubble);
   groupChainCards(bubble);
   applyThinkingStepCollapse(message, bubble);
@@ -1462,6 +1635,7 @@ function renderMessage(message, isLast = false) {
         message.isStreaming,
         'assistant',
         message.id,
+        `${key}:body`,
       ),
       expanded: localExpansion(key, true),
       className: 'translation',
@@ -1490,6 +1664,7 @@ function renderMessage(message, isLast = false) {
   const actions = message.selecting || (message.role !== 'user' && message.isStreaming)
     ? null
     : renderMessageActions(message);
+  if (actions) actions.dataset.viewportAnchorKey = `${message.id}:actions`;
   const suggestions = message.role !== 'user' && isLast && !message.isStreaming
     ? renderSuggestions()
     : null;
@@ -1541,6 +1716,7 @@ function createMessageSlot(message, index, messageCount) {
   const slot = document.createElement('div');
   slot.className = 'message-slot';
   slot.dataset.messageId = message.id;
+  slot.dataset.messageSlot = 'true';
   const presented = messageForPresentation(message);
   slot.append(renderMessage(presented, index === messageCount - 1));
   if (message.showContextDivider) {
@@ -1639,6 +1815,7 @@ function flushMountedUpdates() {
   const ids = [...pendingMountedUpdates];
   pendingMountedUpdates.clear();
   for (const id of ids) updateMountedMessage(id);
+  flushRendererUpdates();
 }
 
 function render() {
@@ -1648,6 +1825,7 @@ function render() {
   const sameSession = renderedSessionId === state.renderSessionId;
   if (!sameSession) {
     navigationEdge = state.initialViewportMode === 'bottom' ? 'bottom' : null;
+    initialBottomPin = navigationEdge === 'bottom';
   }
   const savedViewport = sameSession
     ? null
@@ -1692,6 +1870,8 @@ function render() {
     lastTimelineScrollTop = timeline.scrollTop;
     pendingMountedUpdates.clear();
     enforceNavigationEdge();
+    releaseInitialBottomPin();
+    flushRendererUpdates();
     sendViewportMetrics();
     acknowledgeCommittedRender();
     reportSlowRender(startedAt, 'virtual_window_render_slow');
@@ -1735,6 +1915,7 @@ function render() {
   lastTimelineScrollTop = timeline.scrollTop;
   pendingMountedUpdates.clear();
   enforceNavigationEdge();
+  flushRendererUpdates();
   sendViewportMetrics();
   acknowledgeCommittedRender();
   reportSlowRender(startedAt, 'virtual_window_render_slow');
@@ -1747,6 +1928,80 @@ function acknowledgeCommittedRender() {
     conversationId: state.conversationId,
     renderRevision: state.renderRevision,
   });
+}
+
+function releaseInitialBottomPin() {
+  if (!initialBottomPin || bottomHoldTimer != null) return;
+  initialBottomPin = false;
+  if (navigationEdge === 'bottom') navigationEdge = null;
+}
+
+function notifyViewportInteraction() {
+  if (!state) return;
+  bridge.post({
+    type: 'viewportInteraction',
+    protocolVersion: PROTOCOL_VERSION,
+    renderSessionId: state.renderSessionId,
+    conversationId: state.conversationId,
+    capabilityToken: state.capabilityToken,
+  });
+}
+
+function releaseInteractionAnchor(anchor) {
+  if (!isCurrentInteraction(anchor)) return false;
+  pendingInteractionAnchor = null;
+  clearTimeout(interactionExpiryTimer);
+  interactionExpiryTimer = null;
+  return true;
+}
+
+function cancelInteractionLayout() {
+  interactionRevision += 1;
+  pendingInteractionAnchor = null;
+  clearTimeout(interactionExpiryTimer);
+  interactionExpiryTimer = null;
+  if (interactionMeasureFrame) cancelAnimationFrame(interactionMeasureFrame);
+  interactionMeasureFrame = 0;
+}
+
+function beginLayoutInteraction(element) {
+  cancelInteractionLayout();
+  viewportNavigation.cancel();
+  programmaticNavigationActive = false;
+  navigationCursorId = null;
+  navigationEdge = null;
+  initialBottomPin = false;
+  clearTimeout(bottomHoldTimer);
+  bottomHoldTimer = null;
+  notifyViewportInteraction();
+  const captured = captureInteractionAnchor(timeline, element);
+  if (!captured) return null;
+  const anchor = {
+    ...captured,
+    revision: interactionRevision,
+    controlled: false,
+    releaseRequested: false,
+  };
+  pendingInteractionAnchor = anchor;
+  interactionExpiryTimer = setTimeout(() => {
+    if (!isCurrentInteraction(anchor)) return;
+    releaseInteractionAnchor(anchor);
+    scheduleMeasuredHeightReconcile();
+    scheduleVirtualPrune();
+  }, 2000);
+  return anchor;
+}
+
+function isCurrentInteraction(anchor) {
+  return anchor != null && pendingInteractionAnchor != null &&
+    anchor.revision === interactionRevision &&
+    pendingInteractionAnchor.revision === anchor.revision;
+}
+
+function updateInteractionControl(anchor, controlled) {
+  if (!isCurrentInteraction(anchor)) return;
+  anchor.controlled = Boolean(controlled);
+  pendingInteractionAnchor.controlled = anchor.controlled;
 }
 
 function interactionAnchorCanRelease(anchor) {
@@ -1766,11 +2021,11 @@ function restorePreferredViewport(
     if (restoreInteractionAnchor(timeline, pendingInteractionAnchor)) {
       if (allowInteractionRelease &&
           interactionAnchorCanRelease(pendingInteractionAnchor)) {
-        pendingInteractionAnchor = null;
+        releaseInteractionAnchor(pendingInteractionAnchor);
       }
       return;
     }
-    if (dropMissingInteraction) pendingInteractionAnchor = null;
+    if (dropMissingInteraction) releaseInteractionAnchor(pendingInteractionAnchor);
   }
   restoreViewport(timeline, viewport);
 }
@@ -1786,25 +2041,19 @@ function stageMeasuredHeight(id, rawHeight) {
 }
 
 function queueInteractionLayoutReconcile(anchor, releaseRequested = false) {
-  if (!anchor) return;
-  const previous = pendingInteractionAnchor;
-  const sameAnchor = previous?.messageId === anchor.messageId &&
-    previous?.expansionKey === anchor.expansionKey;
-  pendingInteractionAnchor = {
-    ...anchor,
-    releaseRequested: Boolean(
-      releaseRequested || anchor.releaseRequested ||
-      (sameAnchor && previous.releaseRequested),
-    ),
-  };
+  if (!isCurrentInteraction(anchor)) return;
+  anchor.releaseRequested ||= Boolean(releaseRequested);
+  pendingInteractionAnchor.releaseRequested = anchor.releaseRequested;
   // Correct the click-triggered layout change before the browser can paint;
   // the next frame measures and commits the matching height generation.
-  restoreInteractionAnchor(timeline, pendingInteractionAnchor);
+  restoreInteractionAnchor(timeline, anchor);
   cancelVirtualPrefetch();
   clearTimeout(virtualPruneTimer);
   if (interactionMeasureFrame) return;
+  const revision = anchor.revision;
   interactionMeasureFrame = requestAnimationFrame(() => {
     interactionMeasureFrame = 0;
+    if (!isCurrentInteraction(anchor) || revision !== interactionRevision) return;
     const activeAnchor = pendingInteractionAnchor;
     const slot = activeAnchor == null
       ? null
@@ -1815,7 +2064,9 @@ function queueInteractionLayoutReconcile(anchor, releaseRequested = false) {
         slot.getBoundingClientRect().height,
       );
     }
-    restoreInteractionAnchor(timeline, activeAnchor);
+    if (isCurrentInteraction(activeAnchor)) {
+      restoreInteractionAnchor(timeline, activeAnchor);
+    }
     scheduleMeasuredHeightReconcile();
   });
 }
@@ -1848,6 +2099,7 @@ function reconcileMeasuredHeights() {
   measuredHeightsPending = false;
   if (!changed) {
     restorePreferredViewport(viewport, true);
+    releaseInitialBottomPin();
     sendViewportMetrics();
     return;
   }
@@ -1866,6 +2118,7 @@ function reconcileMeasuredHeights() {
     return;
   }
   enforceNavigationEdge();
+  releaseInitialBottomPin();
   sendViewportMetrics();
   const range = visibleRange({
     heights: messages.map(messageHeight),
@@ -1909,7 +2162,7 @@ const streamPresenter = createAdaptiveStreamPresenter({
   },
 });
 const sendViewportMetrics = createFrameCoalescer(() => {
-  const anchor = captureAnchor(timeline);
+  const anchor = captureAnchor(timeline, { granular: false });
   bridge.post({
     type: 'viewportMetrics',
     pixels: timeline.scrollTop,
@@ -2056,7 +2309,7 @@ const virtualWindowCoordinator = createVirtualWindowCoordinator({
       restoreInteractionAnchor(timeline, pendingInteractionAnchor);
     if (restoredInteraction &&
         interactionAnchorCanRelease(pendingInteractionAnchor)) {
-      pendingInteractionAnchor = null;
+      releaseInteractionAnchor(pendingInteractionAnchor);
     }
     if (!restoredInteraction) {
       timeline.scrollTo({ top: requested, behavior: 'auto' });
@@ -2303,13 +2556,15 @@ function finishUserScrollWhenIdle() {
   scheduleMeasuredHeightReconcile();
   scheduleVirtualPrune();
 }
-function markUserScroll() {
+function markUserScroll(realIntent = true) {
   const firstIntent = !userScrolling;
+  if (realIntent || firstIntent) cancelInteractionLayout();
   if (firstIntent) {
     programmaticNavigationActive = false;
     viewportNavigation.cancel();
     navigationCursorId = null;
     navigationEdge = null;
+    initialBottomPin = false;
     clearTimeout(bottomHoldTimer);
     bottomHoldTimer = null;
   }
@@ -2319,7 +2574,7 @@ function markUserScroll() {
   clearTimeout(userScrollTimer);
   userScrollTimer = setTimeout(finishUserScrollWhenIdle, 800);
 }
-timeline.addEventListener('wheel', markUserScroll, { passive: true });
+timeline.addEventListener('wheel', () => markUserScroll(true), { passive: true });
 timeline.addEventListener('pointerdown', (event) => {
   gestureActive = true;
   gestureIntent = 'hold';
@@ -2444,7 +2699,7 @@ timeline.addEventListener('scroll', () => {
       scheduleVirtualPrefetch(Math.max(0, attemptedTop - viewport * 2));
     }
   }
-  if (userScrolling) markUserScroll();
+  if (userScrolling) markUserScroll(false);
   sendViewportMetrics();
   if (timeline.scrollTop < 180 && state?.hasMoreBefore) sendAction('loadMoreBefore');
   if (timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 180 && state?.hasMoreAfter) sendAction('loadMoreAfter');
@@ -2474,9 +2729,13 @@ timeline.addEventListener('keydown', (event) => {
 window.addEventListener('resize', requestRender);
 
 function prepareProgrammaticNavigation() {
+  cancelInteractionLayout();
   virtualWindowCoordinator.cancel();
   cancelVirtualPrefetch();
   programmaticNavigationActive = true;
+  initialBottomPin = false;
+  clearTimeout(bottomHoldTimer);
+  bottomHoldTimer = null;
   releaseScrollStopLock();
   clearTimeout(userScrollTimer);
   userScrollTimer = null;
@@ -2486,6 +2745,13 @@ function prepareProgrammaticNavigation() {
 function handleViewportCommand(envelope) {
   const command = envelope.command;
   const payload = envelope.payload ?? {};
+  // A bottom command may already be crossing the platform bridge when the
+  // user starts a drag or opens a disclosure. That stale auto-follow must not
+  // cancel the newer local intent and pull the viewport away.
+  if (command === 'bottom' || command === 'holdBottom') {
+    if (touchActive || gestureActive || pendingInteractionAnchor) return;
+    if (userScrolling && payload.force !== true) return;
+  }
   prepareProgrammaticNavigation();
   if (command === 'top') {
     navigationCursorId = null;
@@ -2494,9 +2760,8 @@ function handleViewportCommand(envelope) {
     navigationCursorId = null;
     navigateToEdge('bottom');
   } else if (command === 'holdBottom') {
-    clearTimeout(bottomHoldTimer);
     navigationCursorId = null;
-    navigateToEdge('bottom');
+    navigateToEdge('bottom', { hold: true });
     const duration = Math.max(0, Math.min(2000, Number(payload.durationMs) || 0));
     bottomHoldTimer = setTimeout(() => {
       bottomHoldTimer = null;
@@ -2521,7 +2786,7 @@ function handleViewportCommand(envelope) {
   }
 }
 
-function navigateToEdge(edge) {
+function navigateToEdge(edge, { hold = false } = {}) {
   programmaticNavigationActive = true;
   navigationEdge = edge;
   const settle = edge === 'top'
@@ -2532,6 +2797,9 @@ function navigateToEdge(edge) {
     const settled = edge === 'top' ? timeline.scrollTop <= 1 : remaining <= 1;
     if (!settled) {
       bridge.post({ type: 'diagnostic', code: 'viewport_navigation_unsettled' });
+    }
+    if (!hold && navigationEdge === edge) {
+      navigationEdge = null;
     }
     programmaticNavigationActive = false;
     sendViewportMetrics();
@@ -2752,6 +3020,7 @@ window.CuplivoWeb = {
             streamPresenter.clear();
             navigationCursorId = null;
             navigationEdge = null;
+            initialBottomPin = false;
             programmaticNavigationActive = false;
             clearTimeout(bottomHoldTimer);
             bottomHoldTimer = null;
@@ -2764,11 +3033,14 @@ window.CuplivoWeb = {
             mountedSlots.clear();
             presentedStreamContent.clear();
             pendingMountedUpdates.clear();
+            pendingRendererRenders.clear();
+            pendingRendererRefreshes.clear();
+            pendingMermaidCommits.clear();
+            if (rendererRefreshFrame) cancelAnimationFrame(rendererRefreshFrame);
+            rendererRefreshFrame = 0;
             markdownHtmlCache.clear();
             measuredHeightsPending = false;
-            pendingInteractionAnchor = null;
-            if (interactionMeasureFrame) cancelAnimationFrame(interactionMeasureFrame);
-            interactionMeasureFrame = 0;
+            cancelInteractionLayout();
             renderCommitCoordinator.clear();
             cancelVirtualPrefetch();
             clearTimeout(virtualPruneTimer);

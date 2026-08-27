@@ -513,6 +513,14 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
           }
         });
         return;
+      case 'viewportInteraction':
+        if (!_isAuthorizedBridgeRequest(message)) {
+          debugPrint('WebConversationViewport: rejected viewport interaction');
+          return;
+        }
+        widget.viewportPort.cancelAutoFollow();
+        widget.onUserScrollIntent();
+        return;
       case 'action':
         unawaited(_handleAction(message));
         return;

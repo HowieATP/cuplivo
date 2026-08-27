@@ -6,6 +6,7 @@ import 'tools_hub_content.dart';
 Future<void> showToolsHubSheet(
   BuildContext context, {
   required String assistantId,
+  required String? conversationId,
 }) async {
   final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
@@ -15,14 +16,21 @@ Future<void> showToolsHubSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => _ToolsHubSheet(assistantId: assistantId),
+    builder: (_) => _ToolsHubSheet(
+      assistantId: assistantId,
+      conversationId: conversationId,
+    ),
   );
 }
 
 class _ToolsHubSheet extends StatelessWidget {
-  const _ToolsHubSheet({required this.assistantId});
+  const _ToolsHubSheet({
+    required this.assistantId,
+    required this.conversationId,
+  });
 
   final String assistantId;
+  final String? conversationId;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +59,10 @@ class _ToolsHubSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              ToolsHubContent(assistantId: assistantId),
+              ToolsHubContent(
+                assistantId: assistantId,
+                conversationId: conversationId,
+              ),
             ],
           ),
         ),

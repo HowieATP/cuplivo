@@ -3276,6 +3276,29 @@
   "workspaceBindDisabledHint": "開啟工作區後選擇",
   "workspaceEntryTitle": "工作區",
   "workspaceEntrySubtitleOff": "未開啟",
+  "workspaceDefaultDirectoryTitle": "預設工作目錄",
+  "workspaceConversationDirectoryTitle": "目前對話工作目錄",
+  "workspaceDirectoryHint": "/workspace 或相對於工作區根目錄的路徑",
+  "workspaceDirectoryBrowse": "瀏覽",
+  "workspaceDirectorySave": "儲存",
+  "workspaceDirectoryUseAssistantDefault": "使用助手預設目錄",
+  "workspaceDirectoryInherited": "正在沿用助手預設目錄",
+  "workspaceDirectoryOverride": "目前對話已覆寫",
+  "workspaceDirectorySaved": "工作目錄已儲存",
+  "workspaceDirectorySaveFailed": "儲存工作目錄失敗：{error}",
+  "@workspaceDirectorySaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceAutoLoadAgentsMdTitle": "自動載入 AGENTS.md",
+  "workspaceAutoLoadAgentsMdSubtitle": "從此目錄向上至工作區根目錄載入專案指令",
+  "workspaceAgentsMdLoadFailed": "無法載入 AGENTS.md 指令。請修正該檔案或關閉自動載入。",
+  "workspaceAgentsMdSaveFailed": "無法儲存 AGENTS.md 載入設定。",
+  "workspaceDirectoryPickerTitle": "選擇工作目錄",
+  "workspaceDirectorySelectCurrent": "選擇目前資料夾",
   "workspaceShellMobileOnly": "Shell 僅在 Android 或 iOS 可用",
   "workspaceToolShellTitle": "Shell",
   "workspaceToolShellUserDesc": "在 Linux 沙箱中執行命令（Android 或 iOS，需先安裝基礎依賴）",

@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -24,6 +26,7 @@ import '../../workspace/pages/workspace_list_page.dart';
 import '../../workspace/pages/workspace_terminal_page.dart';
 import '../../workspace/widgets/workspace_bind_sheet.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
+import '../../workspace/widgets/workspace_settings_sheet.dart';
 import '../services/local_tools_service.dart';
 import 'subagent_target_sheet.dart';
 
@@ -35,9 +38,15 @@ import 'subagent_target_sheet.dart';
 /// check-mark rows on desktop (hover highlight), card rows with switches on
 /// mobile.
 class ToolsHubContent extends StatefulWidget {
-  const ToolsHubContent({super.key, required this.assistantId, this.onClose});
+  const ToolsHubContent({
+    super.key,
+    required this.assistantId,
+    required this.conversationId,
+    this.onClose,
+  });
 
   final String assistantId;
+  final String? conversationId;
 
   /// Invoked before navigation actions (dialog/routes) so hosting shells
   /// (e.g. the desktop popover with its full-screen dismiss barrier) can
@@ -184,6 +193,9 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     final boundWs = assistant.workspaceId == null
         ? null
         : wp.getById(assistant.workspaceId!);
+    final conversation = widget.conversationId == null
+        ? null
+        : context.watch<ChatService>().getConversation(widget.conversationId!);
     final wsTerminalReady =
         Platform.isAndroid &&
         assistant.workspaceEnabled &&
@@ -241,6 +253,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
                 assistant,
                 boundWs,
                 wsTerminalReady,
+                conversation,
               ),
             ],
           ),
@@ -481,8 +494,34 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     Assistant a,
     Workspace? boundWs,
     bool wsTerminalReady,
+    Conversation? conversation,
   ) {
     final boundLabel = boundWs?.displayName ?? l10n.toolsHubWorkspaceUnbound;
+    final directoryReady =
+        a.workspaceEnabled && boundWs != null && conversation != null;
+    final directoryLabel = directoryReady
+        ? conversation.workspaceDirectoryOverrides[boundWs.id] ??
+              a.workspaceDefaultDirectories[boundWs.id] ??
+              '/workspace'
+        : l10n.workspaceBindDisabledHint;
+
+    void openDirectorySettings() {
+      final conversationId = widget.conversationId;
+      if (!directoryReady || conversationId == null) return;
+      Haptics.light();
+      final launchContext = widget.onClose == null
+          ? context
+          : Navigator.of(context, rootNavigator: true).context;
+      widget.onClose?.call();
+      unawaited(
+        showWorkspaceDirectorySettings(
+          launchContext,
+          assistantId: a.id,
+          conversationId: conversationId,
+        ),
+      );
+    }
+
     final children = <Widget>[
       if (_isMobileStyle)
         _SheetNavRow(
@@ -523,6 +562,39 @@ class _ToolsHubContentState extends State<ToolsHubContent>
             showWorkspaceBindSheet(context, a);
           },
         ),
+      if (_isMobileStyle)
+        _SheetNavRow(
+          icon: Lucide.FolderOpen,
+          title: l10n.workspaceDirectoryPickerTitle,
+          trailingText: directoryLabel,
+          enabled: directoryReady,
+          onTap: directoryReady ? openDirectorySettings : null,
+        )
+      else
+        _DesktopToolRow(
+          icon: Lucide.FolderOpen,
+          label: l10n.workspaceDirectoryPickerTitle,
+          enabled: directoryReady,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                directoryLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Lucide.ChevronRight,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ],
+          ),
+          onTap: directoryReady ? openDirectorySettings : null,
+        ),
     ];
     if (Platform.isAndroid) {
       children.add(
@@ -551,7 +623,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     return _buildGroup(
       keyName: _workspaceKey,
       groupName: l10n.settingsPageWorkspace,
-      count: Platform.isAndroid ? 2 : 1,
+      count: Platform.isAndroid ? 3 : 2,
       trailing: Tooltip(
         message: l10n.toolsHubWorkspaceManage,
         child: IosIconButton(
@@ -639,6 +711,7 @@ class _DesktopToolRow extends StatefulWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.enabled = true,
     this.onTap,
     this.trailing,
   });
@@ -646,6 +719,7 @@ class _DesktopToolRow extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool selected;
+  final bool enabled;
   final VoidCallback? onTap;
   final Widget? trailing;
 
@@ -665,57 +739,62 @@ class _DesktopToolRowState extends State<_DesktopToolRow> {
     final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
       alpha: isDark ? 0.12 : 0.10,
     );
-    return MouseRegion(
-      cursor: widget.onTap == null
-          ? MouseCursor.defer
-          : SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? hoverBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    size: 16,
-                    color: widget.selected ? cs.primary : onColor,
+    return Opacity(
+      opacity: widget.enabled ? 1 : 0.55,
+      child: MouseRegion(
+        cursor: !widget.enabled || widget.onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
+        onEnter: (_) {
+          if (widget.enabled) setState(() => _hovered = true);
+        },
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.enabled ? widget.onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: _hovered ? hoverBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      size: 16,
+                      color: widget.selected ? cs.primary : onColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: AppFontWeights.regular,
-                    decoration: TextDecoration.none,
-                    color: onColor,
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.regular,
+                      decoration: TextDecoration.none,
+                      color: onColor,
+                    ),
                   ),
                 ),
-              ),
-              if (widget.trailing != null)
-                widget.trailing!
-              else if (widget.selected)
-                Icon(Lucide.Check, size: 16, color: cs.primary)
-              else
-                const SizedBox(width: 16),
-            ],
+                if (widget.trailing != null)
+                  widget.trailing!
+                else if (widget.selected)
+                  Icon(Lucide.Check, size: 16, color: cs.primary)
+                else
+                  const SizedBox(width: 16),
+              ],
+            ),
           ),
         ),
       ),

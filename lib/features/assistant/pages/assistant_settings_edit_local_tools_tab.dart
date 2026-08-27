@@ -120,7 +120,9 @@ class _LocalToolsTab extends StatelessWidget {
     }
 
     final workspaceOn = assistant.workspaceEnabled;
+    var workspaceReady = false;
     String workspaceSubtitle = l10n.workspaceEntrySubtitleOff;
+    String directorySubtitle = l10n.workspaceBindDisabledHint;
     if (workspaceOn) {
       try {
         final wp = context.watch<WorkspaceProvider>();
@@ -128,6 +130,11 @@ class _LocalToolsTab extends StatelessWidget {
             ? null
             : wp.getById(assistant.workspaceId!);
         workspaceSubtitle = ws?.displayName ?? l10n.workspaceBindTitle;
+        workspaceReady = ws != null;
+        if (ws != null) {
+          directorySubtitle =
+              assistant.workspaceDefaultDirectories[ws.id] ?? '/workspace';
+        }
       } on ProviderNotFoundException catch (e) {
         debugPrint('workspace provider missing: $e');
       } catch (e) {
@@ -145,6 +152,19 @@ class _LocalToolsTab extends StatelessWidget {
               title: l10n.assistantEditLocalToolWorkspaceTitle,
               subtitle: workspaceSubtitle,
               onTap: () => showWorkspaceBindSheet(context, assistant),
+            ),
+            _iosDivider(context),
+            _LocalToolNavRow(
+              icon: Lucide.FolderOpen,
+              title: l10n.workspaceDefaultDirectoryTitle,
+              subtitle: directorySubtitle,
+              enabled: workspaceReady,
+              onTap: workspaceReady
+                  ? () => showWorkspaceDirectorySettings(
+                      context,
+                      assistantId: assistant.id,
+                    )
+                  : null,
             ),
             _iosDivider(context),
             _LocalToolRow(
@@ -299,12 +319,14 @@ class _LocalToolNavRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -313,56 +335,62 @@ class _LocalToolNavRow extends StatelessWidget {
       onTap: onTap,
       builder: (pressed) {
         final baseColor = cs.onSurface.withValues(alpha: 0.9);
-        return _AnimatedPressColor(
-          pressed: pressed,
-          base: baseColor,
-          builder: (color) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 36,
-                    child: Icon(icon, size: 20, color: cs.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: color,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.25,
-                            color: cs.onSurface.withValues(alpha: 0.62),
-                          ),
-                        ),
-                      ],
+        return Opacity(
+          opacity: enabled ? 1 : 0.55,
+          child: _AnimatedPressColor(
+            pressed: pressed,
+            base: baseColor,
+            builder: (color) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 36,
+                      child: Icon(icon, size: 20, color: cs.primary),
                     ),
-                  ),
-                  Icon(
-                    Lucide.ChevronRight,
-                    size: 18,
-                    color: cs.onSurface.withValues(alpha: 0.35),
-                  ),
-                ],
-              ),
-            );
-          },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: color,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.25,
+                              color: cs.onSurface.withValues(alpha: 0.62),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Lucide.ChevronRight,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );

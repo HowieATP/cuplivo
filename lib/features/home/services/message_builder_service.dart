@@ -13,10 +13,12 @@ import '../../../core/models/assistant_memory.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
+import '../../../core/services/workspace/workspace_execution_context.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/services/world_book_prompt_injector.dart';
@@ -683,6 +685,14 @@ class MessageBuilderService {
     }
   }
 
+  void injectWorkspacePrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String? prompt,
+  ) {
+    if (prompt == null || prompt.trim().isEmpty) return;
+    _appendToSystemMessage(apiMessages, prompt);
+  }
+
   /// Inject memory prompts and recent chats reference into apiMessages.
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
@@ -813,6 +823,42 @@ These memories are automatically included in future conversation contexts within
         _appendToSystemMessage(apiMessages, lp);
       }
     } catch (_) {}
+  }
+
+  /// Inject project-level AGENTS.md instructions for the effective workspace
+  /// directory. A read failure aborts this generation so project instructions
+  /// are never only partially applied.
+  Future<void> injectWorkspaceAgentsMdInstructions(
+    List<Map<String, dynamic>> apiMessages, {
+    required Assistant? assistant,
+    required WorkspaceExecutionContext? workspaceExecutionContext,
+  }) async {
+    if (assistant?.autoLoadAgentsMd != true ||
+        workspaceExecutionContext == null) {
+      return;
+    }
+
+    try {
+      final instructions = await loadWorkspaceAgentsMdInstructions(
+        context: workspaceExecutionContext,
+        workspaces: contextProvider.read<WorkspaceProvider>(),
+      );
+      if (instructions != null) {
+        _appendToSystemMessage(apiMessages, instructions);
+      }
+    } on WorkspaceAgentsMdLoadException catch (error, stackTrace) {
+      debugPrint(
+        'Failed to load workspace AGENTS.md instructions: '
+        '${error.message}\n$stackTrace',
+      );
+      rethrow;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Unexpected workspace AGENTS.md loading failure: '
+        '$error\n$stackTrace',
+      );
+      throw WorkspaceAgentsMdLoadException(error.toString());
+    }
   }
 
   /// Inject available skill list (metadata only) into apiMessages.

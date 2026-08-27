@@ -88,6 +88,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Time Info'), findsOneWidget);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(AssistantSettingsEditPage)),
+    )!;
+    expect(find.text(l10n.workspaceDefaultDirectoryTitle), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) => widget is Icon && widget.icon == Lucide.clock,

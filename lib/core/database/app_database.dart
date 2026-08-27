@@ -388,7 +388,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0019-schema-self-heal.md.
-  int get schemaVersion => 21;
+  int get schemaVersion => 20;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -441,7 +441,7 @@ class AppDatabase extends _$AppDatabase {
   /// Repair incomplete upgrades where user_version already advanced but some
   /// ALTER TABLE / CREATE TABLE steps were skipped/failed (silent catch).
   ///
-  /// Covers every column/table added by the v5–v21 migrations that are
+  /// Covers every column/table added by the v5–v20 migrations that are
   /// wrapped in silent try/catch — missing these makes inserts crash with
   /// "table X has no column named Y". Runs in beforeOpen (rescues existing
   /// broken DBs whose user_version already passed the failed step) and at the
@@ -451,7 +451,7 @@ class AppDatabase extends _$AppDatabase {
   /// this heal set and the regression tests in the same change. See AGENTS.md
   /// §3.20.
   Future<void> _healSchemaIfNeeded() async {
-    // --- assistant_rows (v5–v21) ---
+    // --- assistant_rows (v5–v20) ---
     await _ensureColumn(
       'assistant_rows',
       'memory_mode',
@@ -889,8 +889,6 @@ class AppDatabase extends _$AppDatabase {
             '$error',
           );
         }
-      }
-      if (from < 21) {
         try {
           await migrator.addColumn(
             assistantRows,
@@ -898,7 +896,7 @@ class AppDatabase extends _$AppDatabase {
           );
         } catch (error) {
           debugPrint(
-            'v21 migration could not add automatic AGENTS.md loading: '
+            'v20 migration could not add automatic AGENTS.md loading: '
             '$error',
           );
         }

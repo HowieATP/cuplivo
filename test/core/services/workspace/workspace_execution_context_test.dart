@@ -55,6 +55,19 @@ void main() {
         );
       }
     });
+
+    test('rejects the reserved SAF mount namespace', () {
+      for (final path in <String>[
+        '/workspace/.mounts',
+        '/workspace/.mounts/notes',
+        '.mounts/notes',
+      ]) {
+        expect(
+          () => normalizeWorkspaceDirectory(path),
+          throwsA(isA<WorkspacePathException>()),
+        );
+      }
+    });
   });
 
   group('resolveWorkspaceGuestPath', () {

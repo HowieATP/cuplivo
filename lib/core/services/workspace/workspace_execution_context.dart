@@ -76,11 +76,18 @@ String effectiveWorkspaceDirectory({
 /// Normalizes a saved directory to the portable guest `/workspace/...` form.
 /// Relative input is interpreted from the workspace root.
 String normalizeWorkspaceDirectory(String raw) {
-  return resolveWorkspaceGuestPath(
+  final normalized = resolveWorkspaceGuestPath(
     raw,
     baseDirectory: '/workspace',
     allowMountListingRoot: false,
   );
+  if (normalized == '/workspace/.mounts' ||
+      normalized.startsWith('/workspace/.mounts/')) {
+    throw WorkspacePathException(
+      'The /workspace/.mounts namespace is reserved for SAF mounts.',
+    );
+  }
+  return normalized;
 }
 
 /// Resolves a model path using standard cwd semantics without allowing it to

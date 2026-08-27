@@ -8666,7 +8666,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enable fetch for providers without native fetch'**
+  /// **'Add browsing for providers without native browsing'**
   String get searchServicesPageEnableFallbackFetchTitle;
 
   /// No description provided for @searchServicesPageAutoTestTitle.

@@ -5227,6 +5227,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageHapticsIosSwitchTitle => '开关触觉反馈';
 
   @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成期间保持屏幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '对之后开始的生成生效；进行中的生成保持当前行为';
+
+  @override
   String get displaySettingsPageHapticsOnListItemTapTitle => '列表项触觉反馈';
 
   @override
@@ -13967,6 +13975,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageHapticsIosSwitchTitle => '开关触觉反馈';
 
   @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成期间保持屏幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '对之后开始的生成生效；进行中的生成保持当前行为';
+
+  @override
   String get displaySettingsPageHapticsOnListItemTapTitle => '列表项触觉反馈';
 
   @override
@@ -22703,6 +22719,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageHapticsIosSwitchTitle => '開關觸覺回饋';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成期間保持螢幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '對之後開始的生成生效；進行中的生成保持目前行為';
 
   @override
   String get displaySettingsPageHapticsOnListItemTapTitle => '列表項點擊觸覺回饋';

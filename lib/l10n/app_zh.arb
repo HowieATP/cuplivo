@@ -1790,6 +1790,8 @@
   "displaySettingsPageHapticsOnSidebarSubtitle": "打开/关闭侧边栏时启用触觉反馈",
   "displaySettingsPageHapticsGlobalTitle": "全局触觉反馈",
   "displaySettingsPageHapticsIosSwitchTitle": "开关触觉反馈",
+  "displaySettingsPageKeepScreenOnDuringGenerationTitle": "生成期间保持屏幕常亮",
+  "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "对之后开始的生成生效；进行中的生成保持当前行为",
   "displaySettingsPageHapticsOnListItemTapTitle": "列表项触觉反馈",
   "displaySettingsPageHapticsOnCardTapTitle": "卡片触觉反馈",
   "displaySettingsPageHapticsOnGenerateTitle": "消息生成触觉反馈",

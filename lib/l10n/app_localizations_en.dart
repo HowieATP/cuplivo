@@ -5459,6 +5459,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageHapticsIosSwitchTitle => 'Haptics on Switch';
 
   @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      'Keep Screen On While Generating';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      'Applied to generations started after the change; in-flight generations keep their current behavior';
+
+  @override
   String get displaySettingsPageHapticsOnListItemTapTitle =>
       'Haptics on List Items';
 

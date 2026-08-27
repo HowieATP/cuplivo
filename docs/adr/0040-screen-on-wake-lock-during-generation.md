@@ -2,8 +2,15 @@
 
 Mobile chat generation holds the screen on (`wakelock_plus`, Android
 `FLAG_KEEP_SCREEN_ON` / iOS `idleTimerDisabled`) so the user can watch the
-stream without the display sleeping — the classic chat-app behavior. Always-on
-(no user setting): the cost of an interrupted stream outweighs battery.
+stream without the display sleeping — the classic chat-app behavior.
+**User-togglable (issue #552)**: an opt-out switch
+`keepScreenOnDuringGeneration` (default `true`, so the shipped behavior is
+unchanged) lets battery/heat-conscious users turn the wake lock off. The
+toggle is re-checked at every slot start: an in-flight round keeps its lock
+until settle, a new enabled slot turns the screen on even when an older
+disabled round is still running, and an off-flip over overlapping rounds only
+takes effect once every active round has settled (a new round can only *add*
+a lock — it cannot preempt one a still-active round relies on).
 
 ## Why the engine, not the page layer
 
@@ -25,8 +32,9 @@ automatically.
 - **Desktop**: `wakelock_plus` nominally supports Windows/macOS/Linux, but an
   actively watched stream implies a live monitor. Excluded to avoid plugin
   surface on three more platforms.
-- **User toggle**: rejected — always-on. A leaked hold (refcount bug) is a
-  battery bug the tests cover, not a preference.
+- **User toggle**: rejected in v1 (always-on: the cost of a broken stream
+  outweighs battery); adopted with an opt-out in #552 (battery/heat is a
+  real user concern, and the switch makes the trade-off the user's).
 - **App-lifecycle hook**: rejected — the Android window flag is
   foreground-scoped by construction; backgrounding naturally ends the
   screen-on state. An observer would be dead code.
@@ -41,3 +49,7 @@ automatically.
 - The refcount's failure mode is a leaked hold (screen never sleeps, battery);
   the test set covers done / error / cancel / pre-start-abort / `failRound`
   settlement paths.
+- The user toggle is re-checked per slot start; a mid-round flip takes
+  effect for rounds that start afterwards. `WakeLockManager._platformOn`
+  distinguishes "enabled but failed" from "disabled by the user" so the
+  settle-time drop is never skipped once an enable was requested.

@@ -2275,6 +2275,8 @@
   "displaySettingsPageHapticsOnSidebarSubtitle": "Enable haptic feedback when opening/closing sidebar",
   "displaySettingsPageHapticsGlobalTitle": "Global Haptics",
   "displaySettingsPageHapticsIosSwitchTitle": "Haptics on Switch",
+  "displaySettingsPageKeepScreenOnDuringGenerationTitle": "Keep Screen On While Generating",
+  "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "Applied to generations started after the change; in-flight generations keep their current behavior",
   "displaySettingsPageHapticsOnListItemTapTitle": "Haptics on List Items",
   "displaySettingsPageHapticsOnCardTapTitle": "Haptics on Cards",
   "displaySettingsPageHapticsOnGenerateTitle": "Haptics on Generate",

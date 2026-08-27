@@ -8388,6 +8388,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepQueued => '排队中…';
 
   @override
+  String get workspaceDepStatusUnknown => '状态不可用';
+
+  @override
+  String get workspaceDepProbeFailed => '无法刷新依赖状态，已保留此前的探测结果。';
+
+  @override
+  String get workspaceDepRetry => '重试';
+
+  @override
   String get workspaceDepStageDownloading => '正在下载…';
 
   @override
@@ -8407,6 +8416,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepGitPrerequisite => '请先安装 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '请先安装 Python 和 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
@@ -8466,11 +8481,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '通过命令行使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '通过 HTTP、HTTPS 等协议传输数据';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 客户端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 与密钥管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 压缩工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '创建和解压 ZIP 文件（zip 与 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文档办公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+      '建议搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
 
   @override
   String get workspaceDepBuildTitle => '编译工具链';
@@ -17007,6 +17046,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepQueued => '排队中…';
 
   @override
+  String get workspaceDepStatusUnknown => '状态不可用';
+
+  @override
+  String get workspaceDepProbeFailed => '无法刷新依赖状态，已保留此前的探测结果。';
+
+  @override
+  String get workspaceDepRetry => '重试';
+
+  @override
   String get workspaceDepStageDownloading => '正在下载…';
 
   @override
@@ -17026,6 +17074,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceSandboxBaseRequired => '请先安装基础依赖';
+
+  @override
+  String get workspaceDepGitPrerequisite => '请先安装 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '请先安装 Python 和 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系统目录';
@@ -17085,11 +17139,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '通过命令行使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '通过 HTTP、HTTPS 等协议传输数据';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 客户端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 与密钥管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 压缩工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '创建和解压 ZIP 文件（zip 与 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文档办公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 处理（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
+      '建议搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；约 550MB，安装较慢';
 
   @override
   String get workspaceDepBuildTitle => '编译工具链';
@@ -25628,6 +25706,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceDepQueued => '排隊中…';
 
   @override
+  String get workspaceDepStatusUnknown => '狀態無法使用';
+
+  @override
+  String get workspaceDepProbeFailed => '無法重新整理依賴狀態，已保留先前的探測結果。';
+
+  @override
+  String get workspaceDepRetry => '重試';
+
+  @override
   String get workspaceDepStageDownloading => '正在下載…';
 
   @override
@@ -25647,6 +25734,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceSandboxBaseRequired => '請先安裝基礎相依元件';
+
+  @override
+  String get workspaceDepGitPrerequisite => '請先安裝 Git';
+
+  @override
+  String get workspaceDepOfficePrerequisites => '請先安裝 Python 與 Node.js';
 
   @override
   String get workspaceSandboxDirEntryTitle => '沙箱系統目錄';
@@ -25706,11 +25799,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceDepGitDesc => '版本控制工具';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc => '透過命令列使用 GitHub（gh）';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc => '透過 HTTP、HTTPS 等通訊協定傳輸資料';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH 用戶端';
+
+  @override
+  String get workspaceDepOpenSshDesc => 'SSH、SCP、SFTP 與金鑰管理工具';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP 壓縮工具';
+
+  @override
+  String get workspaceDepArchiveDesc => '建立和解壓縮 ZIP 檔案（zip 與 unzip）';
+
+  @override
   String get workspaceDepOfficeTitle => '文件辦公工具';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx 處理（LibreOffice、pandoc、Poppler）；約 550MB，安裝較慢';
+      '建議搭配 Anthropic 官方 docx、pptx、xlsx Skills 使用（LibreOffice、pandoc、Poppler）；約 550MB，安裝較慢';
 
   @override
   String get workspaceDepBuildTitle => '編譯工具鏈';

@@ -520,7 +520,7 @@ static dispatch_queue_t _readerQueue;
 
     ENVP_APPEND("TERM=xterm-256color");
     ENVP_APPEND("HOME=/root");
-    ENVP_APPEND("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    ENVP_APPEND("PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     ENVP_APPEND("LANG=C.UTF-8");
     ENVP_APPEND("CHARSET=UTF-8");
     ENVP_APPEND("DEBIAN_FRONTEND=noninteractive");

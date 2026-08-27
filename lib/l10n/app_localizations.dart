@@ -15797,6 +15797,24 @@ abstract class AppLocalizations {
   /// **'Queued…'**
   String get workspaceDepQueued;
 
+  /// No description provided for @workspaceDepStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unavailable'**
+  String get workspaceDepStatusUnknown;
+
+  /// No description provided for @workspaceDepProbeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t refresh dependency status. Any previous results were preserved.'**
+  String get workspaceDepProbeFailed;
+
+  /// No description provided for @workspaceDepRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get workspaceDepRetry;
+
   /// No description provided for @workspaceDepStageDownloading.
   ///
   /// In en, this message translates to:
@@ -15838,6 +15856,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
+
+  /// No description provided for @workspaceDepGitPrerequisite.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Git first'**
+  String get workspaceDepGitPrerequisite;
+
+  /// No description provided for @workspaceDepOfficePrerequisites.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Python and Node.js first'**
+  String get workspaceDepOfficePrerequisites;
 
   /// No description provided for @workspaceSandboxDirEntryTitle.
   ///
@@ -15953,6 +15983,54 @@ abstract class AppLocalizations {
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
 
+  /// No description provided for @workspaceDepGithubCliTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub CLI'**
+  String get workspaceDepGithubCliTitle;
+
+  /// No description provided for @workspaceDepGithubCliDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use GitHub from the command line (gh)'**
+  String get workspaceDepGithubCliDesc;
+
+  /// No description provided for @workspaceDepCurlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'curl'**
+  String get workspaceDepCurlTitle;
+
+  /// No description provided for @workspaceDepCurlDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer data over HTTP, HTTPS, and other protocols'**
+  String get workspaceDepCurlDesc;
+
+  /// No description provided for @workspaceDepOpenSshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenSSH Client'**
+  String get workspaceDepOpenSshTitle;
+
+  /// No description provided for @workspaceDepOpenSshDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH, SCP, SFTP, and key-management tools'**
+  String get workspaceDepOpenSshDesc;
+
+  /// No description provided for @workspaceDepArchiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ZIP archive tools'**
+  String get workspaceDepArchiveTitle;
+
+  /// No description provided for @workspaceDepArchiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and extract ZIP archives (zip and unzip)'**
+  String get workspaceDepArchiveDesc;
+
   /// No description provided for @workspaceDepOfficeTitle.
   ///
   /// In en, this message translates to:
@@ -15962,7 +16040,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceDepOfficeDesc.
   ///
   /// In en, this message translates to:
-  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  /// **'Recommended with Anthropic’s official docx, pptx, and xlsx Skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
   String get workspaceDepOfficeDesc;
 
   /// No description provided for @workspaceDepBuildTitle.

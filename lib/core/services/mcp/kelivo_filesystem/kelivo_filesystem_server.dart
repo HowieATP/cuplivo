@@ -1937,15 +1937,20 @@ class KelivoFilesystemInMemoryClientTransport implements mcp.ClientTransport {
   Future<void> get onClose => _closeCompleter.future;
 
   @override
-  void send(dynamic message) {
-    if (_closed) return;
-    Future.microtask(() async {
+  mcp.TransportSendOperation send(dynamic message) {
+    if (_closed) {
+      return mcp.TransportSendOperation(
+        Future<void>.error(mcp.McpError('Transport is closed')),
+      );
+    }
+    final done = Future<void>.sync(() async {
       final resp = await _server.handleMessage(message);
       if (_closed) return;
       if (resp != null) {
         _messageController.add(resp);
       }
     });
+    return mcp.TransportSendOperation(done);
   }
 
   @override

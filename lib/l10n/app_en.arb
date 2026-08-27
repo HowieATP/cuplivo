@@ -1608,8 +1608,6 @@
   "mcpServerEditSheetNameLabel": "Name",
   "mcpServerEditSheetTransportLabel": "Transport",
   "mcpServerEditSheetSseRetryHint": "If SSE fails, try a few times",
-  "mcpServerEditSheetHeartbeatLabel": "Heartbeat Interval",
-  "mcpServerEditSheetHeartbeatHint": "If you encounter frequent 429 (rate limit) errors, try increasing this interval.",
   "mcpServerEditSheetAdvancedLabel": "Advanced Settings",
   "mcpServerEditSheetUrlLabel": "Server URL",
   "mcpServerEditSheetCustomHeadersTitle": "Custom Headers",

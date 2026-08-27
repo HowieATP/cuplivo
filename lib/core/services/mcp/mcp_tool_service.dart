@@ -42,11 +42,7 @@ class McpToolService extends ChangeNotifier {
     if (selected.isEmpty) return null;
 
     // Find a server that has this tool enabled
-    final connected = mcpProvider.connectedServers
-        .where((s) => selected.contains(s.id))
-        .toList();
-    // debugPrint('[MCP/Call/Select] connectedAndSelected=${connected.map((s)=>s.id).join(',')}');
-    for (final s in connected) {
+    for (final s in _routingServers(mcpProvider, selected)) {
       final has = s.tools.any((t) => t.enabled && t.name == toolName);
       if (has) {
         // debugPrint('[MCP/Call/Select] using server=${s.id} name=${s.name} transport=${s.transport.name}');
@@ -66,12 +62,9 @@ class McpToolService extends ChangeNotifier {
   }) async {
     // Attempt call via selected server
     final selected = chat.getConversationMcpServers(conversationId).toSet();
-    final connected = mcpProvider.connectedServers
-        .where((s) => selected.contains(s.id))
-        .toList();
     mcp.CallToolResult? res;
     McpServerConfig? usedServer;
-    for (final s in connected) {
+    for (final s in _routingServers(mcpProvider, selected)) {
       final has = s.tools.any((t) => t.enabled && t.name == toolName);
       if (!has) continue;
       usedServer = s;
@@ -80,16 +73,12 @@ class McpToolService extends ChangeNotifier {
     }
     if (res == null) {
       if (usedServer != null) {
-        final errMsg = mcpProvider.errorFor(usedServer.id) ?? 'Unknown error';
-        final schema = usedServer.tools
-            .firstWhere((t) => t.name == toolName)
-            .schema;
+        final errMsg =
+            mcpProvider.errorFor(usedServer.id) ?? 'MCP server is unavailable.';
         return _renderToolErrorForModel(
           serverName: usedServer.name,
           toolName: toolName,
-          arguments: arguments,
           errorMessage: errMsg,
-          schema: schema,
         );
       }
       return '';
@@ -179,12 +168,12 @@ class McpToolService extends ChangeNotifier {
     // debugPrint('[MCP/Call/Select] assistant=${assistantId ?? a?.id ?? '(current)'} tool=$toolName selectedServers=${selected.join(',')}');
     if (selected.isEmpty) return '';
 
-    var candidates = mcpProvider.connectedServers.where(
-      (s) => selected.contains(s.id),
-    );
+    var candidates = _routingServers(mcpProvider, selected);
     // If targetServerId is given, try only that server
     if (targetServerId != null) {
-      candidates = candidates.where((s) => s.id == targetServerId);
+      candidates = candidates
+          .where((s) => s.id == targetServerId)
+          .toList(growable: false);
     }
     for (final s in candidates) {
       final has = s.tools.any((t) => t.enabled && t.name == toolName);
@@ -192,14 +181,12 @@ class McpToolService extends ChangeNotifier {
         // debugPrint('[MCP/Call/Select] using server=${s.id} name=${s.name} transport=${s.transport.name}');
         final res = await mcpProvider.callTool(s.id, toolName, arguments);
         if (res == null) {
-          final errMsg = mcpProvider.errorFor(s.id) ?? 'Unknown error';
-          final schema = s.tools.firstWhere((t) => t.name == toolName).schema;
+          final errMsg =
+              mcpProvider.errorFor(s.id) ?? 'MCP server is unavailable.';
           return _renderToolErrorForModel(
             serverName: s.name,
             toolName: toolName,
-            arguments: arguments,
             errorMessage: errMsg,
-            schema: schema,
           );
         }
         final buf = StringBuffer();
@@ -269,24 +256,41 @@ class McpToolService extends ChangeNotifier {
     return '';
   }
 
+  /// Routed server candidates: connected servers first (usable now), then
+  /// any enabled selected server (so reconnecting/error servers still get
+  /// tried through [McpProvider.callTool], which surfaces unavailable
+  /// errors precisely instead of silently skipping them).
+  Iterable<McpServerConfig> _routingServers(
+    McpProvider provider,
+    Set<String> selected,
+  ) sync* {
+    for (final server in provider.servers) {
+      if (server.enabled &&
+          selected.contains(server.id) &&
+          provider.statusFor(server.id) == McpStatus.connected) {
+        yield server;
+      }
+    }
+    for (final server in provider.servers) {
+      if (server.enabled &&
+          selected.contains(server.id) &&
+          provider.statusFor(server.id) != McpStatus.connected) {
+        yield server;
+      }
+    }
+  }
+
   String _renderToolErrorForModel({
     required String serverName,
     required String toolName,
-    required Map<String, dynamic> arguments,
     required String errorMessage,
-    Map<String, dynamic>? schema,
   }) {
-    // Provide a concise JSON for the model to self-correct and retry
     final map = <String, dynamic>{
       'type': 'tool_error',
-      'error': 'invalid_arguments',
+      'error': 'tool_unavailable',
       'message': errorMessage,
       'tool': toolName,
       'server': serverName,
-      'lastArguments': arguments,
-      if (schema != null && schema.isNotEmpty) 'parametersSchema': schema,
-      'instruction':
-          'Revise arguments to satisfy parametersSchema, then call the same tool again.',
     };
     return const JsonEncoder.withIndent('  ').convert(map);
   }

@@ -55,21 +55,17 @@ class QuoteBlock extends StatelessWidget {
       }
     }
 
-    Widget label = Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: 12.5,
-        height: 1.35,
-        color: cs.onSurface.withValues(alpha: 0.7),
-      ),
+    final mutedStyle = TextStyle(
+      fontSize: 11.5,
+      height: 1.25,
+      color: cs.onSurface.withValues(alpha: 0.6),
     );
+
     if (spanStart != null && spanEnd != null && spanStart < spanEnd) {
       final pre = spanStart > 0 ? text.substring(0, spanStart) : '';
       final span = text.substring(spanStart, spanEnd);
       final post = spanEnd < text.length ? text.substring(spanEnd) : '';
-      label = Text.rich(
+      return Text.rich(
         TextSpan(
           children: [
             TextSpan(text: pre),
@@ -84,26 +80,15 @@ class QuoteBlock extends StatelessWidget {
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 12.5,
-          height: 1.35,
-          color: cs.onSurface.withValues(alpha: 0.7),
-        ),
+        style: mutedStyle,
       );
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(left: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: cs.onSurface.withValues(alpha: 0.25),
-            width: 2,
-          ),
-        ),
-      ),
-      child: Align(alignment: Alignment.centerLeft, child: label),
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: mutedStyle,
     );
   }
 }

@@ -1455,15 +1455,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (widget.message.quote != null) ...[
-                    SizedBox(
-                      width: MediaQuery.sizeOf(context).width * 0.75,
-                      child: QuoteBlock(
-                        key: ValueKey(
-                          'user-message-quote:${widget.message.id}',
-                        ),
-                        quote: widget.message.quote!,
-                        target: widget.quoteTarget,
-                      ),
+                    QuoteBlock(
+                      key: ValueKey('user-message-quote:${widget.message.id}'),
+                      quote: widget.message.quote!,
+                      target: widget.quoteTarget,
                     ),
                     const SizedBox(height: 8),
                   ],

@@ -2196,6 +2196,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromOtherApps => 'Import from Other Apps';
 
   @override
+  String get backupPageImportFromKelivo => 'Import from New Kelivo';
+
+  @override
+  String get backupPageKelivoImportHint =>
+      'Backups from newer versions of Kelivo can be converted to a Cuplivo-compatible backup via the Kelivo-helper website:';
+
+  @override
+  String get backupPageKelivoImportUrl =>
+      'https://kelivo-helper.netlify.app/#/compat';
+
+  @override
+  String get backupPageKelivoImportTutorialTitle => 'Usage Tutorial';
+
+  @override
+  String get backupPageKelivoImportStep1 =>
+      'Open the Kelivo-helper website below.';
+
+  @override
+  String get backupPageKelivoImportStep2 =>
+      'Select the backup file exported from the newer version of Kelivo and follow the instructions on the webpage.';
+
+  @override
+  String get backupPageKelivoImportStep3 =>
+      'Wait for the conversion to complete.';
+
+  @override
+  String get backupPageKelivoImportStep4 =>
+      'Download the converted backup file.';
+
+  @override
+  String get backupPageKelivoImportStep5 =>
+      'Return to Cuplivo, tap “Import Backup File”, and select the converted file to complete the import.';
+
+  @override
   String get backupPageImportFromRikkaHub => 'Import from RikkaHub';
 
   @override

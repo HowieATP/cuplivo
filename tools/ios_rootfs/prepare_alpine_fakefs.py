@@ -76,7 +76,7 @@ export TERM=xterm-256color
 export HOME=/root
 export LANG=C.UTF-8
 export CHARSET=UTF-8
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 """
 
 # Guest directories that must exist even if the tarball omits them.

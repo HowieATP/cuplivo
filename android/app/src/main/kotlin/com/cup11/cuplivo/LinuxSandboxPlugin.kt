@@ -796,7 +796,7 @@ private object NativeLibResolver {
   }
 }
 
-/** Assemble the proot argv: flags, guest bindings, and a clean bash -lc. */
+/** Assemble the proot argv with a clean, fixed environment. */
 private fun buildGuestCommand(
   proot: File,
   linuxDir: File,
@@ -832,7 +832,7 @@ private fun buildGuestCommand(
     "/usr/bin/env",
     "-i",
     "HOME=/root",
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "LANG=C.UTF-8",
     "TERM=xterm-256color",
     "DEBIAN_FRONTEND=noninteractive",
@@ -841,7 +841,10 @@ private fun buildGuestCommand(
   if (command == null) {
     argv += listOf("/bin/bash", "-l")
   } else {
-    argv += listOf("/bin/bash", "-lc", command)
+    // Non-interactive tool/probe commands must use the fixed environment
+    // above. A login shell could replace PATH or source user-controlled
+    // profile files, making detection disagree with command execution.
+    argv += listOf("/bin/bash", "-c", command)
   }
   return argv
 }

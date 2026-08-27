@@ -8808,6 +8808,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepQueued => 'Queued…';
 
   @override
+  String get workspaceDepStatusUnknown => 'Status unavailable';
+
+  @override
+  String get workspaceDepProbeFailed =>
+      'Couldn’t refresh dependency status. Any previous results were preserved.';
+
+  @override
+  String get workspaceDepRetry => 'Retry';
+
+  @override
   String get workspaceDepStageDownloading => 'Downloading…';
 
   @override
@@ -8829,6 +8839,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceSandboxBaseRequired =>
       'Install the base dependency first';
+
+  @override
+  String get workspaceDepGitPrerequisite => 'Install Git first';
+
+  @override
+  String get workspaceDepOfficePrerequisites =>
+      'Install Python and Node.js first';
 
   @override
   String get workspaceSandboxDirEntryTitle => 'Sandbox system';
@@ -8889,11 +8906,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceDepGitDesc => 'Version control tools';
 
   @override
+  String get workspaceDepGithubCliTitle => 'GitHub CLI';
+
+  @override
+  String get workspaceDepGithubCliDesc =>
+      'Use GitHub from the command line (gh)';
+
+  @override
+  String get workspaceDepCurlTitle => 'curl';
+
+  @override
+  String get workspaceDepCurlDesc =>
+      'Transfer data over HTTP, HTTPS, and other protocols';
+
+  @override
+  String get workspaceDepOpenSshTitle => 'OpenSSH Client';
+
+  @override
+  String get workspaceDepOpenSshDesc =>
+      'SSH, SCP, SFTP, and key-management tools';
+
+  @override
+  String get workspaceDepArchiveTitle => 'ZIP archive tools';
+
+  @override
+  String get workspaceDepArchiveDesc =>
+      'Create and extract ZIP archives (zip and unzip)';
+
+  @override
   String get workspaceDepOfficeTitle => 'Document & Office Tools';
 
   @override
   String get workspaceDepOfficeDesc =>
-      'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
+      'Recommended with Anthropic’s official docx, pptx, and xlsx Skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install';
 
   @override
   String get workspaceDepBuildTitle => 'Build tools';

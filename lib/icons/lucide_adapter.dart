@@ -39,6 +39,8 @@ class Lucide {
   static const IconData SunMoon = lucide.LucideIcons.sunMoon;
   static const IconData Palette = lucide.LucideIcons.palette;
   static const IconData Monitor = lucide.LucideIcons.monitor;
+  static const IconData MonitorSmartphone =
+      lucide.LucideIcons.monitorSmartphone;
   static const IconData Heart = lucide.LucideIcons.heart;
   static const IconData Boxes = lucide.LucideIcons.boxes;
   static const IconData Volume2 = lucide.LucideIcons.volume2;

@@ -224,6 +224,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowChatListDateKey =
       'display_show_chat_list_date_v1';
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
+  static const String _keepScreenOnDuringGenerationKey =
+      'keep_screen_on_during_generation_v1';
   static const String _oneClickCompressEnabledKey =
       'one_click_compress_enabled_v1';
   static const String _oneClickCompressMaxLongEdgeKey =
@@ -1295,6 +1297,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
+    _keepScreenOnDuringGeneration =
+        prefs.getBool(_keepScreenOnDuringGenerationKey) ?? true;
     _oneClickCompressEnabled =
         prefs.getBool(_oneClickCompressEnabledKey) ?? true;
     _oneClickCompressMaxLongEdge =
@@ -4682,6 +4686,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_imageCropperEnabledKey, v);
+  }
+
+  // Keep screen on during generation (mobile, Android/iOS only)
+  bool _keepScreenOnDuringGeneration = true;
+  bool get keepScreenOnDuringGeneration => _keepScreenOnDuringGeneration;
+  Future<void> setKeepScreenOnDuringGeneration(bool v) async {
+    if (_keepScreenOnDuringGeneration == v) return;
+    _keepScreenOnDuringGeneration = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keepScreenOnDuringGenerationKey, v);
   }
 
   // Image: one-click compression (quick compress)

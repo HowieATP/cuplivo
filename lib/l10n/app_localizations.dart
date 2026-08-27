@@ -9851,6 +9851,18 @@ abstract class AppLocalizations {
   /// **'Haptics on Switch'**
   String get displaySettingsPageHapticsIosSwitchTitle;
 
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Screen On While Generating'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle;
+
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to generations started after the change; in-flight generations keep their current behavior'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle;
+
   /// No description provided for @displaySettingsPageHapticsOnListItemTapTitle.
   ///
   /// In en, this message translates to:

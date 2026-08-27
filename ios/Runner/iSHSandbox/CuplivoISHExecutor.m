@@ -37,6 +37,15 @@ enum {
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 /// Grace period for the exit notification to arrive after a timeout kill.
 static const NSTimeInterval kKillGraceSeconds = 2.0;
+static const char *kNodeFetchPolyfillGuestPath =
+    "/lib/cuplivo-fetch-jitless-polyfill.js";
+
+static BOOL CuplivoGuestFileExists(const char *path) {
+    struct fd *fd = generic_open(path, O_RDONLY_, 0);
+    if (IS_ERR(fd)) return NO;
+    fd_close(fd);
+    return YES;
+}
 
 #pragma mark - Execution context
 
@@ -519,8 +528,19 @@ static dispatch_queue_t _readerQueue;
     ENVP_APPEND("NO_COLOR=1");
     ENVP_APPEND("PYTHONMALLOC=malloc");
     ENVP_APPEND("PYTHONDONTWRITEBYTECODE=1");
-    // V8 cannot JIT under emulation; node honours NODE_OPTIONS.
-    ENVP_APPEND("NODE_OPTIONS=--jitless --max-old-space-size=512");
+    // V8 cannot JIT under emulation. --no-experimental-fetch prevents Node
+    // 22 from loading undici's WASM llhttp parser; when the bundled fallback
+    // is present, it restores fetch through core http/https instead.
+    if (CuplivoGuestFileExists(kNodeFetchPolyfillGuestPath)) {
+        ENVP_APPEND("NODE_OPTIONS=--jitless --no-experimental-fetch "
+                    "--require=/lib/cuplivo-fetch-jitless-polyfill.js "
+                    "--max-old-space-size=512");
+    } else {
+        NSLog(@"CuplivoISHExecutor: node fetch polyfill unavailable; "
+              "disabling built-in fetch to avoid undici WASM crash");
+        ENVP_APPEND("NODE_OPTIONS=--jitless --no-experimental-fetch "
+                    "--max-old-space-size=512");
+    }
     // Go tuning (ported from OpenMinis): cap the scheduler to one core-pair
     // so it does not spin extra threads under the interpreter, and disable
     // async preemption which is expensive under emulation.

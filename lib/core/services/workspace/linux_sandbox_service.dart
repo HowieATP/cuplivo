@@ -160,6 +160,19 @@ class SandboxInstallProgress {
   });
 }
 
+/// A single readiness check and command probe for every sandbox dependency.
+/// The workspace dependency panel refreshes all rows together, so launching a
+/// guest shell once is materially cheaper than probing each command separately.
+class SandboxDependencyStatusSnapshot {
+  SandboxDependencyStatusSnapshot({
+    required this.hasRuntime,
+    required Map<String, bool> installed,
+  }) : installed = Map<String, bool>.unmodifiable(installed);
+
+  final bool hasRuntime;
+  final Map<String, bool> installed;
+}
+
 /// One staged package-manager operation inside the sandbox rootfs.
 class PackageInstallStep {
   /// 'recover' (self-heal package state), 'update' or 'install'.
@@ -568,6 +581,87 @@ class LinuxSandboxService {
     );
   }
 
+  static const String _dependencyProbePrefix = '__cuplivo_dependency__:';
+
+  static const Map<String, String> _dependencyProbes = <String, String>{
+    WorkspaceDependencyIds.python: 'command -v python3 >/dev/null 2>&1',
+    WorkspaceDependencyIds.nodejs: 'command -v node >/dev/null 2>&1',
+    WorkspaceDependencyIds.git: 'command -v git >/dev/null 2>&1',
+    // The Office install is a toolchain; LibreOffice alone is insufficient.
+    WorkspaceDependencyIds.office:
+        'command -v soffice >/dev/null 2>&1 && '
+        'command -v pandoc >/dev/null 2>&1 && '
+        'command -v pdftoppm >/dev/null 2>&1',
+    WorkspaceDependencyIds.buildEssential: 'command -v gcc >/dev/null 2>&1',
+  };
+
+  /// A fixed shell script: no model or user input enters this command.
+  static String dependencyProbeCommand() {
+    final buffer = StringBuffer();
+    for (final entry in _dependencyProbes.entries) {
+      buffer.writeln(
+        'if ${entry.value}; then '
+        "printf '%s\\n' '$_dependencyProbePrefix${entry.key}=1'; "
+        'else '
+        "printf '%s\\n' '$_dependencyProbePrefix${entry.key}=0'; "
+        'fi',
+      );
+    }
+    return buffer.toString();
+  }
+
+  @visibleForTesting
+  static Map<String, bool> parseDependencyProbeOutput(String stdout) {
+    final statuses = <String, bool>{
+      for (final id in _dependencyProbes.keys) id: false,
+    };
+    for (final line in stdout.split(RegExp(r'\r?\n'))) {
+      if (!line.startsWith(_dependencyProbePrefix)) continue;
+      final payload = line.substring(_dependencyProbePrefix.length);
+      final separator = payload.indexOf('=');
+      if (separator <= 0) continue;
+      final id = payload.substring(0, separator);
+      if (!statuses.containsKey(id)) continue;
+      statuses[id] = payload.substring(separator + 1) == '1';
+    }
+    return statuses;
+  }
+
+  Future<SandboxDependencyStatusSnapshot> dependencyStatus(
+    String workspaceHostPath,
+  ) async {
+    final installed = <String, bool>{
+      for (final id in WorkspaceDependencyIds.ordered) id: false,
+    };
+    final rootfs = await hasRootfs(workspaceHostPath);
+    installed[WorkspaceDependencyIds.base] = rootfs;
+    final runtime = await hasRuntime();
+    if (!rootfs || !runtime) {
+      return SandboxDependencyStatusSnapshot(
+        hasRuntime: runtime,
+        installed: installed,
+      );
+    }
+
+    final result = await exec(
+      workspaceHostPath: workspaceHostPath,
+      command: dependencyProbeCommand(),
+      timeoutSeconds: 15,
+    );
+    if (result.exitCode == 0) {
+      installed.addAll(parseDependencyProbeOutput(result.stdout));
+    } else {
+      debugPrint(
+        'LinuxSandboxService.dependencyStatus probe failed '
+        '(exit ${result.exitCode}): ${result.stderr}',
+      );
+    }
+    return SandboxDependencyStatusSnapshot(
+      hasRuntime: runtime,
+      installed: installed,
+    );
+  }
+
   Future<bool> isDependencyInstalled(
     String workspaceHostPath,
     String depId,
@@ -578,19 +672,7 @@ class LinuxSandboxService {
     }
     final status = await statusFor(workspaceHostPath);
     if (status != SandboxStatus.ready) return false;
-    final probe = switch (depId) {
-      WorkspaceDependencyIds.python => 'command -v python3 >/dev/null 2>&1',
-      WorkspaceDependencyIds.nodejs => 'command -v node >/dev/null 2>&1',
-      WorkspaceDependencyIds.git => 'command -v git >/dev/null 2>&1',
-      // The office step installs a whole toolchain; LibreOffice alone is not
-      // enough, so require every component the document skills rely on.
-      WorkspaceDependencyIds.office =>
-        'command -v soffice >/dev/null 2>&1 && '
-            'command -v pandoc >/dev/null 2>&1 && '
-            'command -v pdftoppm >/dev/null 2>&1',
-      WorkspaceDependencyIds.buildEssential => 'command -v gcc >/dev/null 2>&1',
-      _ => null,
-    };
+    final probe = _dependencyProbes[depId];
     if (probe == null) return false;
     final r = await exec(
       workspaceHostPath: workspaceHostPath,

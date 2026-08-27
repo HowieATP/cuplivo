@@ -106,4 +106,19 @@ void main() {
       );
     });
   });
+
+  test(
+    'shell definition directs file operations to native workspace tools',
+    () {
+      expect(WorkspaceToolsService.shellToolDescription, contains('Prefer'));
+      expect(
+        WorkspaceToolsService.shellToolDescription,
+        contains('filesystem'),
+      );
+      expect(
+        WorkspaceToolsService.shellToolDescription,
+        contains('package semantics'),
+      );
+    },
+  );
 }

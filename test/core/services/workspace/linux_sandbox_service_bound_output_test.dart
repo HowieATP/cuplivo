@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/services/workspace/linux_sandbox_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,6 +47,40 @@ void main() {
       final out = LinuxSandboxService.boundOutput(value);
       expectValidUtf16(out);
       expect(() => jsonEncode(out), returnsNormally);
+    });
+  });
+
+  group('LinuxSandboxService dependency probe', () {
+    test('probes every non-base dependency in one fixed shell command', () {
+      final command = LinuxSandboxService.dependencyProbeCommand();
+
+      expect(command, contains('command -v python3'));
+      expect(command, contains('command -v node'));
+      expect(command, contains('command -v git'));
+      expect(command, contains('command -v soffice'));
+      expect(command, contains('command -v gcc'));
+      for (final depId in WorkspaceDependencyIds.ordered.skip(1)) {
+        expect(command, contains('__cuplivo_dependency__:$depId=1'));
+        expect(command, contains('__cuplivo_dependency__:$depId=0'));
+      }
+    });
+
+    test('parses complete, partial, and malformed probe output safely', () {
+      final parsed = LinuxSandboxService.parseDependencyProbeOutput('''
+__cuplivo_dependency__:python=1
+__cuplivo_dependency__:nodejs=0
+ordinary command output
+__cuplivo_dependency__:office=unexpected
+__cuplivo_dependency__:unknown=1
+__cuplivo_dependency__:git=1
+''');
+
+      expect(parsed[WorkspaceDependencyIds.python], isTrue);
+      expect(parsed[WorkspaceDependencyIds.nodejs], isFalse);
+      expect(parsed[WorkspaceDependencyIds.git], isTrue);
+      expect(parsed[WorkspaceDependencyIds.office], isFalse);
+      expect(parsed[WorkspaceDependencyIds.buildEssential], isFalse);
+      expect(parsed.containsKey('unknown'), isFalse);
     });
   });
 }

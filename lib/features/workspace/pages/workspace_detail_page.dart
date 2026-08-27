@@ -119,17 +119,13 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     setState(() => _depStatusLoading = true);
     try {
       final svc = LinuxSandboxService.instance;
-      final runtime = await svc.hasRuntime();
-      final next = <String, bool>{};
-      for (final id in WorkspaceDependencyIds.ordered) {
-        next[id] = await svc.isDependencyInstalled(host, id);
-      }
+      final snapshot = await svc.dependencyStatus(host);
       if (!mounted) return;
       setState(() {
-        _hasRuntime = runtime;
+        _hasRuntime = snapshot.hasRuntime;
         _depInstalled
           ..clear()
-          ..addAll(next);
+          ..addAll(snapshot.installed);
         _depStatusLoading = false;
       });
     } catch (e) {

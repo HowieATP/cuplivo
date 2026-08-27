@@ -19,6 +19,29 @@ enum McpTransportType { sse, http, stdio, inmemory }
 /// Connection status for an MCP server.
 enum McpStatus { idle, connecting, connected, error }
 
+class _Cooldown {
+  final DateTime startedAt;
+  final DateTime until;
+
+  const _Cooldown({required this.startedAt, required this.until});
+}
+
+/// Per-server connection record. Holds the live client and every piece of
+/// connection state so connect/disconnect/recover can coalesce, dedupe
+/// concurrent attempts, and distinguish stale generations after a reload.
+class _ServerConnection {
+  mcp.Client? client;
+  Future<bool>? connectFuture;
+  int generation = 0;
+  McpStatus status = McpStatus.idle;
+  String? error;
+  _Cooldown? cooldown;
+  Future<void>? refreshFuture;
+  bool refreshDirty = false;
+}
+
+enum _ToolRefreshOutcome { success, sessionExpired, failed }
+
 class McpParamSpec {
   final String name;
   final bool required;
@@ -225,7 +248,6 @@ class McpServerConfig {
   final List<String> args;
   final Map<String, String> env;
   final String? workingDirectory;
-  final int? heartbeatIntervalSeconds; // null = use default (12s)
   final String
   toolPrefix; // optional prefix prepended to all tool names from this server
   // OAuth (HTTP/SSE only). Null = no OAuth, static headers apply.
@@ -245,7 +267,6 @@ class McpServerConfig {
     this.args = const [],
     this.env = const {},
     this.workingDirectory,
-    this.heartbeatIntervalSeconds,
     this.toolPrefix = '',
     this.oauth,
     this.oauthToken,
@@ -264,8 +285,6 @@ class McpServerConfig {
     Map<String, String>? env,
     String? workingDirectory,
     bool clearWorkingDirectory = false,
-    int? heartbeatIntervalSeconds,
-    bool clearHeartbeatIntervalSeconds = false,
     String? toolPrefix,
     McpOAuthConfig? oauth,
     bool clearOauth = false,
@@ -285,9 +304,6 @@ class McpServerConfig {
     workingDirectory: clearWorkingDirectory
         ? null
         : (workingDirectory ?? this.workingDirectory),
-    heartbeatIntervalSeconds: clearHeartbeatIntervalSeconds
-        ? null
-        : (heartbeatIntervalSeconds ?? this.heartbeatIntervalSeconds),
     toolPrefix: toolPrefix ?? this.toolPrefix,
     oauth: clearOauth ? null : (oauth ?? this.oauth),
     oauthToken: clearOauthToken ? null : (oauthToken ?? this.oauthToken),
@@ -310,8 +326,6 @@ class McpServerConfig {
     if (transport == McpTransportType.stdio) 'env': env,
     if (transport == McpTransportType.stdio && workingDirectory != null)
       'workingDirectory': workingDirectory,
-    if (heartbeatIntervalSeconds != null)
-      'heartbeatIntervalSeconds': heartbeatIntervalSeconds,
     if (toolPrefix.isNotEmpty) 'toolPrefix': toolPrefix,
     if (oauth != null) 'oauth': oauth!.toJson(),
     if (oauthToken != null) 'oauthToken': oauthToken!.toJson(),
@@ -333,7 +347,6 @@ class McpServerConfig {
             )
             .toList() ??
         const <McpToolConfig>[];
-    final heartbeatIntervalSeconds = json['heartbeatIntervalSeconds'] as int?;
     final toolPrefix = (json['toolPrefix'] as String?) ?? '';
     final oauth = json['oauth'] is Map
         ? McpOAuthConfig.fromJson(
@@ -360,7 +373,6 @@ class McpServerConfig {
             ? envAny.map((k, v) => MapEntry(k.toString(), v.toString()))
             : const <String, String>{},
         workingDirectory: (json['workingDirectory'] as String?)?.trim(),
-        heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
         oauth: oauth,
         oauthToken: oauthToken,
@@ -372,7 +384,6 @@ class McpServerConfig {
         name: json['name'] as String? ?? '',
         transport: McpTransportType.inmemory,
         tools: tools,
-        heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
         oauth: oauth,
         oauthToken: oauthToken,
@@ -390,7 +401,6 @@ class McpServerConfig {
               (k, v) => MapEntry(k.toString(), v.toString()),
             )) ??
             const {},
-        heartbeatIntervalSeconds: heartbeatIntervalSeconds,
         toolPrefix: toolPrefix,
         oauth: oauth,
         oauthToken: oauthToken,
@@ -428,25 +438,25 @@ class McpProvider extends ChangeNotifier {
   /// Provider-agnostic OAuth flow orchestration (see ADR-0015).
   final OAuthFlowService oauthFlowService;
 
-  final Map<String, mcp.Client> _clients = {};
-  final Map<String, McpStatus> _status = {}; // id -> status
-  final Map<String, String> _errors = {}; // id -> last error
+  final Map<String, _ServerConnection> _connections = {};
   List<McpServerConfig> _servers = [];
-  // Reconnect bookkeeping to avoid duplicate concurrent retries
-  final Set<String> _reconnecting = <String>{};
-  // Heartbeat timers for live-connection health checks
-  final Map<String, Timer> _heartbeats = <String, Timer>{};
+  Future<void> _serverMutationTail = Future<void>.value();
   Duration _requestTimeout = const Duration(seconds: 30);
+  bool _disposed = false;
 
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
-  McpStatus statusFor(String id) => _status[id] ?? McpStatus.idle;
-  String? errorFor(String id) => _errors[id];
-  bool get hasAnyEnabled => _servers.any((s) => s.enabled);
-  bool isConnected(String id) =>
-      _clients.containsKey(id) && statusFor(id) == McpStatus.connected;
+  McpStatus statusFor(String id) => _connections[id]?.status ?? McpStatus.idle;
+  String? errorFor(String id) => _connections[id]?.error;
+  bool isConnected(String id) {
+    final state = _connections[id];
+    return state?.client?.isConnected == true &&
+        state?.status == McpStatus.connected;
+  }
+
+  bool isInCooldown(String id) => _activeCooldown(_connections[id]) != null;
   List<McpServerConfig> get connectedServers => _servers
       .where((s) => statusFor(s.id) == McpStatus.connected)
       .toList(growable: false);
@@ -454,7 +464,7 @@ class McpProvider extends ChangeNotifier {
   int get requestTimeoutSeconds => _requestTimeout.inSeconds;
 
   Future<void> _load() async {
-    await _reloadServersFromPrefs();
+    await _serializeServerMutation(_reloadServersFromPrefs);
   }
 
   /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
@@ -491,10 +501,9 @@ class McpProvider extends ChangeNotifier {
     }
     // initialize statuses
     for (final s in _servers) {
-      _status[s.id] = McpStatus.idle;
-      _errors.remove(s.id);
+      _connections.putIfAbsent(s.id, _ServerConnection.new);
     }
-    notifyListeners();
+    _notify();
 
     // Auto-connect enabled servers. Skip OAuth servers that have not been
     // authorized yet — connecting them would fail with "no token yet" and
@@ -514,26 +523,29 @@ class McpProvider extends ChangeNotifier {
   /// holds the restored ones. This disconnects every live client, rebuilds
   /// the list from disk, and reconnects enabled servers.
   Future<void> reloadFromPrefs() async {
-    for (final id in _clients.keys.toList()) {
-      try {
-        await disconnect(id);
-      } catch (e) {
-        debugPrint('[MCP/Reload] disconnect $id failed: $e');
+    await _serializeServerMutation(() async {
+      for (final id in _connections.keys.toList()) {
+        try {
+          final state = _connections[id];
+          if (state?.client != null) {
+            await disconnect(id);
+          }
+        } catch (e) {
+          debugPrint('[MCP/Reload] disconnect $id failed: $e');
+        }
       }
-    }
-    _servers = <McpServerConfig>[];
-    _status.clear();
-    _errors.clear();
-    _reconnecting.clear();
-    await _reloadServersFromPrefs();
+      _connections.clear();
+      _servers = <McpServerConfig>[];
+      await _reloadServersFromPrefs();
+    });
   }
 
   /// Retired built-in MCP servers, removed on load and import:
   /// - `kelivo_fetch`: replaced by the search-layer `web_fetch` tool.
   /// - `kelivo_filesystem`: filesystem tools moved into per-workspace local
   ///   tools (see WorkspaceToolsService).
-  /// - `kelivo_subagent`: handoff is now the local `kelivo_handoff` /
-  ///   `kelivo_handoff_sync` tools (see HandoffToolService).
+  /// - `kelivo_subagent`: handoff is the single wait-mode local tool
+  ///   `kelivo_handoff` (see HandoffToolService; ADR-0041).
   static bool _isRetiredServer(McpServerConfig server) =>
       server.id == 'kelivo_fetch' ||
       server.id == 'kelivo_filesystem' ||
@@ -552,9 +564,26 @@ class McpProvider extends ChangeNotifier {
     await prefs.setInt(_prefsTimeoutKey, _requestTimeout.inMilliseconds);
   }
 
-  Future<void> _persistTimeout() async {
+  Future<void> _persistServers(List<McpServerConfig> servers) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefsTimeoutKey, _requestTimeout.inMilliseconds);
+    await prefs.setString(
+      _prefsKey,
+      jsonEncode(servers.map((e) => e.toJson()).toList()),
+    );
+  }
+
+  Future<void> _persistTimeout(Duration timeout) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_prefsTimeoutKey, timeout.inMilliseconds);
+  }
+
+  Future<T> _serializeServerMutation<T>(Future<T> Function() operation) {
+    final result = _serverMutationTail.then((_) => operation());
+    _serverMutationTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
   }
 
   /// Export current MCP servers as a user-friendly JSON structure.
@@ -829,14 +858,13 @@ class McpProvider extends ChangeNotifier {
 
     // Replace and reset statuses
     _servers = next;
-    _status.clear();
-    _errors.clear();
+    _connections.clear();
     for (final s in _servers) {
-      _status[s.id] = McpStatus.idle;
+      _connections[s.id] = _ServerConnection();
     }
 
     await _persist();
-    notifyListeners();
+    _notify();
 
     // Auto-connect enabled servers
     for (final s in _servers.where((e) => e.enabled)) {
@@ -862,7 +890,6 @@ class McpProvider extends ChangeNotifier {
     List<String> args = const <String>[],
     Map<String, String> env = const <String, String>{},
     String? workingDirectory,
-    int? heartbeatIntervalSeconds,
     String toolPrefix = '',
     McpOAuthConfig? oauth,
   }) async {
@@ -880,14 +907,15 @@ class McpProvider extends ChangeNotifier {
       workingDirectory: (workingDirectory?.trim().isNotEmpty ?? false)
           ? workingDirectory!.trim()
           : null,
-      heartbeatIntervalSeconds: heartbeatIntervalSeconds,
       toolPrefix: toolPrefix,
       oauth: oauth,
     );
-    _servers = [..._servers, cfg];
-    _status[id] = McpStatus.idle;
-    await _persist();
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      _servers = [..._servers, cfg];
+      _connections[id] = _ServerConnection();
+      await _persist();
+      _notify();
+    });
     // Skip the automatic connect when OAuth is configured but not yet
     // authorized — it would fail with "no token yet" and leave a stale
     // error state. The connection happens after authorization completes.
@@ -902,24 +930,29 @@ class McpProvider extends ChangeNotifier {
   /// list and persists. Used by [TrashRestoreCoordinator].
   void restoreServer(McpServerConfig config) {
     _servers = [..._servers, config];
-    _status[config.id] = McpStatus.idle;
+    _connections.putIfAbsent(config.id, _ServerConnection.new);
     _persist();
-    notifyListeners();
+    _notify();
   }
 
   Future<void> updateServer(McpServerConfig updated) async {
-    final idx = _servers.indexWhere((e) => e.id == updated.id);
-    if (idx < 0) return;
-    _servers = List<McpServerConfig>.of(_servers)..[idx] = updated;
-    await _persist();
-    notifyListeners();
-    if (!updated.enabled) {
-      await disconnect(updated.id);
-    } else {
-      // Always reconnect after saving to apply changes (url/transport/name)
-      await disconnect(updated.id);
-      unawaited(connect(updated.id));
-    }
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == updated.id);
+      if (idx < 0) return;
+      _servers = List<McpServerConfig>.of(_servers)..[idx] = updated;
+      await _persist();
+      _notify();
+      if (!updated.enabled) {
+        // The disabled state is already persisted. Tear down the old
+        // connection in the background so settings UI does not wait on a
+        // remote session DELETE or a connection attempt finishing.
+        unawaited(disconnect(updated.id));
+      } else {
+        // Always reconnect after saving to apply changes (url/transport/name)
+        await disconnect(updated.id);
+        unawaited(connect(updated.id));
+      }
+    });
   }
 
   /// Starts the OAuth authorization flow for [serverId].
@@ -989,7 +1022,7 @@ class McpProvider extends ChangeNotifier {
         _servers = List<McpServerConfig>.of(_servers)
           ..[idx] = current.copyWith(oauth: updated);
         await _persist();
-        notifyListeners();
+        _notify();
       }
     }
     return result;
@@ -1017,7 +1050,7 @@ class McpProvider extends ChangeNotifier {
     _servers = List<McpServerConfig>.of(_servers)
       ..[idx] = server.copyWith(oauthToken: token);
     await _persist();
-    notifyListeners();
+    _notify();
     if (server.enabled) {
       // The connection may have failed earlier with "no token yet" —
       // reconnect now that the token is persisted.
@@ -1033,7 +1066,7 @@ class McpProvider extends ChangeNotifier {
     _servers = List<McpServerConfig>.of(_servers)
       ..[idx] = _servers[idx].copyWith(clearOauthToken: true);
     await _persist();
-    notifyListeners();
+    _notify();
   }
 
   /// Cancels an in-flight OAuth flow (PKCE verifier discarded).
@@ -1049,7 +1082,7 @@ class McpProvider extends ChangeNotifier {
     _servers = List<McpServerConfig>.of(_servers)
       ..[idx] = _servers[idx].copyWith(oauthToken: token);
     unawaited(_persist());
-    notifyListeners();
+    _notify();
   }
 
   Future<void> removeServer(String id) async {
@@ -1073,19 +1106,21 @@ class McpProvider extends ChangeNotifier {
     }
     await disconnect(id);
     _servers = _servers.where((e) => e.id != id).toList(growable: false);
-    _status.remove(id);
+    _connections.remove(id);
     await _persist();
-    notifyListeners();
+    _notify();
   }
 
   Future<void> reorderServers(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
     if (oldIndex < 0 || oldIndex >= _servers.length) return;
     if (newIndex < 0 || newIndex >= _servers.length) return;
-    final moved = _servers.removeAt(oldIndex);
-    _servers.insert(newIndex, moved);
-    notifyListeners();
-    await _persist();
+    await _serializeServerMutation(() async {
+      final moved = _servers.removeAt(oldIndex);
+      _servers.insert(newIndex, moved);
+      _notify();
+      await _persist();
+    });
   }
 
   Future<void> setToolEnabled(
@@ -1093,15 +1128,17 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     bool enabled,
   ) async {
-    final idx = _servers.indexWhere((e) => e.id == serverId);
-    if (idx < 0) return;
-    final server = _servers[idx];
-    final tools = server.tools
-        .map((t) => t.name == toolName ? t.copyWith(enabled: enabled) : t)
-        .toList();
-    _servers[idx] = server.copyWith(tools: tools);
-    await _persist();
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == serverId);
+      if (idx < 0) return;
+      final server = _servers[idx];
+      final tools = server.tools
+          .map((t) => t.name == toolName ? t.copyWith(enabled: enabled) : t)
+          .toList();
+      _servers[idx] = server.copyWith(tools: tools);
+      await _persist();
+      _notify();
+    });
   }
 
   /// Set whether a tool requires user approval before execution.
@@ -1110,25 +1147,26 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     bool needsApproval,
   ) async {
-    final idx = _servers.indexWhere((e) => e.id == serverId);
-    if (idx < 0) return;
-    final server = _servers[idx];
-    final tools = server.tools
-        .map(
-          (t) =>
-              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
-        )
-        .toList();
-    _servers[idx] = server.copyWith(tools: tools);
-    await _persist();
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == serverId);
+      if (idx < 0) return;
+      final server = _servers[idx];
+      final tools = server.tools
+          .map(
+            (t) => t.name == toolName
+                ? t.copyWith(needsApproval: needsApproval)
+                : t,
+          )
+          .toList();
+      _servers[idx] = server.copyWith(tools: tools);
+      await _persist();
+      _notify();
+    });
   }
 
-  /// Check if a tool (by name) requires approval across all connected servers.
-  /// Conservative: returns true if ANY connected server marks the tool as needing approval.
+  /// Conservative: require approval if any enabled cached tool requires it.
   bool toolNeedsApproval(String toolName) {
     for (final s in _servers) {
-      if (statusFor(s.id) != McpStatus.connected) continue;
       if (!s.enabled) continue;
       for (final t in s.tools) {
         if (t.name == toolName && t.enabled && t.needsApproval) return true;
@@ -1138,148 +1176,236 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> connect(String id) async {
-    final server = _servers.firstWhere(
-      (e) => e.id == id,
-      orElse: () => throw StateError('Server not found'),
-    );
-    // If already connected, try a ping by listing tools quickly; else return
-    if (_clients.containsKey(id)) {
-      // Already connected; update status just in case
-      _status[id] = McpStatus.connected;
-      _errors.remove(id);
-      notifyListeners();
-      return;
+    await _connect(id);
+  }
+
+  Future<bool> _connect(String id) {
+    final server = getById(id);
+    if (server == null || !server.enabled || _disposed) {
+      return Future<bool>.value(false);
     }
-    _status[id] = McpStatus.connecting;
-    _errors.remove(id);
-    notifyListeners();
+    final state = _connections.putIfAbsent(id, _ServerConnection.new);
+    final active = state.connectFuture;
+    if (active != null) return active;
+    if (_activeCooldown(state) != null) return Future<bool>.value(false);
+    if (state.client?.isConnected == true) {
+      state.status = McpStatus.connected;
+      state.error = null;
+      _notify();
+      unawaited(refreshTools(id));
+      return Future<bool>.value(true);
+    }
 
+    return _beginConnect(id, server, state);
+  }
+
+  Future<bool> _beginConnect(
+    String id,
+    McpServerConfig server,
+    _ServerConnection state, {
+    Future<bool>? waitFor,
+  }) {
+    state.status = McpStatus.connecting;
+    state.error = null;
+    final generation = state.generation;
+    _notify();
+    late final Future<bool> future;
+    future =
+        (() async {
+          if (waitFor != null) {
+            try {
+              await waitFor;
+            } catch (_) {}
+          }
+          if (_disposed ||
+              state.generation != generation ||
+              getById(id)?.enabled != true) {
+            return false;
+          }
+          return _performConnect(id, server, state, generation);
+        })().whenComplete(() {
+          if (identical(state.connectFuture, future)) {
+            state.connectFuture = null;
+          }
+        });
+    state.connectFuture = future;
+    return future.then((connected) {
+      if (connected && !_disposed) unawaited(refreshTools(id));
+      return connected;
+    });
+  }
+
+  Future<bool> _performConnect(
+    String id,
+    McpServerConfig server,
+    _ServerConnection state,
+    int generation,
+  ) async {
+    mcp.Client? client;
+    final startedAt = DateTime.now();
     try {
-      // Log connect intent and parameters
-      // debugPrint('[MCP/Connect] id=$id name=${server.name} transport=${server.transport.name}');
-      // debugPrint('[MCP/Connect] url=${server.url}');
-      // if (server.headers.isNotEmpty) {
-      //   debugPrint('[MCP/Headers] ${server.headers.length} headers:');
-      //   server.headers.forEach((k, v) {
-      //     final masked = _maskIfSensitive(k, v);
-      //     debugPrint('  - $k: $masked');
-      //   });
-      // } else {
-      //   debugPrint('[MCP/Headers] (none)');
-      // }
-
       final clientConfig = mcp.McpClient.simpleConfig(
         name: 'Cuplivo MCP',
         version: '1.0.0',
-        // Turn on library-internal verbose logs
         enableDebugLogging: false,
         requestTimeout: _requestTimeout,
         logListener: McpLogBridge.onEvent,
         logServerLabel: server.name,
-      );
+      ).copyWith(maxRetries: 1);
 
       // In-memory builtin server path — all built-in in-memory engines
       // (fetch, filesystem, subagent) have been retired; refuse any
       // in-memory id as a safety net.
       if (server.transport == McpTransportType.inmemory) {
-        _status[id] = McpStatus.error;
-        _errors[id] = 'Unsupported in-memory MCP server: ${server.id}';
-        notifyListeners();
-        return;
+        throw StateError('Unsupported in-memory MCP server: ${server.id}');
       }
 
-      final mergedHeaders = <String, String>{...server.headers};
-      final oauthConfig = server.oauth?.toLibraryConfig();
-      final transportConfig = await () async {
-        if (server.transport == McpTransportType.sse) {
-          if (oauthConfig != null && server.oauthToken == null) {
-            throw StateError(
-              'OAuth server "${server.name}" has no token yet. '
-              'Authorize it first (edit → OAuth section → 开始授权).',
-            );
-          }
-          return mcp.TransportConfig.sse(
-            serverUrl: server.url,
-            headers: mergedHeaders.isEmpty ? null : mergedHeaders,
-            oauthConfig: oauthConfig,
-            oauthToken: server.oauthToken,
-            onTokenRefreshed: (token) => _persistOAuthToken(id, token),
-          );
-        } else if (server.transport == McpTransportType.http) {
-          if (oauthConfig != null && server.oauthToken == null) {
-            throw StateError(
-              'OAuth server "${server.name}" has no token yet. '
-              'Authorize it first (edit → OAuth section → 开始授权).',
-            );
-          }
-          return mcp.TransportConfig.streamableHttp(
-            baseUrl: server.url,
-            headers: mergedHeaders.isEmpty ? null : mergedHeaders,
-            timeout: _requestTimeout,
-            oauthConfig: oauthConfig,
-            oauthToken: server.oauthToken,
-            onTokenRefreshed: (token) => _persistOAuthToken(id, token),
-          );
-        } else {
-          // STDIO; only supported on desktop
-          if (!_isDesktopPlatform()) {
-            throw StateError('STDIO transport not supported on this platform');
-          }
-          final cmd = server.command;
-          if (cmd == null || cmd.isEmpty) {
-            throw StateError('STDIO command is empty');
-          }
-          final mergedEnv = await _stdioCommandResolver
-              .resolveEnvironmentWithPath(server.env);
-          final commandExists = await _stdioCommandResolver.commandExists(
-            cmd,
-            mergedEnv,
-          );
-          if (!commandExists) {
-            throw StateError(
-              'Command "$cmd" not found in PATH. '
-              'Ensure the command is installed and accessible.',
-            );
-          }
-          return mcp.TransportConfig.stdio(
-            command: cmd,
-            arguments: server.args,
-            workingDirectory: server.workingDirectory,
-            environment: mergedEnv.isEmpty ? null : mergedEnv,
-          );
-        }
-      }();
-
-      // debugPrint('[MCP/Connect] creating client (enableDebugLogging=true) ...');
-      final clientResult = await mcp.McpClient.createAndConnect(
+      final transportConfig = await _transportConfig(server, id);
+      final result = await mcp.McpClient.createAndConnect(
         config: clientConfig,
         transportConfig: transportConfig,
       );
+      client = result.fold((value) => value, (error) => throw error);
+      final connectedClient = client;
+      if (connectedClient == null) {
+        throw StateError('MCP client was not created');
+      }
 
-      final client = clientResult.fold((c) => c, (err) => throw err);
-      _clients[id] = client;
-      _status[id] = McpStatus.connected;
-      _errors.remove(id);
-      // debugPrint('[MCP/Connected] id=$id (${server.name})');
-      notifyListeners();
+      if (_disposed ||
+          state.generation != generation ||
+          getById(id)?.enabled != true) {
+        await connectedClient.terminateSession();
+        connectedClient.dispose();
+        return false;
+      }
 
-      // Try to refresh tools once connected
-      // debugPrint('[MCP/Tools] refreshing tools for id=$id ...');
-      await refreshTools(id);
-      // debugPrint('[MCP/Tools] refresh done for id=$id');
-
-      // Start/refresh heartbeat for this connection
-      _startHeartbeat(
-        id,
-        interval: Duration(seconds: server.heartbeatIntervalSeconds ?? 12),
-      );
-    } catch (e) {
-      // debugPrint('[MCP/Error] connect failed for id=$id (${server.name})');
-      // _logMcpException('connect', serverId: id, error: e, stack: st);
-      _status[id] = McpStatus.error;
-      _errors[id] = e.toString();
-      notifyListeners();
+      state.client = connectedClient;
+      state.status = McpStatus.connected;
+      state.error = null;
+      _clearCooldownAfterSuccess(state, startedAt);
+      _attachClient(id, state, connectedClient, generation);
+      _notify();
+      return true;
+    } catch (error) {
+      client?.dispose();
+      if (_disposed || state.generation != generation) return false;
+      if (error is mcp.McpHttpError && _requiresCooldown(error)) {
+        _enterCooldown(state, error.retryAfter);
+      }
+      state.status = McpStatus.error;
+      state.error = error.toString();
+      _notify();
+      return false;
     }
+  }
+
+  Future<mcp.TransportConfig> _transportConfig(
+    McpServerConfig server,
+    String id,
+  ) async {
+    final headers = server.headers.isEmpty ? null : server.headers;
+    final oauthConfig = server.oauth?.toLibraryConfig();
+    if (server.transport == McpTransportType.sse) {
+      if (oauthConfig != null && server.oauthToken == null) {
+        throw StateError(
+          'OAuth server "${server.name}" has no token yet. '
+          'Authorize it first (edit → OAuth section → 开始授权).',
+        );
+      }
+      return mcp.TransportConfig.sse(
+        serverUrl: server.url,
+        headers: headers,
+        oauthConfig: oauthConfig,
+        oauthToken: server.oauthToken,
+        onTokenRefreshed: (token) => _persistOAuthToken(id, token),
+      );
+    }
+    if (server.transport == McpTransportType.http) {
+      if (oauthConfig != null && server.oauthToken == null) {
+        throw StateError(
+          'OAuth server "${server.name}" has no token yet. '
+          'Authorize it first (edit → OAuth section → 开始授权).',
+        );
+      }
+      return mcp.TransportConfig.streamableHttp(
+        baseUrl: server.url,
+        headers: headers,
+        timeout: _requestTimeout,
+        oauthConfig: oauthConfig,
+        oauthToken: server.oauthToken,
+        onTokenRefreshed: (token) => _persistOAuthToken(id, token),
+        terminateOnClose: false,
+      );
+    }
+    if (!_isDesktopPlatform()) {
+      throw StateError('STDIO transport not supported on this platform');
+    }
+    final command = server.command;
+    if (command == null || command.isEmpty) {
+      throw StateError('STDIO command is empty');
+    }
+    final environment = await _stdioCommandResolver.resolveEnvironmentWithPath(
+      server.env,
+    );
+    if (!await _stdioCommandResolver.commandExists(command, environment)) {
+      throw StateError(
+        'Command "$command" not found in PATH. '
+        'Ensure the command is installed and accessible.',
+      );
+    }
+    return mcp.TransportConfig.stdio(
+      command: command,
+      arguments: server.args,
+      workingDirectory: server.workingDirectory,
+      environment: environment.isEmpty ? null : environment,
+    );
+  }
+
+  void _attachClient(
+    String id,
+    _ServerConnection state,
+    mcp.Client client,
+    int generation,
+  ) {
+    client.onDisconnect.listen((_) {
+      if (_disposed ||
+          state.generation != generation ||
+          !identical(state.client, client)) {
+        return;
+      }
+      state.client = null;
+      state.status = McpStatus.idle;
+      state.error = null;
+      _notify();
+    });
+    client.onError.listen((error) {
+      if (_disposed ||
+          state.generation != generation ||
+          !identical(state.client, client)) {
+        return;
+      }
+      if (error is mcp.McpHttpError &&
+          error.isBackgroundRequest &&
+          error.statusCode == 404 &&
+          error.sessionIdPresent) {
+        unawaited(_recoverExpiredSession(id, state, client));
+      } else if (error is mcp.McpHttpError && _requiresCooldown(error)) {
+        _enterCooldown(state, error.retryAfter);
+        _notify();
+      } else if (error is mcp.McpHttpError &&
+          (error.statusCode == 401 || error.statusCode == 403)) {
+        _enterCooldown(state, const Duration(minutes: 5));
+        _notify();
+      }
+    });
+    client.onToolsListChanged(() {
+      if (_disposed ||
+          state.generation != generation ||
+          !identical(state.client, client)) {
+        return;
+      }
+      unawaited(refreshTools(id));
+    });
   }
 
   Future<void> updateRequestTimeout(
@@ -1288,98 +1414,43 @@ class McpProvider extends ChangeNotifier {
   }) async {
     if (duration.inMilliseconds <= 0) return;
     if (duration == _requestTimeout) return;
+    await _persistTimeout(duration);
     _requestTimeout = duration;
-    await _persistTimeout();
-    notifyListeners();
+    _notify();
     if (reconnectActive) {
-      for (final id in _clients.keys.toList()) {
-        if (_servers.any((s) => s.id == id && s.enabled)) {
-          unawaited(reconnect(id));
-        }
+      for (final state in _connections.values) {
+        state.client?.setRequestTimeout(duration);
       }
     }
   }
 
-  Future<void> disconnect(String id) async {
-    final client = _clients.remove(id);
-    try {
-      // debugPrint('[MCP/Disconnect] id=$id ...');
-      client?.disconnect();
-      // debugPrint('[MCP/Disconnect] id=$id done');
-    } catch (e) {
-      // debugPrint('[MCP/Error] disconnect failed for id=$id');
-      // _logMcpException('disconnect', serverId: id, error: e, stack: st);
-    }
-    _status[id] = McpStatus.idle;
-    _errors.remove(id);
-    _stopHeartbeat(id);
-    notifyListeners();
-  }
+  Future<void> disconnect(String id, {bool terminateSession = true}) async {
+    final state = _connections.putIfAbsent(id, _ServerConnection.new);
+    state.generation++;
+    final active = state.connectFuture;
+    final client = state.client;
+    state.client = null;
+    state.status = McpStatus.idle;
+    state.error = null;
+    state.cooldown = null;
+    state.refreshDirty = false;
+    _notify();
 
-  Future<void> reconnect(String id) async {
-    await disconnect(id);
-    await connect(id);
-  }
-
-  Future<void> _reconnectWithBackoff(String id, {int maxAttempts = 3}) async {
-    if (_reconnecting.contains(id)) return;
-    _reconnecting.add(id);
-    try {
-      for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-        await reconnect(id);
-        if (isConnected(id)) return;
-        // progressive backoff: 600ms, 1200ms, 2400ms
-        final delayMs = 600 * (1 << (attempt - 1));
-        await Future.delayed(Duration(milliseconds: delayMs));
-      }
-    } finally {
-      _reconnecting.remove(id);
-    }
-  }
-
-  void _startHeartbeat(
-    String id, {
-    Duration interval = const Duration(seconds: 12),
-  }) {
-    _stopHeartbeat(id);
-    _heartbeats[id] = Timer.periodic(interval, (t) async {
-      // Heartbeat only when we think we're connected
-      if (!isConnected(id)) return;
-      final client = _clients[id];
-      if (client == null) return;
+    if (active != null) {
       try {
-        // A lightweight call to verify liveness
-        // listTools is relatively cheap and available
-        final fut = client.listTools(logTags: {'reason': 'heartbeat'});
-        // Add a soft timeout to avoid piling up
-        await fut.timeout(const Duration(seconds: 6));
-      } catch (e) {
-        // Rate-limited? Server is alive — skip this tick, don't reconnect.
-        if (_isRateLimitError(e)) return;
-        // debugPrint('[MCP/Heartbeat] liveness check failed id=$id');
-        // Consider connection lost; mark error and try auto-reconnect
-        _status[id] = McpStatus.error;
-        _errors[id] = e.toString();
-        notifyListeners();
-        await _reconnectWithBackoff(id, maxAttempts: 3);
-        // If reconnected, restart heartbeat (connect() also starts it)
-        if (!isConnected(id)) {
-          // keep error state; next heartbeat tick will be a no-op
-        }
-      }
-    });
+        await active;
+      } catch (_) {}
+    }
+    if (client != null) {
+      if (terminateSession) await client.terminateSession();
+      client.dispose();
+    }
   }
 
-  void _stopHeartbeat(String id) {
-    _heartbeats.remove(id)?.cancel();
-  }
-
-  /// Returns true if the error indicates rate-limiting (429, MCP -32106).
-  /// Rate-limited responses prove the server is alive — skip heartbeat retry.
-  bool _isRateLimitError(Object e) {
-    if (e is mcp.McpError && e.code == -32106) return true;
-    final msg = e.toString().toLowerCase();
-    return msg.contains('429') || msg.contains('rate limit');
+  Future<bool> reconnect(String id) async {
+    if (_activeCooldown(_connections[id]) != null) return false;
+    await disconnect(id, terminateSession: true);
+    return _connect(id);
   }
 
   McpToolConfig? _toolConfig(String serverId, String toolName) {
@@ -1668,33 +1739,135 @@ class McpProvider extends ChangeNotifier {
     return const [];
   }
 
-  Future<void> refreshTools(String id) async {
-    final client = _clients[id];
-    if (client == null) return;
-    try {
-      // debugPrint('[MCP/Tools] listTools() ...');
-      final tools = await client.listTools();
-      // The client may have been disconnected or replaced while listTools was
-      // in flight (e.g. restore reload rebuilt the server list). Never write
-      // a stale tool refresh back to disk — it would clobber the restored
-      // mcp_servers_v1 with the pre-restore list (assistant changes trigger
-      // this refresh, and restore reloads assistants).
-      if (!identical(_clients[id], client)) return;
-      // debugPrint('[MCP/Tools] listTools() returned ${tools.length} tools');
-      // Preserve enabled state from existing config
-      final idx = _servers.indexWhere((e) => e.id == id);
-      if (idx < 0) return;
-      final existing = _servers[idx].tools;
-      final existingMap = {for (final t in existing) t.name: t};
+  Future<void> refreshTools(String id) {
+    final state = _connections[id];
+    if (state?.client == null || _disposed) return Future<void>.value();
+    state!.refreshDirty = true;
+    final active = state.refreshFuture;
+    if (active != null) return active;
 
-      List<McpToolConfig> merged = [];
-      for (final t in tools) {
-        final prior = existingMap[t.name];
+    final future = _drainToolRefresh(id, state);
+    state.refreshFuture = future;
+    return future.whenComplete(() {
+      if (!identical(state.refreshFuture, future)) return;
+      state.refreshFuture = null;
+      if (state.refreshDirty && !_disposed) {
+        unawaited(refreshTools(id));
+      }
+    });
+  }
+
+  Future<void> _drainToolRefresh(String id, _ServerConnection state) async {
+    var sessionRecoveries = 0;
+    while (state.refreshDirty && !_disposed) {
+      state.refreshDirty = false;
+      final failedClient = state.client;
+      final outcome = await _refreshToolsOnce(id, state);
+      if (outcome == _ToolRefreshOutcome.sessionExpired &&
+          sessionRecoveries++ == 0 &&
+          failedClient != null &&
+          await _recoverExpiredSession(id, state, failedClient) != null) {
+        state.refreshDirty = true;
+        continue;
+      }
+      if (outcome != _ToolRefreshOutcome.success) return;
+    }
+  }
+
+  Future<_ToolRefreshOutcome> _refreshToolsOnce(
+    String id,
+    _ServerConnection state,
+  ) async {
+    final client = state.client;
+    if (client == null) return _ToolRefreshOutcome.failed;
+    final generation = state.generation;
+
+    if (client.serverCapabilities?.tools != true) {
+      await _persistToolList(id, state, client, const <mcp.Tool>[]);
+      if (_disposed ||
+          state.generation != generation ||
+          !identical(state.client, client)) {
+        return _ToolRefreshOutcome.failed;
+      }
+      state.status = McpStatus.connected;
+      state.error = null;
+      _notify();
+      return _ToolRefreshOutcome.success;
+    }
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final cooldown = _activeCooldown(state);
+      if (cooldown != null) {
+        await Future<void>.delayed(cooldown.until.difference(DateTime.now()));
+      }
+      if (_disposed ||
+          state.generation != generation ||
+          !identical(state.client, client)) {
+        return _ToolRefreshOutcome.failed;
+      }
+
+      final startedAt = DateTime.now();
+      try {
+        final tools = await client.listTools();
+        if (_disposed ||
+            state.generation != generation ||
+            !identical(state.client, client)) {
+          return _ToolRefreshOutcome.failed;
+        }
+        await _persistToolList(id, state, client, tools);
+        if (_disposed ||
+            state.generation != generation ||
+            !identical(state.client, client)) {
+          return _ToolRefreshOutcome.failed;
+        }
+        state.status = McpStatus.connected;
+        state.error = null;
+        _clearCooldownAfterSuccess(state, startedAt);
+        _notify();
+        return _ToolRefreshOutcome.success;
+      } catch (error) {
+        if (_isRejectedSession(error)) {
+          return _ToolRefreshOutcome.sessionExpired;
+        }
+        if (error is mcp.McpHttpError && _requiresCooldown(error)) {
+          _enterCooldown(state, error.retryAfter);
+        }
+        if (_isSafeTransient(error) && attempt < 2) {
+          if (_activeCooldown(state) == null) {
+            await Future<void>.delayed(Duration(seconds: attempt == 0 ? 1 : 4));
+          }
+          continue;
+        }
+        state.status = McpStatus.error;
+        state.error = error.toString();
+        _notify();
+        return _ToolRefreshOutcome.failed;
+      }
+    }
+    return _ToolRefreshOutcome.failed;
+  }
+
+  Future<void> _persistToolList(
+    String id,
+    _ServerConnection state,
+    mcp.Client client,
+    List<mcp.Tool> tools,
+  ) async {
+    await _serializeServerMutation(() async {
+      if (!identical(state.client, client)) return;
+      final index = _servers.indexWhere((server) => server.id == id);
+      if (index < 0) return;
+      final existing = {
+        for (final tool in _servers[index].tools) tool.name: tool,
+      };
+      final merged = <McpToolConfig>[];
+      for (final tool in tools) {
+        final prior = existing[tool.name];
         // Extract params from inputSchema if present
         final params = <McpParamSpec>[];
+        final js = tool.inputSchema;
         Map<String, dynamic>? schemaJson;
         try {
-          final js = t.inputSchema;
           schemaJson = js;
           final props =
               (js['properties'] as Map?)?.cast<String, dynamic>() ??
@@ -1725,27 +1898,24 @@ class McpProvider extends ChangeNotifier {
             );
           });
         } catch (_) {}
-
         merged.add(
           McpToolConfig(
             enabled: prior?.enabled ?? true,
-            name: t.name,
-            description: t.description,
+            name: tool.name,
+            description: tool.description,
             params: params,
             schema: schemaJson,
             needsApproval:
-                prior?.needsApproval ?? _defaultToolNeedsApproval(id, t.name),
+                prior?.needsApproval ??
+                _defaultToolNeedsApproval(id, tool.name),
           ),
         );
       }
-
-      _servers[idx] = _servers[idx].copyWith(tools: merged);
-      await _persist();
-      notifyListeners();
-    } catch (e) {
-      // debugPrint('[MCP/Tools] listTools() failed for id=$id');
-      // ignore tool refresh errors; status stays connected
-    }
+      final next = List<McpServerConfig>.of(_servers)
+        ..[index] = _servers[index].copyWith(tools: merged);
+      await _persistServers(next);
+      _servers = next;
+    });
   }
 
   /// Default approval flag for a tool when its config is first created.
@@ -1761,8 +1931,7 @@ class McpProvider extends ChangeNotifier {
     final cfg = getById(id);
     if (cfg == null || !cfg.enabled) return;
     if (isConnected(id)) return;
-    // Try a few times with short backoff in case server blips
-    await _reconnectWithBackoff(id, maxAttempts: 3);
+    await _connect(id);
   }
 
   Future<mcp.CallToolResult?> callTool(
@@ -1770,64 +1939,188 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     Map<String, dynamic> args,
   ) async {
+    await ensureConnected(serverId);
+    final state = _connections[serverId];
+    if (state == null) return null;
+    final cooldown = _activeCooldown(state);
+    if (cooldown != null) {
+      return _toolError(
+        'MCP server is temporarily unavailable; retry after '
+        '${cooldown.until.difference(DateTime.now()).inSeconds + 1} seconds.',
+      );
+    }
+    final client = state.client;
+    if (client == null) return null;
+    // Normalize arguments based on tool schema (best-effort)
+    final normalized = _normalizeArgsForTool(serverId, toolName, args);
+    final startedAt = DateTime.now();
     try {
-      await ensureConnected(serverId);
-      var client = _clients[serverId];
-      if (client == null) return null;
-      // Normalize arguments based on tool schema (best-effort)
-      final normalized = _normalizeArgsForTool(serverId, toolName, args);
-      // if (normalized != args) {
-      //   debugPrint('[MCP/Call] serverId=$serverId tool=$toolName args(normalized)=${jsonEncode(normalized)}');
-      // } else {
-      //   debugPrint('[MCP/Call] serverId=$serverId tool=$toolName args=${jsonEncode(args)}');
-      // }
       final result = await client.callTool(toolName, normalized);
-      // Detailed call timing/content logging disabled
+      _clearCooldownAfterSuccess(state, startedAt);
       return result;
-    } catch (e) {
-      // debugPrint('[MCP/Call/Error] serverId=$serverId tool=$toolName');
-
-      // If this is a parameter validation error from the server, do NOT disconnect.
-      try {
-        if (e is mcp.McpError && (e.code == -32602)) {
-          // Keep connection healthy status; surface error to caller via null
-          _errors[serverId] = e.toString();
-          // debugPrint('[MCP/Call] invalid arguments; skipping reconnect');
-          return null;
-        }
-      } catch (_) {}
-
-      _status[serverId] = McpStatus.error;
-      _errors[serverId] = e.toString();
-      notifyListeners();
-      // Auto-reconnect a few times and try once more
-      try {
-        await _reconnectWithBackoff(serverId, maxAttempts: 3);
-        if (!isConnected(serverId)) return null;
-        final client = _clients[serverId];
-        if (client == null) return null;
-        // debugPrint('[MCP/Call] retry serverId=$serverId tool=$toolName');
-        final normalized = _normalizeArgsForTool(serverId, toolName, args);
-        final result = await client.callTool(toolName, normalized);
-        // Detailed retry logging disabled
-        // Mark healthy again
-        _status[serverId] = McpStatus.connected;
-        _errors.remove(serverId);
-        notifyListeners();
-        return result;
-      } catch (e2) {
-        // debugPrint('[MCP/Call/RetryError] serverId=$serverId tool=$toolName');
-        // Keep error state; give up
-        return null;
+    } catch (error) {
+      if (error is mcp.McpError && error.code == -32602) {
+        return _toolError(error.toString());
       }
+      if (error is mcp.McpHttpError && _requiresCooldown(error)) {
+        _enterCooldown(state, error.retryAfter);
+        _notify();
+        if (error.statusCode == 429) {
+          return _toolError('MCP server rate limited this request.');
+        }
+      }
+      if (_isRejectedSession(error)) {
+        final replacement = await _recoverExpiredSession(
+          serverId,
+          state,
+          client,
+        );
+        if (replacement != null) {
+          try {
+            return await replacement.callTool(toolName, normalized);
+          } catch (retryError) {
+            if (retryError is mcp.McpHttpError &&
+                _requiresCooldown(retryError)) {
+              _enterCooldown(state, retryError.retryAfter);
+              _notify();
+              if (retryError.statusCode == 429) {
+                return _toolError('MCP server rate limited this request.');
+              }
+            }
+            if (retryError is mcp.McpError && retryError.code != null) {
+              return _toolError(retryError.toString());
+            }
+            return _toolError(
+              'The MCP tool request may have been executed, but its result is '
+              'unknown. It was not retried. $retryError',
+            );
+          }
+        }
+      }
+      if (error is mcp.McpError && error.code != null) {
+        return _toolError(error.toString());
+      }
+      return _toolError(
+        'The MCP tool request may have been executed, but its result is '
+        'unknown. It was not retried. $error',
+      );
     }
   }
 
+  Future<mcp.Client?> _recoverExpiredSession(
+    String id,
+    _ServerConnection state,
+    mcp.Client failedClient,
+  ) async {
+    if (_disposed || getById(id)?.enabled != true) return null;
+    if (!identical(state.client, failedClient)) {
+      final active = state.connectFuture;
+      if (active != null) {
+        try {
+          await active;
+        } catch (_) {}
+      }
+      final current = state.client;
+      return current?.isConnected == true ? current : null;
+    }
+
+    final previousConnect = state.connectFuture;
+    state.generation++;
+    state.client = null;
+    state.status = McpStatus.connecting;
+    state.error = null;
+    state.cooldown = null;
+
+    final server = getById(id);
+    if (server == null || !server.enabled || _disposed) {
+      failedClient.dispose();
+      return null;
+    }
+    try {
+      final connected = await _beginConnect(
+        id,
+        server,
+        state,
+        waitFor: previousConnect,
+      );
+      await failedClient.waitForPendingRequests();
+      return connected ? state.client : null;
+    } finally {
+      failedClient.dispose();
+    }
+  }
+
+  _Cooldown? _activeCooldown(_ServerConnection? state) {
+    final cooldown = state?.cooldown;
+    if (cooldown == null) return null;
+    if (!cooldown.until.isAfter(DateTime.now())) {
+      state!.cooldown = null;
+      return null;
+    }
+    return cooldown;
+  }
+
+  void _enterCooldown(_ServerConnection state, Duration? retryAfter) {
+    const minimum = Duration(seconds: 1);
+    var delay = retryAfter ?? const Duration(seconds: 30);
+    if (delay < minimum) delay = minimum;
+    final now = DateTime.now();
+    final until = now.add(delay);
+    final current = _activeCooldown(state);
+    state.cooldown = _Cooldown(
+      startedAt: now,
+      until: current != null && current.until.isAfter(until)
+          ? current.until
+          : until,
+    );
+  }
+
+  void _clearCooldownAfterSuccess(
+    _ServerConnection state,
+    DateTime requestStartedAt,
+  ) {
+    final cooldown = state.cooldown;
+    if (cooldown == null || !requestStartedAt.isAfter(cooldown.startedAt)) {
+      return;
+    }
+    state.cooldown = null;
+  }
+
+  bool _requiresCooldown(mcp.McpHttpError error) =>
+      error.statusCode == 429 ||
+      (error.statusCode >= 500 && error.retryAfter != null);
+
+  bool _isRejectedSession(Object error) =>
+      error is mcp.McpHttpError &&
+      error.statusCode == 404 &&
+      error.sessionIdPresent &&
+      error.canRetryRequest;
+
+  bool _isSafeTransient(Object error) {
+    if (error is mcp.McpHttpError) {
+      return error.statusCode == 408 ||
+          error.statusCode == 429 ||
+          error.statusCode >= 500;
+    }
+    if (error is! mcp.McpError || error.code != null) return false;
+    final message = error.message.toLowerCase();
+    return message.contains('timed out') ||
+        message.contains('transport') ||
+        message.contains('socket') ||
+        message.contains('connection') ||
+        message.contains('handshake');
+  }
+
+  mcp.CallToolResult _toolError(String message) =>
+      mcp.CallToolResult([mcp.TextContent(text: message)], isError: true);
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   List<McpToolConfig> getEnabledToolsForServers(Set<String> serverIds) {
-    // Only expose tools for servers that are both selected AND currently connected
     final tools = <McpToolConfig>[];
     for (final s in _servers.where((s) => serverIds.contains(s.id))) {
-      if (statusFor(s.id) != McpStatus.connected) continue;
       if (!s.enabled) continue;
       tools.addAll(s.tools.where((t) => t.enabled));
     }
@@ -1836,11 +2129,14 @@ class McpProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Clean up timers
-    for (final t in _heartbeats.values) {
-      t.cancel();
+    if (_disposed) return;
+    _disposed = true;
+    for (final state in _connections.values) {
+      state.generation++;
+      state.client?.dispose();
+      state.client = null;
     }
-    _heartbeats.clear();
+    _connections.clear();
     super.dispose();
   }
 

@@ -8,6 +8,7 @@ Future<void> showDesktopToolsHubPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required String assistantId,
+  required String? conversationId,
 }) async {
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -31,6 +32,7 @@ Future<void> showDesktopToolsHubPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
+      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -46,12 +48,14 @@ class _ToolsHubPopover extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
+    required this.conversationId,
     required this.onClose,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final String assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -145,6 +149,7 @@ class _ToolsHubPopoverState extends State<_ToolsHubPopover>
                             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                             child: ToolsHubContent(
                               assistantId: widget.assistantId,
+                              conversationId: widget.conversationId,
                               onClose: () => widget.onClose(),
                             ),
                           ),

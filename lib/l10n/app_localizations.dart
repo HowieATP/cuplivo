@@ -4048,6 +4048,60 @@ abstract class AppLocalizations {
   /// **'Import from Other Apps'**
   String get backupPageImportFromOtherApps;
 
+  /// No description provided for @backupPageImportFromKelivo.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from New Kelivo'**
+  String get backupPageImportFromKelivo;
+
+  /// No description provided for @backupPageKelivoImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups from newer versions of Kelivo can be converted to a Cuplivo-compatible backup via the Kelivo-helper website:'**
+  String get backupPageKelivoImportHint;
+
+  /// No description provided for @backupPageKelivoImportUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/compat'**
+  String get backupPageKelivoImportUrl;
+
+  /// No description provided for @backupPageKelivoImportTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageKelivoImportTutorialTitle;
+
+  /// No description provided for @backupPageKelivoImportStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Kelivo-helper website below.'**
+  String get backupPageKelivoImportStep1;
+
+  /// No description provided for @backupPageKelivoImportStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the backup file exported from the newer version of Kelivo and follow the instructions on the webpage.'**
+  String get backupPageKelivoImportStep2;
+
+  /// No description provided for @backupPageKelivoImportStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the conversion to complete.'**
+  String get backupPageKelivoImportStep3;
+
+  /// No description provided for @backupPageKelivoImportStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the converted backup file.'**
+  String get backupPageKelivoImportStep4;
+
+  /// No description provided for @backupPageKelivoImportStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File”, and select the converted file to complete the import.'**
+  String get backupPageKelivoImportStep5;
+
   /// No description provided for @backupPageImportFromRikkaHub.
   ///
   /// In en, this message translates to:
@@ -5229,6 +5283,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select Messages'**
   String get messageMoreSheetSelectMessages;
+
+  /// No description provided for @messageMoreSheetReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get messageMoreSheetReply;
+
+  /// No description provided for @messageQuoteDeletedErrorMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The original message has been deleted'**
+  String get messageQuoteDeletedErrorMessage;
+
+  /// No description provided for @messageQuotePreviewDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss reply quote'**
+  String get messageQuotePreviewDismiss;
 
   /// No description provided for @messageMoreSheetCreateBranch.
   ///
@@ -6793,18 +6865,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If SSE fails, try a few times'**
   String get mcpServerEditSheetSseRetryHint;
-
-  /// No description provided for @mcpServerEditSheetHeartbeatLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Heartbeat Interval'**
-  String get mcpServerEditSheetHeartbeatLabel;
-
-  /// No description provided for @mcpServerEditSheetHeartbeatHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
-  String get mcpServerEditSheetHeartbeatHint;
 
   /// No description provided for @mcpServerEditSheetAdvancedLabel.
   ///
@@ -8666,7 +8726,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enable fetch for providers without native fetch'**
+  /// **'Add browsing for providers without native browsing'**
   String get searchServicesPageEnableFallbackFetchTitle;
 
   /// No description provided for @searchServicesPageAutoTestTitle.
@@ -9575,6 +9635,18 @@ abstract class AppLocalizations {
   /// **'Confirm before regenerating'**
   String get displaySettingsPageShowRegenerateConfirmDialogTitle;
 
+  /// No description provided for @displaySettingsPageForkKeepMessageVersionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Message Versions When Forking'**
+  String get displaySettingsPageForkKeepMessageVersionsTitle;
+
+  /// No description provided for @displaySettingsPageForkKeepMessageVersionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The fork carries every regenerated version of each message so you can still switch between them; off keeps only the selected answer.'**
+  String get displaySettingsPageForkKeepMessageVersionsSubtitle;
+
   /// No description provided for @chainOfThoughtExpandSteps.
   ///
   /// In en, this message translates to:
@@ -9778,6 +9850,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Haptics on Switch'**
   String get displaySettingsPageHapticsIosSwitchTitle;
+
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Screen On While Generating'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle;
+
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to generations started after the change; in-flight generations keep their current behavior'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle;
 
   /// No description provided for @displaySettingsPageHapticsOnListItemTapTitle.
   ///
@@ -11990,26 +12074,20 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditLocalToolHandoffTitle.
   ///
   /// In en, this message translates to:
-  /// **'Task Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffTitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Delegate a task to another assistant in a new conversation without waiting for the result.'**
+  /// **'Hand a task to a delegated sub-agent and wait for its full output; watch progress in the sub-agent panel.'**
   String get assistantEditLocalToolHandoffSubtitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSyncTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sync Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffSyncTitle;
-
-  /// No description provided for @assistantEditLocalToolHandoffSyncSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.'**
-  String get assistantEditLocalToolHandoffSyncSubtitle;
 
   /// No description provided for @assistantEditSkillDownloadTitle.
   ///
@@ -14687,12 +14765,6 @@ abstract class AppLocalizations {
   /// **'Speak'**
   String get chatMessageWidgetSpeak;
 
-  /// No description provided for @handoffForwardChip.
-  ///
-  /// In en, this message translates to:
-  /// **'→ {assistantName} · {convIdPrefix}'**
-  String handoffForwardChip(Object assistantName, Object convIdPrefix);
-
   /// No description provided for @handoffBackwardChip.
   ///
   /// In en, this message translates to:
@@ -14708,25 +14780,31 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Handoff / Delegation'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditHandoffSectionTitle;
 
   /// No description provided for @assistantEditHandoffDiscoverable.
   ///
   /// In en, this message translates to:
-  /// **'Discoverable by other assistants'**
+  /// **'Delegateable as a sub-agent by other assistants'**
   String get assistantEditHandoffDiscoverable;
+
+  /// No description provided for @assistantEditHandoffDiscoverableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other assistants can delegate tasks to this assistant via Sub-agent Delegation.'**
+  String get assistantEditHandoffDiscoverableSubtitle;
 
   /// No description provided for @assistantEditHandoffId.
   ///
   /// In en, this message translates to:
-  /// **'Handoff ID'**
+  /// **'Delegation ID'**
   String get assistantEditHandoffId;
 
   /// No description provided for @assistantEditHandoffDescription.
   ///
   /// In en, this message translates to:
-  /// **'Description for other assistants'**
+  /// **'Describe your specialty so other assistants know when to delegate to you.'**
   String get assistantEditHandoffDescription;
 
   /// No description provided for @assistantEditHandoffIdInvalid.
@@ -14738,14 +14816,8 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffIdUnique.
   ///
   /// In en, this message translates to:
-  /// **'This Handoff ID is already in use'**
+  /// **'This Delegation ID is already in use'**
   String get assistantEditHandoffIdUnique;
-
-  /// No description provided for @handoffForwardChipTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Open the spawned conversation'**
-  String get handoffForwardChipTooltip;
 
   /// No description provided for @handoffBackwardChipTooltip.
   ///
@@ -14854,6 +14926,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My group chats'**
   String get groupChatMyGroupChats;
+
+  /// No description provided for @subagentTargetStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No sub-agent targets available} =1{1 sub-agent target} other{{count} sub-agent targets}}'**
+  String subagentTargetStatus(num count);
+
+  /// No description provided for @subagentTargetBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 targets} =1{1 target} other{{count} targets}}'**
+  String subagentTargetBadge(num count);
+
+  /// No description provided for @subagentNoTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-agent delegation is on, but no sub-agent targets are available. Enable “Delegateable as a sub-agent” on another assistant first.'**
+  String get subagentNoTargetHint;
+
+  /// No description provided for @subagentGoSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up'**
+  String get subagentGoSetup;
+
+  /// No description provided for @subagentTargetListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegatable assistants'**
+  String get subagentTargetListTitle;
+
+  /// No description provided for @subagentTargetListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No delegatable assistants yet.'**
+  String get subagentTargetListEmpty;
 
   /// No description provided for @groupChatCreate.
   ///
@@ -15893,6 +16001,102 @@ abstract class AppLocalizations {
   /// **'Off'**
   String get workspaceEntrySubtitleOff;
 
+  /// No description provided for @workspaceDefaultDirectoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Default working directory'**
+  String get workspaceDefaultDirectoryTitle;
+
+  /// No description provided for @workspaceConversationDirectoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation working directory'**
+  String get workspaceConversationDirectoryTitle;
+
+  /// No description provided for @workspaceDirectoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'/workspace or a path relative to the workspace root'**
+  String get workspaceDirectoryHint;
+
+  /// No description provided for @workspaceDirectoryBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get workspaceDirectoryBrowse;
+
+  /// No description provided for @workspaceDirectorySave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workspaceDirectorySave;
+
+  /// No description provided for @workspaceDirectoryUseAssistantDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use assistant default'**
+  String get workspaceDirectoryUseAssistantDefault;
+
+  /// No description provided for @workspaceDirectoryInherited.
+  ///
+  /// In en, this message translates to:
+  /// **'Following the assistant default'**
+  String get workspaceDirectoryInherited;
+
+  /// No description provided for @workspaceDirectoryOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'Overridden for this conversation'**
+  String get workspaceDirectoryOverride;
+
+  /// No description provided for @workspaceDirectorySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Working directory saved'**
+  String get workspaceDirectorySaved;
+
+  /// No description provided for @workspaceDirectorySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save working directory: {error}'**
+  String workspaceDirectorySaveFailed(String error);
+
+  /// No description provided for @workspaceAutoLoadAgentsMdTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically load AGENTS.md'**
+  String get workspaceAutoLoadAgentsMdTitle;
+
+  /// No description provided for @workspaceAutoLoadAgentsMdSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Load project instructions from this directory up to the workspace root'**
+  String get workspaceAutoLoadAgentsMdSubtitle;
+
+  /// No description provided for @workspaceAgentsMdLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load AGENTS.md instructions. Fix the file or turn off automatic loading.'**
+  String get workspaceAgentsMdLoadFailed;
+
+  /// No description provided for @workspaceAgentsMdSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the AGENTS.md loading setting.'**
+  String get workspaceAgentsMdSaveFailed;
+
+  /// No description provided for @workspaceDirectoryPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose working directory'**
+  String get workspaceDirectoryPickerTitle;
+
+  /// No description provided for @workspaceDirectorySelectCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this folder'**
+  String get workspaceDirectorySelectCurrent;
+
   /// No description provided for @workspaceShellMobileOnly.
   ///
   /// In en, this message translates to:
@@ -15953,6 +16157,24 @@ abstract class AppLocalizations {
   /// **'Queued…'**
   String get workspaceDepQueued;
 
+  /// No description provided for @workspaceDepStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unavailable'**
+  String get workspaceDepStatusUnknown;
+
+  /// No description provided for @workspaceDepProbeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t refresh dependency status. Any previous results were preserved.'**
+  String get workspaceDepProbeFailed;
+
+  /// No description provided for @workspaceDepRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get workspaceDepRetry;
+
   /// No description provided for @workspaceDepStageDownloading.
   ///
   /// In en, this message translates to:
@@ -15994,6 +16216,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
+
+  /// No description provided for @workspaceDepGitPrerequisite.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Git first'**
+  String get workspaceDepGitPrerequisite;
+
+  /// No description provided for @workspaceDepOfficePrerequisites.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Python and Node.js first'**
+  String get workspaceDepOfficePrerequisites;
 
   /// No description provided for @workspaceSandboxDirEntryTitle.
   ///
@@ -16109,6 +16343,54 @@ abstract class AppLocalizations {
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
 
+  /// No description provided for @workspaceDepGithubCliTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub CLI'**
+  String get workspaceDepGithubCliTitle;
+
+  /// No description provided for @workspaceDepGithubCliDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use GitHub from the command line (gh)'**
+  String get workspaceDepGithubCliDesc;
+
+  /// No description provided for @workspaceDepCurlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'curl'**
+  String get workspaceDepCurlTitle;
+
+  /// No description provided for @workspaceDepCurlDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer data over HTTP, HTTPS, and other protocols'**
+  String get workspaceDepCurlDesc;
+
+  /// No description provided for @workspaceDepOpenSshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenSSH Client'**
+  String get workspaceDepOpenSshTitle;
+
+  /// No description provided for @workspaceDepOpenSshDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH, SCP, SFTP, and key-management tools'**
+  String get workspaceDepOpenSshDesc;
+
+  /// No description provided for @workspaceDepArchiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ZIP archive tools'**
+  String get workspaceDepArchiveTitle;
+
+  /// No description provided for @workspaceDepArchiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and extract ZIP archives (zip and unzip)'**
+  String get workspaceDepArchiveDesc;
+
   /// No description provided for @workspaceDepOfficeTitle.
   ///
   /// In en, this message translates to:
@@ -16118,7 +16400,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceDepOfficeDesc.
   ///
   /// In en, this message translates to:
-  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  /// **'Recommended with Anthropic’s official docx, pptx, and xlsx Skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
   String get workspaceDepOfficeDesc;
 
   /// No description provided for @workspaceDepBuildTitle.

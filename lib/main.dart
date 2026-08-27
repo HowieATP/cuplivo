@@ -47,6 +47,7 @@ import 'core/services/chat/chat_service.dart';
 import 'core/services/trash_restore_coordinator.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/generation_engine.dart';
+import 'core/services/wake_lock_manager.dart';
 import 'core/services/network/dio_http_client.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
@@ -235,10 +236,16 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DownloadProgressStore()),
         ChangeNotifierProvider(create: (_) => InputStatusProvider()),
         ChangeNotifierProvider(
-          create: (ctx) => GenerationEngine(
-            chatService: ctx.read<ChatService>(),
-            downloadProgressStore: ctx.read<DownloadProgressStore>(),
-          ),
+          create: (ctx) {
+            final settings = ctx.read<SettingsProvider>();
+            return GenerationEngine(
+              chatService: ctx.read<ChatService>(),
+              downloadProgressStore: ctx.read<DownloadProgressStore>(),
+              wakeLockManager: WakeLockManager(
+                isEnabled: () => settings.keepScreenOnDuringGeneration,
+              ),
+            );
+          },
         ),
         ChangeNotifierProvider(
           create: (ctx) {

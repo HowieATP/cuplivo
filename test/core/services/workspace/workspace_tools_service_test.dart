@@ -1,109 +1,219 @@
+import 'dart:io';
+
+import 'package:Cuplivo/core/models/assistant.dart';
+import 'package:Cuplivo/core/models/conversation.dart';
+import 'package:Cuplivo/core/models/workspace.dart';
+import 'package:Cuplivo/core/providers/workspace_provider.dart';
 import 'package:Cuplivo/core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
+import 'package:Cuplivo/core/services/workspace/workspace_execution_context.dart';
 import 'package:Cuplivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakePathProvider extends PathProviderPlatform {
+  _FakePathProvider(this.root);
+
+  final String root;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => root;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => root;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$root/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$root/tmp';
+}
 
 void main() {
-  group('WorkspaceToolsService.dedupeMounts', () {
-    test('keeps workspace mounts first and drops colliding SAF mounts', () {
-      final wsMounts = [
-        const FilesystemMount(
-          alias: 'default',
-          path: '/ws/default',
-          readOnly: false,
-        ),
-      ];
-      final safMounts = [
-        const FilesystemMount(
-          alias: 'default',
-          path: '/mirror/default',
-          uri: 'content://tree/1',
-        ),
-        const FilesystemMount(
-          alias: 'notes',
-          path: '/mirror/notes',
-          uri: 'content://tree/2',
-        ),
-      ];
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-      final out = WorkspaceToolsService.dedupeMounts(wsMounts, safMounts);
+  group('SAF mount composition', () {
+    test('keeps workspace mounts first and drops colliding SAF mounts', () {
+      final out = WorkspaceToolsService.dedupeMounts(
+        const [
+          FilesystemMount(
+            alias: 'default',
+            path: '/ws/default',
+            readOnly: false,
+          ),
+        ],
+        const [
+          FilesystemMount(
+            alias: 'default',
+            path: '/mirror/default',
+            uri: 'content://tree/1',
+          ),
+          FilesystemMount(
+            alias: 'notes',
+            path: '/mirror/notes',
+            uri: 'content://tree/2',
+          ),
+        ],
+      );
 
       expect(out.map((m) => m.alias), ['default', 'notes']);
-      // The workspace mount wins the alias; the SAF mirror is shadowed.
       expect(out.first.uri, isNull);
       expect(out.first.path, '/ws/default');
-      // The non-colliding SAF mount stays.
       expect(out[1].uri, 'content://tree/2');
       expect(out.where((m) => m.isSafMount), hasLength(1));
     });
 
-    test('an empty SAF list is a pass-through', () {
-      final wsMounts = [
-        const FilesystemMount(alias: 'default', path: '/ws/default'),
-      ];
-      final out = WorkspaceToolsService.dedupeMounts(wsMounts, const []);
-      expect(out, hasLength(1));
-      expect(out.single.alias, 'default');
-    });
+    test('empty SAF mounts pass through and aliases use deduped mounts', () {
+      const workspaceMount = FilesystemMount(alias: 'notes', path: '/ws/notes');
+      expect(
+        WorkspaceToolsService.dedupeMounts(const [workspaceMount], const []),
+        hasLength(1),
+      );
 
-    test('a restored custom workspace alias shadows a SAF mount', () {
-      // Backup restore can bring a workspace whose alias matches a SAF mount
-      // added after that backup was made.
-      final wsMounts = [
-        const FilesystemMount(
-          alias: 'notes',
-          path: '/ws/notes',
-          readOnly: false,
-        ),
-      ];
-      final safMounts = [
-        const FilesystemMount(
-          alias: 'notes',
-          path: '/mirror/notes',
-          uri: 'content://tree/9',
-        ),
-      ];
-
-      final out = WorkspaceToolsService.dedupeMounts(wsMounts, safMounts);
-      expect(out, hasLength(1));
-      expect(out.single.uri, isNull);
-    });
-  });
-
-  group('WorkspaceToolsService.safAliasesFrom', () {
-    test('derives aliases from the deduped composition only', () {
       final combined = WorkspaceToolsService.dedupeMounts(
-        [
-          const FilesystemMount(
-            alias: 'notes',
-            path: '/ws/notes',
-            readOnly: false,
-          ),
-        ],
-        [
-          const FilesystemMount(
+        const [workspaceMount],
+        const [
+          FilesystemMount(
             alias: 'notes',
             path: '/mirror/notes',
             uri: 'content://tree/9',
           ),
-          const FilesystemMount(
+          FilesystemMount(
             alias: 'assets',
             path: '/mirror/assets',
             uri: 'content://tree/8',
           ),
         ],
       );
-      // The shadowed "notes" alias must NOT be addressable — parse-time
-      // rejection beats silent routing to the workspace mount.
       expect(WorkspaceToolsService.safAliasesFrom(combined), {'assets'});
     });
+  });
 
-    test('empty when there are no SAF mounts', () {
+  group('working-directory execution', () {
+    late Directory temp;
+    late WorkspaceProvider workspaces;
+    late Workspace workspace;
+    late PathProviderPlatform originalPathProvider;
+
+    setUp(() async {
+      originalPathProvider = PathProviderPlatform.instance;
+      temp = await Directory.systemTemp.createTemp('cuplivo_tools_cwd_');
+      PathProviderPlatform.instance = _FakePathProvider(temp.path);
+      SharedPreferences.setMockInitialValues({});
+      workspaces = WorkspaceProvider();
+      await workspaces.init();
+      workspace = workspaces.defaultWorkspace!;
+    });
+
+    tearDown(() async {
+      PathProviderPlatform.instance = originalPathProvider;
+      if (await temp.exists()) await temp.delete(recursive: true);
+    });
+
+    test('filesystem paths resolve from the assistant directory', () async {
+      final host = workspaces.hostPathFor(workspace)!;
+      await Directory('$host/project').create(recursive: true);
+      await File('$host/project/note.txt').writeAsString('cwd-data');
+      await File('$host/root.txt').writeAsString('root-data');
+      final assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        workspaceEnabled: true,
+        workspaceId: workspace.id,
+        workspaceDefaultDirectories: {workspace.id: '/workspace/project'},
+      );
+      final executionContext = WorkspaceExecutionContext(
+        workspace: workspace,
+        workingDirectory: '/workspace/project',
+      );
+
+      final definitions = WorkspaceToolsService.buildToolDefinitions(
+        assistant: assistant,
+        workspaces: workspaces,
+        supportsTools: true,
+        executionContext: executionContext,
+      );
+      final reminder = WorkspaceToolsService.buildPromptReminder(
+        assistant: assistant,
+        workspaces: workspaces,
+        executionContext: executionContext,
+      );
+      final relative = await WorkspaceToolsService.tryHandleToolCall(
+        name: WorkspaceToolNames.read,
+        args: const {'path': 'note.txt'},
+        assistant: assistant,
+        workspaces: workspaces,
+        executionContext: executionContext,
+      );
+      final absolute = await WorkspaceToolsService.tryHandleToolCall(
+        name: WorkspaceToolNames.read,
+        args: const {'path': '/workspace/root.txt'},
+        assistant: assistant,
+        workspaces: workspaces,
+      );
+
+      expect(relative, contains('cwd-data'));
+      expect(absolute, contains('root-data'));
+      expect(definitions.first.toString(), contains('/workspace/project'));
       expect(
-        WorkspaceToolsService.safAliasesFrom(const [
-          FilesystemMount(alias: 'default', path: '/ws/default'),
-        ]),
-        isEmpty,
+        reminder,
+        contains('Current working directory: /workspace/project'),
       );
     });
+
+    test('conversation override wins and escaping paths fail', () async {
+      final host = workspaces.hostPathFor(workspace)!;
+      await Directory('$host/assistant').create(recursive: true);
+      await Directory('$host/conversation').create(recursive: true);
+      await File('$host/assistant/note.txt').writeAsString('assistant-data');
+      await File(
+        '$host/conversation/note.txt',
+      ).writeAsString('conversation-data');
+      final assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        workspaceEnabled: true,
+        workspaceId: workspace.id,
+        workspaceDefaultDirectories: {workspace.id: '/workspace/assistant'},
+      );
+      final conversation = Conversation(
+        title: 'Conversation',
+        workspaceDirectoryOverrides: {workspace.id: '/workspace/conversation'},
+      );
+
+      final result = await WorkspaceToolsService.tryHandleToolCall(
+        name: WorkspaceToolNames.read,
+        args: const {'path': 'note.txt'},
+        assistant: assistant,
+        conversation: conversation,
+        workspaces: workspaces,
+      );
+      final escaped = await WorkspaceToolsService.tryHandleToolCall(
+        name: WorkspaceToolNames.read,
+        args: const {'path': '../../outside.txt'},
+        assistant: assistant,
+        conversation: conversation,
+        workspaces: workspaces,
+      );
+
+      expect(result, contains('conversation-data'));
+      expect(escaped, contains('invalid_path'));
+    });
   });
+
+  test(
+    'shell definition directs file operations to native workspace tools',
+    () {
+      expect(WorkspaceToolsService.shellToolDescription, contains('Prefer'));
+      expect(
+        WorkspaceToolsService.shellToolDescription,
+        contains('filesystem'),
+      );
+      expect(
+        WorkspaceToolsService.shellToolDescription,
+        contains('package semantics'),
+      );
+    },
+  );
 }

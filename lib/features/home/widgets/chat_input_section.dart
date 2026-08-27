@@ -201,13 +201,7 @@ class ChatInputSection extends StatelessWidget {
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
-      showToolsHubButton: _shouldShowToolsHubButton(
-        context,
-        settings,
-        a,
-        pk,
-        mid,
-      ),
+      showToolsHubButton: _shouldShowToolsHubButton(settings, a, pk, mid),
       toolsHubActive: _isToolsActive(context, a),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
@@ -327,7 +321,6 @@ class ChatInputSection extends StatelessWidget {
   }
 
   bool _shouldShowToolsHubButton(
-    BuildContext context,
     SettingsProvider settings,
     Assistant? a,
     String? pk,
@@ -336,11 +329,7 @@ class ChatInputSection extends StatelessWidget {
     final pk2 = a?.chatModelProvider ?? settings.currentModelProvider;
     final mid3 = a?.chatModelId ?? settings.currentModelId;
     if (pk2 == null || mid3 == null) return false;
-    final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    final hasLocalTools = a?.localToolIds.isNotEmpty ?? false;
-    final workspaceOn = a?.workspaceEnabled ?? false;
-    return isToolModel(pk2, mid3) &&
-        (hasEnabledMcp || hasLocalTools || workspaceOn);
+    return isToolModel(pk2, mid3);
   }
 
   bool _isToolsActive(BuildContext context, Assistant? a) {

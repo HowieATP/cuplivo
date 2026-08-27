@@ -40,7 +40,9 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
   bool _depsExpanded = false;
   final Map<String, bool> _depInstalled = <String, bool>{};
   bool _depStatusLoading = false;
+  bool _depProbeFailed = false;
   bool _hasRuntime = true;
+  int _depStatusRefreshGeneration = 0;
 
   @override
   void initState() {
@@ -116,26 +118,35 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     if (ws == null) return;
     final host = wp.hostPathFor(ws);
     if (host == null) return;
+    final generation = ++_depStatusRefreshGeneration;
     setState(() => _depStatusLoading = true);
     try {
       final svc = LinuxSandboxService.instance;
-      final runtime = await svc.hasRuntime();
-      final next = <String, bool>{};
-      for (final id in WorkspaceDependencyIds.ordered) {
-        next[id] = await svc.isDependencyInstalled(host, id);
-      }
-      if (!mounted) return;
+      final snapshot = await svc.dependencyStatus(host);
+      if (!mounted || generation != _depStatusRefreshGeneration) return;
       setState(() {
-        _hasRuntime = runtime;
+        _hasRuntime = snapshot.hasRuntime;
         _depInstalled
           ..clear()
-          ..addAll(next);
+          ..addAll(snapshot.installed);
         _depStatusLoading = false;
+        _depProbeFailed = false;
       });
     } catch (e) {
       debugPrint('WorkspaceDetailPage._refreshDepStatus: $e');
-      if (mounted) setState(() => _depStatusLoading = false);
+      if (mounted && generation == _depStatusRefreshGeneration) {
+        setState(() {
+          _depStatusLoading = false;
+          _depProbeFailed = true;
+        });
+      }
     }
+  }
+
+  void _toggleDependencies() {
+    final expanding = !_depsExpanded;
+    setState(() => _depsExpanded = expanding);
+    if (expanding) unawaited(_refreshDepStatus());
   }
 
   @override
@@ -267,9 +278,10 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
               icon: Lucide.Boxes,
               title: l10n.workspaceInstallDeps,
               expanded: _depsExpanded,
-              onToggle: () => setState(() => _depsExpanded = !_depsExpanded),
+              onToggle: _toggleDependencies,
               showDivider: true,
               children: [
+                if (_depProbeFailed) _dependencyProbeError(context),
                 for (final depId in WorkspaceDependencyIds.ordered)
                   _depRow(context, ws, depId),
               ],
@@ -450,21 +462,41 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
         depId != WorkspaceDependencyIds.base && !baseInstalled;
     final needsRuntime =
         depId != WorkspaceDependencyIds.base && baseInstalled && !_hasRuntime;
+    final missingPrerequisites = WorkspaceDependencyIds.missingPrerequisites(
+      depId,
+      _depInstalled,
+    );
 
     String? subtitleExtra;
     if (needsBaseFirst) {
       subtitleExtra = l10n.workspaceSandboxBaseRequired;
     } else if (needsRuntime) {
       subtitleExtra = l10n.workspaceSandboxRuntimeMissing;
+    } else if (missingPrerequisites.isNotEmpty) {
+      subtitleExtra = switch (depId) {
+        WorkspaceDependencyIds.githubCli => l10n.workspaceDepGitPrerequisite,
+        WorkspaceDependencyIds.office => l10n.workspaceDepOfficePrerequisites,
+        _ => null,
+      };
     }
 
     final label = installing
         ? l10n.workspaceDepInstalling
         : queued
         ? l10n.workspaceDepQueued
+        : _depProbeFailed
+        ? l10n.workspaceDepStatusUnknown
         : installed
         ? l10n.workspaceDepInstalled
         : l10n.workspaceDepInstall;
+    final installDisabled =
+        installing ||
+        queued ||
+        _depStatusLoading ||
+        _depProbeFailed ||
+        needsBaseFirst ||
+        needsRuntime ||
+        missingPrerequisites.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -514,7 +546,7 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
                     : () => _showDepSettings(context, ws, depId),
               ),
               TextButton(
-                onPressed: installing || queued || _depStatusLoading
+                onPressed: installDisabled
                     ? null
                     : () =>
                           _installDep(context, ws, depId, reinstall: installed),
@@ -523,6 +555,34 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
             ],
           ),
           if (installing) ..._installProgressArea(context, ws, depId),
+        ],
+      ),
+    );
+  }
+
+  Widget _dependencyProbeError(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Lucide.TriangleAlert, size: 18, color: cs.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              l10n.workspaceDepProbeFailed,
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.error.withValues(alpha: 0.9),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _depStatusLoading ? null : _refreshDepStatus,
+            child: Text(l10n.workspaceDepRetry),
+          ),
         ],
       ),
     );
@@ -806,6 +866,10 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     WorkspaceDependencyIds.python => l10n.workspaceDepPythonTitle,
     WorkspaceDependencyIds.nodejs => l10n.workspaceDepNodeTitle,
     WorkspaceDependencyIds.git => l10n.workspaceDepGitTitle,
+    WorkspaceDependencyIds.githubCli => l10n.workspaceDepGithubCliTitle,
+    WorkspaceDependencyIds.curl => l10n.workspaceDepCurlTitle,
+    WorkspaceDependencyIds.opensshClient => l10n.workspaceDepOpenSshTitle,
+    WorkspaceDependencyIds.archive => l10n.workspaceDepArchiveTitle,
     WorkspaceDependencyIds.office => l10n.workspaceDepOfficeTitle,
     WorkspaceDependencyIds.buildEssential => l10n.workspaceDepBuildTitle,
     _ => id,
@@ -816,6 +880,10 @@ class _WorkspaceDetailPageState extends State<WorkspaceDetailPage>
     WorkspaceDependencyIds.python => l10n.workspaceDepPythonDesc,
     WorkspaceDependencyIds.nodejs => l10n.workspaceDepNodeDesc,
     WorkspaceDependencyIds.git => l10n.workspaceDepGitDesc,
+    WorkspaceDependencyIds.githubCli => l10n.workspaceDepGithubCliDesc,
+    WorkspaceDependencyIds.curl => l10n.workspaceDepCurlDesc,
+    WorkspaceDependencyIds.opensshClient => l10n.workspaceDepOpenSshDesc,
+    WorkspaceDependencyIds.archive => l10n.workspaceDepArchiveDesc,
     WorkspaceDependencyIds.office => l10n.workspaceDepOfficeDesc,
     WorkspaceDependencyIds.buildEssential => l10n.workspaceDepBuildDesc,
     _ => '',

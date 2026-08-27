@@ -189,7 +189,6 @@ void main() {
 
       expect(noTargets.map((tool) => tool['function']['name']), const [
         LocalToolNames.handoff,
-        LocalToolNames.handoffSync,
       ]);
       expect(
         (noTargets.first['function']['description'] as String),
@@ -197,7 +196,6 @@ void main() {
       );
       expect(withTargets.map((tool) => tool['function']['name']), const [
         LocalToolNames.handoff,
-        LocalToolNames.handoffSync,
       ]);
       for (final tool in withTargets) {
         final fn = tool['function'] as Map<String, dynamic>;
@@ -209,50 +207,93 @@ void main() {
       }
       final handoffDesc =
           withTargets.first['function']['description'] as String;
-      final syncDesc = withTargets.last['function']['description'] as String;
       expect(handoffDesc, contains('research-bot'));
-      expect(syncDesc, contains('research-bot'));
-      expect(syncDesc, contains('AND WAIT'));
+      expect(handoffDesc, contains('WAIT for it to finish'));
     });
 
-    test(
-      'handoff definitions are absent when only one of the two is enabled',
-      () {
-        final onlyHandoff = LocalToolsService.buildToolDefinitions(
-          assistant: Assistant(
-            id: 'a1',
-            name: 'Assistant',
-            localToolIds: [LocalToolNames.handoff],
-          ),
-          supportsTools: true,
-          discoverableAssistants: const [],
-        );
-        expect(onlyHandoff.map((tool) => tool['function']['name']), const [
-          LocalToolNames.handoff,
-        ]);
-        expect(
-          (onlyHandoff.first['function']['description'] as String),
-          contains('No assistants are currently available'),
-        );
+    test('single wait-mode tool regardless of legacy handoff ids', () {
+      final onlyHandoff = LocalToolsService.buildToolDefinitions(
+        assistant: Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.handoff],
+        ),
+        supportsTools: true,
+        discoverableAssistants: const [],
+      );
+      expect(onlyHandoff.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+      ]);
+      expect(
+        (onlyHandoff.first['function']['description'] as String),
+        contains('No assistants are currently available'),
+      );
+      expect(
+        (onlyHandoff.first['function']['description'] as String),
+        contains('WAIT for it to finish'),
+      );
 
-        final onlySync = LocalToolsService.buildToolDefinitions(
-          assistant: Assistant(
-            id: 'a1',
-            name: 'Assistant',
-            localToolIds: [LocalToolNames.handoffSync],
-          ),
-          supportsTools: true,
-          discoverableAssistants: const [],
-        );
-        expect(onlySync.map((tool) => tool['function']['name']), const [
+      // A legacy sync-id list normalizes onto the single wait-mode tool
+      // (ADR-0041) — the definition comes out identical.
+      final onlySync = LocalToolsService.buildToolDefinitions(
+        assistant: Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.handoffSync],
+        ),
+        supportsTools: true,
+        discoverableAssistants: const [],
+      );
+      expect(onlySync.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+      ]);
+      expect(
+        (onlySync.first['function']['description'] as String),
+        contains('WAIT for it to finish'),
+      );
+    });
+
+    test('assistant localToolIds normalize legacy sync id onto handoff', () {
+      final assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [
           LocalToolNames.handoffSync,
-        ]);
-        expect(
-          (onlySync.first['function']['description'] as String),
-          contains('AND WAIT'),
-        );
-      },
-    );
+          LocalToolNames.timeInfo,
+          LocalToolNames.handoff,
+        ],
+      );
+      expect(assistant.localToolIds, const [
+        LocalToolNames.timeInfo,
+        LocalToolNames.handoff,
+      ]);
+
+      final decoded = Assistant.fromJson(assistant.toJson());
+      expect(decoded.localToolIds, const [
+        LocalToolNames.timeInfo,
+        LocalToolNames.handoff,
+      ]);
+    });
+
+    test('handoffTargets filters discoverable, non-empty ids and self', () {
+      final delegating = Assistant(
+        id: 'delegator',
+        name: 'Delegator',
+        localToolIds: [LocalToolNames.handoff],
+      );
+      final targets = LocalToolsService.handoffTargets([
+        delegating,
+        Assistant(id: 'plain', name: 'Plain'),
+        Assistant(
+          id: 'visible',
+          name: 'Visible',
+          discoverable: true,
+          handoffId: 'visible-bot',
+        ),
+        Assistant(id: 'empty-id', name: 'Empty', discoverable: true),
+      ], excludeId: 'delegator');
+      expect(targets.map((t) => t.id), const ['visible']);
+    });
 
     test('handoff target lists exclude the delegating assistant itself', () {
       final delegating = Assistant(

@@ -39,6 +39,8 @@ class Lucide {
   static const IconData SunMoon = lucide.LucideIcons.sunMoon;
   static const IconData Palette = lucide.LucideIcons.palette;
   static const IconData Monitor = lucide.LucideIcons.monitor;
+  static const IconData MonitorSmartphone =
+      lucide.LucideIcons.monitorSmartphone;
   static const IconData Heart = lucide.LucideIcons.heart;
   static const IconData Boxes = lucide.LucideIcons.boxes;
   static const IconData Volume2 = lucide.LucideIcons.volume2;
@@ -86,6 +88,7 @@ class Lucide {
   static const IconData BookOpenText = lucide.LucideIcons.bookOpenText;
   static const IconData Pencil = lucide.LucideIcons.pencil;
   static const IconData GitFork = lucide.LucideIcons.gitFork;
+  static const IconData Reply = lucide.LucideIcons.cornerUpLeft;
   static const IconData Eye = lucide.LucideIcons.eye;
   static const IconData EyeOff = lucide.LucideIcons.eyeOff;
   static const IconData Clipboard = lucide.LucideIcons.clipboard;

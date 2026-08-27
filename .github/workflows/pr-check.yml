@@ -25,6 +25,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -39,6 +44,12 @@ jobs:
 
       - name: Flutter pub get
         run: flutter pub get
+
+      - name: Node jitless fetch polyfill regression
+        run: >
+          node --jitless --no-experimental-fetch
+          --require ./ios/sandbox/resources/node-fetch-jitless-polyfill.js
+          ./ios/sandbox/tests/node_fetch_jitless_polyfill_test.js
 
       - name: Dart format (changed files only)
         shell: bash

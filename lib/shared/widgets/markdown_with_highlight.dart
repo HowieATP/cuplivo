@@ -19,6 +19,7 @@ import 'package:image/image.dart' as image_lib;
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../utils/sandbox_path_resolver.dart';
+import '../../utils/markdown_code_scanner.dart';
 import '../../utils/clipboard_images.dart';
 import '../../core/services/haptics.dart';
 import '../../features/chat/pages/image_viewer_page.dart';
@@ -49,8 +50,49 @@ import 'windows_ax_tree_safe_tooltip.dart';
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
 const int _maxInlineMathBodyLength = 512;
-const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
-const String _fencedHtmlTagStartMask = '\uE002';
+
+/// Placeholder token boundaries for code regions. The token text is opaque to
+/// every later rewrite: it carries no `` ` ``, `$`, `<`, `[`, `|`, or newline.
+/// The embedded id makes tokens unique per region; the embedded content
+/// length + FNV-1a hash make tokenized-text equality imply content equality,
+/// so caching layers (block identity, GptMarkdown data) refresh on growth.
+const String _codeTokenStart = '\uE020';
+const String _codeTokenEnd = '\uE021';
+
+int _codeTokenHash(String content) {
+  var h = 0x811C9DC5;
+  for (var i = 0; i < content.length; i++) {
+    h ^= content.codeUnitAt(i);
+    h = (h * 0x01000193) & 0xFFFFFFFF;
+  }
+  return h;
+}
+
+String _codeToken(String kind, int id, String content) {
+  final len = content.length.toRadixString(36);
+  final hash = _codeTokenHash(content).toRadixString(36);
+  return '$_codeTokenStart$kind$id-$len-$hash$_codeTokenEnd';
+}
+
+/// Immutable registry minted together with the tokenized text. Tokens in the
+/// text resolve to their code entries here; the registry is rebuilt with the
+/// same scan whenever the payload is re-cached.
+class MarkdownCodeRegistry {
+  const MarkdownCodeRegistry(this.entries);
+
+  final Map<String, MarkdownCodeSegment> entries;
+
+  MarkdownCodeSegment? lookup(String token) => entries[token];
+}
+
+/// Result of preprocessing a markdown source: the tokenized text plus the
+/// registry that resolves its code tokens.
+class MarkdownCodePayload {
+  const MarkdownCodePayload({required this.text, required this.entries});
+
+  final String text;
+  final Map<String, MarkdownCodeSegment> entries;
+}
 
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
@@ -100,10 +142,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   Timer? _renderDebounce;
   final IncrementalMarkdownDocument _incrementalDocument =
       IncrementalMarkdownDocument();
-  static final ByteLruCache<String, String> _normalizedBlockCache =
-      ByteLruCache<String, String>(
+  static final ByteLruCache<String, MarkdownCodePayload> _normalizedBlockCache =
+      ByteLruCache<String, MarkdownCodePayload>(
         maxBytes: 4 << 20,
-        sizeOf: (key, value) => (key.length + value.length) * 2,
+        sizeOf: (key, value) => (key.length + value.text.length) * 2,
       );
 
   @override
@@ -150,7 +192,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final cs = Theme.of(context).colorScheme;
     final sanitizedText = _sanitizeImageLinks(_renderText);
     final imageUrls = _extractImageUrls(sanitizedText);
-    String normalize(String source, {required bool streaming}) {
+    MarkdownCodePayload normalize(String source, {required bool streaming}) {
       final cacheKey =
           '${settings.enableMathRendering}:${settings.enableDollarLatex}:$streaming:$source';
       final cached = _normalizedBlockCache.get(cacheKey);
@@ -185,83 +227,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           color: null,
         );
 
-    // Replace default components and add our own where needed
-    final components = List<MarkdownComponent>.from(
-      MarkdownComponent.globalComponents,
-    );
-    components.removeWhere((c) => c is LatexMathMultiLine || c is HTag);
-    final hrIdx = components.indexWhere((c) => c is HrLine);
-    if (hrIdx != -1) components[hrIdx] = SoftHrLine();
-    components.removeWhere((c) => c is BlockQuote);
-    final cbIdx = components.indexWhere((c) => c is CheckBoxMd);
-    if (cbIdx != -1) components[cbIdx] = ModernCheckBoxMd();
-    final rbIdx = components.indexWhere((c) => c is RadioButtonMd);
-    if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
-    final tableIdx = components.indexWhere((c) => c is TableMd);
-    if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
-    // Prepend custom renderers in priority order.
-    // Temporarily disable custom bold label line transformer to avoid
-    // interfering with block parsing for complex documents.
-    // components.insert(0, LabelValueLineMd());
-    components.removeWhere((c) => c is CodeBlockMd);
-    // Conditionally add LaTeX/math renderers
-    if (settings.enableMathRendering) {
-      // Block-level LaTeX (e.g., $$...$$ or \[...\])
-      components.insert(0, LatexBlockScrollableMd());
-    }
-    components.insert(0, AtxHeadingMd());
-    // Ensure fenced code blocks take precedence over headings and other blocks
-    // so lines like "# comment" inside code fences are not parsed as headings.
-    components.insert(0, ModernBlockQuote());
-    components.insert(0, FencedCodeBlockMd(streaming: widget.streaming));
-    // Inline components: keep defaults but make link parsing line-scoped
-    final inlineComponents = List<MarkdownComponent>.from(
-      MarkdownComponent.inlineComponents,
-    );
-    inlineComponents.removeWhere(
-      (c) => c is LatexMath || c is LatexMathMultiLine,
-    );
-    // Add whitelist-based HTML tag renderer (e.g., <br>)
-    inlineComponents.insert(0, HtmlAnchorMd());
-    inlineComponents.insert(0, AllowedHtmlTagsMd());
-
-    // Conditionally add inline LaTeX/math renderers
-    if (settings.enableMathRendering) {
-      // Inline LaTeX: $...$ and \(...\)
-      if (settings.enableDollarLatex) {
-        inlineComponents.insert(0, InlineLatexParenScrollableMd());
-        inlineComponents.insert(0, InlineLatexDollarScrollableMd());
-      } else {
-        // Only \(...\) inline
-        inlineComponents.insert(0, InlineLatexParenScrollableMd());
-      }
-    }
-
-    final boldIdxInline = inlineComponents.indexWhere((c) => c is BoldMd);
-    if (boldIdxInline != -1) {
-      inlineComponents[boldIdxInline] = EscapeAwareBoldMd();
-    }
-    final italicIdxInline = inlineComponents.indexWhere((c) => c is ItalicMd);
-    if (italicIdxInline != -1) {
-      inlineComponents[italicIdxInline] = EscapeAwareItalicMd();
-    }
-    final imageIdxInline = inlineComponents.indexWhere((c) => c is ImageMd);
-    if (imageIdxInline != -1) {
-      inlineComponents[imageIdxInline] = EscapeAwareImageMd();
-    }
-    final codeIdxInline = inlineComponents.indexWhere(
-      (c) => c is HighlightedText,
-    );
-    if (codeIdxInline != -1) {
-      inlineComponents[codeIdxInline] = EscapeAwareHighlightedTextMd();
-    }
-    final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
-    if (linkIdxInline != -1) {
-      inlineComponents[linkIdxInline] = LineSafeLinkMd();
-    }
-    // Keep escaped punctuation out of block parsing so it cannot split
-    // \( ... \) math containing \{...\}; inline math is registered ahead of it.
-    inlineComponents.add(BackslashEscapeMd());
     // codeBuilder handles rendering. A custom BlockMd for fences can
     // interfere with block segmentation in some cases.
     // Resolve user preferred code font family (default to monospace)
@@ -311,13 +276,96 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         '${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-'
         '$codeFontFamily-$appFontFamily-${_imageRevision(imageUrls)}';
 
-    Widget buildMarkdown(String markdown, Key key) {
+    Widget buildMarkdown(MarkdownCodePayload payload, Key key) {
+      final codeRegistry = MarkdownCodeRegistry(payload.entries);
       final detailsRegistry = MarkdownDetailsRegistry(
         enableMath: settings.enableMathRendering,
       );
+
+      // Replace default components and add our own where needed. Constructed
+      // per payload: the code token components own this payload's registry.
+      final components = List<MarkdownComponent>.from(
+        MarkdownComponent.globalComponents,
+      );
+      components.removeWhere((c) => c is LatexMathMultiLine || c is HTag);
+      final hrIdx = components.indexWhere((c) => c is HrLine);
+      if (hrIdx != -1) components[hrIdx] = SoftHrLine();
+      components.removeWhere((c) => c is BlockQuote);
+      final cbIdx = components.indexWhere((c) => c is CheckBoxMd);
+      if (cbIdx != -1) components[cbIdx] = ModernCheckBoxMd();
+      final rbIdx = components.indexWhere((c) => c is RadioButtonMd);
+      if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
+      final tableIdx = components.indexWhere((c) => c is TableMd);
+      if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
+      components.removeWhere((c) => c is CodeBlockMd);
+      // Conditionally add LaTeX/math renderers
+      if (settings.enableMathRendering) {
+        // Block-level LaTeX (e.g., $$...$$ or \[...\])
+        components.insert(0, LatexBlockScrollableMd());
+      }
+      components.insert(0, AtxHeadingMd());
+      // Ensure fenced code blocks take precedence over headings and other blocks
+      // so lines like "# comment" inside code fences are not parsed as headings.
+      components.insert(0, ModernBlockQuote());
+      components.insert(
+        0,
+        FencedCodeTokenMd(codeRegistry, streaming: widget.streaming),
+      );
+      // Inline components: keep defaults but make link parsing line-scoped
+      final inlineComponents = List<MarkdownComponent>.from(
+        MarkdownComponent.inlineComponents,
+      );
+      inlineComponents.removeWhere(
+        (c) => c is LatexMath || c is LatexMathMultiLine,
+      );
+      // Add whitelist-based HTML tag renderer (e.g., <br>)
+      inlineComponents.insert(0, HtmlAnchorMd());
+      inlineComponents.insert(0, AllowedHtmlTagsMd());
+
+      // Conditionally add inline LaTeX/math renderers
+      if (settings.enableMathRendering) {
+        // Inline LaTeX: $...$ and \(...\)
+        if (settings.enableDollarLatex) {
+          inlineComponents.insert(0, InlineLatexParenScrollableMd());
+          inlineComponents.insert(0, InlineLatexDollarScrollableMd());
+        } else {
+          // Only \(...\) inline
+          inlineComponents.insert(0, InlineLatexParenScrollableMd());
+        }
+      }
+
+      final boldIdxInline = inlineComponents.indexWhere((c) => c is BoldMd);
+      if (boldIdxInline != -1) {
+        inlineComponents[boldIdxInline] = EscapeAwareBoldMd();
+      }
+      final italicIdxInline = inlineComponents.indexWhere((c) => c is ItalicMd);
+      if (italicIdxInline != -1) {
+        inlineComponents[italicIdxInline] = EscapeAwareItalicMd();
+      }
+      final imageIdxInline = inlineComponents.indexWhere((c) => c is ImageMd);
+      if (imageIdxInline != -1) {
+        inlineComponents[imageIdxInline] = EscapeAwareImageMd();
+      }
+      // The legacy regex-based inline code component is replaced by the token
+      // component: code spans were tokenized during preprocessing (one rule
+      // set, see markdown_code_scanner.dart).
+      final codeIdxInline = inlineComponents.indexWhere(
+        (c) => c is HighlightedText,
+      );
+      if (codeIdxInline != -1) {
+        inlineComponents[codeIdxInline] = InlineCodeTokenMd(codeRegistry);
+      }
+      final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
+      if (linkIdxInline != -1) {
+        inlineComponents[linkIdxInline] = LineSafeLinkMd();
+      }
+      // Keep escaped punctuation out of block parsing so it cannot split
+      // \( ... \) math containing \{...\}; inline math is registered ahead of it.
+      inlineComponents.add(BackslashEscapeMd());
+
       return GptMarkdown(
         key: key,
-        markdown,
+        payload.text,
         style: baseTextStyle,
         followLinkColor: true,
         // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
@@ -505,9 +553,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         },
         // Inline `code` styling via highlightBuilder in gpt_markdown
         highlightBuilder: (ctx, inline, style) {
-          // Unmask dollar signs that were protected during preprocessing
-          String unmasked = inline.replaceAll(_codeDollarMask, r'$');
-          String softened = _softBreakInline(unmasked);
+          String softened = _softBreakInline(inline);
           final csCtx = Theme.of(ctx).colorScheme;
           final bg = ctx.appColors.surfaceFill;
           return Container(
@@ -531,35 +577,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             ),
           );
         },
-        // Fenced code block styling via codeBuilder (with collapse/expand)
-        codeBuilder: (ctx, name, code, closed) {
-          final lang = name.trim();
-          final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
-          if (lang.toLowerCase() == 'mermaid') {
-            return _MermaidBlock(
-              code: restoredCode,
-              streaming: widget.streaming && !closed,
-            );
-          } else if (lang.toLowerCase() == 'plantuml') {
-            return PlantUMLBlock(code: restoredCode);
-          } else if (lang.toLowerCase() == 'svg') {
-            return SvgPreviewBlock(
-              code: restoredCode,
-              streaming: widget.streaming && !closed,
-            );
-          } else if (_isHtml(lang)) {
-            return HtmlPreviewBlock(
-              code: restoredCode,
-              streaming: widget.streaming && !closed,
-            );
-          }
-          return _CollapsibleCodeBlock(
-            language: lang,
-            code: restoredCode,
-            streaming: widget.streaming,
-            closed: closed,
-          );
-        },
       );
     }
 
@@ -571,7 +588,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 streaming: widget.streaming && !block.stable,
               ),
           ]
-        : const <String>[];
+        : const <MarkdownCodePayload>[];
     final markdownWidget = useIncrementalBlocks
         ? _MarkdownBlockColumn(
             children: [
@@ -585,7 +602,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 // renderer eats the run.
                 if (i > 0 &&
                     !_swallowsTrailingBlankLine(
-                      blockContents[i - 1],
+                      blockContents[i - 1].text,
                       mathEnabled: settings.enableMathRendering,
                     ))
                   _MarkdownBlockSeparator(
@@ -598,7 +615,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   key: ValueKey(
                     'markdown-source-block-${sourceBlocks[i].start}',
                   ),
-                  content: blockContents[i],
+                  payload: blockContents[i],
                   signature: themeSignature,
                   builder: buildMarkdown,
                 ),
@@ -606,7 +623,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             ],
           )
         : _CachedMarkdownBlock(
-            content: normalized!,
+            payload: normalized!,
             signature: themeSignature,
             builder: buildMarkdown,
           );
@@ -653,17 +670,18 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   }
 }
 
-typedef _MarkdownBlockBuilder = Widget Function(String content, Key key);
+typedef _MarkdownBlockBuilder =
+    Widget Function(MarkdownCodePayload payload, Key key);
 
 class _CachedMarkdownBlock extends StatefulWidget {
   const _CachedMarkdownBlock({
     super.key,
-    required this.content,
+    required this.payload,
     required this.signature,
     required this.builder,
   });
 
-  final String content;
+  final MarkdownCodePayload payload;
   final String signature;
   final _MarkdownBlockBuilder builder;
 
@@ -679,7 +697,7 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   @override
   void didUpdateWidget(covariant _CachedMarkdownBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.content != widget.content ||
+    if (oldWidget.payload.text != widget.payload.text ||
         oldWidget.signature != widget.signature) {
       _rendered = null;
     }
@@ -699,8 +717,8 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   @override
   Widget build(BuildContext context) {
     return _rendered ??= widget.builder(
-      widget.content,
-      _parseIdentity(widget.content),
+      widget.payload,
+      _parseIdentity(widget.payload.text),
     );
   }
 }
@@ -925,7 +943,7 @@ String? _normalizeLanguage(String? lang) {
   }
 }
 
-String _preprocessFences(
+MarkdownCodePayload _preprocessFences(
   String input, {
   required bool enableMath,
   required bool enableDollarLatex,
@@ -933,55 +951,41 @@ String _preprocessFences(
 }) {
   // Normalize newlines to simplify regex handling
   var out = input.replaceAll('\r\n', '\n');
-  out = _maskBlockquoteFenceMarkers(out);
 
-  // Move fenced code from list lines to the next line before masking so list
-  // fences are protected from later inline math normalization.
-  final bulletFence = RegExp(
-    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
-    multiLine: true,
-  );
-  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
-
-  // STEP 1: MASKING - Protect code blocks from LaTeX processing
-  // This prevents $...$ inside code from being converted to LaTeX
-  final Map<String, String> codeMap = {};
-  int codeCount = 0;
-
-  // Match fenced code blocks and inline code (`...`)
-  // Fenced: CommonMark-style variable-length fences (>= 3 backticks or tildes)
-  // Group 1: entire fenced block, Group 2: opening fence, Group 3: fence char
-  // Closing fence must use same char and be >= opening length
-  final codeRegex = RegExp(
-    r'(^[ \t]*(([`~])\3{2,})[ \t]*[^\n]*\n(?:[\s\S]*?^[ \t]*\2\3*[ \t]*$|[\s\S]*))'
-    r'|(`[^`\n]+`)',
-    multiLine: true,
-  );
-
-  out = out.replaceAllMapped(codeRegex, (match) {
-    final key = '__CODE_MASK_${codeCount++}__';
-    var codeContent = match.group(0)!;
-
-    // For inline code (`...`), escape dollar signs to prevent LaTeX interpretation
-    // Inline code is single-line and delimited by single backticks (not fenced)
-    final isInlineCode =
-        !codeContent.contains('\n') &&
-        codeContent.startsWith('`') &&
-        codeContent.endsWith('`');
-    if (isInlineCode) {
-      codeContent = codeContent.replaceAllMapped(
-        RegExp(r'\$'),
-        (m) => _codeDollarMask,
-      );
+  // STEP 1: TOKENIZATION - Replace every code span and fenced block with an
+  // opaque token (see markdown_code_scanner.dart for the single rule set).
+  // Later rewrites only see tokens; the content lives in the registry that
+  // ships with the returned payload.
+  final codeScan = markdownCodeScan(out);
+  final entries = <String, MarkdownCodeSegment>{};
+  final tokenized = StringBuffer();
+  var cursor = 0;
+  var fenceId = 0;
+  var inlineId = 0;
+  for (final seg in codeScan.segments) {
+    if (seg.start > cursor) tokenized.write(out.substring(cursor, seg.start));
+    if (seg.kind == MarkdownCodeSegmentKind.inlineCode) {
+      final token = _codeToken('C', inlineId++, seg.content);
+      entries[token] = seg;
+      tokenized.write(token);
     } else {
-      codeContent = _maskHtmlTagStartsInsideFencedCode(codeContent);
+      final token = _codeToken('F', fenceId++, seg.content);
+      entries[token] = seg;
+      switch (seg.context) {
+        case MarkdownCodeFenceContext.none:
+          tokenized.write(token);
+        case MarkdownCodeFenceContext.blockquote:
+          tokenized.write('${seg.contextPrefix}$token');
+        case MarkdownCodeFenceContext.list:
+          tokenized.write('${seg.contextPrefix}\n$token');
+      }
     }
+    cursor = seg.end;
+  }
+  if (cursor < out.length) tokenized.write(out.substring(cursor));
+  out = tokenized.toString();
 
-    codeMap[key] = codeContent;
-    return key;
-  });
-
-  // STEP 2: PROCESSING (on masked string, code is now protected)
+  // STEP 2: PROCESSING (on tokenized string, code is now protected)
   if (streaming) {
     out = _stabilizeStreamingTables(out);
     if (enableMath && enableDollarLatex) {
@@ -1017,7 +1021,37 @@ String _preprocessFences(
   // Skips $$...$$ blocks, which are handled separately.
   // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
   if (enableMath && enableDollarLatex) {
-    out = _replaceInlineDollarMath(out);
+    // Renderable display math is masked too: _replaceInlineDollarMath is
+    // line-agnostic and cannot tell a literal dollar inside a $$...$$ body
+    // from an inline delimiter, so a body like "\text{ costs }$5$" had its
+    // dollars rewritten to "\( ... \)" — corrupting both the rendered formula
+    // and the Copy LaTeX export (issue #500). Only spans the shared scanner
+    // accepts are masked, so "$$" kept literally in prose (pinned by the
+    // $a$$b$$c$ tests) is never swallowed.
+    final mathScan = markdownScanDisplayMath(out);
+    if (mathScan.spans.isNotEmpty) {
+      final Map<String, String> displayMathMap = {};
+      int displayMathCount = 0;
+      final buf = StringBuffer();
+      var cursor = 0;
+      for (final span in mathScan.spans) {
+        buf.write(out.substring(cursor, span.start));
+        final key = '__DISPLAY_MATH_MASK_${displayMathCount++}__';
+        displayMathMap[key] = out.substring(span.start, span.end);
+        buf.write(key);
+        cursor = span.end;
+      }
+      buf.write(out.substring(cursor));
+      out = _replaceInlineDollarMath(buf.toString());
+      out = out.replaceAllMapped(RegExp(r'__DISPLAY_MATH_MASK_\d+__'), (
+        match,
+      ) {
+        final key = match.group(0)!;
+        return displayMathMap[key] ?? key;
+      });
+    } else {
+      out = _replaceInlineDollarMath(out);
+    }
   }
 
   // Ensure display-math blocks stay as standalone blocks even when generated inline.
@@ -1077,18 +1111,6 @@ String _preprocessFences(
     });
   }
 
-  // 2) Dedent opening fences: leading spaces before ```lang
-  final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
-  out = out.replaceAllMapped(dedentOpen, (m) => "```${m[1]}");
-
-  // 3) Dedent closing fences: leading spaces before ```
-  final dedentClose = RegExp(r"^[ \t]+```\s*$", multiLine: true);
-  out = out.replaceAllMapped(dedentClose, (m) => "```");
-
-  // 4) Ensure closing fences are on their own line: transform "} ```" or "}```" into "}\n```"
-  final inlineClosing = RegExp(r"([^\r\n`])```(?=\s*(?:\r?\n|$))");
-  out = out.replaceAllMapped(inlineClosing, (m) => "${m[1]}\n```");
-
   // 5) Disambiguate Setext vs HR after label-value lines:
   // If a line of only dashes follows a bold label line (e.g., "**作者:** 张三"),
   // insert a blank line so it's treated as an HR, not a Setext heading underline.
@@ -1134,27 +1156,7 @@ String _preprocessFences(
     out = buf.toString();
   }
 
-  // STEP 3: UNMASKING - Restore code blocks
-  // Replace all mask placeholders with their original content
-  // NOTE: We do NOT restore _codeDollarMask here because we want LaTeX components
-  // to never see dollar signs inside code. The unmask will happen later in highlightBuilder.
-  out = out.replaceAllMapped(RegExp(r'__CODE_MASK_\d+__'), (match) {
-    final key = match.group(0)!;
-    return codeMap[key] ?? key;
-  });
-
-  return out;
-}
-
-String _maskHtmlTagStartsInsideFencedCode(String input) {
-  return input.replaceAllMapped(
-    RegExp(r'</?(?:details|summary)\b', caseSensitive: false),
-    (match) => '$_fencedHtmlTagStartMask${match[0]!.substring(1)}',
-  );
-}
-
-String _unmaskHtmlTagStartsInsideFencedCode(String input) {
-  return input.replaceAll(_fencedHtmlTagStartMask, '<');
+  return MarkdownCodePayload(text: out, entries: entries);
 }
 
 String _normalizeRawCitationMetadata(String input) {
@@ -1218,59 +1220,6 @@ class _CitationRef {
   final String id;
 
   String get markdownTarget => indexText == id ? indexText : '$indexText:$id';
-}
-
-String _maskBlockquoteFenceMarkers(String input) {
-  final lines = input.split('\n');
-  var inTopLevelFence = false;
-  String? topLevelFence;
-  String? topLevelFenceMarker;
-
-  for (var i = 0; i < lines.length; i++) {
-    final line = lines[i];
-    if (inTopLevelFence) {
-      final closeFence = topLevelFence;
-      final closeMarker = topLevelFenceMarker;
-      if (closeFence != null &&
-          closeMarker != null &&
-          RegExp(
-            '^[ \\t]*${RegExp.escape(closeFence)}${RegExp.escape(closeMarker)}*[ \\t]*\$',
-          ).hasMatch(line)) {
-        inTopLevelFence = false;
-        topLevelFence = null;
-        topLevelFenceMarker = null;
-      }
-      continue;
-    }
-
-    final topLevelOpen = RegExp(
-      r'^[ \t]*(([`~])\2{2,})[ \t]*[^\n]*$',
-    ).firstMatch(line);
-    if (topLevelOpen != null) {
-      inTopLevelFence = true;
-      topLevelFence = topLevelOpen.group(1)!;
-      topLevelFenceMarker = topLevelOpen.group(2)!;
-      continue;
-    }
-
-    final blockquoteFence = RegExp(
-      r'^([ \t]*>[ \t]*)([`~]{3,})([^\n]*)$',
-    ).firstMatch(line);
-    if (blockquoteFence == null) continue;
-
-    final prefix = blockquoteFence.group(1)!;
-    final fence = blockquoteFence.group(2)!;
-    final suffix = blockquoteFence.group(3) ?? '';
-    final marker = fence.startsWith('`') ? '\uE000' : '\uE001';
-    lines[i] =
-        '$prefix${List<String>.filled(fence.length, marker).join()}$suffix';
-  }
-
-  return lines.join('\n');
-}
-
-String _unmaskBlockquoteFenceMarkers(String input) {
-  return input.replaceAll('\uE000', '`').replaceAll('\uE001', '~');
 }
 
 String _stabilizeStreamingTables(String input) {
@@ -3682,7 +3631,7 @@ class _MarkdownTableCell extends StatelessWidget {
       fontFamily: appFontFamily ?? style.fontFamily,
     );
     final innerCfg = config.copyWith(style: baseStyle);
-    final cellText = data.text.trim().replaceAll(_codeDollarMask, r'$');
+    final cellText = data.text.trim();
     final displayText = _softBreakTableCellText(cellText);
     final spans = MarkdownComponent.generate(
       context,
@@ -4948,49 +4897,44 @@ class SoftHrLine extends BlockMd {
   }
 }
 
-// Robust fenced code block that takes precedence over other blocks
-class FencedCodeBlockMd extends BlockMd {
-  FencedCodeBlockMd({required this.streaming});
+// Fenced code block that matches preprocessing tokens instead of raw fences:
+// the code scanner (markdown_code_scanner.dart) decided the fence regions and
+// replaced them with tokens; this component resolves them back to blocks.
+// The build dispatch below is the same walk the legacy regex version used.
+class FencedCodeTokenMd extends BlockMd {
+  FencedCodeTokenMd(this.registry, {this.streaming = false});
 
+  final MarkdownCodeRegistry registry;
   final bool streaming;
 
   @override
-  RegExp get exp => RegExp(expString, dotAll: true, multiLine: true);
-
-  @override
-  // CommonMark-style fences:
-  // - fence length is variable (>= 3)
-  // - closing fence must use the same marker and be >= opening length
-  // - supports both ``` and ~~~
   String get expString =>
-      (r"^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*?)\n"
-      r"(?:(?:([\s\S]*?)^[ \t]*\1\2*[ \t]*$)|([\s\S]*))");
+      '$_codeTokenStart'
+      'F[0-9]+-[0-9a-z]+-[0-9a-z]+$_codeTokenEnd';
 
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final m = exp.firstMatch(text);
     if (m == null) return const SizedBox.shrink();
-    final lang = (m.group(3) ?? '').trim();
-    final code = _unmaskHtmlTagStartsInsideFencedCode(
-      m.group(4) ?? m.group(5) ?? '',
-    );
-    final closed = m.group(4) != null;
+    final seg = registry.lookup(m[0]!);
+    if (seg == null) return const SizedBox.shrink();
+    final lang = seg.identifier;
     final langLower = lang.toLowerCase();
-    final isStreamingFence = streaming && !closed;
+    final isStreamingFence = streaming && !seg.closed;
     if (langLower == 'mermaid') {
-      return _MermaidBlock(code: code, streaming: isStreamingFence);
+      return _MermaidBlock(code: seg.content, streaming: isStreamingFence);
     } else if (langLower == 'plantuml') {
-      return PlantUMLBlock(code: code);
+      return PlantUMLBlock(code: seg.content);
     } else if (langLower == 'svg') {
-      return SvgPreviewBlock(code: code, streaming: isStreamingFence);
+      return SvgPreviewBlock(code: seg.content, streaming: isStreamingFence);
     } else if (_isHtml(langLower)) {
-      return HtmlPreviewBlock(code: code, streaming: isStreamingFence);
+      return HtmlPreviewBlock(code: seg.content, streaming: isStreamingFence);
     }
     return _CollapsibleCodeBlock(
       language: lang,
-      code: code,
+      code: seg.content,
       streaming: isStreamingFence,
-      closed: closed,
+      closed: seg.closed,
     );
   }
 }
@@ -5010,21 +4954,28 @@ class LatexBlockScrollableMd extends BlockMd {
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _LatexMathBlock(body: body, style: config.style);
-    // Wrap in horizontal scroll to avoid overflow and center within available width
+    // Wrap in horizontal scroll to avoid overflow and center within available
+    // width. A static capture (message image export via ExportCaptureScope)
+    // has no way to scroll: a formula wider than the export canvas would be
+    // clipped, so the capture instead scales the whole formula down to fit.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          return SelectionContainer.disabled(
-            child: SingleChildScrollView(
+          final Widget content;
+          if (ExportCaptureScope.of(context)) {
+            content = FittedBox(fit: BoxFit.scaleDown, child: math);
+          } else {
+            content = SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               primary: false,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
                 child: Center(child: math),
               ),
-            ),
-          );
+            );
+          }
+          return SelectionContainer.disabled(child: content);
         },
       ),
     );
@@ -5656,7 +5607,7 @@ class ModernBlockQuote extends InlineMd {
         sb.writeln(line);
       }
     }
-    final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
+    final data = sb.toString().trim();
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -5667,8 +5618,8 @@ class ModernBlockQuote extends InlineMd {
         (config.components ?? MarkdownComponent.globalComponents)
             .where((component) => component is! CodeBlockMd)
             .map((component) {
-              if (component is FencedCodeBlockMd) {
-                return FencedCodeBlockMd(streaming: false);
+              if (component is FencedCodeTokenMd) {
+                return FencedCodeTokenMd(component.registry, streaming: false);
               }
               return component;
             })
@@ -6074,9 +6025,52 @@ class EscapeAwareItalicMd extends ItalicMd {
   );
 }
 
-class EscapeAwareHighlightedTextMd extends HighlightedText {
+/// Inline code span that matches preprocessing tokens instead of raw
+/// backticks: the code scanner decided the spans and replaced them with
+/// tokens; this component resolves them back to code chips.
+class InlineCodeTokenMd extends InlineMd {
+  InlineCodeTokenMd(this.registry);
+
+  final MarkdownCodeRegistry registry;
+
   @override
-  RegExp get exp => RegExp(r"(?<!\\)`(?!`)(.+?)(?<![\\`])`(?!`)");
+  RegExp get exp => RegExp(
+    '$_codeTokenStart'
+    'C[0-9]+-[0-9a-z]+-[0-9a-z]+$_codeTokenEnd',
+  );
+
+  @override
+  InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
+    final seg = registry.lookup(text);
+    if (seg == null) return TextSpan(text: text, style: config.style);
+    final code = seg.content;
+    if (config.highlightBuilder != null) {
+      return WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: config.highlightBuilder!(
+          context,
+          code,
+          config.style ?? const TextStyle(),
+        ),
+      );
+    }
+    var style =
+        config.style?.copyWith(
+          fontWeight: FontWeight.bold,
+          background: Paint()
+            ..color = GptMarkdownTheme.of(context).highlightColor
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round,
+        ) ??
+        TextStyle(
+          fontWeight: FontWeight.bold,
+          background: Paint()
+            ..color = GptMarkdownTheme.of(context).highlightColor
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round,
+        );
+    return TextSpan(text: code, style: style);
+  }
 }
 
 /// Treat backslash-escaped punctuation as a literal character, so that

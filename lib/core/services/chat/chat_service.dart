@@ -1005,6 +1005,48 @@ class ChatService extends ChangeNotifier {
     await setConversationMcpServers(conversationId, set.toList());
   }
 
+  Future<void> setConversationWorkspaceDirectoryOverride(
+    String conversationId,
+    String workspaceId,
+    String directory,
+  ) async {
+    await _updateConversationWorkspaceDirectories(
+      conversationId,
+      (current) => current[workspaceId] = directory,
+    );
+  }
+
+  Future<void> clearConversationWorkspaceDirectoryOverride(
+    String conversationId,
+    String workspaceId,
+  ) async {
+    await _updateConversationWorkspaceDirectories(
+      conversationId,
+      (current) => current.remove(workspaceId),
+    );
+  }
+
+  Future<void> _updateConversationWorkspaceDirectories(
+    String conversationId,
+    void Function(Map<String, String> current) update,
+  ) async {
+    if (!_initialized) await init();
+    final conversation =
+        _draftConversations[conversationId] ??
+        _conversationsCache[conversationId];
+    if (conversation == null) return;
+    final directories = Map<String, String>.of(
+      conversation.workspaceDirectoryOverrides,
+    );
+    update(directories);
+    conversation.workspaceDirectoryOverrides = directories;
+    conversation.updatedAt = DateTime.now();
+    if (!_draftConversations.containsKey(conversationId)) {
+      await _saveConversation(conversation);
+    }
+    notifyListeners();
+  }
+
   Future<List<Assistant>> getAllAssistants() => _repo.getAllAssistants();
   Future<void> putAssistants(List<Assistant> list) => _repo.putAssistants(list);
   Future<void> putAssistant(Assistant a) => _repo.putAssistant(a);
@@ -1177,6 +1219,7 @@ class ChatService extends ChangeNotifier {
     int? version,
     bool isPreset = false,
     String? speakerAssistantId,
+    String? quoteJson,
   }) async {
     if (!_initialized) await init();
 
@@ -1222,6 +1265,7 @@ class ChatService extends ChangeNotifier {
       version: version,
       isPreset: isPreset,
       speakerAssistantId: speakerAssistantId,
+      quoteJson: quoteJson,
     );
 
     if (!temporary) {
@@ -1544,8 +1588,20 @@ class ChatService extends ChangeNotifier {
     required String title,
     required String? assistantId,
     required List<ChatMessage> sourceMessages,
+    bool preserveVersions = false,
+    Map<String, int>? sourceVersionSelections,
+    String? forkTargetMessageId,
   }) async {
     if (!_initialized) await init();
+    if (preserveVersions) {
+      return _forkConversationPreservingVersions(
+        title: title,
+        assistantId: assistantId,
+        sourceMessages: sourceMessages,
+        sourceVersionSelections: sourceVersionSelections,
+        forkTargetMessageId: forkTargetMessageId,
+      );
+    }
     // Create new conversation first
     final convo = await createConversation(
       title: title,
@@ -1571,6 +1627,7 @@ class ChatService extends ChangeNotifier {
         isPreset: src.isPreset,
         requestAllowImagesApiRouting: src.requestAllowImagesApiRouting,
         requestExtraBodyJson: src.requestExtraBodyJson,
+        quoteJson: src.quoteJson,
       );
       await _repo.putMessage(clone, messageOrder: ids.length);
       ids.add(clone.id);
@@ -1590,6 +1647,174 @@ class ChatService extends ChangeNotifier {
     _messagesCache[convo.id] = clones;
     notifyListeners();
     return _conversationsCache[convo.id]!;
+  }
+
+  /// Preserve-mode fork: carries every version of each kept group in one
+  /// transactional batch. The fidelity capture happens FIRST, before
+  /// `createConversation` discards a temporary source conversation — the
+  /// temp-only tool events / Gemini signatures would otherwise be purged
+  /// before the fork could read them (they live in memory maps that
+  /// `_discardTemporaryConversation` clears).
+  Future<Conversation> _forkConversationPreservingVersions({
+    required String title,
+    required String? assistantId,
+    required List<ChatMessage> sourceMessages,
+    Map<String, int>? sourceVersionSelections,
+    String? forkTargetMessageId,
+  }) async {
+    // Capture fidelity data via the temp-aware accessors (they check the
+    // temporary in-memory maps first, then fall back to the repository).
+    final toolEventsBySource = <String, List<Map<String, dynamic>>>{};
+    final geminiBySource = <String, String>{};
+    for (final src in sourceMessages) {
+      final events = getToolEvents(src.id);
+      if (events.isNotEmpty) toolEventsBySource[src.id] = events;
+      final signature = getGeminiThoughtSignature(src.id);
+      if (signature != null) geminiBySource[src.id] = signature;
+    }
+
+    // Create new conversation first
+    final convo = await createConversation(
+      title: title,
+      assistantId: assistantId,
+    );
+
+    final ids = _buildForkIdMaps(sourceMessages);
+    final clones = <ChatMessage>[];
+    final toolEventsByClone = <String, List<Map<String, dynamic>>>{};
+    final geminiByClone = <String, String>{};
+    for (final src in sourceMessages) {
+      final cloneId = ids.messageIdMap[src.id]!;
+      final clone = ChatMessage(
+        id: cloneId,
+        role: src.role,
+        content: src.content,
+        timestamp: src.timestamp,
+        modelId: src.modelId,
+        providerId: src.providerId,
+        totalTokens: src.totalTokens,
+        contextTokens: src.contextTokens,
+        conversationId: convo.id,
+        isStreaming: false,
+        reasoningText: src.reasoningText,
+        reasoningStartAt: src.reasoningStartAt,
+        reasoningFinishedAt: src.reasoningFinishedAt,
+        translation: src.translation,
+        reasoningSegmentsJson: src.reasoningSegmentsJson,
+        groupId: src.groupId == null ? null : ids.groupIdMap[src.groupId]!,
+        subgroupId: null,
+        version: src.version,
+        promptTokens: src.promptTokens,
+        completionTokens: src.completionTokens,
+        cachedTokens: src.cachedTokens,
+        durationMs: src.durationMs,
+        isPreset: src.isPreset,
+        speakerAssistantId: src.speakerAssistantId,
+        requestAllowImagesApiRouting: src.requestAllowImagesApiRouting,
+        requestExtraBodyJson: src.requestExtraBodyJson,
+      );
+      clones.add(clone);
+      final events = toolEventsBySource[src.id];
+      if (events != null) toolEventsByClone[cloneId] = events;
+      final signature = geminiBySource[src.id];
+      if (signature != null) geminiByClone[cloneId] = signature;
+    }
+
+    // Attach to conversation in storage
+    final c = _conversationsCache[convo.id];
+    if (c == null) {
+      _messagesCache[convo.id] = clones;
+      notifyListeners();
+      return convo;
+    }
+    c.messageIds
+      ..clear()
+      ..addAll(<String>[for (final m in clones) m.id]);
+    c.versionSelections = _forkVersionSelections(
+      sourceMessages: sourceMessages,
+      sourceVersionSelections: sourceVersionSelections,
+      forkTargetMessageId: forkTargetMessageId,
+      groupIdMap: ids.groupIdMap,
+    );
+    c.updatedAt = DateTime.now();
+
+    // One transaction: conversation row + ordered messages + fidelity rows.
+    await _repo.putMigrationBatch(
+      conversations: [c],
+      messages: [
+        for (var i = 0; i < clones.length; i++)
+          (message: clones[i], messageOrder: i),
+      ],
+      toolEventsByMessageId: toolEventsByClone,
+      geminiSignaturesByMessageId: geminiByClone,
+    );
+
+    // Cache
+    _messagesCache[convo.id] = clones;
+    notifyListeners();
+    return _conversationsCache[convo.id]!;
+  }
+
+  /// Fresh-id allocation for the preserve path: every source message gets a
+  /// new id, and every source group key (`groupId ?? id`) gets a new group
+  /// id. A group anchored by its own message id reuses that message's new id;
+  /// a group whose anchor message is not in the kept set (deleted anchor,
+  /// e.g. mid-group version removal) falls back to a fresh uuid.
+  _ForkIdMaps _buildForkIdMaps(List<ChatMessage> sourceMessages) {
+    final messageIdMap = <String, String>{};
+    for (final src in sourceMessages) {
+      messageIdMap[src.id] = const Uuid().v4();
+    }
+    final groupIdMap = <String, String>{};
+    for (final src in sourceMessages) {
+      final gid = src.groupId ?? src.id;
+      groupIdMap.putIfAbsent(gid, () => messageIdMap[gid] ?? const Uuid().v4());
+    }
+    return _ForkIdMaps(messageIdMap, groupIdMap);
+  }
+
+  /// Builds the fork conversation's `versionSelections`: source selections
+  /// remapped through [groupIdMap] for every kept group, then the target
+  /// group forced to the index of the forked-off revision. Values are
+  /// indices into the group's sorted-by-version list (the semantics of
+  /// `collapseWithSelections`), not version numbers.
+  Map<String, int> _forkVersionSelections({
+    required List<ChatMessage> sourceMessages,
+    Map<String, int>? sourceVersionSelections,
+    String? forkTargetMessageId,
+    required Map<String, String> groupIdMap,
+  }) {
+    final keptGids = {for (final src in sourceMessages) src.groupId ?? src.id};
+    final selections = <String, int>{};
+    for (final entry
+        in (sourceVersionSelections ?? const <String, int>{}).entries) {
+      if (!keptGids.contains(entry.key)) continue;
+      final newGid = groupIdMap[entry.key];
+      if (newGid != null) {
+        selections[newGid] = entry.value;
+      }
+    }
+    // Force the target group's selection to the forked-off revision index
+    if (forkTargetMessageId != null) {
+      final targetVersions = sourceMessages
+          .where((m) => m.id == forkTargetMessageId)
+          .toList(growable: false);
+      if (targetVersions.isNotEmpty) {
+        final target = targetVersions.first;
+        final targetGid = target.groupId ?? target.id;
+        final newGid = groupIdMap[targetGid];
+        if (newGid != null) {
+          final versions =
+              sourceMessages
+                  .where((m) => (m.groupId ?? m.id) == targetGid)
+                  .toList()
+                ..sort((a, b) => a.version.compareTo(b.version));
+          final idx = versions.indexWhere((m) => m.id == forkTargetMessageId);
+          if (idx >= 0) selections[newGid] = idx;
+        }
+      }
+    }
+    return selections;
   }
 
   Future<ChatMessage?> appendMessageVersion({
@@ -1631,6 +1856,9 @@ class ChatService extends ChangeNotifier {
       speakerAssistantId: original.speakerAssistantId,
       requestAllowImagesApiRouting: original.requestAllowImagesApiRouting,
       requestExtraBodyJson: original.requestExtraBodyJson,
+      // Quote is part of the user message's content identity: a retry/edit
+      // version carries the citation with it (docs/adr/0042).
+      quoteJson: original.quoteJson,
       timestamp: timestamp,
     );
     // Append to conversation order at the end (we'll group when rendering)
@@ -2163,4 +2391,10 @@ class UploadStats {
   final int fileCount;
   final int totalBytes;
   const UploadStats({required this.fileCount, required this.totalBytes});
+}
+
+class _ForkIdMaps {
+  final Map<String, String> messageIdMap;
+  final Map<String, String> groupIdMap;
+  const _ForkIdMaps(this.messageIdMap, this.groupIdMap);
 }

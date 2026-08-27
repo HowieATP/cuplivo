@@ -119,4 +119,74 @@ void main() {
 
     expect(find.text('Reading Mode'), findsNothing);
   });
+
+  testWidgets('assistant 消息显示回复入口', (tester) async {
+    await _openMoreSheet(tester, canDeleteAllVersions: false);
+    expect(find.text('Reply'), findsOneWidget);
+  });
+
+  testWidgets('user 消息显示回复入口', (tester) async {
+    final userMessage = ChatMessage(
+      role: 'user',
+      content: 'hello',
+      conversationId: 'conversation-1',
+    );
+    await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      message: userMessage,
+    );
+    expect(find.text('Reply'), findsOneWidget);
+  });
+
+  testWidgets('流式回答不显示回复入口', (tester) async {
+    final streamingMessage = ChatMessage(
+      role: 'assistant',
+      content: 'hello',
+      conversationId: 'conversation-1',
+      isStreaming: true,
+    );
+    await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      message: streamingMessage,
+    );
+
+    expect(find.text('Reply'), findsNothing);
+  });
+
+  testWidgets('hideActions 中的回复被隐藏', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return TextButton(
+                onPressed: () {
+                  showMessageMoreSheet(
+                    context,
+                    _message(),
+                    canDeleteAllVersions: false,
+                    hideActions: {MessageMoreAction.reply},
+                  );
+                },
+                child: const Text('open'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reply'), findsNothing);
+  });
 }

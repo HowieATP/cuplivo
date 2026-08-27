@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/message_quote.dart';
 
 /// Persists the chat input bar's unsent content (`text` + media) across app
 /// restarts, under the single global key `chat_draft_v1`.
@@ -156,7 +157,8 @@ class InputDraftPersistence with WidgetsBindingObserver {
     final empty =
         input.text.trim().isEmpty &&
         input.imagePaths.isEmpty &&
-        input.documents.isEmpty;
+        input.documents.isEmpty &&
+        input.quote == null;
     if (empty) {
       prefs.remove(key);
       return;
@@ -172,6 +174,8 @@ class InputDraftPersistence with WidgetsBindingObserver {
         for (final d in input.documents)
           {'path': d.path, 'fileName': d.fileName, 'mime': d.mime},
       ],
+      if (input.quote != null) 'quote': input.quote!.toJson(),
+      if (input.quoteSnippet != null) 'quoteSnippet': input.quoteSnippet,
     });
   }
 
@@ -208,15 +212,29 @@ class InputDraftPersistence with WidgetsBindingObserver {
                 .where((d) => d.path.isNotEmpty)
                 .toList()
           : const <DocumentAttachment>[];
+      final quote = _decodeQuote(map['quote']);
       return ChatInputData(
         text: text is String ? text : '',
         imagePaths: images is List
             ? images.whereType<String>().toList()
             : const <String>[],
         documents: parsedDocs,
+        quote: quote,
+        quoteSnippet: map['quoteSnippet'] as String?,
       );
     } catch (e) {
       debugPrint('[InputDraftPersistence] draft decode failed: $e');
+      return null;
+    }
+  }
+
+  /// Tolerant quote parse: a malformed `quote` (old/corrupt blob) degrades to
+  /// null instead of failing the whole draft.
+  static MessageQuote? _decodeQuote(Object? raw) {
+    if (raw is! Map) return null;
+    try {
+      return MessageQuote.fromJson(raw.cast<String, dynamic>());
+    } catch (_) {
       return null;
     }
   }

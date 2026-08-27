@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_quote.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/world_book.dart';
@@ -12,10 +13,12 @@ import '../../../core/models/assistant_memory.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
+import '../../../core/services/workspace/workspace_execution_context.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/services/world_book_prompt_injector.dart';
@@ -29,6 +32,7 @@ import '../../model/utils/ocr_model_capability.dart';
 import '../../../features/skills/skill_manager.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
+import '../../../utils/quote_plain_text.dart';
 
 /// Service for building API messages from conversation state.
 ///
@@ -138,6 +142,12 @@ class MessageBuilderService {
       versionSelections,
     );
 
+    // Resolve <reply-to> targets against the collapsed stream: the quote
+    // points at a message row id; the resolved citation is the plain text of
+    // that version (or the selected span). Unresolvable (deleted target) →
+    // no prefix, display stub only (docs/adr/0042).
+    final sourceById = <String, ChatMessage>{for (final m in source) m.id: m};
+
     final out = <Map<String, dynamic>>[];
 
     for (final m in source) {
@@ -217,6 +227,15 @@ class MessageBuilderService {
       }
       if (content.isEmpty) continue;
       final isUser = m.role != 'assistant';
+      if (isUser && content.trim().isNotEmpty) {
+        final quote = m.quote;
+        if (quote != null) {
+          final quoteText = _replyToQuoteText(m, quote, sourceById);
+          if (quoteText != null && quoteText.isNotEmpty) {
+            content = '<reply-to>$quoteText</reply-to>\n\n$content';
+          }
+        }
+      }
       final message = <String, dynamic>{
         'role': isUser ? 'user' : 'assistant',
         'content': content,
@@ -235,6 +254,28 @@ class MessageBuilderService {
     }
 
     return out;
+  }
+
+  /// `<reply-to>` plain text for [message]'s quote against the collapsed
+  /// stream. Unresolvable target → null (no prefix; the UI shows the stub).
+  /// Range slices are markdown-space ([start, end) into raw content) per
+  /// docs/adr/0042; malformed out-of-range pairs degrade to full text.
+  String? _replyToQuoteText(
+    ChatMessage message,
+    MessageQuote quote,
+    Map<String, ChatMessage> sourceById,
+  ) {
+    final target = sourceById[quote.id];
+    if (target == null) return null;
+    final content = target.content;
+    final start = quote.start;
+    final end = quote.end;
+    if (start != null && end != null) {
+      final s = start < 0 ? 0 : start;
+      final e = end > content.length ? content.length : end;
+      if (s < e) return quotePlainText(content.substring(s, e));
+    }
+    return quotePlainText(content);
   }
 
   ChatMessage? _latestPersistedMessage(ChatMessage message) {
@@ -644,6 +685,14 @@ class MessageBuilderService {
     }
   }
 
+  void injectWorkspacePrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String? prompt,
+  ) {
+    if (prompt == null || prompt.trim().isEmpty) return;
+    _appendToSystemMessage(apiMessages, prompt);
+  }
+
   /// Inject memory prompts and recent chats reference into apiMessages.
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
@@ -774,6 +823,42 @@ These memories are automatically included in future conversation contexts within
         _appendToSystemMessage(apiMessages, lp);
       }
     } catch (_) {}
+  }
+
+  /// Inject project-level AGENTS.md instructions for the effective workspace
+  /// directory. A read failure aborts this generation so project instructions
+  /// are never only partially applied.
+  Future<void> injectWorkspaceAgentsMdInstructions(
+    List<Map<String, dynamic>> apiMessages, {
+    required Assistant? assistant,
+    required WorkspaceExecutionContext? workspaceExecutionContext,
+  }) async {
+    if (assistant?.autoLoadAgentsMd != true ||
+        workspaceExecutionContext == null) {
+      return;
+    }
+
+    try {
+      final instructions = await loadWorkspaceAgentsMdInstructions(
+        context: workspaceExecutionContext,
+        workspaces: contextProvider.read<WorkspaceProvider>(),
+      );
+      if (instructions != null) {
+        _appendToSystemMessage(apiMessages, instructions);
+      }
+    } on WorkspaceAgentsMdLoadException catch (error, stackTrace) {
+      debugPrint(
+        'Failed to load workspace AGENTS.md instructions: '
+        '${error.message}\n$stackTrace',
+      );
+      rethrow;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Unexpected workspace AGENTS.md loading failure: '
+        '$error\n$stackTrace',
+      );
+      throw WorkspaceAgentsMdLoadException(error.toString());
+    }
   }
 
   /// Inject available skill list (metadata only) into apiMessages.

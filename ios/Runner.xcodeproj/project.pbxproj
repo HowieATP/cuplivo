@@ -26,6 +26,7 @@
 		B15A000000000000000000A4 /* CuplivoLinuxSandboxPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B7 /* CuplivoLinuxSandboxPlugin.swift */; };
 		B15A000000000000000000A5 /* CuplivoSandboxRootfsInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B8 /* CuplivoSandboxRootfsInstaller.swift */; };
 		B15A000000000000000000A6 /* alpine-rootfs.zip in Resources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000B9 /* alpine-rootfs.zip */; };
+		B15A000000000000000000A7 /* node-fetch-jitless-polyfill.js in Resources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000BD /* node-fetch-jitless-polyfill.js */; };
 		B15A000000000000000000CA /* BackgroundKeepAliveManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15A000000000000000000CB /* BackgroundKeepAliveManager.swift */; };
 /* End PBXBuildFile section */
 
@@ -114,6 +115,7 @@
 		B15A000000000000000000B8 /* CuplivoSandboxRootfsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuplivoSandboxRootfsInstaller.swift; sourceTree = "<group>"; };
 		B15A000000000000000000CB /* BackgroundKeepAliveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKeepAliveManager.swift; sourceTree = "<group>"; };
 		B15A000000000000000000B9 /* alpine-rootfs.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = "alpine-rootfs.zip"; path = "sandbox/resources/alpine-rootfs.zip"; sourceTree = SOURCE_ROOT; };
+		B15A000000000000000000BD /* node-fetch-jitless-polyfill.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "node-fetch-jitless-polyfill.js"; path = "sandbox/resources/node-fetch-jitless-polyfill.js"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +183,7 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				CB99E8CD1E59B0861193D1F0 /* Pods */,
 				2EE6D5FD27723C6C9804D147 /* Frameworks */,
+				B15A000000000000000000BD /* node-fetch-jitless-polyfill.js */,
 			);
 			sourceTree = "<group>";
 		};
@@ -382,6 +385,7 @@
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
 				B15A000000000000000000A6 /* alpine-rootfs.zip in Resources */,
+				B15A000000000000000000A7 /* node-fetch-jitless-polyfill.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

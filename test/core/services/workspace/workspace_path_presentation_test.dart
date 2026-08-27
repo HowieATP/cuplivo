@@ -5,9 +5,33 @@ void main() {
   const safAliases = <String>{'notes', 'assets'};
 
   group('parseModelPath', () {
-    test('translates the bound workspace', () {
+    test('translates workspace absolute and relative paths', () {
       expect(parseModelPath('/workspace', 'default'), '@default');
       expect(parseModelPath('/workspace/a/b.md', 'default'), '@default/a/b.md');
+      expect(
+        parseModelPath(
+          'notes.md',
+          'default',
+          workingDirectory: '/workspace/project',
+        ),
+        '@default/project/notes.md',
+      );
+      expect(
+        parseModelPath(
+          '../shared/file.txt',
+          'default',
+          workingDirectory: '/workspace/project/src',
+        ),
+        '@default/project/shared/file.txt',
+      );
+      expect(
+        parseModelPath(
+          '/workspace/root.txt',
+          'default',
+          workingDirectory: '/workspace/project',
+        ),
+        '@default/root.txt',
+      );
     });
 
     test('translates SAF mounts under /workspace/.mounts/<alias>', () {
@@ -23,13 +47,35 @@ void main() {
         parseModelPath(
           '/workspace/.mounts/notes/a.md',
           'default',
+          workingDirectory: '/workspace/project',
           safAliases: safAliases,
         ),
         '@notes/a.md',
       );
     });
 
-    test('rejects an unknown SAF alias', () {
+    test('rejects escaping and foreign paths', () {
+      for (final bad in [
+        '../../outside.txt',
+        '/etc/passwd',
+        '/tmp/x',
+        '/workspace2/x',
+        'C:/x',
+        '@default/x',
+      ]) {
+        expect(
+          () => parseModelPath(
+            bad,
+            'default',
+            workingDirectory: '/workspace/project',
+          ),
+          throwsA(isA<ModelPathException>()),
+          reason: 'should reject: $bad',
+        );
+      }
+    });
+
+    test('rejects unknown or missing SAF aliases', () {
       expect(
         () => parseModelPath(
           '/workspace/.mounts/nope/a.md',
@@ -38,9 +84,6 @@ void main() {
         ),
         throwsA(isA<ModelPathException>()),
       );
-    });
-
-    test('rejects .mounts without an alias', () {
       expect(
         () => parseModelPath(
           '/workspace/.mounts',
@@ -51,31 +94,20 @@ void main() {
       );
     });
 
-    test('a literal .mounts workspace folder is shadowed', () {
-      // /workspace/.mounts/notes resolves as the SAF mount when the alias is
-      // known — a real folder named .mounts cannot be addressed (ADR-0037).
+    test('preserves trailing slash for engine validation parity', () {
+      expect(parseModelPath('/workspace/', 'default'), '@default/');
+      expect(parseModelPath('/workspace/dir/', 'default'), '@default/dir/');
       expect(
         parseModelPath(
-          '/workspace/.mounts/notes',
+          '/workspace/.mounts/notes/',
           'default',
           safAliases: safAliases,
         ),
-        '@notes',
+        '@notes/',
       );
     });
 
-    test('still rejects canonical wire and absolute paths', () {
-      expect(
-        () => parseModelPath('@notes/a.md', 'default', safAliases: safAliases),
-        throwsA(isA<ModelPathException>()),
-      );
-      expect(
-        () => parseModelPath('/etc/passwd', 'default'),
-        throwsA(isA<ModelPathException>()),
-      );
-    });
-
-    test('passes the root listing through', () {
+    test('passes the mount listing root through', () {
       expect(parseModelPath('/', 'default', safAliases: safAliases), '/');
     });
   });

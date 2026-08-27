@@ -235,6 +235,41 @@ void main() {
     },
   );
 
+  test('heal adds quote_json to a workspace-complete v20 database', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 20,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingV15RequestMetadata: false,
+      missingQuoteJson: true,
+      includeWorkspaceBindingColumns: true,
+      includeWorkspaceV20Columns: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    // Must succeed: heal adds quote_json before Drift INSERT, and the
+    // citation round-trips through the repository.
+    final conv = Conversation(title: 'Conv', assistantId: 'a1');
+    await repo.putConversation(conv);
+    await repo.putMessage(
+      ChatMessage(
+        role: 'user',
+        content: 'reply',
+        conversationId: conv.id,
+        quoteJson: '{"id":"msg-1","start":3,"end":9}',
+      ),
+    );
+
+    final rows = await repo.db.select(repo.db.messageRows).get();
+    expect(rows, hasLength(1));
+    expect(rows.first.quoteJson, '{"id":"msg-1","start":3,"end":9}');
+
+    await repo.close();
+  });
+
   test('heal adds inject_group_members column on group_chat_rows '
       '(v17 column shape)', () async {
     _createLegacyDb(
@@ -289,6 +324,133 @@ CREATE TABLE group_chat_rows (
 
     await repo.close();
   });
+
+  test('heal adds workspace directory maps and AGENTS.md loading before '
+      'assistant and conversation inserts (v20 column shape)', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 20,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingContextTokens: false,
+      missingQuoteJson: false,
+      includeWorkspaceBindingColumns: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    await repo.putAssistant(
+      Assistant(
+        id: 'a1',
+        name: 'Alpha',
+        workspaceDefaultDirectories: const {'w1': '/workspace/project'},
+        autoLoadAgentsMd: false,
+      ),
+      sortOrder: 0,
+    );
+    await repo.putConversation(
+      Conversation(
+        title: 'Conv',
+        assistantId: 'a1',
+        workspaceDirectoryOverrides: const {'w1': '/workspace/project/session'},
+      ),
+    );
+
+    final assistants = await repo.getAllAssistants();
+    final conversations = await repo.getAllConversations();
+    expect(assistants.single.workspaceDefaultDirectories, {
+      'w1': '/workspace/project',
+    });
+    expect(assistants.single.autoLoadAgentsMd, isFalse);
+    expect(conversations.single.workspaceDirectoryOverrides, {
+      'w1': '/workspace/project/session',
+    });
+
+    await repo.close();
+  });
+
+  test('upgrades v19 workspace bindings to the complete v20 shape', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 19,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingContextTokens: false,
+      includeWorkspaceBindingColumns: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    final assistantColumns = await repo.db
+        .customSelect('PRAGMA table_info(assistant_rows)')
+        .get();
+    final assistantColumnNames = assistantColumns
+        .map((row) => row.read<String>('name'))
+        .toSet();
+    expect(
+      assistantColumnNames,
+      containsAll(<String>[
+        'workspace_default_directories_json',
+        'auto_load_agents_md',
+      ]),
+    );
+    final conversationColumns = await repo.db
+        .customSelect('PRAGMA table_info(conversation_rows)')
+        .get();
+    expect(
+      conversationColumns.map((row) => row.read<String>('name')),
+      contains('workspace_directory_overrides_json'),
+    );
+    final messageColumns = await repo.db
+        .customSelect('PRAGMA table_info(message_rows)')
+        .get();
+    expect(
+      messageColumns.map((row) => row.read<String>('name')),
+      contains('quote_json'),
+    );
+
+    await repo.putAssistant(
+      Assistant(
+        id: 'a1',
+        name: 'Alpha',
+        workspaceEnabled: true,
+        workspaceId: 'w1',
+        workspaceDefaultDirectories: const {'w1': '/workspace/project'},
+        autoLoadAgentsMd: false,
+      ),
+      sortOrder: 0,
+    );
+    final assistant = (await repo.getAllAssistants()).single;
+    expect(assistant.workspaceDefaultDirectories, {'w1': '/workspace/project'});
+    expect(assistant.autoLoadAgentsMd, isFalse);
+
+    final conversation = Conversation(
+      title: 'Conv',
+      assistantId: assistant.id,
+      workspaceDirectoryOverrides: const {'w1': '/workspace/project/session'},
+    );
+    await repo.putConversation(conversation);
+    await repo.putMessage(
+      ChatMessage(
+        role: 'user',
+        content: 'reply',
+        conversationId: conversation.id,
+        quoteJson: '{"id":"msg-1","start":3,"end":9}',
+      ),
+    );
+    expect(
+      (await repo.getAllConversations()).single.workspaceDirectoryOverrides,
+      {'w1': '/workspace/project/session'},
+    );
+    expect(
+      (await repo.db.select(repo.db.messageRows).get()).single.quoteJson,
+      '{"id":"msg-1","start":3,"end":9}',
+    );
+
+    await repo.close();
+  });
 }
 
 /// Builds a v13-era DB shape (assistant/conversation/message tables only —
@@ -303,6 +465,9 @@ void _createLegacyDb(
   bool missingOcrMode = false,
   bool missingContextTokens = true,
   bool missingV15RequestMetadata = false,
+  bool missingQuoteJson = true,
+  bool includeWorkspaceBindingColumns = false,
+  bool includeWorkspaceV20Columns = false,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -318,6 +483,21 @@ void _createLegacyDb(
       : '''
   ocr_mode TEXT NOT NULL DEFAULT 'auto',
 ''';
+  final workspaceBindingColumns = includeWorkspaceBindingColumns
+      ? '''
+  workspace_enabled INTEGER NOT NULL DEFAULT 0,
+  workspace_id TEXT NULL,
+'''
+      : '';
+  final workspaceV20AssistantColumns = includeWorkspaceV20Columns
+      ? '''
+  workspace_default_directories_json TEXT NOT NULL DEFAULT '{}',
+  auto_load_agents_md INTEGER NOT NULL DEFAULT 1,
+'''
+      : '';
+  final workspaceV20ConversationColumn = includeWorkspaceV20Columns
+      ? ",\n  workspace_directory_overrides_json TEXT NOT NULL DEFAULT '{}'"
+      : '';
   raw.execute('''
 CREATE TABLE assistant_rows (
   id TEXT NOT NULL PRIMARY KEY,
@@ -360,6 +540,8 @@ CREATE TABLE assistant_rows (
   $ocrModeColumn
   enable_time_injection INTEGER NOT NULL DEFAULT 0,
   $handoffColumns
+  $workspaceBindingColumns
+  $workspaceV20AssistantColumns
   sort_order INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -378,7 +560,7 @@ CREATE TABLE conversation_rows (
   summary TEXT NULL,
   last_summarized_message_count INTEGER NOT NULL DEFAULT 0,
   chat_suggestions_json TEXT NOT NULL DEFAULT '[]',
-  parent_conversation_id TEXT NULL
+  parent_conversation_id TEXT NULL$workspaceV20ConversationColumn
 );
 ''');
   final isPresetColumn = missingIsPreset
@@ -396,6 +578,11 @@ CREATE TABLE conversation_rows (
       : '''
   request_allow_images_api_routing INTEGER NULL,
   request_extra_body_json TEXT NULL,
+''';
+  final quoteJsonColumn = missingQuoteJson
+      ? ''
+      : '''
+  quote_json TEXT NULL,
 ''';
   raw.execute('''
 CREATE TABLE message_rows (
@@ -424,6 +611,7 @@ CREATE TABLE message_rows (
   $contextTokensColumn
   $isPresetColumn
   $v15Columns
+  $quoteJsonColumn
   FOREIGN KEY (conversation_id) REFERENCES conversation_rows (id) ON DELETE CASCADE
 );
 ''');

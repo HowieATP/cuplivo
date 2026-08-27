@@ -8,11 +8,13 @@ void main() {
 
   WakeLockManager build({
     bool mobile = true,
+    bool Function()? isEnabled,
     Future<void> Function(bool enabled)? applyLock,
   }) {
     calls = [];
     manager = WakeLockManager(
       isMobilePlatform: () => mobile,
+      isEnabled: isEnabled,
       applyLock:
           applyLock ??
           (enabled) async {
@@ -96,6 +98,83 @@ void main() {
     await pumpEventQueue();
     expect(calls, [true, false]);
   });
+
+  test(
+    'a disabled toggle never touches the platform, but refcount stays balanced',
+    () async {
+      build(isEnabled: () => false);
+      manager.acquire();
+      manager.acquire();
+      manager.release();
+      manager.reset();
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+      expect(manager.isHeld, isFalse);
+    },
+  );
+
+  test(
+    'a new enabled slot while an older disabled round runs turns the screen on',
+    () async {
+      var enabled = false;
+      build(isEnabled: () => enabled);
+      manager.acquire();
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+      expect(manager.isHeld, isTrue);
+
+      enabled = true;
+      manager.acquire();
+      await pumpEventQueue();
+      expect(calls, [true]);
+
+      manager.release();
+      manager.release();
+      await pumpEventQueue();
+      expect(calls, [true, false]);
+      expect(manager.isHeld, isFalse);
+    },
+  );
+
+  test(
+    'full user flow: off round settles, then on round acquires the lock',
+    () async {
+      var enabled = false;
+      build(isEnabled: () => enabled);
+      manager.acquire();
+      manager.release();
+      await pumpEventQueue();
+      expect(calls, isEmpty);
+
+      enabled = true;
+      manager.acquire();
+      await pumpEventQueue();
+      expect(calls, [true]);
+      expect(manager.isHeld, isTrue);
+
+      manager.release();
+      await pumpEventQueue();
+      expect(calls, [true, false]);
+    },
+  );
+
+  test(
+    'toggling off mid-generation keeps the lock until the last release',
+    () async {
+      var enabled = true;
+      build(isEnabled: () => enabled);
+      manager.acquire();
+      await pumpEventQueue();
+      expect(calls, [true]);
+      expect(manager.isHeld, isTrue);
+
+      enabled = false;
+      manager.release();
+      await pumpEventQueue();
+      expect(calls, [true, false]);
+      expect(manager.isHeld, isFalse);
+    },
+  );
 
   test(
     'a failing platform call is logged, never rethrown into generation',

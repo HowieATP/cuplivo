@@ -19,20 +19,17 @@ import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 import 'tool_handler_service.dart';
 
-/// Executes the handoff local tools (`kelivo_handoff` / `kelivo_handoff_sync`).
+/// Executes the handoff local tool (`kelivo_handoff`).
 ///
-/// Formerly served by the `@kelivo/subagent` in-memory MCP server; the same
-/// delegation semantics now run directly inside the tool call handler:
-/// - fire-and-forget (`kelivo_handoff`): create a child conversation for the
-///   target assistant, dispatch the task, return the child conversation id.
-/// - wait-mode (`kelivo_handoff_sync`): additionally block until the child
-///   generation completes and return its FULL output as the tool result
-///   (or a cancellation/error marker — the await never hangs).
+/// Formerly the `@kelivo/subagent` in-memory MCP server, then a fire-and-forget
+/// / wait-mode tool pair; since ADR-0041 the single wait-mode tool: create a
+/// child conversation for the target assistant, dispatch the task, and block
+/// until the child generation completes — returning its FULL output as the
+/// tool result (or a cancellation/error marker — the await never hangs).
 class HandoffToolService {
   const HandoffToolService._();
 
   static Future<String> execute({
-    required String toolName,
     required Map<String, dynamic> args,
     required AssistantProvider assistants,
     required ChatService chatService,
@@ -40,13 +37,11 @@ class HandoffToolService {
     required BuildContext context,
     Assistant? delegatingAssistant,
   }) async {
-    final waitForResult = toolName == LocalToolNames.handoffSync;
-
     final handoffId = (args['assistant'] ?? '').toString().trim();
     final task = (args['task'] ?? '').toString().trim();
 
     debugPrint(
-      '[HandoffTool] $toolName request: assistant=$handoffId, '
+      '[HandoffTool] request: assistant=$handoffId, '
       'task=${task.length > 80 ? '${task.substring(0, 80)}...' : task}',
     );
 
@@ -54,14 +49,14 @@ class HandoffToolService {
       return _toolError(
         error: 'handoff_empty_task',
         message: 'Error: task must not be empty.',
-        tool: toolName,
+        tool: LocalToolNames.handoff,
       );
     }
     if (handoffId.isEmpty) {
       return _toolError(
         error: 'handoff_empty_target',
         message: 'Error: "assistant" must name a valid handoff target.',
-        tool: toolName,
+        tool: LocalToolNames.handoff,
       );
     }
 
@@ -96,7 +91,7 @@ class HandoffToolService {
         message:
             'Error: no discoverable assistant with id \'$handoffId\'. '
             'Available: [${shown.isEmpty ? 'none' : shown}$truncated].',
-        tool: toolName,
+        tool: LocalToolNames.handoff,
       );
     }
 
@@ -125,31 +120,27 @@ class HandoffToolService {
 
     // The caller creates the assistant placeholder (ADR-0034 slot model: the
     // engine streams into a pre-created message row and never creates rows
-    // itself). For wait-mode it is created NOW so the round/slot registered
-    // below carries the row id — the 子代理面板 binds to the slot from the
-    // dispatch moment, before the async pipeline build.
-    String? preparedAssistantMessageId;
-    if (waitForResult) {
-      final assistantMsg = await chatService.addMessage(
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-      );
-      preparedAssistantMessageId = assistantMsg.id;
+    // itself). It is created NOW so the round/slot registered below carries
+    // the row id — the 子代理面板 binds to the slot from the dispatch moment,
+    // before the async pipeline build.
+    final assistantMsg = await chatService.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    );
 
-      // Register the round BEFORE starting the generation: the generation's
-      // synchronous section may fail immediately (failRound below must find
-      // the round), and the waitFor below must find the round in both the
-      // synchronous and suspended-start cases.
-      engine.prepareRound(
-        conversationId: conversation.id,
-        assistantMessageId: assistantMsg.id,
-        parentConversationId: parentConversationId,
-        wait: true,
-        targetName: target.name,
-      );
-    }
+    // Register the round BEFORE starting the generation: the generation's
+    // synchronous section may fail immediately (failRound below must find
+    // the round), and the waitFor below must find the round in both the
+    // synchronous and suspended-start cases.
+    engine.prepareRound(
+      conversationId: conversation.id,
+      assistantMessageId: assistantMsg.id,
+      parentConversationId: parentConversationId,
+      wait: true,
+      targetName: target.name,
+    );
 
     unawaited(
       _startGeneration(
@@ -159,14 +150,9 @@ class HandoffToolService {
         engine,
         conversation,
         target,
-        waitForResult: waitForResult,
-        preparedAssistantMessageId: preparedAssistantMessageId,
+        assistantMessageId: assistantMsg.id,
       ),
     );
-
-    if (!waitForResult) {
-      return 'Handoff dispatched. Conversation: ${conversation.id}';
-    }
 
     // No MCP JSON-RPC boundary anymore: await the child generation directly.
     // waitFor always resolves (normal, error, or cancelled) — never hangs.
@@ -175,7 +161,7 @@ class HandoffToolService {
       return _toolError(
         error: 'subagent_cancelled',
         message: 'The sub-agent was cancelled by the user before finishing.',
-        tool: toolName,
+        tool: LocalToolNames.handoff,
         instruction:
             'The sub-agent did not finish. Summarize what was accomplished '
             'or ask the user whether to retry.',
@@ -185,7 +171,7 @@ class HandoffToolService {
       return _toolError(
         error: 'subagent_error',
         message: result.error!,
-        tool: toolName,
+        tool: LocalToolNames.handoff,
       );
     }
     return result.text;
@@ -197,8 +183,7 @@ class HandoffToolService {
     GenerationEngine engine,
     Conversation conversation,
     Assistant target, {
-    bool waitForResult = false,
-    String? preparedAssistantMessageId,
+    required String assistantMessageId,
   }) async {
     try {
       // ignore: use_build_context_synchronously (root context, valid for app lifetime)
@@ -231,20 +216,35 @@ class HandoffToolService {
         providerKey: providerKey,
         modelId: modelId,
       );
+      // ignore: use_build_context_synchronously (root context)
+      final toolHandler = ToolHandlerService(contextProvider: context);
+      final workspaceExecutionContext = toolHandler
+          .resolveWorkspaceExecutionContext(target, conversation);
       messageBuilder.injectSystemPrompt(apiMessages, target, modelId);
+      await messageBuilder.injectWorkspaceAgentsMdInstructions(
+        apiMessages,
+        assistant: target,
+        workspaceExecutionContext: workspaceExecutionContext,
+      );
       await messageBuilder.injectMemoryAndRecentChats(
         apiMessages,
         target,
         currentConversationId: conversation.id,
       );
-      messageBuilder.injectInstructionPrompts(apiMessages, target.id);
+      await messageBuilder.injectInstructionPrompts(apiMessages, target.id);
       await messageBuilder.injectWorldBookPrompts(apiMessages, target.id);
       messageBuilder.injectSkillListPrompt(apiMessages, target.id);
       messageBuilder.injectTimeNote(apiMessages, target);
       messageBuilder.applyContextLimit(apiMessages, target);
 
-      // ignore: use_build_context_synchronously (root context)
-      final toolHandler = ToolHandlerService(contextProvider: context);
+      messageBuilder.injectWorkspacePrompt(
+        apiMessages,
+        toolHandler.buildWorkspacePromptReminder(
+          assistant: target,
+          conversation: conversation,
+          executionContext: workspaceExecutionContext,
+        ),
+      );
       final toolDefs = toolHandler.buildToolDefinitions(
         settings,
         target,
@@ -252,6 +252,8 @@ class HandoffToolService {
         modelId,
         false,
         isToolModel: (_, _) => true,
+        conversation: conversation,
+        workspaceExecutionContext: workspaceExecutionContext,
       );
       final onToolCall = toolDefs.isNotEmpty
           ? toolHandler.buildToolCallHandler(
@@ -264,6 +266,8 @@ class HandoffToolService {
               // ignore: use_build_context_synchronously (root context)
               askUserService: context.read<AskUserInteractionService>(),
               conversationId: conversation.id,
+              conversation: conversation,
+              workspaceExecutionContext: workspaceExecutionContext,
             )
           : null;
 
@@ -272,22 +276,11 @@ class HandoffToolService {
         '(${apiMessages.length} messages, ${toolDefs.length} tools)',
       );
 
-      // Fire-and-forget creates its placeholder here (wait-mode already
-      // created it in execute for panel visibility).
-      final assistantMsgId =
-          preparedAssistantMessageId ??
-          (await chatService.addMessage(
-            conversationId: conversation.id,
-            role: 'assistant',
-            content: '',
-            isStreaming: true,
-          )).id;
-
       engine.startRound(
         conversationId: conversation.id,
         slots: [
           GenerationSlotRequest(
-            assistantMessageId: assistantMsgId,
+            assistantMessageId: assistantMessageId,
             apiMessages: apiMessages,
             config: config,
             modelId: modelId,
@@ -305,25 +298,22 @@ class HandoffToolService {
           ),
         ],
         parentConversationId: conversation.parentConversationId,
-        wait: waitForResult,
+        wait: true,
         targetName: target.name,
       );
     } catch (e, st) {
       debugPrint(
         '[HandoffTool] generation failed for ${conversation.id}: $e\n$st',
       );
-      // The wait-mode placeholder was created in execute but never streamed
-      // into — remove the empty row (build failure before start).
-      if (preparedAssistantMessageId != null) {
-        try {
-          await chatService.deleteMessage(preparedAssistantMessageId);
-        } catch (cleanupError) {
-          debugPrint('[HandoffTool] placeholder cleanup failed: $cleanupError');
-        }
+      // The placeholder was created in execute but never streamed into —
+      // remove the empty row (build failure before start).
+      try {
+        await chatService.deleteMessage(assistantMessageId);
+      } catch (cleanupError) {
+        debugPrint('[HandoffTool] placeholder cleanup failed: $cleanupError');
       }
       // Resolve the waiter: a wait-mode handoff must never leave the
-      // orchestrator's await hanging (see ADR-0026 iron rule). No-op for
-      // fire-and-forget (nothing listens to the completer).
+      // orchestrator's await hanging (see ADR-0026 iron rule).
       engine.failRound(conversation.id, e);
     }
   }

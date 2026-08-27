@@ -10,6 +10,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/message_quote.dart';
+import '../../../utils/markdown_subsequence_match.dart';
+import '../../../utils/quote_plain_text.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -26,6 +29,7 @@ import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/storage/message_locate_bus.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
+import '../../../core/services/workspace/workspace_execution_context.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -545,6 +549,8 @@ class HomePageController extends ChangeNotifier {
     switch (error) {
       case 'audio_attachment_unsupported':
         return l10n.homePageAudioAttachmentUnsupported;
+      case workspaceAgentsMdLoadErrorCode:
+        return l10n.workspaceAgentsMdLoadFailed;
       default:
         return '${l10n.generationInterrupted}: $error';
     }
@@ -922,6 +928,7 @@ class HomePageController extends ChangeNotifier {
       documents: input.documents,
       allowImagesApiRouting: input.allowImagesApiRouting,
       extraBody: Map<String, dynamic>.of(input.extraBody),
+      quote: input.quote,
     );
     final result = await _viewModel.sendMessage(syntheticInput);
     if (result != ChatInputSubmissionResult.rejected) {
@@ -2605,6 +2612,38 @@ class HomePageController extends ChangeNotifier {
     );
     _mediaController.syncDraft();
     notifyListeners();
+  }
+
+  /// Starts a whole-message reply (更多 → 回复): the quote carries the target
+  /// id; the composer preview shows the clipped plain text.
+  void startReplyTo(ChatMessage message) {
+    final snippet = quoteClipText(quotePlainText(message.content));
+    _mediaController.setQuoteDraft(
+      MessageQuote(id: message.id),
+      snippet: snippet,
+    );
+    _inputFocus.requestFocus();
+  }
+
+  /// Starts a selection-driven reply (ranged quote): the selection is bridged
+  /// into raw-markdown content offsets via `subsequenceRange`; match failure
+  /// degrades to a whole-message reply.
+  void startReplyToSelection(ChatMessage message, String selected) {
+    final span = subsequenceRange(message.content, selected);
+    if (span == null) {
+      startReplyTo(message);
+      return;
+    }
+    final full = quotePlainText(message.content);
+    final spanPlain = quotePlainText(
+      message.content.substring(span.start, span.end),
+    );
+    final win = quoteWindowText(fullPlain: full, spanPlain: spanPlain);
+    _mediaController.setQuoteDraft(
+      MessageQuote(id: message.id, start: span.start, end: span.end),
+      snippet: win?.text ?? quoteClipText(spanPlain),
+    );
+    _inputFocus.requestFocus();
   }
 
   void insertQuote(String text) {

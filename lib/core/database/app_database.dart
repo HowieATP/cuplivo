@@ -30,6 +30,8 @@ class ConversationRows extends Table {
   /// 'normal' | 'group' — group public transcripts use kind=group.
   TextColumn get conversationKind =>
       text().withDefault(const Constant('normal'))();
+  TextColumn get workspaceDirectoryOverridesJson =>
+      text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -82,6 +84,10 @@ class MessageRows extends Table {
   BoolColumn get requestAllowImagesApiRouting => boolean().nullable()();
   TextColumn get requestExtraBodyJson => text().nullable()();
 
+  /// JSON-encoded MessageQuote citation reference (schema v20, issue #312).
+  /// Nullable TEXT so existing rows and non-reply messages stay untouched.
+  TextColumn get quoteJson => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -131,6 +137,10 @@ class AssistantRows extends Table {
   BoolColumn get workspaceEnabled =>
       boolean().withDefault(const Constant(false))();
   TextColumn get workspaceId => text().nullable()();
+  TextColumn get workspaceDefaultDirectoriesJson =>
+      text().withDefault(const Constant('{}'))();
+  BoolColumn get autoLoadAgentsMd =>
+      boolean().withDefault(const Constant(true))();
   TextColumn get regexRulesJson => text().withDefault(const Constant('[]'))();
 
   // --- Proactive Care ("Ta的来信") ---
@@ -378,7 +388,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0019-schema-self-heal.md.
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -431,7 +441,7 @@ class AppDatabase extends _$AppDatabase {
   /// Repair incomplete upgrades where user_version already advanced but some
   /// ALTER TABLE / CREATE TABLE steps were skipped/failed (silent catch).
   ///
-  /// Covers every column/table added by the v5–v13/v16–v17 migrations that are
+  /// Covers every column/table added by the v5–v20 migrations that are
   /// wrapped in silent try/catch — missing these makes inserts crash with
   /// "table X has no column named Y". Runs in beforeOpen (rescues existing
   /// broken DBs whose user_version already passed the failed step) and at the
@@ -441,7 +451,7 @@ class AppDatabase extends _$AppDatabase {
   /// this heal set and the regression tests in the same change. See AGENTS.md
   /// §3.20.
   Future<void> _healSchemaIfNeeded() async {
-    // --- assistant_rows (v5–v12) ---
+    // --- assistant_rows (v5–v20) ---
     await _ensureColumn(
       'assistant_rows',
       'memory_mode',
@@ -526,6 +536,16 @@ class AppDatabase extends _$AppDatabase {
       'workspace_id',
       'ALTER TABLE assistant_rows ADD COLUMN workspace_id TEXT NULL',
     );
+    await _ensureColumn(
+      'assistant_rows',
+      'workspace_default_directories_json',
+      "ALTER TABLE assistant_rows ADD COLUMN workspace_default_directories_json TEXT NOT NULL DEFAULT '{}'",
+    );
+    await _ensureColumn(
+      'assistant_rows',
+      'auto_load_agents_md',
+      'ALTER TABLE assistant_rows ADD COLUMN auto_load_agents_md INTEGER NOT NULL DEFAULT 1',
+    );
 
     // --- message_rows ---
     await _ensureColumn(
@@ -558,6 +578,12 @@ class AppDatabase extends _$AppDatabase {
       'request_extra_body_json',
       'ALTER TABLE message_rows ADD COLUMN request_extra_body_json TEXT NULL',
     );
+    // message reply citation (schema v20)
+    await _ensureColumn(
+      'message_rows',
+      'quote_json',
+      'ALTER TABLE message_rows ADD COLUMN quote_json TEXT NULL',
+    );
 
     // --- conversation_rows ---
     await _ensureColumn(
@@ -569,6 +595,11 @@ class AppDatabase extends _$AppDatabase {
       'conversation_rows',
       'conversation_kind',
       "ALTER TABLE conversation_rows ADD COLUMN conversation_kind TEXT NOT NULL DEFAULT 'normal'",
+    );
+    await _ensureColumn(
+      'conversation_rows',
+      'workspace_directory_overrides_json',
+      "ALTER TABLE conversation_rows ADD COLUMN workspace_directory_overrides_json TEXT NOT NULL DEFAULT '{}'",
     );
     await customStatement(
       "UPDATE conversation_rows SET conversation_kind = 'normal' "
@@ -826,6 +857,49 @@ class AppDatabase extends _$AppDatabase {
         try {
           await migrator.addColumn(assistantRows, assistantRows.workspaceId);
         } catch (_) {}
+      }
+      if (from < 20) {
+        // v20 combines reply citations with workspace working-directory
+        // preferences. Pre-existing v20 variants are completed by the schema
+        // heal below before Drift reads or writes them.
+        try {
+          await migrator.addColumn(messageRows, messageRows.quoteJson);
+        } catch (error) {
+          debugPrint('v20 migration could not add reply citations: $error');
+        }
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.workspaceDefaultDirectoriesJson,
+          );
+        } catch (error) {
+          debugPrint(
+            'v20 migration could not add assistant working directories: '
+            '$error',
+          );
+        }
+        try {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.workspaceDirectoryOverridesJson,
+          );
+        } catch (error) {
+          debugPrint(
+            'v20 migration could not add conversation working directories: '
+            '$error',
+          );
+        }
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.autoLoadAgentsMd,
+          );
+        } catch (error) {
+          debugPrint(
+            'v20 migration could not add automatic AGENTS.md loading: '
+            '$error',
+          );
+        }
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

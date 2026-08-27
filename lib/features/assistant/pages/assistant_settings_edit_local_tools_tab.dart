@@ -27,8 +27,9 @@ class _LocalToolsTab extends StatelessWidget {
     final handoffEnabled = assistant.localToolIds.contains(
       LocalToolNames.handoff,
     );
-    final handoffSyncEnabled = assistant.localToolIds.contains(
-      LocalToolNames.handoffSync,
+    final handoffTargets = LocalToolsService.handoffTargets(
+      ap.assistants,
+      excludeId: assistant.id,
     );
     final screenTimeEnabled = assistant.localToolIds.contains(
       LocalToolNames.screenTime,
@@ -68,6 +69,13 @@ class _LocalToolsTab extends StatelessWidget {
         );
       } catch (e) {
         debugPrint('Failed to persist local tool switch: $e');
+      }
+      if (toolId == LocalToolNames.handoff && value && handoffTargets.isEmpty) {
+        if (!context.mounted) return;
+        showSubagentNoTargetSnackbar(
+          context,
+          onGoSetup: () => _goAssistantSettings(context),
+        );
       }
     }
 
@@ -112,7 +120,9 @@ class _LocalToolsTab extends StatelessWidget {
     }
 
     final workspaceOn = assistant.workspaceEnabled;
+    var workspaceReady = false;
     String workspaceSubtitle = l10n.workspaceEntrySubtitleOff;
+    String directorySubtitle = l10n.workspaceBindDisabledHint;
     if (workspaceOn) {
       try {
         final wp = context.watch<WorkspaceProvider>();
@@ -120,6 +130,11 @@ class _LocalToolsTab extends StatelessWidget {
             ? null
             : wp.getById(assistant.workspaceId!);
         workspaceSubtitle = ws?.displayName ?? l10n.workspaceBindTitle;
+        workspaceReady = ws != null;
+        if (ws != null) {
+          directorySubtitle =
+              assistant.workspaceDefaultDirectories[ws.id] ?? '/workspace';
+        }
       } on ProviderNotFoundException catch (e) {
         debugPrint('workspace provider missing: $e');
       } catch (e) {
@@ -137,6 +152,19 @@ class _LocalToolsTab extends StatelessWidget {
               title: l10n.assistantEditLocalToolWorkspaceTitle,
               subtitle: workspaceSubtitle,
               onTap: () => showWorkspaceBindSheet(context, assistant),
+            ),
+            _iosDivider(context),
+            _LocalToolNavRow(
+              icon: Lucide.FolderOpen,
+              title: l10n.workspaceDefaultDirectoryTitle,
+              subtitle: directorySubtitle,
+              enabled: workspaceReady,
+              onTap: workspaceReady
+                  ? () => showWorkspaceDirectorySettings(
+                      context,
+                      assistantId: assistant.id,
+                    )
+                  : null,
             ),
             _iosDivider(context),
             _LocalToolRow(
@@ -219,14 +247,7 @@ class _LocalToolsTab extends StatelessWidget {
               onChanged: (value) => updateTool(LocalToolNames.handoff, value),
             ),
             _iosDivider(context),
-            _LocalToolRow(
-              icon: Lucide.Timer,
-              title: l10n.assistantEditLocalToolHandoffSyncTitle,
-              subtitle: l10n.assistantEditLocalToolHandoffSyncSubtitle,
-              enabled: handoffSyncEnabled,
-              onChanged: (value) =>
-                  updateTool(LocalToolNames.handoffSync, value),
-            ),
+            _SubagentTargetStatusRow(targets: handoffTargets),
           ],
         ),
       ],
@@ -234,29 +255,24 @@ class _LocalToolsTab extends StatelessWidget {
   }
 }
 
-class _LocalToolNavRow extends StatelessWidget {
-  const _LocalToolNavRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+/// Footer row under the Sub-agent Delegation toggle: live target count that
+/// opens the shared target list sheet (names + delegation IDs + purposes).
+class _SubagentTargetStatusRow extends StatelessWidget {
+  const _SubagentTargetStatusRow({required this.targets});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
+  final List<Assistant> targets;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final muted = cs.onSurface.withValues(alpha: 0.62);
     return _TactileRow(
-      onTap: onTap,
+      onTap: () => showSubagentTargetSheet(context, targets),
       builder: (pressed) {
-        final baseColor = cs.onSurface.withValues(alpha: 0.9);
         return _AnimatedPressColor(
           pressed: pressed,
-          base: baseColor,
+          base: cs.onSurface.withValues(alpha: 0.9),
           builder: (color) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -264,35 +280,22 @@ class _LocalToolNavRow extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 36,
-                    child: Icon(icon, size: 20, color: cs.primary),
+                    child: Icon(
+                      Lucide.ListChecks,
+                      size: 20,
+                      color: targets.isEmpty ? cs.error : cs.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: color,
-                            fontWeight: AppFontWeights.semibold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.25,
-                            color: cs.onSurface.withValues(alpha: 0.62),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      l10n.subagentTargetStatus(targets.length),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: targets.isEmpty ? cs.error : muted,
+                      ),
                     ),
                   ),
                   Icon(
@@ -304,6 +307,90 @@ class _LocalToolNavRow extends StatelessWidget {
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _LocalToolNavRow extends StatelessWidget {
+  const _LocalToolNavRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _TactileRow(
+      onTap: onTap,
+      builder: (pressed) {
+        final baseColor = cs.onSurface.withValues(alpha: 0.9);
+        return Opacity(
+          opacity: enabled ? 1 : 0.55,
+          child: _AnimatedPressColor(
+            pressed: pressed,
+            base: baseColor,
+            builder: (color) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 36,
+                      child: Icon(icon, size: 20, color: cs.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: color,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.25,
+                              color: cs.onSurface.withValues(alpha: 0.62),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Lucide.ChevronRight,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -388,4 +475,19 @@ class _LocalToolRow extends StatelessWidget {
       },
     );
   }
+}
+
+void _goAssistantSettings(BuildContext context) {
+  if (PlatformUtils.isDesktop) {
+    // The desktop shell owns the assistant list pane (settings menu →
+    // assistants); dismiss the edit dialog first, then deep-link via the
+    // settings navigation bus (backup-reminder pattern).
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).maybePop();
+    DesktopSettingsNavigationBus.instance.openAssistants();
+    return;
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => const AssistantSettingsPage()),
+  );
 }

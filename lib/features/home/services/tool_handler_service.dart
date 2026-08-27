@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/assistant_memory.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/download_progress_store.dart';
@@ -20,6 +21,7 @@ import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/saf/saf_mount_sync_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/workspace/linux_sandbox_service.dart';
+import '../../../core/services/workspace/workspace_execution_context.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
 import 'ask_user_interaction_service.dart';
 import 'handoff_tool_service.dart';
@@ -51,6 +53,50 @@ class ToolHandlerService {
 
   /// Build context (used for accessing providers)
   final BuildContext contextProvider;
+
+  WorkspaceExecutionContext? resolveWorkspaceExecutionContext(
+    Assistant? assistant,
+    Conversation? conversation,
+  ) {
+    try {
+      return WorkspaceExecutionContext.resolve(
+        assistant: assistant,
+        conversation: conversation,
+        workspaces: contextProvider.read<WorkspaceProvider>(),
+      );
+    } on ProviderNotFoundException catch (e) {
+      debugPrint(
+        'workspace context unavailable: WorkspaceProvider is not registered '
+        '(${e.runtimeType})',
+      );
+      return null;
+    } on WorkspacePathException catch (e) {
+      debugPrint('workspace context invalid: ${e.message}');
+      return null;
+    }
+  }
+
+  String? buildWorkspacePromptReminder({
+    required Assistant? assistant,
+    required Conversation? conversation,
+    WorkspaceExecutionContext? executionContext,
+  }) {
+    try {
+      return WorkspaceToolsService.buildPromptReminder(
+        assistant: assistant,
+        conversation: conversation,
+        workspaces: contextProvider.read<WorkspaceProvider>(),
+        sandbox: LinuxSandboxService.instance,
+        executionContext: executionContext,
+      );
+    } on ProviderNotFoundException catch (e) {
+      debugPrint(
+        'workspace reminder skipped: WorkspaceProvider is not registered '
+        '(${e.runtimeType})',
+      );
+      return null;
+    }
+  }
 
   // ============================================================================
   // Tool Schema Sanitization
@@ -345,6 +391,8 @@ class ToolHandlerService {
     String modelId,
     bool hasBuiltInSearch, {
     required bool Function(String providerKey, String modelId) isToolModel,
+    Conversation? conversation,
+    WorkspaceExecutionContext? workspaceExecutionContext,
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
@@ -398,10 +446,15 @@ class ToolHandlerService {
           supportsTools: supportsTools,
           sandbox: LinuxSandboxService.instance,
           safMounts: safMounts,
+          conversation: conversation,
+          executionContext: workspaceExecutionContext,
         ),
       );
     } on ProviderNotFoundException catch (e) {
-      debugPrint('workspace tools defs skipped: $e');
+      debugPrint(
+        'workspace tools defs skipped: WorkspaceProvider is not registered '
+        '(${e.runtimeType})',
+      );
     }
 
     // MCP tools
@@ -581,6 +634,8 @@ class ToolHandlerService {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
     String? conversationId,
+    Conversation? conversation,
+    WorkspaceExecutionContext? workspaceExecutionContext,
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
@@ -592,8 +647,24 @@ class ToolHandlerService {
     try {
       workspaceProvider = contextProvider.read<WorkspaceProvider>();
       chatService = contextProvider.read<ChatService>();
-    } catch (_) {
-      // Headless / tests without WorkspaceProvider.
+    } on ProviderNotFoundException catch (e) {
+      debugPrint(
+        'workspace providers unavailable in tool handler '
+        '(${e.runtimeType})',
+      );
+    }
+    WorkspaceExecutionContext? capturedWorkspaceContext =
+        workspaceExecutionContext;
+    if (capturedWorkspaceContext == null && workspaceProvider != null) {
+      try {
+        capturedWorkspaceContext = WorkspaceExecutionContext.resolve(
+          assistant: assistant,
+          conversation: conversation,
+          workspaces: workspaceProvider,
+        );
+      } on WorkspacePathException catch (e) {
+        debugPrint('workspace context invalid: ${e.message}');
+      }
     }
 
     return (name, args, {toolCallId}) async {
@@ -737,14 +808,13 @@ class ToolHandlerService {
           return localResult;
         }
 
-        // Handoff tools (kelivo_handoff / kelivo_handoff_sync) need chat /
-        // headless providers, so they are dispatched here instead of inside
+        // Handoff tool (kelivo_handoff, sub-agent delegation) needs chat /
+        // generation providers, so it is dispatched here instead of inside
         // LocalToolsService (same precedent as ask_user). The providers are
         // read lazily — only when the tool actually fires — so harnesses
         // without chat/headless providers can still exercise other
         // built-in tools.
-        if (name == LocalToolNames.handoff ||
-            name == LocalToolNames.handoffSync) {
+        if (name == LocalToolNames.handoff) {
           if (assistant == null || !assistant.localToolIds.contains(name)) {
             return _toolError(
               error: 'handoff_disabled',
@@ -753,7 +823,6 @@ class ToolHandlerService {
             );
           }
           return await HandoffToolService.execute(
-            toolName: name,
             args: args,
             assistants: assistantProvider,
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)
@@ -777,8 +846,7 @@ class ToolHandlerService {
               tool: name,
             );
           }
-          final boundId = assistant?.workspaceId;
-          final boundWs = boundId != null ? wp.getById(boundId) : null;
+          final boundWs = capturedWorkspaceContext?.workspace;
           final needsApproval =
               boundWs?.isToolNeedsApproval(name) ??
               WorkspaceToolNames.defaultApprovalFor(name);
@@ -850,6 +918,8 @@ class ToolHandlerService {
               downloadAbortToken: downloadJob?.abortToken,
               toolCallId: toolCallId,
               conversationId: conversationId,
+              conversation: conversation,
+              executionContext: capturedWorkspaceContext,
             );
             if (wsResult != null) return wsResult;
           } catch (e) {

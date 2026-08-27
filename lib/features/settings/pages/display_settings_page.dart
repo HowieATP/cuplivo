@@ -234,6 +234,23 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   ),
                 ),
               if (Platform.isIOS) _iosDivider(context),
+              if (Platform.isAndroid || Platform.isIOS) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.MonitorSmartphone,
+                  label:
+                      l10n.displaySettingsPageKeepScreenOnDuringGenerationTitle,
+                  subtitle: l10n
+                      .displaySettingsPageKeepScreenOnDuringGenerationSubtitle,
+                  value: context
+                      .read<SettingsProvider>()
+                      .keepScreenOnDuringGeneration,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setKeepScreenOnDuringGeneration(v),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.MessageSquare,
@@ -2210,6 +2227,18 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) => context
                     .read<SettingsProvider>()
                     .setShowRegenerateConfirmDialog(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.GitFork,
+                label: l10n.displaySettingsPageForkKeepMessageVersionsTitle,
+                subtitle:
+                    l10n.displaySettingsPageForkKeepMessageVersionsSubtitle,
+                value: sp.forkKeepMessageVersions,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setForkKeepMessageVersions(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

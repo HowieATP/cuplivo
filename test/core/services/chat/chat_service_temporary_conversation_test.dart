@@ -54,6 +54,41 @@ void main() {
   }
 
   group('ChatService temporary conversations', () {
+    test(
+      'workspace directory override updates and clears on a draft',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createDraftConversation(
+          title: 'Chat',
+        );
+
+        await service.setConversationWorkspaceDirectoryOverride(
+          conversation.id,
+          'workspace-a',
+          '/workspace/session-a',
+        );
+        expect(
+          service
+              .getConversation(conversation.id)
+              ?.workspaceDirectoryOverrides['workspace-a'],
+          '/workspace/session-a',
+        );
+
+        await service.clearConversationWorkspaceDirectoryOverride(
+          conversation.id,
+          'workspace-a',
+        );
+        expect(
+          service
+              .getConversation(conversation.id)
+              ?.workspaceDirectoryOverrides
+              .containsKey('workspace-a'),
+          isFalse,
+        );
+      },
+    );
+
     test('ordinary draft persists when its first message is added', () async {
       final service = createService();
       await service.init();
@@ -353,5 +388,180 @@ void main() {
         expect(service.getVersionSelections(fork.id), isEmpty);
       },
     );
+
+    test('preserve-mode fork carries every version, remaps groups and '
+        'forces the forked revision selection', () async {
+      final service = createService();
+      await service.init();
+
+      final source = await service.createConversation(title: 'Source');
+      final user = await service.addMessage(
+        conversationId: source.id,
+        role: 'user',
+        content: 'question',
+      );
+      final original = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'answer v0',
+      );
+      final edited = await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'answer v1',
+      );
+      expect(user.id, isNot(original.id));
+      expect(edited, isNotNull);
+
+      final target = await service.addMessage(
+        conversationId: source.id,
+        role: 'user',
+        content: 'second question',
+      );
+
+      await service.setToolEvents(edited!.id, [
+        {'id': 'tool-call', 'name': 'search', 'result': 'done'},
+      ]);
+      await service.setGeminiThoughtSignature(edited.id, 'sig-v1');
+
+      final fork = await service.forkConversation(
+        title: 'Fork',
+        assistantId: null,
+        sourceMessages: [user, original, edited, target],
+        preserveVersions: true,
+        sourceVersionSelections: {original.id: 0},
+        forkTargetMessageId: edited.id,
+      );
+
+      final forkMessages = service.getMessages(fork.id);
+      expect(forkMessages, hasLength(4));
+
+      final byContent = {for (final m in forkMessages) m.content: m};
+      // All rows of the kept context are present with version counters.
+      expect(byContent['answer v0']!.version, 0);
+      expect(byContent['answer v1']!.version, 1);
+      // The anchor clone emulates the source anchor (groupId == own id is
+      // the factory normalization of null); the v1 clone references it.
+      expect(byContent['answer v0']!.groupId, byContent['answer v0']!.id);
+      expect(byContent['answer v1']!.groupId, byContent['answer v0']!.id);
+      // Origin ids are never carried into the fork (fresh identities).
+      expect(byContent['answer v0']!.id, isNot(original.id));
+      expect(byContent['answer v1']!.id, isNot(edited.id));
+      // subgroupId must be stripped even if the source rows carried it.
+      expect(byContent['answer v0']!.subgroupId, isNull);
+      // Every clone lives in the fork conversation.
+      expect(forkMessages.map((m) => m.conversationId).toSet(), {fork.id});
+
+      // The new conversation's selection map uses the remapped group key
+      // (the anchor clone's new id) and points at the forked-off revision's
+      // index (the v1 clone sits at index 1 in the sorted group). Only the
+      // forked target group is written; the plain user groups carry no
+      // selection entries.
+      final newSelections = service.getVersionSelections(fork.id);
+      expect(newSelections, {byContent['answer v0']!.id: 1});
+      // Verify tool events + signature rode along to the v1 clone.
+      final v1Clone = byContent['answer v1']!;
+      expect(service.getToolEvents(v1Clone.id), [
+        {'id': 'tool-call', 'name': 'search', 'result': 'done'},
+      ]);
+      expect(service.getGeminiThoughtSignature(v1Clone.id), 'sig-v1');
+
+      // The user group keeps no selection entry (map uses group keys only).
+      expect(newSelections.containsKey(byContent['question']!.id), isFalse);
+    });
+
+    test('preserve-mode fork keeps source selections of earlier groups, drops '
+        'unknowns, and forces the forked revision index', () async {
+      final service = createService();
+      await service.init();
+
+      final source = await service.createConversation(title: 'Source');
+      final user1 = await service.addMessage(
+        conversationId: source.id,
+        role: 'user',
+        content: 'q1',
+      );
+      final a1v0 = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'a1 v0',
+      );
+      final a1v1 = (await service.appendMessageVersion(
+        messageId: a1v0.id,
+        content: 'a1 v1',
+      ))!;
+      expect(a1v1.id, isNot(a1v0.id));
+
+      // Fork at a1v0. The caller supplies the cut itself (user1 + both a1
+      // versions); the source map carries an entry for a group that ia not
+      // in the cut (dropped), plus a stale target selection (overridden).
+      final fork = await service.forkConversation(
+        title: 'Fork',
+        assistantId: null,
+        sourceMessages: [user1, a1v0, a1v1],
+        preserveVersions: true,
+        sourceVersionSelections: {a1v0.id: 1, 'unknown-group': 0},
+        forkTargetMessageId: a1v0.id,
+      );
+
+      final forkMessages = service.getMessages(fork.id);
+      expect(forkMessages.map((m) => m.content).toList(), [
+        'q1',
+        'a1 v0',
+        'a1 v1',
+      ]);
+      // The anchor clone's group key is its own new id (factory
+      // normalization of the anchor's null groupId); the v1 clone must
+      // reference it, and the selection must be forced onto that key.
+      final aGroup = forkMessages[1].id;
+      expect(forkMessages[1].groupId, aGroup);
+      expect(forkMessages[2].groupId, aGroup);
+      // The a1 group's position selection is the forked-off revision (0),
+      // the stale target index (1) and the unknown group are gone.
+      expect(service.getVersionSelections(fork.id), {aGroup: 0});
+    });
+
+    test('preserve-mode fork carries tool events and signatures from a '
+        'temporary source conversation', () async {
+      final service = createService();
+      await service.init();
+
+      final temporary = await service.createDraftConversation(
+        title: 'Temporary Chat',
+        temporary: true,
+      );
+      final answer = await service.addMessage(
+        conversationId: temporary.id,
+        role: 'assistant',
+        content: 'temp answer',
+      );
+      await service.setToolEvents(answer.id, [
+        {'id': 'tool-temp', 'name': 'temp-search', 'result': 'ok'},
+      ]);
+      await service.setGeminiThoughtSignature(answer.id, 'temp-sig');
+
+      final fork = await service.forkConversation(
+        title: 'Fork',
+        assistantId: null,
+        sourceMessages: [answer],
+        preserveVersions: true,
+        sourceVersionSelections: const {},
+        forkTargetMessageId: answer.id,
+      );
+
+      // The temporary source conversation is discarded by the fork.
+      expect(service.getConversation(temporary.id), isNull);
+
+      final forkMessages = service.getMessages(fork.id);
+      expect(forkMessages, hasLength(1));
+      expect(forkMessages.single.content, 'temp answer');
+      expect(forkMessages.single.id, isNot(answer.id));
+      expect(service.getToolEvents(forkMessages.single.id), [
+        {'id': 'tool-temp', 'name': 'temp-search', 'result': 'ok'},
+      ]);
+      expect(
+        service.getGeminiThoughtSignature(forkMessages.single.id),
+        'temp-sig',
+      );
+    });
   });
 }

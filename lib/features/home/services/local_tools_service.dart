@@ -513,26 +513,14 @@ class LocalToolsService {
       });
     }
     if (assistant.localToolIds.contains(LocalToolNames.handoff)) {
+      // Single wait-mode sub-agent delegation tool (ADR-0041): the retired
+      // `kelivo_handoff_sync` sibling is fused into `kelivo_handoff`, whose
+      // ids are normalized at Assistant construction.
       tools.add({
         'type': 'function',
         'function': {
           'name': LocalToolNames.handoff,
           'description': _handoffDescription(
-            sync: false,
-            discoverableAssistants: discoverableAssistants,
-            excludeId: assistant.id,
-          ),
-          'parameters': _handoffParameters(),
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.handoffSync)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.handoffSync,
-          'description': _handoffDescription(
-            sync: true,
             discoverableAssistants: discoverableAssistants,
             excludeId: assistant.id,
           ),
@@ -602,27 +590,30 @@ class LocalToolsService {
         .toList();
   }
 
+  /// Available sub-agent delegation targets for the given assistant — the
+  /// single source behind the settings status row, the Tools Hub badge and
+  /// the target list sheet.
+  static List<Assistant> handoffTargets(
+    List<Assistant> all, {
+    String? excludeId,
+  }) {
+    return _handoffTargets(all, excludeId: excludeId);
+  }
+
   static String _handoffDescription({
-    required bool sync,
     required List<Assistant>? discoverableAssistants,
     String? excludeId,
   }) {
     final buffer = StringBuffer();
-    if (sync) {
-      buffer.write(
-        'Delegate a task to another specialized assistant AND WAIT for it to '
-        'finish. The sub-agent\'s complete output is returned as the tool '
-        'result, so you can synthesize from it. Unlike kelivo_handoff, the '
-        'result may be long and this call may take minutes. '
-        'The user can watch progress in the panel and visit the sub-conversation.\n',
-      );
-    } else {
-      buffer.write(
-        'Delegate a task to another specialized assistant. '
-        'A new conversation is created with full tool access. '
-        'The user can navigate to it from the conversation list.\n',
-      );
-    }
+    buffer.write(
+      'Delegate a task to another specialized assistant AS A SUB-AGENT and '
+      'WAIT for it to finish. '
+      'The sub-agent\'s complete output is returned as the tool result, '
+      'so you can synthesize from it. '
+      'The result may be long and this call may take minutes. '
+      'The user can watch progress in the sub-agent panel and visit the '
+      'sub-conversation.\n',
+    );
     final targets = _handoffTargets(
       discoverableAssistants,
       excludeId: excludeId,
@@ -630,7 +621,7 @@ class LocalToolsService {
     if (targets.isEmpty) {
       buffer.write(
         'No assistants are currently available. '
-        'Ask the user to enable "discoverable" on a target assistant.',
+        'Ask the user to enable "discoverable" on the target assistant.',
       );
     } else {
       buffer.write('Available targets:\n');

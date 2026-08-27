@@ -18,6 +18,7 @@ import 'dart:async';
 import 'dart:io';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/message_quote.dart';
 import '../../../core/services/model_override_payload_parser.dart';
 import 'image_generation_options.dart';
 import '../../../utils/clipboard_images.dart';
@@ -65,6 +66,16 @@ class ChatInputBarController {
   ChatInputData snapshotInput(String text) =>
       _state?._snapshotInput(text) ?? ChatInputData(text: text.trim());
   void clearDraft() => _state?._clearDraft();
+
+  /// Sets (or clears) the pending reply citation. [snippet] is the
+  /// display-ready preview text; null keeps the current preview (used by
+  /// draft restore).
+  void setQuoteDraft(MessageQuote? quote, {String? snippet}) =>
+      _state?._setQuoteDraft(quote, snippet: snippet);
+  void clearQuoteDraft() => setQuoteDraft(null);
+
+  /// The pending reply citation in the bar, or null.
+  MessageQuote? get quoteDraft => _state?._quoteDraft;
 
   /// Ids of direct buttons the narrow row could not fit. They land in the
   /// right "+" sheet (phone bucket merge). Stale-safe: updated on every bar
@@ -267,6 +278,14 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _lastImageDefaultsSignature;
   late final ImageGenerationOptionsController _imageGenController =
       widget.imageGenController ?? ImageGenerationOptionsController();
+
+  /// Pending reply citation (message reply, issue #312). Part of the draft
+  /// state: cleared on sent/queued, kept on rejected, rides chat_draft_v1.
+  MessageQuote? _quoteDraft;
+
+  /// Display snippet of the pending reply preview row. Composer-only
+  /// presentation (the sent bubble renders its own citation).
+  String? _quoteSnippet;
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -483,7 +502,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     for (final doc in draft.documents) {
       if (File(doc.path).existsSync()) documents.add(doc);
     }
-    if (draft.text.trim().isEmpty && images.isEmpty && documents.isEmpty) {
+    if (draft.text.trim().isEmpty &&
+        images.isEmpty &&
+        documents.isEmpty &&
+        draft.quote == null) {
       // Everything was filtered out (whitespace-only text, media files
       // deleted on disk) — drop the stale draft instead of leaving it to
       // nag the storage guardrail forever.
@@ -496,6 +518,8 @@ class _ChatInputBarState extends State<ChatInputBar>
       _imageSizes[p] = _fileSize(p);
     }
     _docs.addAll(documents);
+    _quoteDraft = draft.quote;
+    _quoteSnippet = draft.quoteSnippet;
     // Re-persist the filtered content so storage stays in sync with the bar.
     _scheduleDraftSave();
   }
@@ -509,8 +533,19 @@ class _ChatInputBarState extends State<ChatInputBar>
         text: _controller.text,
         imagePaths: List<String>.of(_images),
         documents: List<DocumentAttachment>.of(_docs),
+        quote: _quoteDraft,
+        quoteSnippet: _quoteSnippet,
       ),
     );
+  }
+
+  /// Sets (or clears) the pending reply citation owned by this bar.
+  void _setQuoteDraft(MessageQuote? quote, {String? snippet}) {
+    setState(() {
+      _quoteDraft = quote;
+      if (snippet != null) _quoteSnippet = snippet;
+    });
+    _scheduleDraftSave();
   }
 
   void _addImages(List<String> paths) {
@@ -583,6 +618,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         conversationId: widget.conversationId,
       );
       _imageGenController.restoreFromBody(input.extraBody);
+      _quoteDraft = input.quote;
+      _quoteSnippet = input.quoteSnippet;
     });
     _scheduleDraftSave();
   }
@@ -594,6 +631,8 @@ class _ChatInputBarState extends State<ChatInputBar>
       documents: List<DocumentAttachment>.of(_docs),
       allowImagesApiRouting: _allowImagesApiRouting,
       extraBody: _imageGenerationExtraBody(),
+      quote: _quoteDraft,
+      quoteSnippet: _quoteSnippet,
     );
   }
 
@@ -601,6 +640,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {
       _controller.clear();
       _resetMedia(images: true, docs: true);
+      _quoteDraft = null;
+      _quoteSnippet = null;
     });
     _clearPersistedDraft();
   }
@@ -1249,6 +1290,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
     final images = List.of(_images);
     final docs = List.of(_docs);
+    final quoted = _quoteDraft;
+    final quoteSnippet = _quoteSnippet;
     final submittedValue = _controller.value;
     // The content has moved into the conversation or the queue — clear the
     // input before awaiting so the composer shrink and the message growth
@@ -1257,6 +1300,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {
       _controller.clear();
       _resetMedia(images: true, docs: true);
+      _quoteDraft = null;
+      _quoteSnippet = null;
     });
     try {
       final result =
@@ -1267,6 +1312,8 @@ class _ChatInputBarState extends State<ChatInputBar>
               documents: docs,
               allowImagesApiRouting: _allowImagesApiRouting,
               extraBody: _imageGenerationExtraBody(),
+              quote: quoted,
+              quoteSnippet: quoteSnippet,
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
@@ -1314,6 +1361,8 @@ class _ChatInputBarState extends State<ChatInputBar>
             _docs
               ..clear()
               ..addAll(docs);
+            _quoteDraft = quoted;
+            _quoteSnippet = quoteSnippet;
           });
           _scheduleDraftSave();
         }
@@ -2547,6 +2596,79 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {});
   }
 
+  /// Pending-reply preview row — LivePanel visual language (transparent row,
+  /// hairline rule, single line) but owned by the bar as draft state, never a
+  /// LivePanel entry (docs/adr/0042).
+  Widget _buildQuotePreviewRow(BuildContext context, bool isDark) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final cs = theme.colorScheme;
+    final snippet = _quoteSnippet;
+    final label = (snippet != null && snippet.trim().isNotEmpty)
+        ? snippet
+        : l10n.messageQuoteDeletedErrorMessage;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.xxs,
+            AppSpacing.sm,
+            AppSpacing.xxs,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Lucide.Reply,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Material(
+                color: Colors.transparent,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _setQuoteDraft(null),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xxs),
+                    child: Tooltip(
+                      message: l10n.messageQuotePreviewDismiss,
+                      child: Icon(
+                        Lucide.X,
+                        size: 15,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: isDark
+              ? cs.onSurface.withValues(alpha: 0.06)
+              : cs.onSurface.withValues(alpha: 0.08),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     final previewFill = isDark
@@ -2984,6 +3106,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                       child: Column(
                         children: [
                           if (widget.livePanel != null) widget.livePanel!,
+                          if (_quoteDraft != null)
+                            _buildQuotePreviewRow(context, isDark),
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button

@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/models/workspace.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/workspace_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -18,11 +20,15 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../workspace/pages/workspace_list_page.dart';
 import '../../workspace/pages/workspace_terminal_page.dart';
 import '../../workspace/widgets/workspace_bind_sheet.dart';
+import '../../assistant/pages/assistant_settings_page.dart';
+import '../../workspace/widgets/workspace_settings_sheet.dart';
 import '../services/local_tools_service.dart';
+import 'subagent_target_sheet.dart';
 
 /// The shared Tools Hub content: local tools / MCP servers / workspace
 /// management grouped with collapsible headers. Used by both the mobile
@@ -32,9 +38,15 @@ import '../services/local_tools_service.dart';
 /// check-mark rows on desktop (hover highlight), card rows with switches on
 /// mobile.
 class ToolsHubContent extends StatefulWidget {
-  const ToolsHubContent({super.key, required this.assistantId, this.onClose});
+  const ToolsHubContent({
+    super.key,
+    required this.assistantId,
+    required this.conversationId,
+    this.onClose,
+  });
 
   final String assistantId;
+  final String? conversationId;
 
   /// Invoked before navigation actions (dialog/routes) so hosting shells
   /// (e.g. the desktop popover with its full-screen dismiss barrier) can
@@ -51,6 +63,9 @@ class _ToolsHubContentState extends State<ToolsHubContent>
   static const String _mcpKey = 'mcp';
   static const String _workspaceKey = 'workspace';
 
+  /// Desktop popover inline hint: dismissed per-open (transient surface).
+  bool _subagentHintDismissed = false;
+
   @override
   Set<String> get initialCollapsedGroups => {_localToolsKey};
 
@@ -62,6 +77,20 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     }
   }
 
+  void _goAssistantSettings() {
+    widget.onClose?.call();
+    if (PlatformUtils.isDesktop) {
+      // Desktop deep link mirrors the backup-reminder pattern: the settings
+      // shell owns the assistant list pane; pushing a mobile-style route on
+      // desktop is wrong (see side_drawer._openBackupSettings).
+      DesktopSettingsNavigationBus.instance.openAssistants();
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AssistantSettingsPage()),
+    );
+  }
+
   void _toggleLocalTool(Assistant a, String toolId, bool value) {
     Haptics.light();
     final ids = a.localToolIds.toSet();
@@ -71,6 +100,21 @@ class _ToolsHubContentState extends State<ToolsHubContent>
       ids.remove(toolId);
     }
     _updateAssistant(a.copyWith(localToolIds: ids.toList(growable: false)));
+    if (toolId == LocalToolNames.handoff && value) {
+      final targets = LocalToolsService.handoffTargets(
+        context.read<AssistantProvider>().assistants,
+        excludeId: a.id,
+      );
+      if (targets.isEmpty) {
+        setState(() => _subagentHintDismissed = false);
+        if (PlatformUtils.isMobile) {
+          showSubagentNoTargetSnackbar(
+            context,
+            onGoSetup: _goAssistantSettings,
+          );
+        }
+      }
+    }
   }
 
   Future<void> _toggleDeviceTool(Assistant a, String toolId, bool value) async {
@@ -149,6 +193,9 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     final boundWs = assistant.workspaceId == null
         ? null
         : wp.getById(assistant.workspaceId!);
+    final conversation = widget.conversationId == null
+        ? null
+        : context.watch<ChatService>().getConversation(widget.conversationId!);
     final wsTerminalReady =
         Platform.isAndroid &&
         assistant.workspaceEnabled &&
@@ -206,6 +253,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
                 assistant,
                 boundWs,
                 wsTerminalReady,
+                conversation,
               ),
             ],
           ),
@@ -224,6 +272,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     required String title,
     required String toolId,
     bool deviceTool = false,
+    int? targetBadge,
   }) {
     final enabled = a.localToolIds.contains(toolId);
     void toggle(bool v) {
@@ -240,6 +289,10 @@ class _ToolsHubContentState extends State<ToolsHubContent>
         title: title,
         enabled: enabled,
         onChanged: toggle,
+        tag: targetBadge == null
+            ? null
+            : AppLocalizations.of(context)!.subagentTargetBadge(targetBadge),
+        tagWarning: targetBadge != null && targetBadge == 0,
       );
     }
     return _DesktopToolRow(
@@ -247,6 +300,9 @@ class _ToolsHubContentState extends State<ToolsHubContent>
       label: title,
       selected: enabled,
       onTap: () => toggle(!enabled),
+      trailing: targetBadge == null
+          ? null
+          : _SubagentBadgeText(count: targetBadge, showCheck: enabled),
     );
   }
 
@@ -255,6 +311,11 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     ColorScheme cs,
     Assistant a,
   ) {
+    final targets = LocalToolsService.handoffTargets(
+      context.read<AssistantProvider>().assistants,
+      excludeId: a.id,
+    );
+    final handoffEnabled = a.localToolIds.contains(LocalToolNames.handoff);
     final rows = <Widget>[
       _localToolRow(
         a,
@@ -291,12 +352,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
         icon: Lucide.Bot,
         title: l10n.assistantEditLocalToolHandoffTitle,
         toolId: LocalToolNames.handoff,
-      ),
-      _localToolRow(
-        a,
-        icon: Lucide.Timer,
-        title: l10n.assistantEditLocalToolHandoffSyncTitle,
-        toolId: LocalToolNames.handoffSync,
+        targetBadge: targets.length,
       ),
       if (DeviceLocalTools.screenTimeSupported)
         _localToolRow(
@@ -323,10 +379,22 @@ class _ToolsHubContentState extends State<ToolsHubContent>
         ),
       ],
     ];
+    final toolCount = rows.length;
+    if (!PlatformUtils.isMobile &&
+        handoffEnabled &&
+        targets.isEmpty &&
+        !_subagentHintDismissed) {
+      rows.add(
+        SubagentNoTargetHintRow(
+          onGoSetup: _goAssistantSettings,
+          onDismiss: () => setState(() => _subagentHintDismissed = true),
+        ),
+      );
+    }
     return _buildGroup(
       keyName: _localToolsKey,
       groupName: l10n.toolsHubLocalToolsTitle,
-      count: rows.length,
+      count: toolCount,
       children: rows,
     );
   }
@@ -426,8 +494,34 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     Assistant a,
     Workspace? boundWs,
     bool wsTerminalReady,
+    Conversation? conversation,
   ) {
     final boundLabel = boundWs?.displayName ?? l10n.toolsHubWorkspaceUnbound;
+    final directoryReady =
+        a.workspaceEnabled && boundWs != null && conversation != null;
+    final directoryLabel = directoryReady
+        ? conversation.workspaceDirectoryOverrides[boundWs.id] ??
+              a.workspaceDefaultDirectories[boundWs.id] ??
+              '/workspace'
+        : l10n.workspaceBindDisabledHint;
+
+    void openDirectorySettings() {
+      final conversationId = widget.conversationId;
+      if (!directoryReady || conversationId == null) return;
+      Haptics.light();
+      final launchContext = widget.onClose == null
+          ? context
+          : Navigator.of(context, rootNavigator: true).context;
+      widget.onClose?.call();
+      unawaited(
+        showWorkspaceDirectorySettings(
+          launchContext,
+          assistantId: a.id,
+          conversationId: conversationId,
+        ),
+      );
+    }
+
     final children = <Widget>[
       if (_isMobileStyle)
         _SheetNavRow(
@@ -468,6 +562,39 @@ class _ToolsHubContentState extends State<ToolsHubContent>
             showWorkspaceBindSheet(context, a);
           },
         ),
+      if (_isMobileStyle)
+        _SheetNavRow(
+          icon: Lucide.FolderOpen,
+          title: l10n.workspaceDirectoryPickerTitle,
+          trailingText: directoryLabel,
+          enabled: directoryReady,
+          onTap: directoryReady ? openDirectorySettings : null,
+        )
+      else
+        _DesktopToolRow(
+          icon: Lucide.FolderOpen,
+          label: l10n.workspaceDirectoryPickerTitle,
+          enabled: directoryReady,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                directoryLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Lucide.ChevronRight,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ],
+          ),
+          onTap: directoryReady ? openDirectorySettings : null,
+        ),
     ];
     if (Platform.isAndroid) {
       children.add(
@@ -496,7 +623,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     return _buildGroup(
       keyName: _workspaceKey,
       groupName: l10n.settingsPageWorkspace,
-      count: Platform.isAndroid ? 2 : 1,
+      count: Platform.isAndroid ? 3 : 2,
       trailing: Tooltip(
         message: l10n.toolsHubWorkspaceManage,
         child: IosIconButton(
@@ -543,7 +670,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, child) in children.indexed) ...[
-                if (i > 0) const SizedBox(height: 10),
+                if (i > 0) const SizedBox(height: 6),
                 child,
               ],
             ],
@@ -584,6 +711,7 @@ class _DesktopToolRow extends StatefulWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.enabled = true,
     this.onTap,
     this.trailing,
   });
@@ -591,6 +719,7 @@ class _DesktopToolRow extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool selected;
+  final bool enabled;
   final VoidCallback? onTap;
   final Widget? trailing;
 
@@ -610,57 +739,62 @@ class _DesktopToolRowState extends State<_DesktopToolRow> {
     final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
       alpha: isDark ? 0.12 : 0.10,
     );
-    return MouseRegion(
-      cursor: widget.onTap == null
-          ? MouseCursor.defer
-          : SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? hoverBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    size: 16,
-                    color: widget.selected ? cs.primary : onColor,
+    return Opacity(
+      opacity: widget.enabled ? 1 : 0.55,
+      child: MouseRegion(
+        cursor: !widget.enabled || widget.onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
+        onEnter: (_) {
+          if (widget.enabled) setState(() => _hovered = true);
+        },
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.enabled ? widget.onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: _hovered ? hoverBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      size: 16,
+                      color: widget.selected ? cs.primary : onColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: AppFontWeights.regular,
-                    decoration: TextDecoration.none,
-                    color: onColor,
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.regular,
+                      decoration: TextDecoration.none,
+                      color: onColor,
+                    ),
                   ),
                 ),
-              ),
-              if (widget.trailing != null)
-                widget.trailing!
-              else if (widget.selected)
-                Icon(Lucide.Check, size: 16, color: cs.primary)
-              else
-                const SizedBox(width: 16),
-            ],
+                if (widget.trailing != null)
+                  widget.trailing!
+                else if (widget.selected)
+                  Icon(Lucide.Check, size: 16, color: cs.primary)
+                else
+                  const SizedBox(width: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -677,11 +811,13 @@ class _SheetToolRow extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     this.tag,
+    this.tagWarning = false,
   });
 
   final IconData icon;
   final String title;
   final String? tag;
+  final bool tagWarning;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
@@ -691,6 +827,7 @@ class _SheetToolRow extends StatelessWidget {
     final iconColor = enabled
         ? cs.primary
         : cs.onSurface.withValues(alpha: 0.7);
+    final tagColor = tagWarning ? cs.error : cs.primary;
     return IosCardPress(
       borderRadius: BorderRadius.circular(14),
       baseColor: cs.surface,
@@ -718,15 +855,15 @@ class _SheetToolRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.10),
+                color: tagColor.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+                border: Border.all(color: tagColor.withValues(alpha: 0.35)),
               ),
               child: Text(
                 tag!,
                 style: TextStyle(
                   fontSize: 11,
-                  color: cs.primary,
+                  color: tagColor,
                   fontWeight: AppFontWeights.semibold,
                 ),
               ),
@@ -736,6 +873,40 @@ class _SheetToolRow extends StatelessWidget {
           IosSwitch(value: enabled, onChanged: onChanged),
         ],
       ),
+    );
+  }
+}
+
+/// Desktop trailing badge for the Sub-agent Delegation row: live target count
+/// (error-tinted at zero) next to the selected check marker.
+class _SubagentBadgeText extends StatelessWidget {
+  const _SubagentBadgeText({required this.count, required this.showCheck});
+
+  final int count;
+  final bool showCheck;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final color = count == 0 ? cs.error : cs.onSurface.withValues(alpha: 0.5);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l10n.subagentTargetBadge(count),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: AppFontWeights.medium,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 6),
+        if (showCheck)
+          Icon(Lucide.Check, size: 16, color: cs.primary)
+        else
+          const SizedBox(width: 16),
+      ],
     );
   }
 }

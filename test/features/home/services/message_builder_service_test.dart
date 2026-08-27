@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
+import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/core/services/workspace/workspace_execution_context.dart';
 import 'package:Cuplivo/features/home/services/message_builder_service.dart';
 
 class _FakeBuildContext implements BuildContext {
@@ -680,5 +682,133 @@ void main() {
         'user',
       ]);
     });
+
+    test('<reply-to> 前缀注入到带引用的用户消息上 (id-only)', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'a1', role: 'assistant', content: '**原始的**回答'),
+          ChatMessage(
+            id: 'u1',
+            role: 'user',
+            content: '这里补充说明',
+            conversationId: 'conversation-1',
+            quoteJson: '{"id":"a1"}',
+          ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      final userMessage = apiMessages.last;
+      expect(userMessage['role'], 'user');
+      expect(userMessage['content'], '<reply-to>原始的回答</reply-to>\n\n这里补充说明');
+    });
+
+    test('<reply-to> 范围引用只注入选中片段 (range)', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      // "**bold** text" → plain "bold text"; range (0..13) selects the whole
+      // markdown fragment including markers.
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'a1', role: 'assistant', content: '**bold** text'),
+          ChatMessage(
+            id: 'u1',
+            role: 'user',
+            content: '回答正确',
+            conversationId: 'conversation-1',
+            quoteJson: '{"id":"a1","start":0,"end":13}',
+          ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      final userMessage = apiMessages.last;
+      expect(userMessage['content'], '<reply-to>bold text</reply-to>\n\n回答正确');
+    });
+
+    test('引用的目标被折叠/删除时不注入前缀', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          ChatMessage(
+            id: 'u1',
+            role: 'user',
+            content: '这是正文',
+            conversationId: 'conversation-1',
+            quoteJson: '{"id":"missing"}',
+          ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      final userMessage = apiMessages.last;
+      expect(userMessage['content'], '这是正文');
+    });
+
+    test('引用前缀不丢失内部元数据 (preset/timestamp keys)', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'a1', role: 'assistant', content: 'target'),
+          ChatMessage(
+            id: 'u1',
+            role: 'user',
+            content: 'reply body',
+            conversationId: 'conversation-1',
+            quoteJson: '{"id":"a1"}',
+            isPreset: true,
+          ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      final userMessage = apiMessages.last;
+      expect(userMessage['_isPreset'], true);
+      expect(userMessage.containsKey('_timestamp'), isTrue);
+      expect(
+        userMessage['content'],
+        '<reply-to>target</reply-to>\n\nreply body',
+      );
+    });
   });
+
+  test(
+    'skips AGENTS.md loading before accessing the workspace when disabled',
+    () async {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'system', 'content': 'assistant instructions'},
+      ];
+
+      await service.injectWorkspaceAgentsMdInstructions(
+        apiMessages,
+        assistant: Assistant(
+          id: 'assistant-1',
+          name: 'Assistant',
+          autoLoadAgentsMd: false,
+        ),
+        workspaceExecutionContext: WorkspaceExecutionContext(
+          workspace: Workspace.createDefault(),
+          workingDirectory: '/workspace',
+        ),
+      );
+
+      expect(apiMessages.single['content'], 'assistant instructions');
+    },
+  );
 }

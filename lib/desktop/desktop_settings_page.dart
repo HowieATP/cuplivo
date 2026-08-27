@@ -142,6 +142,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
         case DesktopSettingsNavigationTarget.backup:
           setState(() => _selected = _SettingsMenuItem.backup);
           break;
+        case DesktopSettingsNavigationTarget.assistants:
+          setState(() => _selected = _SettingsMenuItem.assistant);
+          break;
       }
     });
   }

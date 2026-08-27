@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -173,6 +174,13 @@ class MessageGenerationService {
 
     // Inject prompts
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    final workspaceExecutionContext = generationController
+        .resolveWorkspaceExecutionContext(assistant, currentConversation);
+    await messageBuilderService.injectWorkspaceAgentsMdInstructions(
+      apiMessages,
+      assistant: assistant,
+      workspaceExecutionContext: workspaceExecutionContext,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -200,6 +208,15 @@ class MessageGenerationService {
     );
     await messageBuilderService.injectSkillListPrompt(apiMessages, assistantId);
 
+    messageBuilderService.injectWorkspacePrompt(
+      apiMessages,
+      generationController.buildWorkspacePromptReminder(
+        assistant: assistant,
+        conversation: currentConversation,
+        workspaceExecutionContext: workspaceExecutionContext,
+      ),
+    );
+
     // Inject time note (at the end of system message, after all other injections)
     messageBuilderService.injectTimeNote(apiMessages, assistant);
 
@@ -214,6 +231,8 @@ class MessageGenerationService {
       providerKey,
       modelId,
       hasBuiltInSearch,
+      conversation: currentConversation,
+      workspaceExecutionContext: workspaceExecutionContext,
     );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
@@ -222,6 +241,8 @@ class MessageGenerationService {
             approvalService: approvalService,
             askUserService: askUserService,
             conversationId: currentConversation?.id,
+            conversation: currentConversation,
+            workspaceExecutionContext: workspaceExecutionContext,
           )
         : null;
 
@@ -275,6 +296,7 @@ class MessageGenerationService {
         assistant: assistant,
       ),
       groupId: groupId,
+      quoteJson: input.quote == null ? null : jsonEncode(input.quote!.toJson()),
     );
     // Persist per-message request metadata (routing decision + image options
     // body) so regenerate/continue can replay them. See

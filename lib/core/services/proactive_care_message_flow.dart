@@ -832,6 +832,18 @@ class ProactiveCareHeadlessChatStore {
     return _dateTimeFromSql(value);
   }
 
+  static String? _readOptionalString(sqlite.Row row, String column) {
+    try {
+      return row[column]?.toString();
+    } catch (error) {
+      FlutterLogger.log(
+        'Optional assistant column $column is unavailable: $error',
+        tag: _logTag,
+      );
+      return null;
+    }
+  }
+
   /// Converts [DateTime] to unix timestamp seconds for drift compatibility.
   static int _dateTimeToSql(DateTime dt) => dt.millisecondsSinceEpoch ~/ 1000;
 
@@ -887,6 +899,11 @@ class ProactiveCareHeadlessChatStore {
           .cast<String>(),
       'workspaceEnabled': (row['workspace_enabled'] as int? ?? 0) != 0,
       'workspaceId': row['workspace_id'] as String?,
+      'workspaceDefaultDirectories': jsonDecode(
+        _readOptionalString(row, 'workspace_default_directories_json') ?? '{}',
+      ),
+      'autoLoadAgentsMd':
+          (_readOptionalString(row, 'auto_load_agents_md') ?? '1') != '0',
       'customHeaders': jsonDecode(row['custom_headers_json'] as String),
       'customBody': jsonDecode(row['custom_body_json'] as String),
       'enableMemory': (row['enable_memory'] as int) != 0,

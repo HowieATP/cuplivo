@@ -37,6 +37,10 @@
 NSNotificationName const CuplivoISHProcessExitedNotification = @"CuplivoISHProcessExited";
 
 static NSString *const kDnsSubdir = @"CuplivoSandbox/dns";
+static NSString *const kNodeFetchPolyfillResource = @"node-fetch-jitless-polyfill";
+static NSString *const kNodeFetchPolyfillGuestPath = @"/lib/cuplivo-fetch-jitless-polyfill.js";
+static NSString *const kNodeFetchPolyfillGuestTempPath =
+    @"/lib/.cuplivo-fetch-jitless-polyfill.js.tmp";
 
 // Fallback nameservers appended after the system resolver servers. System
 // DNS may be absent (airplane mode) or unusable from the guest (a loopback
@@ -180,6 +184,11 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
     // 3. Device nodes.
     [self createDeviceNodes];
 
+    // Node runs with --jitless in iSH, which removes WebAssembly and makes
+    // Node 22's undici fetch crash while loading its llhttp WASM parser.
+    // Install the bundled non-WASM fetch implementation before commands run.
+    [self installNodeJitlessFetchPolyfill];
+
     // 4. Mount proc and devpts.
     do_mount(&procfs, "proc", "/proc", "", 0);
     do_mount(&devptsfs, "devpts", "/dev/pts", "", 0);
@@ -220,6 +229,74 @@ static void cuplivo_handle_process_exit(struct task *task, int code) {
     generic_mknodat(AT_PWD, "/dev/random", S_IFCHR | 0666, dev_make(MEM_MAJOR, DEV_RANDOM_MINOR));
     generic_mknodat(AT_PWD, "/dev/urandom", S_IFCHR | 0666, dev_make(MEM_MAJOR, DEV_URANDOM_MINOR));
     NSLog(@"CuplivoISHKernel: device nodes created");
+}
+
+- (void)installNodeJitlessFetchPolyfill {
+    NSURL *resource = [[NSBundle mainBundle]
+        URLForResource:kNodeFetchPolyfillResource withExtension:@"js"];
+    if (resource == nil) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill bundle resource missing");
+        return;
+    }
+
+    NSError *readError = nil;
+    NSData *contents = [NSData dataWithContentsOfURL:resource
+                                              options:0
+                                                error:&readError];
+    if (contents == nil) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill read failed: %@", readError);
+        return;
+    }
+    if (contents.length == 0) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill bundle resource is empty");
+        return;
+    }
+
+    struct fd *fd = generic_open(kNodeFetchPolyfillGuestTempPath.UTF8String,
+                                 O_WRONLY_ | O_CREAT_ | O_TRUNC_, 0644);
+    if (IS_ERR(fd)) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill guest temp write open failed: %ld",
+              PTR_ERR(fd));
+        return;
+    }
+
+    const char *bytes = contents.bytes;
+    size_t offset = 0;
+    const size_t length = contents.length;
+    while (offset < length) {
+        ssize_t written = fd->ops->write(fd, bytes + offset, length - offset);
+        if (written <= 0) {
+            NSLog(@"CuplivoISHKernel: node fetch polyfill guest write failed: %zd",
+                  written);
+            break;
+        }
+        offset += (size_t)written;
+    }
+    fd_close(fd);
+
+    if (offset != length) {
+        int unlinkErr = generic_unlinkat(AT_PWD, kNodeFetchPolyfillGuestTempPath.UTF8String);
+        if (unlinkErr < 0) {
+            NSLog(@"CuplivoISHKernel: node fetch polyfill temp cleanup failed: %d", unlinkErr);
+        }
+        return;
+    }
+
+    int renameErr = generic_renameat(AT_PWD,
+                                     kNodeFetchPolyfillGuestTempPath.UTF8String,
+                                     AT_PWD,
+                                     kNodeFetchPolyfillGuestPath.UTF8String);
+    if (renameErr < 0) {
+        NSLog(@"CuplivoISHKernel: node fetch polyfill guest install rename failed: %d",
+              renameErr);
+        int unlinkErr = generic_unlinkat(AT_PWD, kNodeFetchPolyfillGuestTempPath.UTF8String);
+        if (unlinkErr < 0) {
+            NSLog(@"CuplivoISHKernel: node fetch polyfill temp cleanup failed: %d", unlinkErr);
+        }
+        return;
+    }
+
+    NSLog(@"CuplivoISHKernel: installed node fetch polyfill");
 }
 
 - (void)mountDnsConfig {

@@ -3349,44 +3349,80 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditMemoryVariableHint.
   ///
   /// In en, this message translates to:
-  /// **'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.'**
+  /// **'Including time variables reduces cache hit rate. If the model needs to know the current time, remove these variables and use \"Append current time\" in the Prompt tab instead.'**
   String get assistantEditMemoryVariableHint;
 
-  /// No description provided for @assistantEditTimeInjectionTitle.
+  /// No description provided for @assistantEditPromptTimeVarWarning.
   ///
   /// In en, this message translates to:
-  /// **'Smart Time Injection'**
-  String get assistantEditTimeInjectionTitle;
+  /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \'Append current time\' toggle below instead.'**
+  String get assistantEditPromptTimeVarWarning;
 
-  /// No description provided for @assistantEditTimeInjectionDescription.
+  /// No description provided for @assistantEditPromptAppendTimeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Append timestamp after each user message. Cache-friendly. Bypasses message template.'**
-  String get assistantEditTimeInjectionDescription;
+  /// **'Append current time'**
+  String get assistantEditPromptAppendTimeTitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningTitle.
+  /// No description provided for @assistantEditPromptAppendTimeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Volatile Variables Detected'**
-  String get assistantEditTimeInjectionWarningTitle;
+  /// **'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.'**
+  String get assistantEditPromptAppendTimeSubtitle;
 
-  /// No description provided for @assistantEditTimeInjectionWarningContent.
+  /// No description provided for @assistantEditPromptAppendTimeInfoTitle.
   ///
   /// In en, this message translates to:
-  /// **'For optimal cache results, consider removing the following volatile variables:'**
-  String get assistantEditTimeInjectionWarningContent;
+  /// **'Appended time format'**
+  String get assistantEditPromptAppendTimeInfoTitle;
 
-  /// No description provided for @assistantEditTimeInjectionTemplateDisabled.
+  /// No description provided for @assistantEditPromptAppendTimeInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'Message template is disabled when Smart Time Injection is active.'**
-  String get assistantEditTimeInjectionTemplateDisabled;
+  /// **'When enabled, a blank line and then the following line are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message\'s own send time, so it stays stable when you retry.'**
+  String assistantEditPromptAppendTimeInfoBody(Object example);
 
-  /// No description provided for @assistantEditMemoryRecordPromptLabel.
+  /// No description provided for @assistantEditPromptAppendTimeInfoClose.
   ///
   /// In en, this message translates to:
-  /// **'Memory Record Prompt'**
-  String get assistantEditMemoryRecordPromptLabel;
+  /// **'Got it'**
+  String get assistantEditPromptAppendTimeInfoClose;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt contains time variables'**
+  String get assistantEditPromptTimeVarDialogTitle;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using Append current time instead - it puts the time at the end of the request, off the cached prefix.'**
+  String assistantEditPromptTimeVarDialogBody(Object variables);
+
+  /// No description provided for @assistantEditPromptTimeVarDialogRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Go remove'**
+  String get assistantEditPromptTimeVarDialogRemove;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable anyway'**
+  String get assistantEditPromptTimeVarDialogKeep;
+
+  /// No description provided for @assistantEditPromptTimeVarDialogMemoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Time variables in the memory record prompt (e.g. current_hour, current_datetime) hurt cache hits the same way - consider removing them too.'**
+  String get assistantEditPromptTimeVarDialogMemoryHint;
+
+  /// No description provided for @assistantEditPromptAppendTimeTemplateDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Message template is disabled while Append current time is active.'**
+  String get assistantEditPromptAppendTimeTemplateDisabled;
 
   /// No description provided for @assistantEditMessageTemplateTitle.
   ///
@@ -3952,6 +3988,36 @@ abstract class AppLocalizations {
   /// **'Exporting...'**
   String get backupPageExporting;
 
+  /// No description provided for @backupPageExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String backupPageExportFailed(Object error);
+
+  /// No description provided for @backupPageExportElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed {seconds}s'**
+  String backupPageExportElapsed(Object seconds);
+
+  /// No description provided for @backupStageGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing files...'**
+  String get backupStageGenerating;
+
+  /// No description provided for @backupStagePacking.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing backup...'**
+  String get backupStagePacking;
+
+  /// No description provided for @backupStageUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading...'**
+  String get backupStageUploading;
+
   /// No description provided for @backupPageExportToFile.
   ///
   /// In en, this message translates to:
@@ -3981,6 +4047,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import from Other Apps'**
   String get backupPageImportFromOtherApps;
+
+  /// No description provided for @backupPageImportFromKelivo.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from New Kelivo'**
+  String get backupPageImportFromKelivo;
+
+  /// No description provided for @backupPageKelivoImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups from newer versions of Kelivo can be converted to a Cuplivo-compatible backup via the Kelivo-helper website:'**
+  String get backupPageKelivoImportHint;
+
+  /// No description provided for @backupPageKelivoImportUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://kelivo-helper.netlify.app/#/compat'**
+  String get backupPageKelivoImportUrl;
+
+  /// No description provided for @backupPageKelivoImportTutorialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Tutorial'**
+  String get backupPageKelivoImportTutorialTitle;
+
+  /// No description provided for @backupPageKelivoImportStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Kelivo-helper website below.'**
+  String get backupPageKelivoImportStep1;
+
+  /// No description provided for @backupPageKelivoImportStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the backup file exported from the newer version of Kelivo and follow the instructions on the webpage.'**
+  String get backupPageKelivoImportStep2;
+
+  /// No description provided for @backupPageKelivoImportStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the conversion to complete.'**
+  String get backupPageKelivoImportStep3;
+
+  /// No description provided for @backupPageKelivoImportStep4.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the converted backup file.'**
+  String get backupPageKelivoImportStep4;
+
+  /// No description provided for @backupPageKelivoImportStep5.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Cuplivo, tap “Import Backup File”, and select the converted file to complete the import.'**
+  String get backupPageKelivoImportStep5;
 
   /// No description provided for @backupPageImportFromRikkaHub.
   ///
@@ -5163,6 +5283,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select Messages'**
   String get messageMoreSheetSelectMessages;
+
+  /// No description provided for @messageMoreSheetReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get messageMoreSheetReply;
+
+  /// No description provided for @messageQuoteDeletedErrorMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The original message has been deleted'**
+  String get messageQuoteDeletedErrorMessage;
+
+  /// No description provided for @messageQuotePreviewDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss reply quote'**
+  String get messageQuotePreviewDismiss;
 
   /// No description provided for @messageMoreSheetCreateBranch.
   ///
@@ -6398,6 +6536,36 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get chatInputBarMoreTooltip;
 
+  /// No description provided for @chatInputBarCustomizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize Input Bar'**
+  String get chatInputBarCustomizeTitle;
+
+  /// No description provided for @chatInputBarCustomizeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder. Turn off a switch to tuck a button into \"+ More\"; it stays reachable from there.'**
+  String get chatInputBarCustomizeSubtitle;
+
+  /// No description provided for @chatInputBarCustomizeAtLeastOneVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one button directly visible'**
+  String get chatInputBarCustomizeAtLeastOneVisible;
+
+  /// No description provided for @chatInputBarCustomizeResetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get chatInputBarCustomizeResetTooltip;
+
+  /// No description provided for @chatInputBarCustomizeMenuAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize'**
+  String get chatInputBarCustomizeMenuAction;
+
   /// No description provided for @chatInputBarVoiceCancelTooltip.
   ///
   /// In en, this message translates to:
@@ -6697,18 +6865,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If SSE fails, try a few times'**
   String get mcpServerEditSheetSseRetryHint;
-
-  /// No description provided for @mcpServerEditSheetHeartbeatLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Heartbeat Interval'**
-  String get mcpServerEditSheetHeartbeatLabel;
-
-  /// No description provided for @mcpServerEditSheetHeartbeatHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If you encounter frequent 429 (rate limit) errors, try increasing this interval.'**
-  String get mcpServerEditSheetHeartbeatHint;
 
   /// No description provided for @mcpServerEditSheetAdvancedLabel.
   ///
@@ -8570,7 +8726,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServicesPageEnableFallbackFetchTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enable fetch for providers without native fetch'**
+  /// **'Add browsing for providers without native browsing'**
   String get searchServicesPageEnableFallbackFetchTitle;
 
   /// No description provided for @searchServicesPageAutoTestTitle.
@@ -9478,6 +9634,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm before regenerating'**
   String get displaySettingsPageShowRegenerateConfirmDialogTitle;
+
+  /// No description provided for @displaySettingsPageForkKeepMessageVersionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Message Versions When Forking'**
+  String get displaySettingsPageForkKeepMessageVersionsTitle;
+
+  /// No description provided for @displaySettingsPageForkKeepMessageVersionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The fork carries every regenerated version of each message so you can still switch between them; off keeps only the selected answer.'**
+  String get displaySettingsPageForkKeepMessageVersionsSubtitle;
 
   /// No description provided for @chainOfThoughtExpandSteps.
   ///
@@ -11837,29 +12005,77 @@ abstract class AppLocalizations {
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
 
+  /// No description provided for @assistantEditLocalToolScreenTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Screen Time'**
+  String get assistantEditLocalToolScreenTimeTitle;
+
+  /// No description provided for @assistantEditLocalToolScreenTimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query app screen usage on this device, requires the Usage access permission.'**
+  String get assistantEditLocalToolScreenTimeSubtitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarQueryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query Calendar'**
+  String get assistantEditLocalToolCalendarQueryTitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarQuerySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read calendar events on this device, requires the calendar permission.'**
+  String get assistantEditLocalToolCalendarQuerySubtitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Event'**
+  String get assistantEditLocalToolCalendarCreateTitle;
+
+  /// No description provided for @assistantEditLocalToolCalendarCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create calendar events on this device with your confirmation, requires the calendar permission.'**
+  String get assistantEditLocalToolCalendarCreateSubtitle;
+
+  /// No description provided for @chatMessageWidgetScreenTimeTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total screen time'**
+  String get chatMessageWidgetScreenTimeTotal;
+
+  /// No description provided for @chatMessageWidgetScreenTimePermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage access permission is not granted. Please enable it in system settings and try again.'**
+  String get chatMessageWidgetScreenTimePermissionRequired;
+
+  /// No description provided for @chatMessageWidgetCalendarPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar permission was denied. Enable calendar access in system settings, then toggle the tool again.'**
+  String get chatMessageWidgetCalendarPermissionDenied;
+
   /// No description provided for @assistantEditLocalToolHandoffTitle.
   ///
   /// In en, this message translates to:
-  /// **'Task Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffTitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Delegate a task to another assistant in a new conversation without waiting for the result.'**
+  /// **'Hand a task to a delegated sub-agent and wait for its full output; watch progress in the sub-agent panel.'**
   String get assistantEditLocalToolHandoffSubtitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSyncTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sync Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffSyncTitle;
-
-  /// No description provided for @assistantEditLocalToolHandoffSyncSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.'**
-  String get assistantEditLocalToolHandoffSyncSubtitle;
 
   /// No description provided for @assistantEditSkillDownloadTitle.
   ///
@@ -14327,12 +14543,6 @@ abstract class AppLocalizations {
   /// **'Speak'**
   String get chatMessageWidgetSpeak;
 
-  /// No description provided for @handoffForwardChip.
-  ///
-  /// In en, this message translates to:
-  /// **'→ {assistantName} · {convIdPrefix}'**
-  String handoffForwardChip(Object assistantName, Object convIdPrefix);
-
   /// No description provided for @handoffBackwardChip.
   ///
   /// In en, this message translates to:
@@ -14348,25 +14558,31 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Handoff / Delegation'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditHandoffSectionTitle;
 
   /// No description provided for @assistantEditHandoffDiscoverable.
   ///
   /// In en, this message translates to:
-  /// **'Discoverable by other assistants'**
+  /// **'Delegateable as a sub-agent by other assistants'**
   String get assistantEditHandoffDiscoverable;
+
+  /// No description provided for @assistantEditHandoffDiscoverableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other assistants can delegate tasks to this assistant via Sub-agent Delegation.'**
+  String get assistantEditHandoffDiscoverableSubtitle;
 
   /// No description provided for @assistantEditHandoffId.
   ///
   /// In en, this message translates to:
-  /// **'Handoff ID'**
+  /// **'Delegation ID'**
   String get assistantEditHandoffId;
 
   /// No description provided for @assistantEditHandoffDescription.
   ///
   /// In en, this message translates to:
-  /// **'Description for other assistants'**
+  /// **'Describe your specialty so other assistants know when to delegate to you.'**
   String get assistantEditHandoffDescription;
 
   /// No description provided for @assistantEditHandoffIdInvalid.
@@ -14378,14 +14594,8 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffIdUnique.
   ///
   /// In en, this message translates to:
-  /// **'This Handoff ID is already in use'**
+  /// **'This Delegation ID is already in use'**
   String get assistantEditHandoffIdUnique;
-
-  /// No description provided for @handoffForwardChipTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Open the spawned conversation'**
-  String get handoffForwardChipTooltip;
 
   /// No description provided for @handoffBackwardChipTooltip.
   ///
@@ -14494,6 +14704,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My group chats'**
   String get groupChatMyGroupChats;
+
+  /// No description provided for @subagentTargetStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No sub-agent targets available} =1{1 sub-agent target} other{{count} sub-agent targets}}'**
+  String subagentTargetStatus(num count);
+
+  /// No description provided for @subagentTargetBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 targets} =1{1 target} other{{count} targets}}'**
+  String subagentTargetBadge(num count);
+
+  /// No description provided for @subagentNoTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-agent delegation is on, but no sub-agent targets are available. Enable “Delegateable as a sub-agent” on another assistant first.'**
+  String get subagentNoTargetHint;
+
+  /// No description provided for @subagentGoSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up'**
+  String get subagentGoSetup;
+
+  /// No description provided for @subagentTargetListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegatable assistants'**
+  String get subagentTargetListTitle;
+
+  /// No description provided for @subagentTargetListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No delegatable assistants yet.'**
+  String get subagentTargetListEmpty;
 
   /// No description provided for @groupChatCreate.
   ///
@@ -15593,6 +15839,24 @@ abstract class AppLocalizations {
   /// **'Queued…'**
   String get workspaceDepQueued;
 
+  /// No description provided for @workspaceDepStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unavailable'**
+  String get workspaceDepStatusUnknown;
+
+  /// No description provided for @workspaceDepProbeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t refresh dependency status. Any previous results were preserved.'**
+  String get workspaceDepProbeFailed;
+
+  /// No description provided for @workspaceDepRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get workspaceDepRetry;
+
   /// No description provided for @workspaceDepStageDownloading.
   ///
   /// In en, this message translates to:
@@ -15634,6 +15898,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install the base dependency first'**
   String get workspaceSandboxBaseRequired;
+
+  /// No description provided for @workspaceDepGitPrerequisite.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Git first'**
+  String get workspaceDepGitPrerequisite;
+
+  /// No description provided for @workspaceDepOfficePrerequisites.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Python and Node.js first'**
+  String get workspaceDepOfficePrerequisites;
 
   /// No description provided for @workspaceSandboxDirEntryTitle.
   ///
@@ -15749,6 +16025,54 @@ abstract class AppLocalizations {
   /// **'Version control tools'**
   String get workspaceDepGitDesc;
 
+  /// No description provided for @workspaceDepGithubCliTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub CLI'**
+  String get workspaceDepGithubCliTitle;
+
+  /// No description provided for @workspaceDepGithubCliDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use GitHub from the command line (gh)'**
+  String get workspaceDepGithubCliDesc;
+
+  /// No description provided for @workspaceDepCurlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'curl'**
+  String get workspaceDepCurlTitle;
+
+  /// No description provided for @workspaceDepCurlDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer data over HTTP, HTTPS, and other protocols'**
+  String get workspaceDepCurlDesc;
+
+  /// No description provided for @workspaceDepOpenSshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenSSH Client'**
+  String get workspaceDepOpenSshTitle;
+
+  /// No description provided for @workspaceDepOpenSshDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH, SCP, SFTP, and key-management tools'**
+  String get workspaceDepOpenSshDesc;
+
+  /// No description provided for @workspaceDepArchiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ZIP archive tools'**
+  String get workspaceDepArchiveTitle;
+
+  /// No description provided for @workspaceDepArchiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and extract ZIP archives (zip and unzip)'**
+  String get workspaceDepArchiveDesc;
+
   /// No description provided for @workspaceDepOfficeTitle.
   ///
   /// In en, this message translates to:
@@ -15758,7 +16082,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceDepOfficeDesc.
   ///
   /// In en, this message translates to:
-  /// **'docx/pptx/xlsx support for document skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
+  /// **'Recommended with Anthropic’s official docx, pptx, and xlsx Skills (LibreOffice, pandoc, Poppler); ~550MB, slow to install'**
   String get workspaceDepOfficeDesc;
 
   /// No description provided for @workspaceDepBuildTitle.

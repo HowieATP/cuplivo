@@ -146,21 +146,24 @@ class _IosSwitchState extends State<IosSwitch> {
                 height: widget.height,
                 padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
                 decoration: widget.value ? onDecoration : offDecoration,
-                child: Stack(
-                  children: [
-                    // Thumb
-                    AnimatedAlign(
-                      duration: widget.animationDuration,
-                      curve: widget.animationCurve,
-                      alignment: widget.value
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: _Thumb(
-                        size: thumbSize,
-                        color: enabled ? thumb : thumb.withValues(alpha: 0.7),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(radius),
+                  child: Stack(
+                    children: [
+                      // Thumb
+                      AnimatedAlign(
+                        duration: widget.animationDuration,
+                        curve: widget.animationCurve,
+                        alignment: widget.value
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: _Thumb(
+                          size: thumbSize,
+                          color: enabled ? thumb : thumb.withValues(alpha: 0.7),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

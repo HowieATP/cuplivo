@@ -674,6 +674,30 @@ class ToolHandlerService {
           return memoryResult;
         }
 
+        // Creating calendar events modifies user data, so it always requires
+        // explicit user approval before the local tool runs (upstream parity).
+        if (name == LocalToolNames.calendarCreate &&
+            assistant != null &&
+            assistant.localToolIds.contains(LocalToolNames.calendarCreate) &&
+            approvalService != null) {
+          final approvalId = (toolCallId?.trim().isNotEmpty == true)
+              ? toolCallId!.trim()
+              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
+          final approval = await approvalService.requestApproval(
+            toolCallId: approvalId,
+            toolName: name,
+            arguments: args,
+            conversationId: conversationId,
+          );
+          if (!approval.approved) {
+            return _toolError(
+              error: 'approval_denied',
+              message: approval.denyReason ?? 'User denied the tool call',
+              tool: name,
+            );
+          }
+        }
+
         // Local tools
         final localResult = await LocalToolsService.tryHandleToolCall(
           name,
@@ -713,14 +737,13 @@ class ToolHandlerService {
           return localResult;
         }
 
-        // Handoff tools (kelivo_handoff / kelivo_handoff_sync) need chat /
-        // headless providers, so they are dispatched here instead of inside
+        // Handoff tool (kelivo_handoff, sub-agent delegation) needs chat /
+        // generation providers, so it is dispatched here instead of inside
         // LocalToolsService (same precedent as ask_user). The providers are
         // read lazily — only when the tool actually fires — so harnesses
         // without chat/headless providers can still exercise other
         // built-in tools.
-        if (name == LocalToolNames.handoff ||
-            name == LocalToolNames.handoffSync) {
+        if (name == LocalToolNames.handoff) {
           if (assistant == null || !assistant.localToolIds.contains(name)) {
             return _toolError(
               error: 'handoff_disabled',
@@ -729,7 +752,6 @@ class ToolHandlerService {
             );
           }
           return await HandoffToolService.execute(
-            toolName: name,
             args: args,
             assistants: assistantProvider,
             // ignore: use_build_context_synchronously (root context, valid for app lifetime)

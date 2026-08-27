@@ -1290,6 +1290,7 @@ class ChatDatabaseRepository {
       speakerAssistantId: row.speakerAssistantId,
       requestAllowImagesApiRouting: row.requestAllowImagesApiRouting,
       requestExtraBodyJson: row.requestExtraBodyJson,
+      quoteJson: row.quoteJson,
     );
   }
 
@@ -1329,6 +1330,7 @@ class ChatDatabaseRepository {
         'request_allow_images_api_routing',
       ),
       requestExtraBodyJson: _readOptionalString(row, 'request_extra_body_json'),
+      quoteJson: _readOptionalString(row, 'quote_json'),
     );
   }
 
@@ -1377,6 +1379,7 @@ class ChatDatabaseRepository {
       speakerAssistantId: Value(message.speakerAssistantId),
       requestAllowImagesApiRouting: Value(message.requestAllowImagesApiRouting),
       requestExtraBodyJson: Value(message.requestExtraBodyJson),
+      quoteJson: Value(message.quoteJson),
       messageOrder: messageOrder,
     );
   }

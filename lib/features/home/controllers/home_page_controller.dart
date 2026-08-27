@@ -10,6 +10,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/message_quote.dart';
+import '../../../utils/markdown_subsequence_match.dart';
+import '../../../utils/quote_plain_text.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -133,7 +136,7 @@ class HomePageController extends ChangeNotifier {
   final FocusNode _inputFocus;
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
-  final ScrollController _scrollController;
+  ScrollController _scrollController;
 
   // ============================================================================
   // Services & Controllers (created internally)
@@ -501,7 +504,12 @@ class HomePageController extends ChangeNotifier {
         );
       }
     };
-    _viewModel.onScrollToBottom = () => _scrollToBottomSoon();
+    _viewModel.onScrollToBottom = () {
+      _scrollCtrl.resetUserScrolling();
+      _scrollCtrl.scrollToBottom(
+        animate: !_chatController.isCurrentConversationLoading,
+      );
+    };
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -510,11 +518,12 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollToBottom(animate: false);
+      _scrollCtrl.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
       notifyListeners();
+      _scrollCtrl.stickToBottomAfterGeneration();
     };
     _viewModel.onAssistantMessageFinished = _handleAssistantMessageFinished;
   }
@@ -536,7 +545,19 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
+      getTopRevealInset: () =>
+          kToolbarHeight + MediaQuery.paddingOf(_context).top,
+      isGenerating: () => _chatController.isCurrentConversationLoading,
     );
+  }
+
+  /// Give a newly opened conversation its own scroll state.
+  void replaceScrollController(ScrollController controller) {
+    if (identical(_scrollController, controller)) return;
+    _scrollCtrl.dispose();
+    _scrollController = controller;
+    _initializeScrollController();
+    _scrollCtrl.positionAtBottomOnNextLayout();
   }
 
   void _initializeProviders() {
@@ -887,6 +908,7 @@ class HomePageController extends ChangeNotifier {
       documents: input.documents,
       allowImagesApiRouting: input.allowImagesApiRouting,
       extraBody: Map<String, dynamic>.of(input.extraBody),
+      quote: input.quote,
     );
     final result = await _viewModel.sendMessage(syntheticInput);
     if (result != ChatInputSubmissionResult.rejected) {
@@ -1191,7 +1213,6 @@ class HomePageController extends ChangeNotifier {
     }
 
     await _viewModel.switchConversation(id);
-    _scrollCtrl.clearObserverCache();
     recoverMultiAIState();
     _syncHeadlessChunks();
     notifyListeners();
@@ -1255,7 +1276,6 @@ class HomePageController extends ChangeNotifier {
       _mediaController.restoreInput(initialDraft);
       notifyListeners();
     }
-    _scrollCtrl.clearObserverCache();
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.forward();
@@ -2540,6 +2560,38 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Starts a whole-message reply (更多 → 回复): the quote carries the target
+  /// id; the composer preview shows the clipped plain text.
+  void startReplyTo(ChatMessage message) {
+    final snippet = quoteClipText(quotePlainText(message.content));
+    _mediaController.setQuoteDraft(
+      MessageQuote(id: message.id),
+      snippet: snippet,
+    );
+    _inputFocus.requestFocus();
+  }
+
+  /// Starts a selection-driven reply (ranged quote): the selection is bridged
+  /// into raw-markdown content offsets via `subsequenceRange`; match failure
+  /// degrades to a whole-message reply.
+  void startReplyToSelection(ChatMessage message, String selected) {
+    final span = subsequenceRange(message.content, selected);
+    if (span == null) {
+      startReplyTo(message);
+      return;
+    }
+    final full = quotePlainText(message.content);
+    final spanPlain = quotePlainText(
+      message.content.substring(span.start, span.end),
+    );
+    final win = quoteWindowText(fullPlain: full, spanPlain: spanPlain);
+    _mediaController.setQuoteDraft(
+      MessageQuote(id: message.id, start: span.start, end: span.end),
+      snippet: win?.text ?? quoteClipText(spanPlain),
+    );
+    _inputFocus.requestFocus();
+  }
+
   void insertQuote(String text) {
     final lines = text.split('\n').map((line) => '> $line').join('\n');
     final quoted = '$lines\n\n';
@@ -2591,10 +2643,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> scrollToMessageId(String targetId) async {
     if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
-      final loaded = _viewModel.loadUntilMessageVisible(targetId);
-      if (loaded) {
-        _scrollCtrl.clearObserverCache();
-      }
+      _viewModel.loadUntilMessageVisible(targetId);
       try {
         await WidgetsBinding.instance.endOfFrame;
       } catch (_) {}
@@ -2623,7 +2672,6 @@ class HomePageController extends ChangeNotifier {
       final loaded = _chatController.loadStartWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
     _scrollCtrl.scrollToTop(animate: animate);
@@ -2634,7 +2682,6 @@ class HomePageController extends ChangeNotifier {
       final loaded = _chatController.loadEndWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
     _scrollToBottom(animate: animate);

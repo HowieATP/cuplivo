@@ -265,6 +265,69 @@ void main() {
         'a2',
       ]);
     });
+
+    test('preserveVersions 保留定位组或之前组的所有版本并按时间线顺序输出', () {
+      final messages = <ChatMessage>[
+        _message(id: 'u1', role: 'user', content: 'question'),
+        _message(
+          id: 'a1-v0',
+          role: 'assistant',
+          content: 'answer v0',
+          groupId: 'a1',
+        ),
+        _message(id: 'u2', role: 'user', content: 'later question'),
+        _message(id: 'a2', role: 'assistant', content: 'later answer'),
+        _message(
+          id: 'a1-v1',
+          role: 'assistant',
+          content: 'answer v1',
+          groupId: 'a1',
+          version: 1,
+        ),
+      ];
+
+      // Fork at a1-v0: the a1 group is the target's own group, so both of
+      // its versions ride along, with a1-v1 keeping its drift position
+      // (after u2/a2 in the source timeline).
+      final selected = selectForkConversationMessages(
+        messages: messages,
+        targetMessage: messages[1],
+        versionSelections: const {'a1': 1},
+        preserveVersions: true,
+      );
+
+      expect(selected.map((message) => message.id).toList(), [
+        'u1',
+        'a1-v0',
+        'a1-v1',
+      ]);
+    });
+
+    test('preserveVersions 裁剪目标组之后的分组', () {
+      final messages = <ChatMessage>[
+        _message(id: 'u1', role: 'user', content: 'question'),
+        _message(
+          id: 'a1-v0',
+          role: 'assistant',
+          content: 'answer v0',
+          groupId: 'a1',
+        ),
+        _message(id: 'u2', role: 'user', content: 'later question'),
+        _message(id: 'a2', role: 'assistant', content: 'later answer'),
+      ];
+
+      final selected = selectForkConversationMessages(
+        messages: messages,
+        targetMessage: messages[2],
+        preserveVersions: true,
+      );
+
+      expect(selected.map((message) => message.id).toList(), [
+        'u1',
+        'a1-v0',
+        'u2',
+      ]);
+    });
   });
 
   group('selectKeepRecentMessages', () {

@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:math_expressions/math_expressions.dart';
 
@@ -26,6 +29,165 @@ class LocalToolNames {
   static const String handoffSync = 'kelivo_handoff_sync';
   static const String downloadSkill = 'download_skill';
   static const String createSkill = 'create_skill';
+  static const String screenTime = 'get_screen_time';
+  static const String calendarQuery = 'calendar_query';
+  static const String calendarCreate = 'calendar_create';
+}
+
+/// Outcome of the platform permission flow when a device-backed local tool
+/// toggle is turned on. Both toggle surfaces (assistant edit tab, Tools Hub)
+/// translate it into persist + snackbar behavior.
+enum DeviceToolToggleOutcome {
+  /// Permission already granted, or granted via the flow → enable the tool.
+  canEnable,
+
+  /// Usage Access missing: the system Usage Access settings page was opened.
+  /// The tool is still enabled (upstream parity) and the caller shows the
+  /// permission-required snackbar.
+  canEnableUsageAccessMissing,
+
+  /// Calendar permission was denied → do not enable the tool.
+  blocked,
+
+  /// The current platform does not support the tool → do not enable it.
+  notSupported,
+}
+
+/// Platform capability check + permission facade for the device-backed local
+/// tools (get_screen_time / calendar_query / calendar_create), implemented
+/// over a MethodChannel in the Android/iOS host apps.
+class DeviceLocalTools {
+  const DeviceLocalTools._();
+
+  static const MethodChannel channel = MethodChannel('app.device_tools');
+
+  static bool get screenTimeSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static bool get calendarSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  /// Whether Android Usage Access (PACKAGE_USAGE_STATS) is granted.
+  static Future<bool> hasUsageStatsPermission() async {
+    if (!screenTimeSupported) return false;
+    try {
+      final result = await channel.invokeMethod<bool>(
+        'hasUsageStatsPermission',
+      );
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens the system Usage Access settings page (Android).
+  static Future<void> openUsageAccessSettings() async {
+    if (!screenTimeSupported) return;
+    try {
+      await channel.invokeMethod<void>('openUsageAccessSettings');
+    } on MissingPluginException {
+      // Unsupported host.
+    } on PlatformException {
+      // Settings unavailable.
+    }
+  }
+
+  /// Returns true when calendar full access is already granted. Uses the
+  /// native EventKit / Android calendar permission path (not
+  /// permission_handler), so it works without iOS PERMISSION_EVENTS macros.
+  static Future<bool> hasCalendarPermission() async {
+    if (!calendarSupported) return false;
+    try {
+      final result = await channel.invokeMethod<bool>('hasCalendarPermission');
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Upper bound for `requestCalendarPermission` (see the review note on
+  /// activity recreation losing the permission result). Test overrides this
+  /// to a short duration.
+  @visibleForTesting
+  static Duration calendarPermissionTimeout = const Duration(minutes: 2);
+
+  /// Requests calendar full access via the native channel. Returns true only
+  /// when granted. On iOS, permanently denied / restricted states open the app
+  /// Settings page.
+  static Future<bool> requestCalendarPermission() async {
+    if (!calendarSupported) return false;
+    try {
+      final result = await channel
+          .invokeMethod<bool>('requestCalendarPermission')
+          .timeout(calendarPermissionTimeout);
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    } on TimeoutException {
+      // Activity recreation mid-dialog (rotation / memory-pressured OEM
+      // restart) can lose the permission result: the native callback is bound
+      // to the old activity and never fires, leaving this future pending
+      // forever. Re-check the actual grant state instead of reporting false
+      // — the user may have granted before the recreation, and a retry tap
+      // must not be stuck behind the stale "request in progress" guard.
+      return hasCalendarPermission();
+    }
+  }
+
+  /// True when [toolId] is a device-tool name and the current platform
+  /// supports it (rows are hidden elsewhere via `screenTimeSupported` /
+  /// `calendarSupported`).
+  static bool isSupportedDeviceTool(String toolId) {
+    if (toolId == LocalToolNames.screenTime) {
+      return screenTimeSupported;
+    }
+    if (toolId == LocalToolNames.calendarQuery ||
+        toolId == LocalToolNames.calendarCreate) {
+      return calendarSupported;
+    }
+    return false;
+  }
+
+  /// Runs the asymmetric permission flow used by both toggle surfaces (assistant
+  /// edit tab + Tools Hub) before a device tool is enabled:
+  /// - screenTime: Usage Access is a system-settings special permission. When
+  ///   missing, the settings page is opened and the tool is still enabled (the
+  ///   tool def itself reports NO_PERMISSION and lets the model guide the user).
+  /// - calendar: standard runtime request. When denied, the tool stays off.
+  static Future<DeviceToolToggleOutcome> requestToggleEnable(
+    String toolId,
+  ) async {
+    if (!isSupportedDeviceTool(toolId)) {
+      return DeviceToolToggleOutcome.notSupported;
+    }
+    if (toolId == LocalToolNames.screenTime) {
+      final granted = await hasUsageStatsPermission();
+      if (!granted) {
+        await openUsageAccessSettings();
+        return DeviceToolToggleOutcome.canEnableUsageAccessMissing;
+      }
+      return DeviceToolToggleOutcome.canEnable;
+    }
+    if (toolId == LocalToolNames.calendarQuery ||
+        toolId == LocalToolNames.calendarCreate) {
+      if (!await hasCalendarPermission()) {
+        final granted = await requestCalendarPermission();
+        if (!granted) {
+          return DeviceToolToggleOutcome.blocked;
+        }
+      }
+      return DeviceToolToggleOutcome.canEnable;
+    }
+    return DeviceToolToggleOutcome.notSupported;
+  }
 }
 
 class LocalToolsService {
@@ -167,6 +329,146 @@ class LocalToolsService {
         },
       });
     }
+    if (DeviceLocalTools.screenTimeSupported &&
+        assistant.localToolIds.contains(LocalToolNames.screenTime)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.screenTime,
+          'description':
+              "Get the user's app screen usage (screen time) over a time range. "
+              "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week). "
+              'Returns the total foreground time and a per-app breakdown sorted by usage time (descending). '
+              '${_deviceTimezoneHint()} '
+              "Requires the 'Usage access' special permission; if it is not granted, the device's usage "
+              'access settings page is opened automatically and an error is returned.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'begin': {
+                'type': 'string',
+                'description':
+                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                    "When provided, 'range' is ignored.",
+              },
+              'end': {
+                'type': 'string',
+                'description':
+                    "End time (exclusive), same formats as 'begin'. Defaults to now.",
+              },
+              'range': {
+                'type': 'string',
+                'enum': ['today', 'week'],
+                'description':
+                    "Convenience preset, used only when 'begin' is omitted: today or week. Default today.",
+              },
+              'top': {
+                'type': 'integer',
+                'description':
+                    'Maximum number of top apps to return, sorted by usage time. Default 10.',
+              },
+            },
+          },
+        },
+      });
+    }
+    if (DeviceLocalTools.calendarSupported &&
+        assistant.localToolIds.contains(LocalToolNames.calendarQuery)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.calendarQuery,
+          'description':
+              "Query calendar events on the user's device within a time range. "
+              "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week/month). "
+              'Returns a list of events with title, description, location, start/end times, and calendar info. '
+              '${_deviceTimezoneHint()} '
+              "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'begin': {
+                'type': 'string',
+                'description':
+                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                    "When provided, 'range' is ignored.",
+              },
+              'end': {
+                'type': 'string',
+                'description': "End time (exclusive), same formats as 'begin'.",
+              },
+              'range': {
+                'type': 'string',
+                'enum': ['today', 'week', 'month'],
+                'description':
+                    "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
+              },
+              'query': {
+                'type': 'string',
+                'description':
+                    'Optional keyword to filter events by title (case-insensitive substring match).',
+              },
+              'limit': {
+                'type': 'integer',
+                'description':
+                    'Maximum number of events to return. Default 20.',
+              },
+            },
+          },
+        },
+      });
+    }
+    if (DeviceLocalTools.calendarSupported &&
+        assistant.localToolIds.contains(LocalToolNames.calendarCreate)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.calendarCreate,
+          'description':
+              "Create a new calendar event on the user's device. "
+              'Requires title and start time at minimum. End time defaults to 1 hour after start. '
+              'A reminder alarm is set when reminder_minutes is provided (minutes before start, at least 1). '
+              'The user will be asked to confirm before the event is created. '
+              '${_deviceTimezoneHint()} '
+              "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'title': {'type': 'string', 'description': 'Event title.'},
+              'description': {
+                'type': 'string',
+                'description': 'Event description or notes.',
+              },
+              'location': {'type': 'string', 'description': 'Event location.'},
+              'start': {
+                'type': 'string',
+                'description':
+                    "Start time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
+              },
+              'end': {
+                'type': 'string',
+                'description':
+                    "End time, same formats as 'start'. Defaults to 1 hour after start.",
+              },
+              'all_day': {
+                'type': 'boolean',
+                'description':
+                    'Whether this is an all-day event. Default false.',
+              },
+              'reminder_minutes': {
+                'type': 'integer',
+                'description':
+                    'Reminder alarm, minutes before start (at least 1). Optional; no reminder when omitted.',
+              },
+            },
+            'required': ['title', 'start'],
+          },
+        },
+      });
+    }
     if (assistant.skillIds.isNotEmpty) {
       tools.add(const {
         'type': 'function',
@@ -211,26 +513,14 @@ class LocalToolsService {
       });
     }
     if (assistant.localToolIds.contains(LocalToolNames.handoff)) {
+      // Single wait-mode sub-agent delegation tool (ADR-0041): the retired
+      // `kelivo_handoff_sync` sibling is fused into `kelivo_handoff`, whose
+      // ids are normalized at Assistant construction.
       tools.add({
         'type': 'function',
         'function': {
           'name': LocalToolNames.handoff,
           'description': _handoffDescription(
-            sync: false,
-            discoverableAssistants: discoverableAssistants,
-            excludeId: assistant.id,
-          ),
-          'parameters': _handoffParameters(),
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.handoffSync)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.handoffSync,
-          'description': _handoffDescription(
-            sync: true,
             discoverableAssistants: discoverableAssistants,
             excludeId: assistant.id,
           ),
@@ -300,27 +590,30 @@ class LocalToolsService {
         .toList();
   }
 
+  /// Available sub-agent delegation targets for the given assistant — the
+  /// single source behind the settings status row, the Tools Hub badge and
+  /// the target list sheet.
+  static List<Assistant> handoffTargets(
+    List<Assistant> all, {
+    String? excludeId,
+  }) {
+    return _handoffTargets(all, excludeId: excludeId);
+  }
+
   static String _handoffDescription({
-    required bool sync,
     required List<Assistant>? discoverableAssistants,
     String? excludeId,
   }) {
     final buffer = StringBuffer();
-    if (sync) {
-      buffer.write(
-        'Delegate a task to another specialized assistant AND WAIT for it to '
-        'finish. The sub-agent\'s complete output is returned as the tool '
-        'result, so you can synthesize from it. Unlike kelivo_handoff, the '
-        'result may be long and this call may take minutes. '
-        'The user can watch progress in the panel and visit the sub-conversation.\n',
-      );
-    } else {
-      buffer.write(
-        'Delegate a task to another specialized assistant. '
-        'A new conversation is created with full tool access. '
-        'The user can navigate to it from the conversation list.\n',
-      );
-    }
+    buffer.write(
+      'Delegate a task to another specialized assistant AS A SUB-AGENT and '
+      'WAIT for it to finish. '
+      'The sub-agent\'s complete output is returned as the tool result, '
+      'so you can synthesize from it. '
+      'The result may be long and this call may take minutes. '
+      'The user can watch progress in the sub-agent panel and visit the '
+      'sub-conversation.\n',
+    );
     final targets = _handoffTargets(
       discoverableAssistants,
       excludeId: excludeId,
@@ -328,7 +621,7 @@ class LocalToolsService {
     if (targets.isEmpty) {
       buffer.write(
         'No assistants are currently available. '
-        'Ask the user to enable "discoverable" on a target assistant.',
+        'Ask the user to enable "discoverable" on the target assistant.',
       );
     } else {
       buffer.write('Available targets:\n');
@@ -390,6 +683,18 @@ class LocalToolsService {
     }
     if (name == LocalToolNames.calculate) {
       return _handleCalculateTool(args);
+    }
+    if (name == LocalToolNames.screenTime &&
+        DeviceLocalTools.screenTimeSupported) {
+      return _invokeDeviceTool('getScreenTime', args);
+    }
+    if (name == LocalToolNames.calendarQuery &&
+        DeviceLocalTools.calendarSupported) {
+      return _invokeDeviceTool('queryCalendar', args);
+    }
+    if (name == LocalToolNames.calendarCreate &&
+        DeviceLocalTools.calendarSupported) {
+      return _invokeDeviceTool('createCalendarEvent', args);
     }
     if (name == LocalToolNames.downloadSkill) {
       return _handleDownloadSkill(args, onSkillsImported);
@@ -507,6 +812,49 @@ class LocalToolsService {
         'message':
             'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
         'detail': e.toString(),
+      });
+    }
+  }
+
+  static String _deviceTimezoneHint() {
+    final now = DateTime.now();
+    final offset = now.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final abs = offset.abs();
+    final hh = abs.inHours.toString().padLeft(2, '0');
+    final mm = (abs.inMinutes % 60).toString().padLeft(2, '0');
+    return "The device timezone is '${now.timeZoneName}' (UTC offset $sign$hh:$mm); "
+        'times without an explicit offset are interpreted in this timezone.';
+  }
+
+  /// Invokes a native device tool over the MethodChannel. The native side
+  /// returns a JSON string payload (including structured error payloads that
+  /// the model can act on, e.g. missing permissions).
+  static Future<String> _invokeDeviceTool(
+    String method,
+    Map<String, dynamic> args,
+  ) async {
+    try {
+      final result = await DeviceLocalTools.channel.invokeMethod<String>(
+        method,
+        jsonEncode(args),
+      );
+      if (result == null || result.isEmpty) {
+        return jsonEncode({
+          'error': 'no_result',
+          'message': 'The device tool returned no result.',
+        });
+      }
+      return result;
+    } on MissingPluginException {
+      return jsonEncode({
+        'error': 'unsupported_platform',
+        'message': 'This tool is not available on the current platform.',
+      });
+    } on PlatformException catch (e) {
+      return jsonEncode({
+        'error': e.code,
+        'message': e.message ?? 'The device tool failed.',
       });
     }
   }

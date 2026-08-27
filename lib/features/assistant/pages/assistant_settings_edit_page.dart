@@ -11,6 +11,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
@@ -34,6 +35,7 @@ import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../skills/skill_manager.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -49,12 +51,15 @@ import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import '../widgets/proactive_care_datetime_picker.dart';
 import '../../workspace/widgets/workspace_bind_sheet.dart';
+import '../../home/widgets/subagent_target_sheet.dart';
 import 'assistant_regex_tab.dart';
+import 'assistant_settings_page.dart';
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
 part 'assistant_settings_edit_memory_tab.dart';
@@ -1319,6 +1324,7 @@ Widget _iosSwitchRow(
   BuildContext context, {
   required IconData icon,
   required String label,
+  String? subtitle,
   required bool value,
   required ValueChanged<bool> onChanged,
 }) {
@@ -1338,7 +1344,23 @@ Widget _iosSwitchRow(
                 SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(label, style: TextStyle(fontSize: 15, color: c)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: TextStyle(fontSize: 15, color: c)),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.25,
+                            color: cs.onSurface.withValues(alpha: 0.62),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 IosSwitch(value: value, onChanged: onChanged),
               ],
@@ -1924,6 +1946,7 @@ class _DesktopAssistantBasicPaneState
 
     Widget simpleSwitchRow({
       required String label,
+      String? subtitle,
       required bool value,
       required ValueChanged<bool> onChanged,
     }) {
@@ -1935,13 +1958,29 @@ class _DesktopAssistantBasicPaneState
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: AppFontWeights.semibold,
-                    color: cs.onSurface.withValues(alpha: 0.9),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: AppFontWeights.semibold,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.25,
+                          color: cs.onSurface.withValues(alpha: 0.62),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               IosSwitch(value: value, onChanged: onChanged),
@@ -2486,6 +2525,7 @@ class _DesktopAssistantBasicPaneState
                   const SizedBox(height: 12),
                   simpleSwitchRow(
                     label: l10n.assistantEditHandoffDiscoverable,
+                    subtitle: l10n.assistantEditHandoffDiscoverableSubtitle,
                     value: a.discoverable,
                     onChanged: (v) => context
                         .read<AssistantProvider>()

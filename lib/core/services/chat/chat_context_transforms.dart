@@ -27,6 +27,23 @@ class ChatContextTransforms {
         '${timestamp.second.toString().padLeft(2, '0')}';
   }
 
+  /// Cache-volatile variables a system prompt may embed; `{timezone}` etc.
+  /// are excluded because they only change on device/timezone switch.
+  static const List<String> volatileTimeVariables = [
+    '{cur_date}',
+    '{cur_time}',
+    '{cur_datetime}',
+  ];
+
+  /// Returns which of the cache-volatile time variables occur in [prompt],
+  /// in fixed order. Drives the warning badge/banner and the enable gate.
+  static List<String> detectTimeVariables(String prompt) {
+    return [
+      for (final token in volatileTimeVariables)
+        if (prompt.contains(token)) token,
+    ];
+  }
+
   /// Applies [transform] to message text while preserving persisted attachment
   /// markers byte-for-byte. Attachment loading remains the responsibility of
   /// the interactive chat pipeline; headless context building only protects

@@ -1,9 +1,13 @@
+/// Half-open subsequence span of [query] in [source].
+typedef SubsequenceRange = ({int start, int end});
+
 /// Finds the tightest subsequence match of [query] in [source].
 ///
 /// Walks [source] left-to-right for each candidate start position, greedily
-/// matching [query] characters in order. Returns the source fragment with the
-/// smallest span (end - start) that contains all query characters as a
-/// subsequence.
+/// matching [query] characters in order. Returns the span with the smallest
+/// width (end - start) that contains all query characters as a
+/// subsequence. Wrapper around [subsequenceRange]: returns the source
+/// fragment with that smallest span.
 ///
 /// [query] is normalized before matching:
 /// - `\r\n` → `\n`, consecutive newlines folded into one
@@ -14,6 +18,15 @@
 /// Returns `null` if [query] is empty, [source] is empty, or [query] is not a
 /// subsequence of [source].
 String? subsequenceMatch(String source, String query) {
+  final span = subsequenceRange(source, query);
+  return span == null ? null : source.substring(span.start, span.end);
+}
+
+/// Same algorithm as [subsequenceMatch] but returns the half-open
+/// `{start, end}` span (indices in [source]) instead of the matched text —
+/// the index variant is required when the match must be highlighted inside
+/// the source (message reply quote display).
+SubsequenceRange? subsequenceRange(String source, String query) {
   if (query.isEmpty || source.isEmpty) return null;
 
   final normalized = _normalizeQuery(query);
@@ -50,7 +63,7 @@ String? subsequenceMatch(String source, String query) {
 
   if (bestStart == null || bestEnd == null) return null;
 
-  return source.substring(bestStart, bestEnd);
+  return (start: bestStart, end: bestEnd);
 }
 
 String _normalizeQuery(String raw) {

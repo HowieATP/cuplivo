@@ -113,6 +113,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
                   _RowDivider(),
+                  _ToggleRowForkKeepMessageVersions(),
+                  _RowDivider(),
                   _ToggleRowShowUpdates(),
                   _RowDivider(),
                   _ToggleRowShowChatListDate(),
@@ -165,6 +167,11 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowOneClickCompressAlwaysJpg(),
                 ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsCard(
+                title: l10n.chatInputBarCustomizeTitle,
+                children: const [_InputBarButtonsCustomizeRow()],
               ),
             ],
           ),
@@ -234,6 +241,71 @@ class _RowDivider extends StatelessWidget {
         indent: 8,
         endIndent: 8,
         color: cs.outlineVariant.withValues(alpha: 0.12),
+      ),
+    );
+  }
+}
+
+class _InputBarButtonsCustomizeRow extends StatefulWidget {
+  const _InputBarButtonsCustomizeRow();
+  @override
+  State<_InputBarButtonsCustomizeRow> createState() =>
+      _InputBarButtonsCustomizeRowState();
+}
+
+class _InputBarButtonsCustomizeRowState
+    extends State<_InputBarButtonsCustomizeRow> {
+  bool _hover = false;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+    final bg = _hover ? hoverBg : Colors.transparent;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => showInputBarButtonsCustomizationDialog(context),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 26,
+                child: Icon(
+                  lucide.Lucide.Settings2,
+                  size: 18,
+                  color: cs.onSurface.withValues(alpha: 0.92),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  l10n.chatInputBarCustomizeMenuAction,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    color: cs.onSurface.withValues(alpha: 0.92),
+                  ),
+                ),
+              ),
+              Icon(
+                lucide.Lucide.ChevronRight,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2432,6 +2504,21 @@ class _ToggleRowShowRegenerateConfirmDialog extends StatelessWidget {
       value: sp.showRegenerateConfirmDialog,
       onChanged: (v) =>
           context.read<SettingsProvider>().setShowRegenerateConfirmDialog(v),
+    );
+  }
+}
+
+class _ToggleRowForkKeepMessageVersions extends StatelessWidget {
+  const _ToggleRowForkKeepMessageVersions();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageForkKeepMessageVersionsTitle,
+      value: sp.forkKeepMessageVersions,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setForkKeepMessageVersions(v),
     );
   }
 }

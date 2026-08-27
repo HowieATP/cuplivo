@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../core/services/storage/message_locate_bus.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'dart:ui' as ui;
@@ -16,6 +15,7 @@ import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
+import 'quote_block.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 // import '../../../theme/design_tokens.dart';
@@ -46,6 +46,7 @@ import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
+import 'screen_time_tool_ui.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'citation_sources_sheet.dart';
@@ -137,6 +138,9 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.handoffSync => Lucide.Timer,
     LocalToolNames.downloadSkill => Lucide.Download,
     LocalToolNames.createSkill => Lucide.SquarePen,
+    LocalToolNames.screenTime => Lucide.Smartphone,
+    LocalToolNames.calendarQuery => Lucide.Calendar,
+    LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     _ => null,
   };
 }
@@ -162,6 +166,11 @@ String? _localToolTitleFor(
     LocalToolNames.handoffSync => l10n.assistantEditLocalToolHandoffSyncTitle,
     LocalToolNames.downloadSkill => l10n.assistantEditSkillDownloadTitle,
     LocalToolNames.createSkill => l10n.assistantEditSkillCreateTitle,
+    LocalToolNames.screenTime => l10n.assistantEditLocalToolScreenTimeTitle,
+    LocalToolNames.calendarQuery =>
+      l10n.assistantEditLocalToolCalendarQueryTitle,
+    LocalToolNames.calendarCreate =>
+      l10n.assistantEditLocalToolCalendarCreateTitle,
     _ => null,
   };
 }
@@ -364,6 +373,10 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
+  final screenTime = part.toolName == LocalToolNames.screenTime
+      ? ScreenTimeResult.tryParse(cleanText)
+      : null;
+  final useScreenTimeDetail = screenTime != null && screenTime.hasApps;
 
   final bool isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -435,96 +448,108 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     ),
                     const SizedBox(height: 4),
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.chatMessageWidgetArguments,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: ctx.appColors.surfaceFill,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: cs.outlineVariant.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                  ),
-                                ),
-                                child: SelectableText(
-                                  argsPretty,
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                l10n.chatMessageWidgetResult,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: ctx.appColors.surfaceFill,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: cs.outlineVariant.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                  ),
-                                ),
-                                child: SelectableText(
-                                  resultText,
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                              if (images.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  l10n.chatMessageWidgetImages,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurface.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: images.map((path) {
-                                    return GestureDetector(
-                                      onTap: () =>
-                                          _showToolFullImage(ctx, path),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: _buildToolImageFromPath(
-                                          ctx,
-                                          path,
-                                          height: 280,
+                      child: useScreenTimeDetail
+                          ? ScreenTimeToolDetailBody(
+                              result: screenTime,
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.chatMessageWidgetArguments,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.6,
                                         ),
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: ctx.appColors.surfaceFill,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: cs.outlineVariant.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: SelectableText(
+                                        argsPretty,
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      l10n.chatMessageWidgetResult,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: ctx.appColors.surfaceFill,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: cs.outlineVariant.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      child: SelectableText(
+                                        resultText,
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    if (images.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        l10n.chatMessageWidgetImages,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: images.map((path) {
+                                          return GestureDetector(
+                                            onTap: () =>
+                                                _showToolFullImage(ctx, path),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child: _buildToolImageFromPath(
+                                                ctx,
+                                                path,
+                                                height: 280,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -546,123 +571,136 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
     ),
     builder: (ctx) {
       final bottomInset = MediaQuery.viewInsetsOf(ctx).bottom;
+      final headerRow = Row(
+        children: [
+          Icon(
+            _toolIconFor(part.toolName, part.arguments),
+            size: 18,
+            color: cs.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _toolTitleFor(
+                ctx,
+                part.toolName,
+                part.arguments,
+                isResult: !part.loading,
+              ),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: AppFontWeights.emphasis,
+              ),
+            ),
+          ),
+        ],
+      );
       return SafeArea(
         child: FractionallySizedBox(
           heightFactor: 0.6,
           child: Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + 20),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            child: useScreenTimeDetail
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        _toolIconFor(part.toolName, part.arguments),
-                        size: 18,
-                        color: cs.primary,
-                      ),
-                      const SizedBox(width: 8),
+                      headerRow,
+                      const SizedBox(height: 12),
                       Expanded(
-                        child: Text(
-                          _toolTitleFor(
-                            ctx,
-                            part.toolName,
-                            part.arguments,
-                            isResult: !part.loading,
-                          ),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
+                        child: ScreenTimeToolDetailBody(result: screenTime),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.chatMessageWidgetArguments,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: ctx.appColors.surfaceFill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: SelectableText(
-                      argsPretty,
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.chatMessageWidgetResult,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: ctx.appColors.surfaceFill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: SelectableText(
-                      resultText,
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  if (images.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      l10n.chatMessageWidgetImages,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 220,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: images.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (ctx, i) {
-                          final path = images[i];
-                          return GestureDetector(
-                            onTap: () => _showToolFullImage(ctx, path),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: _buildToolImageFromPath(
-                                ctx,
-                                path,
-                                height: 220,
-                              ),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headerRow,
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.chatMessageWidgetArguments,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: ctx.appColors.surfaceFill,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: cs.outlineVariant.withValues(alpha: 0.2),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                          child: SelectableText(
+                            argsPretty,
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.chatMessageWidgetResult,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: ctx.appColors.surfaceFill,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: cs.outlineVariant.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: SelectableText(
+                            resultText,
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        if (images.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            l10n.chatMessageWidgetImages,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 220,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: images.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (ctx, i) {
+                                final path = images[i];
+                                return GestureDetector(
+                                  onTap: () => _showToolFullImage(ctx, path),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: _buildToolImageFromPath(
+                                      ctx,
+                                      path,
+                                      height: 220,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
+                  ),
           ),
         ),
       );
@@ -720,6 +758,15 @@ class ChatMessageWidget extends StatefulWidget {
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
   final ValueChanged<String>? onQuoteSelection;
+
+  /// Selection-driven reply entry (ranged quote); receives the selected plain
+  /// text. Hidden while the message is streaming.
+  final ValueChanged<String>? onReplySelection;
+
+  /// Resolved target of [ChatMessage.quote] (same conversation, current
+  /// display list); null renders the deleted-target stub in [QuoteBlock].
+  final ChatMessage? quoteTarget;
+
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
 
@@ -766,6 +813,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onQuoteSelection,
+    this.onReplySelection,
+    this.quoteTarget,
     this.onRecoveredAskUserAnswer,
   });
 
@@ -1404,6 +1453,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 key: ValueKey('user-message-content:${widget.message.id}'),
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (widget.message.quote != null) ...[
+                    QuoteBlock(
+                      key: ValueKey('user-message-quote:${widget.message.id}'),
+                      quote: widget.message.quote!,
+                      target: widget.quoteTarget,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (mediaPreview != null) mediaPreview,
                   if (mediaPreview != null && textBubble != null)
                     const SizedBox(height: 8),
@@ -2001,6 +2058,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     ContextMenuController.removeAny();
                     selectableRegionState.clearSelection();
                     widget.onQuoteSelection!.call(selected);
+                  },
+                ),
+              if (widget.onReplySelection != null &&
+                  !widget.message.isStreaming)
+                ContextMenuButtonItem(
+                  label: AppLocalizations.of(context)!.messageMoreSheetReply,
+                  onPressed: () {
+                    final selected = _selectedPlainText;
+                    if (selected == null || selected.trim().isEmpty) return;
+                    ContextMenuController.removeAny();
+                    selectableRegionState.clearSelection();
+                    widget.onReplySelection!.call(selected);
                   },
                 ),
               ContextMenuButtonItem(
@@ -4268,15 +4337,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             ),
           );
 
-    // Handoff forward bar
-    final Widget? handoffChip = _buildHandoffForwardChip(context, fg, cs);
-    final Widget? mergedContent = (content != null && handoffChip != null)
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [content, const SizedBox(height: 4), handoffChip],
-          )
-        : handoffChip ?? content;
+    final Widget? mergedContent = content;
 
     final extra = approvalRequest != null
         ? Row(
@@ -4328,63 +4389,6 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
           : Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
       content: mergedContent,
       contentVisible: mergedContent != null && (!_isAskUser || askUserExpanded),
-    );
-  }
-
-  Widget? _buildHandoffForwardChip(
-    BuildContext context,
-    _ChatSurfaceForegroundPalette fg,
-    ColorScheme cs,
-  ) {
-    // v1 handoff only: its tool event content deterministically contains the
-    // child conversation UUID ("Handoff dispatched. Conversation: …"). The
-    // wait-mode handoff's event content is the child's FULL output — scanning
-    // it for a UUID would navigate to a wrong conversation, so sync cards get
-    // no chip (the 子代理面板's 查看子对话 covers navigation during the wait).
-    if (widget.part.toolName != 'kelivo_handoff' || widget.part.loading) {
-      return null;
-    }
-    final contentRaw = widget.part.content?.trim() ?? '';
-    if (contentRaw.isEmpty) return null;
-
-    // Parse conversation UUID from result "Handoff complete. Conversation: uuid"
-    final uuidMatch = RegExp(r'([a-f0-9\-]{36})').firstMatch(contentRaw);
-    if (uuidMatch == null) return null;
-    final convId = uuidMatch.group(1)!;
-    final prefix = convId.substring(0, 4);
-
-    // Resolve target assistant name from arguments['assistant']
-    final handoffId = (widget.part.arguments['assistant'] ?? '').toString();
-    final assistants = context.read<AssistantProvider>();
-    final target = assistants.assistants.where((a) => a.handoffId == handoffId);
-    final targetName = target.isNotEmpty ? target.first.name : handoffId;
-
-    return IosCardPress(
-      onTap: () =>
-          MessageLocateBus.instance.fire(conversationId: convId, messageId: ''),
-      borderRadius: BorderRadius.circular(999),
-      baseColor: Colors.transparent,
-      pressedScale: 0.97,
-      padding: EdgeInsets.zero,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: cs.primary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Lucide.ArrowRight, size: 14, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(
-              '$targetName · $prefix',
-              style: TextStyle(fontSize: 12, color: cs.primary),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -4619,6 +4623,30 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 text: ttsText,
                 textColor: fg.body,
                 buttonColor: fg.accent,
+              ),
+            ],
+            if (!widget.part.loading &&
+                !isPendingApproval &&
+                widget.part.toolName == LocalToolNames.screenTime) ...[
+              Builder(
+                builder: (context) {
+                  final screenTime = ScreenTimeResult.tryParse(
+                    widget.part.content,
+                  );
+                  if (screenTime == null ||
+                      (!screenTime.isNoPermission && !screenTime.hasApps)) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: ScreenTimeToolSummary(
+                      result: screenTime,
+                      textColor: fg.body,
+                      secondaryColor: fg.muted,
+                      errorColor: cs.error,
+                    ),
+                  );
+                },
               ),
             ],
             // Argument summary so users know what the tool is about to do

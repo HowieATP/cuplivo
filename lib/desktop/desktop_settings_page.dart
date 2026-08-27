@@ -33,6 +33,8 @@ import '../shared/widgets/create_action_icon_button.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
+import '../features/home/pages/input_bar_buttons_customization_page.dart'
+    show showInputBarButtonsCustomizationDialog;
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/group_chat_provider.dart';
 import '../features/assistant/widgets/assistant_select_sheet.dart';
@@ -137,6 +139,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       switch (target) {
         case DesktopSettingsNavigationTarget.backup:
           setState(() => _selected = _SettingsMenuItem.backup);
+          break;
+        case DesktopSettingsNavigationTarget.assistants:
+          setState(() => _selected = _SettingsMenuItem.assistant);
           break;
       }
     });

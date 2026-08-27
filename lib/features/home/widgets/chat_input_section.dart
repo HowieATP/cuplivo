@@ -11,6 +11,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../utils/model_display_helper.dart';
+import '../utils/input_bar_button_layout.dart';
 import 'chat_input_bar.dart';
 import 'image_generation_options.dart';
 import 'model_icon.dart';
@@ -144,8 +145,18 @@ class ChatInputSection extends StatelessWidget {
     _enforceModelCapabilities(context, settings, ap, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
-    final hasWorldBooks =
-        isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
+    final hasWorldBooks = context.watch<WorldBookProvider>().books.isNotEmpty;
+    final buttonLayout = resolveInputBarButtonLayout(
+      savedOrder: settings.chatInputButtonOrder,
+      savedMoreIds: settings.chatInputMoreButtonIds,
+      tabletLayout: isTablet,
+    );
+    final customized = settings.chatInputButtonsCustomized;
+    // Tablet-only icons may leak onto the narrow row once the user explicitly
+    // customized AND marked the item directly shown (sentinel-unset keeps the
+    // legacy per-platform split — see resolveInputBarButtonLayout).
+    bool unlocked(String id) =>
+        customized && !buttonLayout.moreIds.contains(id);
 
     return ChatInputBar(
       key: inputBarKey,
@@ -190,43 +201,58 @@ class ChatInputSection extends StatelessWidget {
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
-      showToolsHubButton: _shouldShowToolsHubButton(
-        context,
-        settings,
-        a,
-        pk,
-        mid,
-      ),
+      showToolsHubButton: _shouldShowToolsHubButton(settings, a, pk, mid),
       toolsHubActive: _isToolsActive(context, a),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
+      inputBarButtonOrder: buttonLayout.orderedIds,
+      inputBarMoreIds: buttonLayout.moreIds,
+      inputBarCustomized: customized,
       // Document processing button: always visible on tablet/desktop, navigates to config panel
-      showDocumentProcessingButton: isTablet || isDesktop,
+      showDocumentProcessingButton:
+          isTablet ||
+          isDesktop ||
+          (unlocked(inputBarButtonDocument) && onDocumentProcessing != null),
       onDocumentProcessing: onDocumentProcessing,
       // Tablet-specific parameters
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,
-      onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
-      onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
-      onUploadFiles: isTablet ? onUploadFiles : null,
-      onToggleLearningMode: isTablet ? onToggleLearningMode : null,
-      onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
-      onOpenSkills: isTablet ? onOpenSkills : null,
-      onLongPressLearning: isTablet ? onLongPressLearning : null,
-      learningModeActive: isTablet
+      onPickCamera: !isDesktop && (isTablet || unlocked(inputBarButtonCamera))
+          ? onPickCamera
+          : null,
+      onPickPhotos: !isDesktop && (isTablet || unlocked(inputBarButtonPhotos))
+          ? onPickPhotos
+          : null,
+      onUploadFiles: isTablet || unlocked(inputBarButtonUpload)
+          ? onUploadFiles
+          : null,
+      onToggleLearningMode: isTablet || unlocked(inputBarButtonLearning)
+          ? onToggleLearningMode
+          : null,
+      onOpenWorldBook:
+          hasWorldBooks && (isTablet || unlocked(inputBarButtonWorldBook))
+          ? onOpenWorldBook
+          : null,
+      onOpenSkills: isTablet || unlocked(inputBarButtonSkills)
+          ? onOpenSkills
+          : null,
+      onLongPressLearning: isTablet || unlocked(inputBarButtonLearning)
+          ? onLongPressLearning
+          : null,
+      learningModeActive: isTablet || unlocked(inputBarButtonLearning)
           ? context
                 .watch<InstructionInjectionProvider>()
                 .activeIdsFor(assistantId)
                 .isNotEmpty
           : false,
-      worldBookActive: isTablet
+      worldBookActive: isTablet || unlocked(inputBarButtonWorldBook)
           ? context
                 .watch<WorldBookProvider>()
                 .activeBookIdsFor(assistantId)
                 .isNotEmpty
           : false,
-      skillsActive: isTablet
+      skillsActive: isTablet || unlocked(inputBarButtonSkills)
           ? (context
                     .watch<AssistantProvider>()
                     .currentAssistant
@@ -235,8 +261,12 @@ class ChatInputSection extends StatelessWidget {
                 false)
           : false,
       showMoreButton: !isTablet,
-      onClearContext: isTablet ? onClearContext : null,
-      onCompressContext: isTablet ? onCompressContext : null,
+      onClearContext: isTablet || unlocked(inputBarButtonContext)
+          ? onClearContext
+          : null,
+      onCompressContext: isTablet || unlocked(inputBarButtonContext)
+          ? onCompressContext
+          : null,
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
@@ -291,7 +321,6 @@ class ChatInputSection extends StatelessWidget {
   }
 
   bool _shouldShowToolsHubButton(
-    BuildContext context,
     SettingsProvider settings,
     Assistant? a,
     String? pk,
@@ -300,11 +329,7 @@ class ChatInputSection extends StatelessWidget {
     final pk2 = a?.chatModelProvider ?? settings.currentModelProvider;
     final mid3 = a?.chatModelId ?? settings.currentModelId;
     if (pk2 == null || mid3 == null) return false;
-    final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    final hasLocalTools = a?.localToolIds.isNotEmpty ?? false;
-    final workspaceOn = a?.workspaceEnabled ?? false;
-    return isToolModel(pk2, mid3) &&
-        (hasEnabledMcp || hasLocalTools || workspaceOn);
+    return isToolModel(pk2, mid3);
   }
 
   bool _isToolsActive(BuildContext context, Assistant? a) {

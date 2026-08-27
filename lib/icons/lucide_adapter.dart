@@ -86,6 +86,7 @@ class Lucide {
   static const IconData BookOpenText = lucide.LucideIcons.bookOpenText;
   static const IconData Pencil = lucide.LucideIcons.pencil;
   static const IconData GitFork = lucide.LucideIcons.gitFork;
+  static const IconData Reply = lucide.LucideIcons.cornerUpLeft;
   static const IconData Eye = lucide.LucideIcons.eye;
   static const IconData EyeOff = lucide.LucideIcons.eyeOff;
   static const IconData Clipboard = lucide.LucideIcons.clipboard;
@@ -192,4 +193,6 @@ class Lucide {
   static const IconData clock = lucide.LucideIcons.clock;
   static const IconData Wallet = lucide.LucideIcons.walletMinimal;
   static const IconData Coins = lucide.LucideIcons.coins;
+  static const IconData Smartphone = lucide.LucideIcons.smartphone;
+  static const IconData CalendarPlus = lucide.LucideIcons.calendarPlus;
 }

@@ -121,6 +121,7 @@ object RootfsExtractor {
   /** Pull-based ustar reader that follows GNU long-name and PAX records. */
   private class TarStream(private val source: InputStream) {
     private val block = ByteArray(BLOCK_BYTES)
+    private val payloadBuffer = ByteArray(COPY_CHUNK)
 
     /**
      * Returns the next concrete entry, or null at the end of the archive.
@@ -252,13 +253,12 @@ object RootfsExtractor {
 
     fun drainInto(out: OutputStream, size: Long) {
       var remaining = size
-      val chunk = ByteArray(COPY_CHUNK)
       while (remaining > 0) {
         alive()
-        val want = minOf(chunk.size.toLong(), remaining).toInt()
-        val read = source.read(chunk, 0, want)
+        val want = minOf(payloadBuffer.size.toLong(), remaining).toInt()
+        val read = source.read(payloadBuffer, 0, want)
         if (read < 0) throw EOFException("Tar payload ended early")
-        out.write(chunk, 0, read)
+        out.write(payloadBuffer, 0, read)
         remaining -= read
       }
     }

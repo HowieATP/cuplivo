@@ -35,15 +35,6 @@ class MockTransport implements ClientTransport {
     }
   }
 
-  /// Push an error onto the message stream, as transports do for
-  /// authentication failures. The client must handle it (no unhandled
-  /// zone exception).
-  void sendMockError(Object error) {
-    if (!_closed) {
-      _messageController.addError(error);
-    }
-  }
-
   @override
   Stream<dynamic> get onMessage => _messageController.stream;
 
@@ -51,7 +42,7 @@ class MockTransport implements ClientTransport {
   Future<void> get onClose => _closeCompleter.future;
 
   @override
-  void send(dynamic message) {
+  TransportSendOperation send(dynamic message) {
     if (_closed) {
       throw McpError('Transport is closed');
     }
@@ -78,6 +69,7 @@ class MockTransport implements ClientTransport {
         }
       }
     }
+    return TransportSendOperation.completed();
   }
 
   /// Schedule a response to be sent asynchronously

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -14,13 +15,17 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/collapsible_group_header.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
+import '../../../desktop/desktop_settings_navigation_bus.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../workspace/pages/workspace_list_page.dart';
 import '../../workspace/pages/workspace_terminal_page.dart';
 import '../../workspace/widgets/workspace_bind_sheet.dart';
+import '../../assistant/pages/assistant_settings_page.dart';
 import '../services/local_tools_service.dart';
+import 'subagent_target_sheet.dart';
 
 /// The shared Tools Hub content: local tools / MCP servers / workspace
 /// management grouped with collapsible headers. Used by both the mobile
@@ -49,6 +54,9 @@ class _ToolsHubContentState extends State<ToolsHubContent>
   static const String _mcpKey = 'mcp';
   static const String _workspaceKey = 'workspace';
 
+  /// Desktop popover inline hint: dismissed per-open (transient surface).
+  bool _subagentHintDismissed = false;
+
   @override
   Set<String> get initialCollapsedGroups => {_localToolsKey};
 
@@ -60,6 +68,20 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     }
   }
 
+  void _goAssistantSettings() {
+    widget.onClose?.call();
+    if (PlatformUtils.isDesktop) {
+      // Desktop deep link mirrors the backup-reminder pattern: the settings
+      // shell owns the assistant list pane; pushing a mobile-style route on
+      // desktop is wrong (see side_drawer._openBackupSettings).
+      DesktopSettingsNavigationBus.instance.openAssistants();
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AssistantSettingsPage()),
+    );
+  }
+
   void _toggleLocalTool(Assistant a, String toolId, bool value) {
     Haptics.light();
     final ids = a.localToolIds.toSet();
@@ -69,6 +91,69 @@ class _ToolsHubContentState extends State<ToolsHubContent>
       ids.remove(toolId);
     }
     _updateAssistant(a.copyWith(localToolIds: ids.toList(growable: false)));
+    if (toolId == LocalToolNames.handoff && value) {
+      final targets = LocalToolsService.handoffTargets(
+        context.read<AssistantProvider>().assistants,
+        excludeId: a.id,
+      );
+      if (targets.isEmpty) {
+        setState(() => _subagentHintDismissed = false);
+        if (PlatformUtils.isMobile) {
+          showSubagentNoTargetSnackbar(
+            context,
+            onGoSetup: _goAssistantSettings,
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _toggleDeviceTool(Assistant a, String toolId, bool value) async {
+    if (!value) {
+      _toggleLocalTool(a, toolId, false);
+      return;
+    }
+    final outcome = await DeviceLocalTools.requestToggleEnable(toolId);
+    if (!mounted) {
+      // The permission flow (system settings page / dialog) may have closed
+      // the hub sheet/popover; writing through a stale context would silently
+      // drop the toggle (review finding: stale snapshot round trip).
+      return;
+    }
+    // Re-read the assistant at write time: the permission round trip may have
+    // changed other tools, and the captured snapshot can be stale.
+    final fresh = context.read<AssistantProvider>().getById(a.id);
+    if (fresh == null) {
+      debugPrint('ToolsHubContent: assistant vanished during toggle: ${a.id}');
+      return;
+    }
+    switch (outcome) {
+      case DeviceToolToggleOutcome.canEnable:
+        _toggleLocalTool(fresh, toolId, true);
+      case DeviceToolToggleOutcome.canEnableUsageAccessMissing:
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetScreenTimePermissionRequired,
+          type: NotificationType.warning,
+        );
+        // Upstream parity: still enable even when Usage Access is not
+        // granted yet — the tool error guides the user to the page.
+        _toggleLocalTool(fresh, toolId, true);
+      case DeviceToolToggleOutcome.blocked:
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetCalendarPermissionDenied,
+          type: NotificationType.warning,
+        );
+      case DeviceToolToggleOutcome.notSupported:
+        // The row should not be visible on unsupported platforms; if it is,
+        // keep the tool off.
+        break;
+    }
   }
 
   void _toggleMcpServer(Assistant a, String id, bool value) {
@@ -173,21 +258,38 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     required IconData icon,
     required String title,
     required String toolId,
+    bool deviceTool = false,
+    int? targetBadge,
   }) {
     final enabled = a.localToolIds.contains(toolId);
+    void toggle(bool v) {
+      if (deviceTool) {
+        unawaited(_toggleDeviceTool(a, toolId, v));
+      } else {
+        _toggleLocalTool(a, toolId, v);
+      }
+    }
+
     if (_isMobileStyle) {
       return _SheetToolRow(
         icon: icon,
         title: title,
         enabled: enabled,
-        onChanged: (v) => _toggleLocalTool(a, toolId, v),
+        onChanged: toggle,
+        tag: targetBadge == null
+            ? null
+            : AppLocalizations.of(context)!.subagentTargetBadge(targetBadge),
+        tagWarning: targetBadge != null && targetBadge == 0,
       );
     }
     return _DesktopToolRow(
       icon: icon,
       label: title,
       selected: enabled,
-      onTap: () => _toggleLocalTool(a, toolId, !enabled),
+      onTap: () => toggle(!enabled),
+      trailing: targetBadge == null
+          ? null
+          : _SubagentBadgeText(count: targetBadge, showCheck: enabled),
     );
   }
 
@@ -196,6 +298,11 @@ class _ToolsHubContentState extends State<ToolsHubContent>
     ColorScheme cs,
     Assistant a,
   ) {
+    final targets = LocalToolsService.handoffTargets(
+      context.read<AssistantProvider>().assistants,
+      excludeId: a.id,
+    );
+    final handoffEnabled = a.localToolIds.contains(LocalToolNames.handoff);
     final rows = <Widget>[
       _localToolRow(
         a,
@@ -232,18 +339,49 @@ class _ToolsHubContentState extends State<ToolsHubContent>
         icon: Lucide.Bot,
         title: l10n.assistantEditLocalToolHandoffTitle,
         toolId: LocalToolNames.handoff,
+        targetBadge: targets.length,
       ),
-      _localToolRow(
-        a,
-        icon: Lucide.Timer,
-        title: l10n.assistantEditLocalToolHandoffSyncTitle,
-        toolId: LocalToolNames.handoffSync,
-      ),
+      if (DeviceLocalTools.screenTimeSupported)
+        _localToolRow(
+          a,
+          icon: Lucide.Smartphone,
+          title: l10n.assistantEditLocalToolScreenTimeTitle,
+          toolId: LocalToolNames.screenTime,
+          deviceTool: true,
+        ),
+      if (DeviceLocalTools.calendarSupported) ...[
+        _localToolRow(
+          a,
+          icon: Lucide.Calendar,
+          title: l10n.assistantEditLocalToolCalendarQueryTitle,
+          toolId: LocalToolNames.calendarQuery,
+          deviceTool: true,
+        ),
+        _localToolRow(
+          a,
+          icon: Lucide.CalendarPlus,
+          title: l10n.assistantEditLocalToolCalendarCreateTitle,
+          toolId: LocalToolNames.calendarCreate,
+          deviceTool: true,
+        ),
+      ],
     ];
+    final toolCount = rows.length;
+    if (!PlatformUtils.isMobile &&
+        handoffEnabled &&
+        targets.isEmpty &&
+        !_subagentHintDismissed) {
+      rows.add(
+        SubagentNoTargetHintRow(
+          onGoSetup: _goAssistantSettings,
+          onDismiss: () => setState(() => _subagentHintDismissed = true),
+        ),
+      );
+    }
     return _buildGroup(
       keyName: _localToolsKey,
       groupName: l10n.toolsHubLocalToolsTitle,
-      count: rows.length,
+      count: toolCount,
       children: rows,
     );
   }
@@ -460,7 +598,7 @@ class _ToolsHubContentState extends State<ToolsHubContent>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, child) in children.indexed) ...[
-                if (i > 0) const SizedBox(height: 10),
+                if (i > 0) const SizedBox(height: 6),
                 child,
               ],
             ],
@@ -594,11 +732,13 @@ class _SheetToolRow extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     this.tag,
+    this.tagWarning = false,
   });
 
   final IconData icon;
   final String title;
   final String? tag;
+  final bool tagWarning;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
@@ -608,6 +748,7 @@ class _SheetToolRow extends StatelessWidget {
     final iconColor = enabled
         ? cs.primary
         : cs.onSurface.withValues(alpha: 0.7);
+    final tagColor = tagWarning ? cs.error : cs.primary;
     return IosCardPress(
       borderRadius: BorderRadius.circular(14),
       baseColor: cs.surface,
@@ -635,15 +776,15 @@ class _SheetToolRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.10),
+                color: tagColor.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+                border: Border.all(color: tagColor.withValues(alpha: 0.35)),
               ),
               child: Text(
                 tag!,
                 style: TextStyle(
                   fontSize: 11,
-                  color: cs.primary,
+                  color: tagColor,
                   fontWeight: AppFontWeights.semibold,
                 ),
               ),
@@ -653,6 +794,40 @@ class _SheetToolRow extends StatelessWidget {
           IosSwitch(value: enabled, onChanged: onChanged),
         ],
       ),
+    );
+  }
+}
+
+/// Desktop trailing badge for the Sub-agent Delegation row: live target count
+/// (error-tinted at zero) next to the selected check marker.
+class _SubagentBadgeText extends StatelessWidget {
+  const _SubagentBadgeText({required this.count, required this.showCheck});
+
+  final int count;
+  final bool showCheck;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final color = count == 0 ? cs.error : cs.onSurface.withValues(alpha: 0.5);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          l10n.subagentTargetBadge(count),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: AppFontWeights.medium,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 6),
+        if (showCheck)
+          Icon(Lucide.Check, size: 16, color: cs.primary)
+        else
+          const SizedBox(width: 16),
+      ],
     );
   }
 }

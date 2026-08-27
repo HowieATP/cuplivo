@@ -97,6 +97,10 @@ class WorkspaceDependencyIds {
   static const String python = 'python';
   static const String nodejs = 'nodejs';
   static const String git = 'git';
+  static const String githubCli = 'github_cli';
+  static const String curl = 'curl';
+  static const String opensshClient = 'openssh_client';
+  static const String archive = 'archive';
   static const String office = 'office';
   static const String buildEssential = 'build_essential';
 
@@ -105,8 +109,25 @@ class WorkspaceDependencyIds {
     python,
     nodejs,
     git,
+    githubCli,
+    curl,
+    opensshClient,
+    archive,
     office,
     buildEssential,
+  ];
+
+  static const Map<String, List<String>> prerequisites = <String, List<String>>{
+    githubCli: <String>[git],
+    office: <String>[python, nodejs],
+  };
+
+  static List<String> missingPrerequisites(
+    String dependencyId,
+    Map<String, bool> installed,
+  ) => <String>[
+    for (final prerequisite in prerequisites[dependencyId] ?? const <String>[])
+      if (installed[prerequisite] != true) prerequisite,
   ];
 }
 

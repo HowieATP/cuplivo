@@ -156,6 +156,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
+  static const String _chatForkKeepMessageVersionsKey =
+      'chat_fork_keep_message_versions_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
@@ -254,6 +256,9 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
       'mobile_assistant_edit_tab_hidden_v1';
+  // Input bar buttons customization (order + More bucket)
+  static const String _chatInputButtonsOrderKey = 'chat_input_buttons_v1';
+  static const String _chatInputMoreButtonsKey = 'chat_input_more_buttons_v1';
   static const String _mobileAssistantDetailOutlineEnabledKey =
       'mobile_assistant_detail_outline_enabled_v1';
   // Network request logging (debug)
@@ -1159,6 +1164,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
+    _forkKeepMessageVersions =
+        prefs.getBool(_chatForkKeepMessageVersionsKey) ?? false;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
     _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
       prefs.getString(_displayMobileMessageNavButtonsModeKey),
@@ -1369,6 +1376,12 @@ class SettingsProvider extends ChangeNotifier {
     );
     _hiddenMobileAssistantEditTabs = Set.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabHiddenKey) ?? const <String>[],
+    );
+    _chatInputButtonOrder = List.unmodifiable(
+      prefs.getStringList(_chatInputButtonsOrderKey) ?? const <String>[],
+    );
+    _chatInputMoreButtonIds = List.unmodifiable(
+      prefs.getStringList(_chatInputMoreButtonsKey) ?? const <String>[],
     );
     _mobileAssistantDetailOutlineEnabled =
         prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
@@ -2858,6 +2871,44 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setStringList(_mobileAssistantEditTabHiddenKey, sorted);
   }
 
+  List<String> _chatInputButtonOrder = const <String>[];
+  List<String> get chatInputButtonOrder => _chatInputButtonOrder;
+  Future<void> setChatInputButtonOrder(List<String> order) async {
+    final next = List<String>.unmodifiable(LinkedHashSet<String>.from(order));
+    if (listEquals(_chatInputButtonOrder, next)) return;
+    _chatInputButtonOrder = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_chatInputButtonsOrderKey, next);
+  }
+
+  List<String> _chatInputMoreButtonIds = const <String>[];
+  List<String> get chatInputMoreButtonIds => _chatInputMoreButtonIds;
+  Future<void> setChatInputMoreButtonIds(List<String> ids) async {
+    final sorted = LinkedHashSet<String>.from(ids).toList()..sort();
+    final next = List<String>.unmodifiable(sorted);
+    if (listEquals(_chatInputMoreButtonIds, next)) return;
+    _chatInputMoreButtonIds = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_chatInputMoreButtonsKey, next);
+  }
+
+  /// True once the user saved an explicit customization. While false (sentinel
+  /// unset), every platform keeps its legacy button split.
+  bool get chatInputButtonsCustomized =>
+      _chatInputButtonOrder.isNotEmpty || _chatInputMoreButtonIds.isNotEmpty;
+
+  Future<void> resetChatInputButtons() async {
+    if (!chatInputButtonsCustomized) return;
+    _chatInputButtonOrder = const <String>[];
+    _chatInputMoreButtonIds = const <String>[];
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_chatInputButtonsOrderKey);
+    await prefs.remove(_chatInputMoreButtonsKey);
+  }
+
   bool _mobileAssistantDetailOutlineEnabled = false;
   bool get mobileAssistantDetailOutlineEnabled =>
       _mobileAssistantDetailOutlineEnabled;
@@ -4154,6 +4205,16 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayShowRegenerateConfirmDialogKey, v);
   }
 
+  bool _forkKeepMessageVersions = false;
+  bool get forkKeepMessageVersions => _forkKeepMessageVersions;
+  Future<void> setForkKeepMessageVersions(bool v) async {
+    if (_forkKeepMessageVersions == v) return;
+    _forkKeepMessageVersions = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_chatForkKeepMessageVersionsKey, v);
+  }
+
   // Display: show message navigation button
   bool _showMessageNavButtons = true;
   bool get showMessageNavButtons => _showMessageNavButtons;
@@ -5133,6 +5194,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._showToolResultSummary = _showToolResultSummary;
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
+    copy._forkKeepMessageVersions = _forkKeepMessageVersions;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
@@ -5194,6 +5256,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
+    copy._chatInputButtonOrder = _chatInputButtonOrder;
+    copy._chatInputMoreButtonIds = _chatInputMoreButtonIds;
     copy._mobileAssistantDetailOutlineEnabled =
         _mobileAssistantDetailOutlineEnabled;
     return copy;

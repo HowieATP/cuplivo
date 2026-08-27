@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
@@ -186,7 +189,6 @@ void main() {
 
       expect(noTargets.map((tool) => tool['function']['name']), const [
         LocalToolNames.handoff,
-        LocalToolNames.handoffSync,
       ]);
       expect(
         (noTargets.first['function']['description'] as String),
@@ -194,7 +196,6 @@ void main() {
       );
       expect(withTargets.map((tool) => tool['function']['name']), const [
         LocalToolNames.handoff,
-        LocalToolNames.handoffSync,
       ]);
       for (final tool in withTargets) {
         final fn = tool['function'] as Map<String, dynamic>;
@@ -206,50 +207,93 @@ void main() {
       }
       final handoffDesc =
           withTargets.first['function']['description'] as String;
-      final syncDesc = withTargets.last['function']['description'] as String;
       expect(handoffDesc, contains('research-bot'));
-      expect(syncDesc, contains('research-bot'));
-      expect(syncDesc, contains('AND WAIT'));
+      expect(handoffDesc, contains('WAIT for it to finish'));
     });
 
-    test(
-      'handoff definitions are absent when only one of the two is enabled',
-      () {
-        final onlyHandoff = LocalToolsService.buildToolDefinitions(
-          assistant: Assistant(
-            id: 'a1',
-            name: 'Assistant',
-            localToolIds: [LocalToolNames.handoff],
-          ),
-          supportsTools: true,
-          discoverableAssistants: const [],
-        );
-        expect(onlyHandoff.map((tool) => tool['function']['name']), const [
-          LocalToolNames.handoff,
-        ]);
-        expect(
-          (onlyHandoff.first['function']['description'] as String),
-          contains('No assistants are currently available'),
-        );
+    test('single wait-mode tool regardless of legacy handoff ids', () {
+      final onlyHandoff = LocalToolsService.buildToolDefinitions(
+        assistant: Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.handoff],
+        ),
+        supportsTools: true,
+        discoverableAssistants: const [],
+      );
+      expect(onlyHandoff.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+      ]);
+      expect(
+        (onlyHandoff.first['function']['description'] as String),
+        contains('No assistants are currently available'),
+      );
+      expect(
+        (onlyHandoff.first['function']['description'] as String),
+        contains('WAIT for it to finish'),
+      );
 
-        final onlySync = LocalToolsService.buildToolDefinitions(
-          assistant: Assistant(
-            id: 'a1',
-            name: 'Assistant',
-            localToolIds: [LocalToolNames.handoffSync],
-          ),
-          supportsTools: true,
-          discoverableAssistants: const [],
-        );
-        expect(onlySync.map((tool) => tool['function']['name']), const [
+      // A legacy sync-id list normalizes onto the single wait-mode tool
+      // (ADR-0041) — the definition comes out identical.
+      final onlySync = LocalToolsService.buildToolDefinitions(
+        assistant: Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.handoffSync],
+        ),
+        supportsTools: true,
+        discoverableAssistants: const [],
+      );
+      expect(onlySync.map((tool) => tool['function']['name']), const [
+        LocalToolNames.handoff,
+      ]);
+      expect(
+        (onlySync.first['function']['description'] as String),
+        contains('WAIT for it to finish'),
+      );
+    });
+
+    test('assistant localToolIds normalize legacy sync id onto handoff', () {
+      final assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [
           LocalToolNames.handoffSync,
-        ]);
-        expect(
-          (onlySync.first['function']['description'] as String),
-          contains('AND WAIT'),
-        );
-      },
-    );
+          LocalToolNames.timeInfo,
+          LocalToolNames.handoff,
+        ],
+      );
+      expect(assistant.localToolIds, const [
+        LocalToolNames.timeInfo,
+        LocalToolNames.handoff,
+      ]);
+
+      final decoded = Assistant.fromJson(assistant.toJson());
+      expect(decoded.localToolIds, const [
+        LocalToolNames.timeInfo,
+        LocalToolNames.handoff,
+      ]);
+    });
+
+    test('handoffTargets filters discoverable, non-empty ids and self', () {
+      final delegating = Assistant(
+        id: 'delegator',
+        name: 'Delegator',
+        localToolIds: [LocalToolNames.handoff],
+      );
+      final targets = LocalToolsService.handoffTargets([
+        delegating,
+        Assistant(id: 'plain', name: 'Plain'),
+        Assistant(
+          id: 'visible',
+          name: 'Visible',
+          discoverable: true,
+          handoffId: 'visible-bot',
+        ),
+        Assistant(id: 'empty-id', name: 'Empty', discoverable: true),
+      ], excludeId: 'delegator');
+      expect(targets.map((t) => t.id), const ['visible']);
+    });
 
     test('handoff target lists exclude the delegating assistant itself', () {
       final delegating = Assistant(
@@ -620,5 +664,276 @@ void main() {
         isNull,
       );
     });
+  });
+
+  group('Device local tools', () {
+    final deviceToolsAssistant = Assistant(
+      id: 'd1',
+      name: 'Assistant',
+      localToolIds: [
+        LocalToolNames.screenTime,
+        LocalToolNames.calendarQuery,
+        LocalToolNames.calendarCreate,
+      ],
+    );
+
+    setUp(() {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    });
+
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(DeviceLocalTools.channel, null);
+    });
+
+    test('screen time supported only on Android', () {
+      expect(DeviceLocalTools.screenTimeSupported, isTrue);
+      expect(DeviceLocalTools.calendarSupported, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      expect(DeviceLocalTools.screenTimeSupported, isFalse);
+      expect(DeviceLocalTools.calendarSupported, isTrue);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(DeviceLocalTools.screenTimeSupported, isFalse);
+      expect(DeviceLocalTools.calendarSupported, isFalse);
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(DeviceLocalTools.calendarSupported, isFalse);
+    });
+
+    test('definitions are gated by platform support and localToolIds', () {
+      final android = LocalToolsService.buildToolDefinitions(
+        assistant: deviceToolsAssistant,
+        supportsTools: true,
+      );
+      final names = android
+          .map((t) => (t['function'] as Map)['name'] as String)
+          .toList();
+      expect(
+        names,
+        containsAll(<String>[
+          LocalToolNames.screenTime,
+          LocalToolNames.calendarQuery,
+          LocalToolNames.calendarCreate,
+        ]),
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final ios = LocalToolsService.buildToolDefinitions(
+        assistant: deviceToolsAssistant,
+        supportsTools: true,
+      );
+      final iosNames = ios
+          .map((t) => (t['function'] as Map)['name'] as String)
+          .toList();
+      expect(iosNames, isNot(contains(LocalToolNames.screenTime)));
+      expect(iosNames, contains(LocalToolNames.calendarQuery));
+      expect(iosNames, contains(LocalToolNames.calendarCreate));
+      expect(
+        ios
+            .firstWhere(
+              (t) =>
+                  (t['function'] as Map)['name'] ==
+                  LocalToolNames.calendarCreate,
+            )
+            .toString(),
+        contains('reminder_minutes'),
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      final windows = LocalToolsService.buildToolDefinitions(
+        assistant: deviceToolsAssistant,
+        supportsTools: true,
+      );
+      expect(windows, isEmpty);
+    });
+
+    test('tryHandleToolCall passes args JSON through the channel', () async {
+      const channel = DeviceLocalTools.channel;
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call.method);
+            final args = jsonDecode(call.arguments as String) as Map;
+            if (call.method == 'getScreenTime') {
+              expect(args['top'], 5);
+            }
+            if (call.method == 'createCalendarEvent') {
+              expect(args['reminder_minutes'], 30);
+            }
+            return '{"success":true}';
+          });
+
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.screenTime,
+          const {'top': 5, 'range': 'week'},
+          deviceToolsAssistant,
+        ),
+        '{"success":true}',
+      );
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.calendarQuery,
+          const {'range': 'month'},
+          deviceToolsAssistant,
+        ),
+        '{"success":true}',
+      );
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.calendarCreate,
+          const {
+            'title': 'Dentist',
+            'start': '2026-10-01T10:00:00',
+            'reminder_minutes': 30,
+          },
+          deviceToolsAssistant,
+        ),
+        '{"success":true}',
+      );
+      expect(calls, ['getScreenTime', 'queryCalendar', 'createCalendarEvent']);
+    });
+
+    test('native error payloads reach the model un-mangled', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+            if (call.method == 'getScreenTime') {
+              return '{"error":"NO_PERMISSION","message":"open the usage access settings"}';
+            }
+            return '{"error":"INVALID_REMINDER","message":"reminder_minutes must be positive"}';
+          });
+
+      final screenTime = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.screenTime,
+        const <String, dynamic>{},
+        deviceToolsAssistant,
+      );
+      final screenTimePayload = jsonDecode(screenTime!) as Map;
+      expect(screenTimePayload['error'], 'NO_PERMISSION');
+
+      final create = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.calendarCreate,
+        const {'title': 'x', 'start': '2026-10-01', 'reminder_minutes': 0},
+        deviceToolsAssistant,
+      );
+      final createPayload = jsonDecode(create!) as Map;
+      expect(createPayload['error'], 'INVALID_REMINDER');
+    });
+
+    test('unsupported platforms disable the device tools entirely', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.screenTime,
+          const <String, dynamic>{},
+          deviceToolsAssistant,
+        ),
+        isNull,
+      );
+      expect(
+        await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.calendarQuery,
+          const <String, dynamic>{},
+          deviceToolsAssistant,
+        ),
+        isNull,
+      );
+    });
+
+    test(
+      'requestToggleEnable: usage access missing keeps the tool enabled',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+              if (call.method == 'hasUsageStatsPermission') return false;
+              if (call.method == 'openUsageAccessSettings') return null;
+              return false;
+            });
+        expect(
+          await DeviceLocalTools.requestToggleEnable(LocalToolNames.screenTime),
+          DeviceToolToggleOutcome.canEnableUsageAccessMissing,
+        );
+      },
+    );
+
+    test('requestToggleEnable: calendar denied keeps the tool off', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+            if (call.method == 'hasCalendarPermission') return false;
+            if (call.method == 'requestCalendarPermission') return false;
+            return false;
+          });
+      expect(
+        await DeviceLocalTools.requestToggleEnable(
+          LocalToolNames.calendarCreate,
+        ),
+        DeviceToolToggleOutcome.blocked,
+      );
+    });
+
+    test('requestToggleEnable: calendar granted enables the tool', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+            if (call.method == 'hasCalendarPermission') return false;
+            if (call.method == 'requestCalendarPermission') return true;
+            return false;
+          });
+      expect(
+        await DeviceLocalTools.requestToggleEnable(
+          LocalToolNames.calendarQuery,
+        ),
+        DeviceToolToggleOutcome.canEnable,
+      );
+    });
+
+    test(
+      'requestCalendarPermission times out and re-checks the grant state',
+      () async {
+        final previousTimeout = DeviceLocalTools.calendarPermissionTimeout;
+        DeviceLocalTools.calendarPermissionTimeout = const Duration(
+          milliseconds: 50,
+        );
+        addTearDown(
+          () => DeviceLocalTools.calendarPermissionTimeout = previousTimeout,
+        );
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+              if (call.method == 'requestCalendarPermission') {
+                // Simulate a lost native result: never completes.
+                return Completer<bool>().future;
+              }
+              if (call.method == 'hasCalendarPermission') return true;
+              return false;
+            });
+
+        // The user granted before the recreation → re-check reports the grant.
+        expect(await DeviceLocalTools.requestCalendarPermission(), isTrue);
+      },
+    );
+
+    test(
+      'requestCalendarPermission times out and stays false when un-granted',
+      () async {
+        final previousTimeout = DeviceLocalTools.calendarPermissionTimeout;
+        DeviceLocalTools.calendarPermissionTimeout = const Duration(
+          milliseconds: 50,
+        );
+        addTearDown(
+          () => DeviceLocalTools.calendarPermissionTimeout = previousTimeout,
+        );
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(DeviceLocalTools.channel, (call) async {
+              if (call.method == 'requestCalendarPermission') {
+                return Completer<bool>().future;
+              }
+              return false;
+            });
+
+        expect(await DeviceLocalTools.requestCalendarPermission(), isFalse);
+      },
+    );
   });
 }

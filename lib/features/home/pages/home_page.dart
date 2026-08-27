@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -25,6 +25,7 @@ import '../../settings/pages/trash_detail_page.dart';
 import '../widgets/live_panel.dart';
 import '../widgets/image_generation_options.dart';
 import '../../../core/models/quick_phrase.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/chat/external_chat_draft_handoff.dart';
@@ -73,6 +74,8 @@ import '../widgets/chat_selection_export_bar.dart';
 import '../widgets/user_message_edit_overlay.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
+import '../utils/input_bar_button_layout.dart';
+import 'input_bar_buttons_customization_page.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
@@ -587,7 +590,7 @@ class _HomePageState extends State<HomePage>
   final ChatInputBarController _mediaController = ChatInputBarController();
   final ImageGenerationOptionsController _imageGenController =
       ImageGenerationOptionsController();
-  final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
+  scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
@@ -595,6 +598,8 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
   bool _presetsExpanded = false;
+  String? _scrollConversationId;
+  double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -632,6 +637,7 @@ class _HomePageState extends State<HomePage>
     _initProcessText();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _lastViewInsetBottom = View.of(context).viewInsets.bottom;
       _controller.measureInputBar();
       if (!mounted) return;
       context.read<WorldBookProvider>().initialize();
@@ -679,6 +685,16 @@ class _HomePageState extends State<HomePage>
   }
 
   @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final nextInset = View.of(context).viewInsets.bottom;
+    final keyboardOpening = nextInset > _lastViewInsetBottom + 0.5;
+    _lastViewInsetBottom = nextInset;
+    if (!keyboardOpening) return;
+    _controller.scrollCtrl.pinBottomDuringViewportResizeIfNeeded();
+  }
+
+  @override
   void didPushNext() {
     _controller.onDidPushNext();
   }
@@ -713,6 +729,15 @@ class _HomePageState extends State<HomePage>
   }
 
   void _onControllerChanged() {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId != null && conversationId != _scrollConversationId) {
+      _scrollConversationId = conversationId;
+      final previous = _scrollController;
+      final replacement = scroll_ctrl.ChatAutoFollowScrollController();
+      _scrollController = replacement;
+      _controller.replaceScrollController(replacement);
+      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    }
     if (mounted) setState(() {});
   }
 
@@ -1376,6 +1401,7 @@ class _HomePageState extends State<HomePage>
     }
 
     final settings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
@@ -1424,7 +1450,8 @@ class _HomePageState extends State<HomePage>
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
       scrollController: _scrollController,
-      observerController: _controller.scrollCtrl.observerController,
+      listController: _controller.scrollCtrl.messageListController,
+      onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
       messages: messages,
       headerWidget: presetHeaderWidget,
       byGroup: _controller.chatController.groupedMessages,
@@ -1444,6 +1471,20 @@ class _HomePageState extends State<HomePage>
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
+      chatFontScale: settings.chatFontScale,
+      collapseThinking: settings.autoCollapseThinking,
+      collapsedCodeLines: settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+      wrapCodeBlocks:
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      showModelIcon: settings.showModelIcon,
+      showUserAvatar: settings.showUserAvatar,
+      showTokenStats: settings.showTokenStats,
+      assistant: assistant,
       streamingContentNotifier: _controller.streamingContentNotifier,
       spotlightMessageId: _controller.spotlightMessageId,
       spotlightToken: _controller.spotlightToken,
@@ -1487,6 +1528,9 @@ class _HomePageState extends State<HomePage>
       onSpeakMessage: (message) => _controller.speakMessage(message),
       onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
       onQuoteSelection: (text) => _controller.insertQuote(text),
+      onReplyMessage: (message) => _controller.startReplyTo(message),
+      onReplySelectionMessage: (message, selected) =>
+          _controller.startReplyToSelection(message, selected),
       onRecoveredAskUserAnswer: (message, part, result) =>
           _controller.submitRecoveredAskUserAnswer(message, part, result),
       onToggleSelection: (messageId, selected) {
@@ -1563,22 +1607,7 @@ class _HomePageState extends State<HomePage>
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));
       },
       onOpenSearch: _openSearchSettings,
-      onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant != null) {
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
-      },
+      onConfigureReasoning: () => _configureReasoning(),
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1796,6 +1825,22 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _configureReasoning() async {
+    final assistantProvider = context.read<AssistantProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final assistant = assistantProvider.currentAssistant;
+    if (assistant == null) return;
+    if (assistant.thinkingBudget != null) {
+      settingsProvider.setThinkingBudget(assistant.thinkingBudget);
+    }
+    await _openReasoningSettings();
+    if (!mounted) return;
+    final chosen = settingsProvider.thinkingBudget;
+    await assistantProvider.updateAssistant(
+      assistant.copyWith(thinkingBudget: chosen),
+    );
+  }
+
   Future<void> _openReasoningSettings() async {
     if (PlatformUtils.isDesktop) {
       await showDesktopReasoningBudgetPopover(context, anchorKey: _inputBarKey);
@@ -1892,6 +1937,28 @@ class _HomePageState extends State<HomePage>
     _controller.dismissKeyboard();
     final cs = Theme.of(context).colorScheme;
     final assistantId = context.read<AssistantProvider>().currentAssistantId;
+    final settings = context.read<SettingsProvider>();
+    final ap = context.read<AssistantProvider>();
+    final a = ap.currentAssistant;
+    final layout = resolveInputBarButtonLayout(
+      savedOrder: settings.chatInputButtonOrder,
+      savedMoreIds: settings.chatInputMoreButtonIds,
+      tabletLayout: false,
+    );
+    // Phone bucket = configured in-more ids (in config order) + row overflow.
+    final bucket = <String>[
+      for (final id in layout.orderedIds)
+        if (layout.moreIds.contains(id)) id,
+      ..._mediaController.nonFittedDirectIds,
+    ];
+    // Capability gates mirror ChatInputSection: rows are only offered when
+    // the current model/assistant actually supports them.
+    final modelIds = getActiveModelIds(settings, assistant: a);
+    final pk = modelIds.providerKey;
+    final mid = modelIds.modelId;
+    final supportsReasoning = pk != null && mid != null;
+    final toolsGate = _toolsHubAvailable(pk, mid);
+    final quickPhraseGate = _hasQuickPhrases(a);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1903,6 +1970,15 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: BottomToolsSheet(
+            moreIds: bucket,
+            onCustomize: () {
+              Navigator.of(ctx).maybePop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InputBarButtonsCustomizationPage(),
+                ),
+              );
+            },
             onPhotos: () {
               Navigator.of(ctx).maybePop();
               _controller.onPickPhotos();
@@ -1928,10 +2004,56 @@ class _HomePageState extends State<HomePage>
               Navigator.of(ctx).maybePop();
               _openSkillsPopover();
             },
+            onSelectModel: () async {
+              Navigator.of(ctx).maybePop();
+              showModelSelectSheet(
+                context,
+                onMultiSelectConfirm:
+                    _controller.multiAIEngine.mode == MultiAIMode.synthesize
+                    ? null
+                    : _controller.enterMultiAIMode,
+              );
+            },
+            onOpenSearch: () {
+              Navigator.of(ctx).maybePop();
+              _openSearchSettings();
+            },
+            onConfigureReasoning: !supportsReasoning
+                ? null
+                : () async {
+                    Navigator.of(ctx).maybePop();
+                    await _configureReasoning();
+                  },
+            onQuickPhrase: !quickPhraseGate
+                ? null
+                : () {
+                    Navigator.of(ctx).maybePop();
+                    _showQuickPhraseMenu();
+                  },
+            onOpenToolsHub: !toolsGate
+                ? null
+                : () {
+                    Navigator.of(ctx).maybePop();
+                    if (a != null) {
+                      showToolsHubSheet(context, assistantId: a.id);
+                    }
+                  },
           ),
         );
       },
     );
+  }
+
+  bool _toolsHubAvailable(String? pk, String? mid) {
+    if (pk == null || mid == null) return false;
+    return _controller.isToolModel(pk, mid);
+  }
+
+  bool _hasQuickPhrases(Assistant? a) {
+    final quickPhraseProvider = context.read<QuickPhraseProvider>();
+    if (quickPhraseProvider.globalPhrases.isNotEmpty) return true;
+    if (a == null) return false;
+    return quickPhraseProvider.getForAssistant(a.id).isNotEmpty;
   }
 
   void _showContextManagementSheet() async {

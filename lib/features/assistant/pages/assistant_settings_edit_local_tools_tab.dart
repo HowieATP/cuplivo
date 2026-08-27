@@ -27,12 +27,37 @@ class _LocalToolsTab extends StatelessWidget {
     final handoffEnabled = assistant.localToolIds.contains(
       LocalToolNames.handoff,
     );
-    final handoffSyncEnabled = assistant.localToolIds.contains(
-      LocalToolNames.handoffSync,
+    final handoffTargets = LocalToolsService.handoffTargets(
+      ap.assistants,
+      excludeId: assistant.id,
+    );
+    final screenTimeEnabled = assistant.localToolIds.contains(
+      LocalToolNames.screenTime,
+    );
+    final calendarQueryEnabled = assistant.localToolIds.contains(
+      LocalToolNames.calendarQuery,
+    );
+    final calendarCreateEnabled = assistant.localToolIds.contains(
+      LocalToolNames.calendarCreate,
     );
 
     Future<void> updateTool(String toolId, bool value) async {
-      final ids = assistant.localToolIds.toSet();
+      if (!context.mounted) {
+        // The permission flow (system settings page / dialog) may have
+        // unmounted this tab; writing through a stale context would silently
+        // drop the toggle (review finding: stale snapshot round trip).
+        return;
+      }
+      // Re-read at write time: the permission round trip may have changed
+      // other tools, and the build-time snapshot can be stale.
+      final current = context.read<AssistantProvider>().getById(assistantId);
+      if (current == null) {
+        debugPrint(
+          'Local tools tab: assistant vanished during toggle: $assistantId',
+        );
+        return;
+      }
+      final ids = current.localToolIds.toSet();
       if (value) {
         ids.add(toolId);
       } else {
@@ -40,10 +65,57 @@ class _LocalToolsTab extends StatelessWidget {
       }
       try {
         await context.read<AssistantProvider>().updateAssistant(
-          assistant.copyWith(localToolIds: ids.toList(growable: false)),
+          current.copyWith(localToolIds: ids.toList(growable: false)),
         );
       } catch (e) {
         debugPrint('Failed to persist local tool switch: $e');
+      }
+      if (toolId == LocalToolNames.handoff && value && handoffTargets.isEmpty) {
+        if (!context.mounted) return;
+        showSubagentNoTargetSnackbar(
+          context,
+          onGoSetup: () => _goAssistantSettings(context),
+        );
+      }
+    }
+
+    Future<void> toggleTool(String toolId, bool value) async {
+      if (!value) {
+        await updateTool(toolId, false);
+        return;
+      }
+      if (!DeviceLocalTools.isSupportedDeviceTool(toolId)) {
+        await updateTool(toolId, true);
+        return;
+      }
+      final outcome = await DeviceLocalTools.requestToggleEnable(toolId);
+      if (!context.mounted) {
+        // Toggled off or the tab closed during the permission round trip;
+        // never write through a stale context.
+        return;
+      }
+      switch (outcome) {
+        case DeviceToolToggleOutcome.canEnable:
+          await updateTool(toolId, true);
+        case DeviceToolToggleOutcome.canEnableUsageAccessMissing:
+          showAppSnackBar(
+            context,
+            message: l10n.chatMessageWidgetScreenTimePermissionRequired,
+            type: NotificationType.warning,
+          );
+          // Upstream parity (rikkahub): still enable even when Usage Access
+          // is not granted yet — the tool error guides the user to the page.
+          await updateTool(toolId, true);
+        case DeviceToolToggleOutcome.blocked:
+          showAppSnackBar(
+            context,
+            message: l10n.chatMessageWidgetCalendarPermissionDenied,
+            type: NotificationType.warning,
+          );
+        case DeviceToolToggleOutcome.notSupported:
+          // The row should not be visible on unsupported platforms; if it is,
+          // keep the tool off.
+          break;
       }
     }
 
@@ -115,6 +187,37 @@ class _LocalToolsTab extends StatelessWidget {
               enabled: calculateEnabled,
               onChanged: (value) => updateTool(LocalToolNames.calculate, value),
             ),
+            if (DeviceLocalTools.screenTimeSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.Smartphone,
+                title: l10n.assistantEditLocalToolScreenTimeTitle,
+                subtitle: l10n.assistantEditLocalToolScreenTimeSubtitle,
+                enabled: screenTimeEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.screenTime, value),
+              ),
+            ],
+            if (DeviceLocalTools.calendarSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.Calendar,
+                title: l10n.assistantEditLocalToolCalendarQueryTitle,
+                subtitle: l10n.assistantEditLocalToolCalendarQuerySubtitle,
+                enabled: calendarQueryEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.calendarQuery, value),
+              ),
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.CalendarPlus,
+                title: l10n.assistantEditLocalToolCalendarCreateTitle,
+                subtitle: l10n.assistantEditLocalToolCalendarCreateSubtitle,
+                enabled: calendarCreateEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.calendarCreate, value),
+              ),
+            ],
             _iosDivider(context),
             _LocalToolRow(
               icon: Lucide.Bot,
@@ -124,17 +227,68 @@ class _LocalToolsTab extends StatelessWidget {
               onChanged: (value) => updateTool(LocalToolNames.handoff, value),
             ),
             _iosDivider(context),
-            _LocalToolRow(
-              icon: Lucide.Timer,
-              title: l10n.assistantEditLocalToolHandoffSyncTitle,
-              subtitle: l10n.assistantEditLocalToolHandoffSyncSubtitle,
-              enabled: handoffSyncEnabled,
-              onChanged: (value) =>
-                  updateTool(LocalToolNames.handoffSync, value),
-            ),
+            _SubagentTargetStatusRow(targets: handoffTargets),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Footer row under the Sub-agent Delegation toggle: live target count that
+/// opens the shared target list sheet (names + delegation IDs + purposes).
+class _SubagentTargetStatusRow extends StatelessWidget {
+  const _SubagentTargetStatusRow({required this.targets});
+
+  final List<Assistant> targets;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final muted = cs.onSurface.withValues(alpha: 0.62);
+    return _TactileRow(
+      onTap: () => showSubagentTargetSheet(context, targets),
+      builder: (pressed) {
+        return _AnimatedPressColor(
+          pressed: pressed,
+          base: cs.onSurface.withValues(alpha: 0.9),
+          builder: (color) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 36,
+                    child: Icon(
+                      Lucide.ListChecks,
+                      size: 20,
+                      color: targets.isEmpty ? cs.error : cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.subagentTargetStatus(targets.length),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: targets.isEmpty ? cs.error : muted,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Lucide.ChevronRight,
+                    size: 18,
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -293,4 +447,19 @@ class _LocalToolRow extends StatelessWidget {
       },
     );
   }
+}
+
+void _goAssistantSettings(BuildContext context) {
+  if (PlatformUtils.isDesktop) {
+    // The desktop shell owns the assistant list pane (settings menu →
+    // assistants); dismiss the edit dialog first, then deep-link via the
+    // settings navigation bus (backup-reminder pattern).
+    // ignore: use_build_context_synchronously
+    Navigator.of(context).maybePop();
+    DesktopSettingsNavigationBus.instance.openAssistants();
+    return;
+  }
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => const AssistantSettingsPage()),
+  );
 }

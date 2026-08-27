@@ -50,12 +50,12 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> backup() async {
+  Future<bool> backup({BackupStageCallback? onStage}) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.backupToWebDav(_cfg);
+      await _dataSync.backupToWebDav(_cfg, onStage: onStage);
       _message = 'Backup uploaded';
       return true;
     } catch (e) {
@@ -71,12 +71,19 @@ class BackupProvider extends ChangeNotifier {
     IncrementalBackupConfig config,
   ) => _dataSync.analyzeIncrementalScope(config);
 
-  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
+  Future<bool> incrementalBackup(
+    IncrementalBackupConfig config, {
+    BackupStageCallback? onStage,
+  }) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.backupToWebDav(_cfg, incremental: config);
+      await _dataSync.backupToWebDav(
+        _cfg,
+        incremental: config,
+        onStage: onStage,
+      );
       _message = 'Backup uploaded';
       return true;
     } catch (e) {
@@ -115,24 +122,31 @@ class BackupProvider extends ChangeNotifier {
     return _dataSync.listBackupFiles(_cfg);
   }
 
-  Future<File> exportToFile() async {
+  Future<File> exportToFile({BackupStageCallback? onStage}) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      return await _dataSync.exportToFile(_cfg);
+      return await _dataSync.exportToFile(_cfg, onStage: onStage);
     } finally {
       _busy = false;
       notifyListeners();
     }
   }
 
-  Future<File> incrementalExportToFile(IncrementalBackupConfig config) async {
+  Future<File> incrementalExportToFile(
+    IncrementalBackupConfig config, {
+    BackupStageCallback? onStage,
+  }) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      return await _dataSync.exportToFile(_cfg, incremental: config);
+      return await _dataSync.exportToFile(
+        _cfg,
+        incremental: config,
+        onStage: onStage,
+      );
     } finally {
       _busy = false;
       notifyListeners();

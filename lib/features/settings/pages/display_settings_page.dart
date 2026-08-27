@@ -20,6 +20,7 @@ import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
 import '../../../features/assistant/widgets/assistant_select_sheet.dart';
+import '../../home/pages/input_bar_buttons_customization_page.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
@@ -2193,6 +2194,18 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.GitFork,
+                label: l10n.displaySettingsPageForkKeepMessageVersionsTitle,
+                subtitle:
+                    l10n.displaySettingsPageForkKeepMessageVersionsSubtitle,
+                value: sp.forkKeepMessageVersions,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setForkKeepMessageVersions(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.BadgeInfo,
                 label: l10n.displaySettingsPageShowUpdatesTitle,
                 value: sp.showAppUpdates,
@@ -2233,6 +2246,19 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.imageCropperEnabled,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setImageCropperEnabled(v),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Settings2,
+                label: l10n.chatInputBarCustomizeTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InputBarButtonsCustomizationPage(),
+                    ),
+                  );
+                },
               ),
               _iosDivider(context),
               _iosSwitchRow(

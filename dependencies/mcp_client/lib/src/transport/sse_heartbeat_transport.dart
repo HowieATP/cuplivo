@@ -419,7 +419,15 @@ class SseHeartbeatClientTransport implements ClientTransport {
   Future<void> get onClose => _closeCompleter.future;
 
   @override
-  void send(dynamic message) async {
+  TransportSendOperation send(dynamic message) {
+    final pending = _PendingHeartbeatPost();
+    return TransportSendOperation(
+      _send(message, pending),
+      cancel: pending.cancel,
+    );
+  }
+
+  Future<void> _send(dynamic message, _PendingHeartbeatPost pending) async {
     if (_isClosed) {
       _logger.debug('Attempted to send on closed heartbeat transport');
       return;
@@ -436,22 +444,30 @@ class SseHeartbeatClientTransport implements ClientTransport {
       throw McpError('Cannot send message: Connection is disconnected');
     }
 
+    final client = HttpClient();
+    HttpClientRequest? request;
+    pending.client = client;
     try {
+      if (pending.cancelled) return;
       final jsonMessage = jsonEncode(message);
       _logger.debug(
         'Sending heartbeat message: ${jsonMessage.substring(0, 100)}...',
       );
 
       final url = Uri.parse(_messageEndpoint!);
-      final client = HttpClient();
-      final request = await client.postUrl(url);
+      request = await client.postUrl(url);
+      pending.request = request;
+      if (pending.cancelled) {
+        request.abort();
+        return;
+      }
 
       // Set content type
       request.headers.contentType = ContentType.json;
 
       // Add base headers
       _baseHeaders.forEach((name, value) {
-        request.headers.add(name, value);
+        request!.headers.add(name, value);
       });
 
       // Send the request
@@ -462,37 +478,13 @@ class SseHeartbeatClientTransport implements ClientTransport {
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Heartbeat message delivery confirmation: $responseBody');
-      } else if (response.statusCode == 404) {
-        // 404 means the server no longer knows this session. Mirror
-        // SseClientTransport: surface it as a JSON-RPC "Session terminated"
-        // error on the message stream instead of throwing — `send` is
-        // `void async`, so a throw would escape as an unhandled exception.
-        final responseBody = await response.transform(utf8.decoder).join();
-        _logger.debug('Session terminated (404): $responseBody');
-        if (!_messageController.isClosed) {
-          _messageController.add({
-            'jsonrpc': '2.0',
-            'error': {'code': 32600, 'message': 'Session terminated'},
-            if (message is Map && message['id'] != null) 'id': message['id'],
-          });
-        }
       } else {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        if (!_messageController.isClosed) {
-          _messageController.add({
-            'jsonrpc': '2.0',
-            'error': {
-              'code': -32603,
-              'message':
-                  'Error sending heartbeat message: ${response.statusCode}',
-            },
-            if (message is Map && message['id'] != null) 'id': message['id'],
-          });
-        }
+        throw McpError(
+          'Error sending heartbeat message: ${response.statusCode}',
+        );
       }
-
-      client.close();
       _logger.debug('Heartbeat message sent successfully');
     } catch (e) {
       _logger.debug('Error sending heartbeat message: $e');
@@ -503,16 +495,11 @@ class SseHeartbeatClientTransport implements ClientTransport {
         _updateHealth(ConnectionHealth.degraded);
       }
 
-      if (!_messageController.isClosed) {
-        _messageController.add({
-          'jsonrpc': '2.0',
-          'error': {
-            'code': -32603,
-            'message': 'Error sending heartbeat message: $e',
-          },
-          if (message is Map && message['id'] != null) 'id': message['id'],
-        });
-      }
+      rethrow;
+    } finally {
+      if (identical(pending.request, request)) pending.request = null;
+      if (identical(pending.client, client)) pending.client = null;
+      client.close(force: true);
     }
   }
 
@@ -543,6 +530,19 @@ class SseHeartbeatClientTransport implements ClientTransport {
     }
 
     _updateHealth(ConnectionHealth.disconnected);
+  }
+}
+
+final class _PendingHeartbeatPost {
+  bool cancelled = false;
+  HttpClient? client;
+  HttpClientRequest? request;
+
+  void cancel() {
+    if (cancelled) return;
+    cancelled = true;
+    request?.abort();
+    client?.close(force: true);
   }
 }
 

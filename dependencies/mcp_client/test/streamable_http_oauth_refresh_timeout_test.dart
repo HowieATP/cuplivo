@@ -27,6 +27,10 @@ void main() {
       await request.response.close();
     });
 
+    addTearDown(() async {
+      await server.close(force: true);
+    });
+
     final transport = await StreamableHttpClientTransport.create(
       baseUrl: 'http://${server.address.address}:${server.port}/mcp',
       oauthConfig: OAuthConfig(
@@ -41,25 +45,25 @@ void main() {
         expiresIn: 3600,
         issuedAt: DateTime.now().subtract(const Duration(hours: 2)),
       ),
+      terminateOnClose: false,
     );
+    addTearDown(transport.close);
 
+    // The refresh must time out (~15s) instead of hanging the request; the
+    // error surfaces on the send operation's `done`.
     final errorReceived = Completer<Object>();
-    final sub = transport.onMessage.listen(
+    final operation = transport.send({
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'initialize',
+    });
+    operation.done.then<void>(
       (_) {},
       onError: (Object e, StackTrace _) {
         if (!errorReceived.isCompleted) errorReceived.complete(e);
       },
     );
 
-    addTearDown(() async {
-      sub.cancel();
-      transport.close();
-      await server.close(force: true);
-    });
-
-    transport.send({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize'});
-
-    // The refresh must time out (~15s) instead of hanging the request.
     final err = await errorReceived.future.timeout(const Duration(seconds: 30));
     expect(err, isA<TimeoutException>());
     expect(tokenEndpointHits, 1);

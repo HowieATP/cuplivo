@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:path/path.dart' as p;
 
 import '../../utils/app_directories.dart';
 
@@ -331,6 +332,21 @@ class GroupChatMemberRows extends Table {
   Set<Column<Object>> get primaryKey => {groupChatId, memberKey};
 }
 
+/// Key-value store backing [BusinessPreferences] (issue #123).
+///
+/// Business data migrated out of SharedPreferences lives here; the
+/// in-memory [BusinessPreferences] facade is the only writer. `value` is the
+/// JSON-encoded scalar (bool/int/double/String/List of String); `updated_at`
+/// is the LWW timestamp feeding settings_meta.json in backups.
+class PreferenceRows extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  IntColumn get updatedAt => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -345,10 +361,16 @@ class GroupChatMemberRows extends Table {
     DeletionMarkerRows,
     GroupChatRows,
     GroupChatMemberRows,
+    PreferenceRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
+
+  /// Memoization key when opened via [openShared]; null for plain [open].
+  /// Used by [close] to invalidate the memo so a closed connection is never
+  /// handed out again (tests: seed → close → reopen the same file).
+  String? _openSharedKey;
 
   static const databaseFileName = 'kelivo.sqlite';
 
@@ -366,6 +388,56 @@ class AppDatabase extends _$AppDatabase {
         return _openExecutor(File('${dir.path}/$databaseFileName'));
       }),
     );
+  }
+
+  /// One shared [AppDatabase] instance per backing SQLite file.
+  ///
+  /// The business startup gate opens the DB at launch; ChatService must reuse
+  /// the same connection instead of constructing a second `AppDatabase` over
+  /// the same file (drift warns about multiple instances of one database class
+  /// and two connections can interleave migrations/caches — the PR #403 class
+  /// of corruption). [openShared] memoizes by resolved absolute path; both
+  /// callers resolve to `<appData>/kelivo.sqlite`.
+  ///
+  /// The memo keeps only LIVE connections: [close] invalidates the entry, so
+  /// reopening the same file after a close builds a fresh executor instead of
+  /// serving the dead one.
+  static final Map<String, Future<AppDatabase>> _shared =
+      <String, Future<AppDatabase>>{};
+
+  static Future<AppDatabase> openShared({File? file}) async {
+    File resolved;
+    if (file != null) {
+      resolved = file;
+    } else {
+      final dir = await AppDirectories.getAppDataDirectory();
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      resolved = File(p.join(dir.path, databaseFileName));
+    }
+    final key = resolved.absolute.path;
+    final existing = _shared[key];
+    if (existing != null) return existing;
+    final future = () async {
+      final db = AppDatabase.open(file: resolved);
+      db._openSharedKey = key;
+      // Force the lazy executor open (runs migrations/beforeOpen) exactly
+      // once, before any consumer issues a query on it.
+      await db.customSelect('SELECT 1').get();
+      return db;
+    }();
+    _shared[key] = future;
+    return future;
+  }
+
+  @override
+  Future<void> close() async {
+    final key = _openSharedKey;
+    if (key != null) {
+      _shared.remove(key);
+    }
+    await super.close();
   }
 
   static QueryExecutor _openExecutor(File file) {
@@ -388,7 +460,7 @@ class AppDatabase extends _$AppDatabase {
   // self-heal below repairs such gaps on every open; without it the gap is
   // permanent because later upgrades skip the failed step's `from < N` block.
   // See docs/adr/0019-schema-self-heal.md.
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   /// Whether [table] has a physical column named [column] (sqlite name).
   Future<bool> _hasColumn(String table, String column) async {
@@ -631,6 +703,9 @@ class AppDatabase extends _$AppDatabase {
       'inject_group_members_into_assistant_system_prompt',
       'ALTER TABLE group_chat_rows ADD COLUMN inject_group_members_into_assistant_system_prompt INTEGER NOT NULL DEFAULT 1',
     );
+
+    // --- preference_rows (schema v21, issue #123) ---
+    await _ensureTable(preferenceRows, 'preference_rows');
   }
 
   @override
@@ -900,6 +975,14 @@ class AppDatabase extends _$AppDatabase {
             '$error',
           );
         }
+      }
+      if (from < 21) {
+        // Business preferences KV store (issue #123). Silent catch + heal:
+        // a failed create leaves the version advanced, which the heal pass
+        // (_ensureTable below) repairs on every open.
+        try {
+          await migrator.createTable(preferenceRows);
+        } catch (_) {}
       }
       // Final pass: heal any column/table that still did not land.
       await _healSchemaIfNeeded();

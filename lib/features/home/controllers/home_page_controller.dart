@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:isolate' show ReceivePort;
@@ -436,10 +437,12 @@ class HomePageController extends ChangeNotifier {
     _fileUploadService = FileUploadService(
       getContext: () => _context,
       mediaController: _mediaController,
+      preferences: _context.read<BusinessPreferences>(),
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
       contextProvider: _context,
+      preferences: _context.read<BusinessPreferences>(),
       ocrHandler: (imagePaths) =>
           _ocrService.getOcrTextForImages(imagePaths, _context),
       geminiThoughtSignatureHandler: _appendGeminiThoughtSignatureForApi,

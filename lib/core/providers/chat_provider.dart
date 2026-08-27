@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import '../models/chat_item.dart';
 
 class ChatProvider extends ChangeNotifier {
-  ChatProvider({List<ChatItem>? seed}) {
+  final BusinessPreferences _preferences;
+  ChatProvider({required this._preferences, List<ChatItem>? seed}) {
     _chats = List.of(seed ?? const <ChatItem>[]);
     _init();
   }
@@ -28,7 +29,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _loadPinned() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final ids = prefs.getStringList(_prefsPinnedKey) ?? const <String>[];
     _pinned
       ..clear()
@@ -36,12 +37,12 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _savePinned() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_prefsPinnedKey, _pinned.toList());
   }
 
   Future<void> _loadTitles() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final raw = prefs.getString(_prefsTitlesKey);
     if (raw == null) return;
     try {
@@ -61,7 +62,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _saveTitles() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final map = {for (final c in _chats) c.id: c.title};
     await prefs.setString(_prefsTitlesKey, jsonEncode(map));
   }

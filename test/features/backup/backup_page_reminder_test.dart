@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -10,10 +10,15 @@ import 'package:Cuplivo/core/services/trash_restore_coordinator.dart';
 import 'package:Cuplivo/features/backup/pages/backup_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<BackupReminderProvider> _createReminderProvider({
   bool enabled = false,
 }) async {
-  final provider = BackupReminderProvider(autoLoad: false);
+  final provider = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await provider.load(startTimer: false);
   if (enabled) {
     await provider.saveSchedule(
@@ -31,9 +36,13 @@ Widget _buildHarness({
   required BackupReminderProvider reminder,
 }) {
   final chatService = ChatService();
-  final coordinator = TrashRestoreCoordinator(chatService: chatService);
+  final coordinator = TrashRestoreCoordinator(
+    preferences: businessPrefs,
+    chatService: chatService,
+  );
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>.value(value: chatService),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -51,8 +60,8 @@ void main() {
 
   group('BackupPage reminder settings', () {
     testWidgets('shows reminder switch while disabled', (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
       final reminder = await _createReminderProvider();
 
       await tester.pumpWidget(
@@ -68,8 +77,8 @@ void main() {
     testWidgets('shows frequency and reminder status when enabled', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
       final reminder = await _createReminderProvider(enabled: true);
 
       await tester.pumpWidget(

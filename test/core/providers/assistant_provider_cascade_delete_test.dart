@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/features/search/services/global_session_search_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -29,6 +32,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 Future<AssistantProvider> _createLoadedAssistantProvider({
+  required BusinessPreferences preferences,
   required ChatService chatService,
   List<Map<String, Object?>> assistants = const [
     {'id': 'assistant-delete', 'name': 'Delete Me'},
@@ -38,10 +42,15 @@ Future<AssistantProvider> _createLoadedAssistantProvider({
 }) async {
   SharedPreferences.setMockInitialValues({
     'assistants_v1': jsonEncode(assistants),
+  });
+  businessPrefs = BusinessPreferences.memoryForTests({
     'current_assistant_id_v1': currentAssistantId,
   });
 
-  final provider = AssistantProvider(chatService: chatService);
+  final provider = AssistantProvider(
+    preferences: businessPrefs,
+    chatService: chatService,
+  );
   await provider.ensureLoaded();
   return provider;
 }
@@ -53,6 +62,7 @@ void main() {
   final services = <ChatService>[];
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tempDir = await Directory.systemTemp.createTemp(
       'kelivo_assistant_cascade_test_',
     );
@@ -82,6 +92,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          preferences: businessPrefs,
           chatService: chatService,
         );
 
@@ -140,6 +151,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          preferences: businessPrefs,
           chatService: chatService,
         );
 
@@ -210,6 +222,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          preferences: businessPrefs,
           chatService: chatService,
           assistants: const [
             {'id': 'only-assistant', 'name': 'Only Assistant'},

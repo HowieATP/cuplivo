@@ -16,14 +16,17 @@ import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   late SharedPreferences prefs;
   InputDraftPersistence? draftPersistence;
   late Directory tempDir;
   int fileCounter = 0;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     tempDir = Directory.systemTemp.createTempSync('chat_input_draft_test');
@@ -87,11 +90,16 @@ void main() {
   }) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         Provider<InputDraftPersistence>.value(
           value: draftPersistence ?? buildService(),
         ),
-        ChangeNotifierProvider.value(value: SettingsProvider()),
-        ChangeNotifierProvider.value(value: AssistantProvider()),
+        ChangeNotifierProvider.value(
+          value: SettingsProvider(preferences: businessPrefs),
+        ),
+        ChangeNotifierProvider.value(
+          value: AssistantProvider(preferences: businessPrefs),
+        ),
         ChangeNotifierProvider.value(value: InputStatusProvider()),
       ],
       child: MaterialApp(

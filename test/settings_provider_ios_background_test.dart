@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider iOS background generation settings', () {
     test('defaults all iOS background options to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -26,13 +27,13 @@ void main() {
     });
 
     test('loads persisted enabled values', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'ios_background_generation_enabled_v1': true,
         'ios_background_task_refresh_enabled_v1': true,
         'ios_live_activity_enabled_v1': true,
         'ios_background_notifications_enabled_v1': true,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -43,8 +44,8 @@ void main() {
     });
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setIosBackgroundGenerationEnabled(true);
@@ -52,7 +53,7 @@ void main() {
       await settings.setIosLiveActivityEnabled(true);
       await settings.setIosBackgroundNotificationsEnabled(true);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(settings.iosBackgroundGenerationEnabled, isTrue);
       expect(settings.iosBackgroundTaskRefreshEnabled, isTrue);
       expect(settings.iosLiveActivityEnabled, isTrue);

@@ -5,10 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/filesystem_mounts_provider.dart';
 import 'package:Cuplivo/core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import 'package:Cuplivo/utils/app_directories.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.supportPath, this.documentsPath);
@@ -31,13 +34,17 @@ void main() {
   late String docs;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tmp = Directory.systemTemp.createTempSync('kelivo_reloc_test_');
     support = '${tmp.path}/support';
     docs = '${tmp.path}/documents';
     Directory(support).createSync();
     Directory(docs).createSync();
     PathProviderPlatform.instance = _FakePathProviderPlatform(support, docs);
+    // Physical mock is required: workspaces_dir_v1 stays on SharedPreferences
+    // and several tests also read it through AppDirectories.
     SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
     // Relocation is a desktop feature: force the desktop target so the
     // workspaces_dir_v1 pref is honored and the support dir is used.
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
@@ -51,7 +58,7 @@ void main() {
   });
 
   Future<FilesystemMountsProvider> makeProvider() async {
-    final provider = FilesystemMountsProvider();
+    final provider = FilesystemMountsProvider(preferences: businessPrefs);
     await provider.init();
     return provider;
   }
@@ -287,7 +294,7 @@ void main() {
     test(
       'mount overlapping the sync scope is skipped but kept in prefs',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           FilesystemMountsProvider.prefsKey: jsonEncode([
             FilesystemMount(
               alias: 'photos',
@@ -298,7 +305,7 @@ void main() {
         });
         final provider = await makeProvider();
         expect(provider.externalMounts, isEmpty);
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(
           prefs.getString(FilesystemMountsProvider.prefsKey),
           isNotNull,
@@ -308,7 +315,7 @@ void main() {
     );
 
     test('non-overlapping legacy mount still loads', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         FilesystemMountsProvider.prefsKey: jsonEncode([
           FilesystemMount(
             alias: 'photos',

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../database/business_preferences.dart';
 import '../models/backup.dart';
 import '../models/incremental_backup.dart';
 import '../services/chat/chat_service.dart';
@@ -18,9 +19,11 @@ class BackupProvider extends ChangeNotifier {
   BackupProvider({
     required ChatService chatService,
     required TrashRestoreCoordinator trashRestoreCoordinator,
+    required BusinessPreferences preferences,
     WebDavConfig? initialConfig,
   }) : _dataSync = DataSync(
          chatService: chatService,
+         preferences: preferences,
          localIdResolver: trashRestoreCoordinator.getLocalIds,
        ),
        _cfg = initialConfig ?? const WebDavConfig();
@@ -122,12 +125,19 @@ class BackupProvider extends ChangeNotifier {
     return _dataSync.listBackupFiles(_cfg);
   }
 
-  Future<File> exportToFile({BackupStageCallback? onStage}) async {
+  Future<File> exportToFile({
+    BackupStageCallback? onStage,
+    BackupFormat format = BackupFormat.jsonl,
+  }) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      return await _dataSync.exportToFile(_cfg, onStage: onStage);
+      return await _dataSync.exportToFile(
+        _cfg,
+        onStage: onStage,
+        format: format,
+      );
     } finally {
       _busy = false;
       notifyListeners();

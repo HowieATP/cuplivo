@@ -5,11 +5,13 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   Widget buildHarness({
@@ -21,7 +23,7 @@ void main() {
     VoidCallback? onPreviewTap,
   }) {
     return ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => SettingsProvider(preferences: businessPrefs),
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -295,6 +296,11 @@ class BatchDeletePlan {
 /// - Call simple methods like sendMessage(), regenerate(), etc.
 /// - Handle UI-specific concerns (snackbars, scrolling, animations)
 class HomeViewModel extends ChangeNotifier {
+  late final ProactiveCareMessageFlow _proactiveCareFlow =
+      ProactiveCareMessageFlow(
+        preferences: _contextProvider.read<BusinessPreferences>(),
+      );
+
   HomeViewModel({
     required this._chatService,
     required this._messageBuilderService,
@@ -1762,7 +1768,7 @@ class HomeViewModel extends ChangeNotifier {
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
 
-    final history = ProactiveCareMessageFlow.buildHistory(
+    final history = _proactiveCareFlow.buildHistory(
       conversation: convo,
       messages: _chatService.getMessages(convo.id),
       assistant: assistant,
@@ -1775,7 +1781,7 @@ class HomeViewModel extends ChangeNotifier {
         : assistant.proactiveCareDecisionPrompt;
 
     try {
-      final newTime = await ProactiveCareMessageFlow.decideNextCareTime(
+      final newTime = await _proactiveCareFlow.decideNextCareTime(
         config: cfg,
         modelId: mdlId,
         assistant: assistant,
@@ -1863,7 +1869,7 @@ class HomeViewModel extends ChangeNotifier {
       }
       convo ??= await _chatService.createConversation(assistantId: assistantId);
 
-      final history = ProactiveCareMessageFlow.buildHistory(
+      final history = _proactiveCareFlow.buildHistory(
         conversation: convo,
         messages: _chatService.getMessages(convo.id),
         assistant: assistant,
@@ -1879,7 +1885,7 @@ class HomeViewModel extends ChangeNotifier {
       final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
           ? assistant.proactiveCarePrompt
           : (l10n?.assistantEditProactiveCarePromptDefault ?? '');
-      final apiMessages = await ProactiveCareMessageFlow.buildCareApiMessages(
+      final apiMessages = await _proactiveCareFlow.buildCareApiMessages(
         assistant: assistant,
         userNickname: userNickname,
         modelId: mdlId,
@@ -1889,7 +1895,7 @@ class HomeViewModel extends ChangeNotifier {
         recentChats: recentChats,
       );
 
-      final reply = await ProactiveCareMessageFlow.requestCareReply(
+      final reply = await _proactiveCareFlow.requestCareReply(
         config: cfg,
         modelId: mdlId,
         assistant: assistant,

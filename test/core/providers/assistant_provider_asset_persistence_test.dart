@@ -7,8 +7,11 @@ import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -33,10 +36,12 @@ Future<AssistantProvider> _loadedProvider({
 }) async {
   SharedPreferences.setMockInitialValues({
     'assistants_v1': jsonEncode(assistants),
+  });
+  businessPrefs = BusinessPreferences.memoryForTests({
     'current_assistant_id_v1': assistants.first['id'].toString(),
   });
 
-  final provider = AssistantProvider();
+  final provider = AssistantProvider(preferences: businessPrefs);
   await provider.loadFromPrefs();
   return provider;
 }
@@ -48,6 +53,7 @@ void main() {
   late PathProviderPlatform previousPathProvider;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tempDir = await Directory.systemTemp.createTemp(
       'kelivo_assistant_asset_test_',
     );
@@ -105,8 +111,8 @@ void main() {
       expect(await File(avatarPath).readAsBytes(), const [1, 2, 3]);
       expect(await File(backgroundPath).readAsBytes(), const [4, 5, 6]);
 
-      final prefs = await SharedPreferences.getInstance();
-      final stored = jsonDecode(prefs.getString('assistants_v1')!) as List;
+      final sp = await SharedPreferences.getInstance();
+      final stored = jsonDecode(sp.getString('assistants_v1')!) as List;
       final storedAssistant = stored.single as Map;
       expect(storedAssistant['avatar'], updated.avatar);
       expect(storedAssistant['background'], updated.background);

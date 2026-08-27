@@ -56,4 +56,23 @@ void main() {
       await repo.close();
     },
   );
+
+  test(
+    'openShared serves one live connection per file and rebuilds after close',
+    () async {
+      // Two concurrent callers get the same live instance.
+      final sharedA = await AppDatabase.openShared(file: dbFile);
+      final sharedB = await AppDatabase.openShared(file: dbFile);
+      expect(identical(sharedA, sharedB), isTrue);
+      await sharedA.close();
+
+      // The memo must not hand out a closed connection: the next open builds
+      // a fresh executor (regression: ChatService seed→close→reopen pattern in
+      // chat_service_init_concurrency_test.dart).
+      final reopened = await AppDatabase.openShared(file: dbFile);
+      expect(identical(reopened, sharedA), isFalse);
+      await reopened.customSelect('SELECT 1').get();
+      await reopened.close();
+    },
+  );
 }

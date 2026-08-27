@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:io';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 import 'package:Cuplivo/theme/app_semantic_colors.dart';
@@ -280,6 +281,7 @@ class _BackupPageState extends State<BackupPage> {
           create: (_) => BackupProvider(
             chatService: context.read<ChatService>(),
             trashRestoreCoordinator: coordinator,
+            preferences: context.read<BusinessPreferences>(),
             initialConfig: settings.webDavConfig,
           ),
         ),
@@ -287,6 +289,7 @@ class _BackupPageState extends State<BackupPage> {
           create: (_) => S3BackupProvider(
             chatService: context.read<ChatService>(),
             trashRestoreCoordinator: coordinator,
+            preferences: context.read<BusinessPreferences>(),
             initialConfig: settings.s3Config,
           ),
         ),
@@ -1228,6 +1231,14 @@ class _BackupPageState extends State<BackupPage> {
           _iosDivider(context),
           _iosNavRow(
             context,
+            icon: Lucide.Download,
+            label: l10n.backupPageExportKelivoCompatible,
+            onTap: () =>
+                _doExport(context, vm, format: BackupFormat.kelivoLegacy),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
             icon: Lucide.Import2,
             label: l10n.backupPageImportBackupFile,
             onTap: () => _doImportLocal(context, vm),
@@ -1281,6 +1292,7 @@ class _BackupPageState extends State<BackupPage> {
                     mode: mode,
                     settings: settings,
                     chatService: cs,
+                    preferences: context.read<BusinessPreferences>(),
                   );
                   if (!context.mounted) return;
                   await showDialog(
@@ -1347,6 +1359,7 @@ class _BackupPageState extends State<BackupPage> {
                     mode: mode,
                     settings: settings,
                     chatService: cs,
+                    preferences: context.read<BusinessPreferences>(),
                   );
                   if (!context.mounted) return;
                   await showDialog(
@@ -1394,7 +1407,11 @@ class _BackupPageState extends State<BackupPage> {
     ];
   }
 
-  Future<void> _doExport(BuildContext context, BackupProvider vm) async {
+  Future<void> _doExport(
+    BuildContext context,
+    BackupProvider vm, {
+    BackupFormat format = BackupFormat.jsonl,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final stopwatch = Stopwatch()..start();
     final File file;
@@ -1402,7 +1419,7 @@ class _BackupPageState extends State<BackupPage> {
       debugPrint('BackupExport: pack begin');
       file = await _runWithStageOverlay(
         context,
-        (onStage) => vm.exportToFile(onStage: onStage),
+        (onStage) => vm.exportToFile(onStage: onStage, format: format),
       );
       stopwatch.stop();
       debugPrint(

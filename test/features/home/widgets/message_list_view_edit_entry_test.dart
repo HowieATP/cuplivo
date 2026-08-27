@@ -14,11 +14,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   testWidgets('all user messages expose edit from long press menu', (
@@ -112,10 +115,19 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => AssistantProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => TtsProvider()),
+        Provider<BusinessPreferences>.value(value: businessPrefs),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(preferences: businessPrefs),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AssistantProvider(preferences: businessPrefs),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => UserProvider(preferences: businessPrefs),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => TtsProvider(preferences: businessPrefs),
+        ),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ],

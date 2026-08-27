@@ -12,7 +12,9 @@ import 'package:Cuplivo/features/group_chat/services/director_context_builder.da
 import 'package:Cuplivo/features/group_chat/services/director_runner.dart';
 import 'package:Cuplivo/features/group_chat/services/director_tool_protocol.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// Captures the tool-call handler and lets the test drive the stream.
 class _FakeDirectorTransport {
@@ -102,7 +104,8 @@ void main() {
   late GroupChat group;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
     transport = _FakeDirectorTransport();
     runner = DirectorRunner(
       chatService: ChatService(),
@@ -135,7 +138,7 @@ void main() {
       rosterAssistants: assistants,
       userName: 'user',
       memberNames: const <String>['user', 'Alpha', 'Beta'],
-      settings: SettingsProvider(),
+      settings: SettingsProvider(preferences: businessPrefs),
       modelSupportsTools: (providerKey, modelId) => true,
       publicMessages: const <ChatMessage>[],
       versionSelections: const <String, int>{},
@@ -250,7 +253,7 @@ void main() {
       rosterAssistants: [Assistant(id: 'a1', name: 'Alpha')],
       userName: 'user',
       memberNames: const <String>['user', 'Alpha'],
-      settings: SettingsProvider(),
+      settings: SettingsProvider(preferences: businessPrefs),
       modelSupportsTools: (providerKey, modelId) => true,
       publicMessages: const <ChatMessage>[],
       versionSelections: const <String, int>{},
@@ -305,7 +308,7 @@ void main() {
       rosterAssistants: [Assistant(id: 'a1', name: 'Alpha')],
       userName: 'user',
       memberNames: const <String>['user', 'Alpha'],
-      settings: SettingsProvider(),
+      settings: SettingsProvider(preferences: businessPrefs),
       modelSupportsTools: (providerKey, modelId) => true,
       publicMessages: const <ChatMessage>[],
       versionSelections: const <String, int>{},
@@ -354,7 +357,7 @@ void main() {
           rosterAssistants: [Assistant(id: 'a1', name: 'Alpha')],
           userName: 'user',
           memberNames: const <String>['user', 'Alpha'],
-          settings: SettingsProvider(),
+          settings: SettingsProvider(preferences: businessPrefs),
           modelSupportsTools: (providerKey, modelId) => true,
           publicMessages: const <ChatMessage>[],
           versionSelections: const <String, int>{},
@@ -383,7 +386,7 @@ void main() {
         rosterAssistants: [Assistant(id: 'a1', name: 'Alpha')],
         userName: 'user',
         memberNames: const <String>['user', 'Alpha'],
-        settings: SettingsProvider(),
+        settings: SettingsProvider(preferences: businessPrefs),
         modelSupportsTools: (providerKey, modelId) => false,
         publicMessages: const <ChatMessage>[],
         versionSelections: const <String, int>{},

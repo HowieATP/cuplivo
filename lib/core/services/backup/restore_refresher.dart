@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
+import '../../database/business_preferences.dart';
 import '../../providers/assistant_provider.dart';
 import '../../providers/group_chat_provider.dart';
 import '../../providers/mcp_provider.dart';
@@ -23,6 +24,15 @@ Future<void> refreshProvidersAfterRestore(BuildContext context) async {
   final mcpProvider = context.read<McpProvider>();
   final workspaceProvider = context.read<WorkspaceProvider>();
   final safMounts = context.read<SafMountSyncService>();
+  // Business preferences: the facade cache must re-read the KV table — a
+  // restored/merged settings payload was written through the facade, so the
+  // cache is already co-evolved, but a wipe+restore (or import) may have
+  // replaced the whole table behind the facade's back.
+  try {
+    await context.read<BusinessPreferences>().reload();
+  } catch (e) {
+    debugPrint('refreshProvidersAfterRestore: BusinessPreferences: $e');
+  }
   try {
     await chatService.reloadCachesFromDb();
   } catch (e) {

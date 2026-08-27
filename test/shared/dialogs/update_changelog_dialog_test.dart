@@ -4,11 +4,14 @@ import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/dialogs/update_changelog_dialog.dart';
 import 'package:Cuplivo/shared/widgets/snackbar.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:provider/provider.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 const _urlLauncherChannel = MethodChannel('plugins.flutter.io/url_launcher');
 
@@ -45,7 +48,7 @@ void _allowBenignSystemCalls(MethodCall call) {
 Future<void> _pumpSheet(WidgetTester tester, UpdateInfo info) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => SettingsProvider(preferences: businessPrefs),
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

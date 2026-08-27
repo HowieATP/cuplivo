@@ -1,10 +1,36 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
 import '../models/assistant_memory.dart';
 
 class MemoryStore {
+  MemoryStore(this._preferences);
+
+  /// Per-isolate shared instance, bound to the [BusinessPreferences] facade
+  /// passed on first use. Production code in an isolate always hands over the
+  /// same startup-gate facade, so one shared instance serves every consumer:
+  /// the object-level cache stays coherent and the mutation lock guards all
+  /// concurrent read-modify-write flows in the isolate. The alarm background
+  /// isolate creates a fresh facade per invocation: the identity check fails
+  /// there, so each invocation binds a fresh store with a fresh cache.
+  ///
+  /// Never hold a store reference across a switch to a different facade in a
+  /// long-lived isolate: the shared accessor rebinds to the new facade and
+  /// the previously bound store's caches would diverge.
+  static MemoryStore? _shared;
+  static MemoryStore shared(BusinessPreferences preferences) {
+    final current = _shared;
+    if (current == null || !identical(current._preferences, preferences)) {
+      return _shared = MemoryStore(preferences);
+    }
+    return current;
+  }
+
   static const String _memoriesKey = 'assistant_memories_v1';
+
+  final BusinessPreferences _preferences;
 
   /// Mutex that serializes every read-modify-write mutation
   /// (add/update/delete) so concurrent tool calls cannot observe a stale
@@ -15,11 +41,11 @@ class MemoryStore {
   ///
   /// NOT reentrant: a locked action must never invoke another locked method,
   /// or it will wait forever on its own uncompleted completer.
-  static Completer<void>? _lock;
+  Completer<void>? _lock;
 
-  static List<AssistantMemory>? _cache;
+  List<AssistantMemory>? _cache;
 
-  static Future<T> _withLock<T>(Future<T> Function() action) async {
+  Future<T> _withLock<T>(Future<T> Function() action) async {
     while (_lock != null) {
       await _lock!.future;
     }
@@ -33,9 +59,8 @@ class MemoryStore {
     }
   }
 
-  static Future<List<AssistantMemory>> _loadAllInternal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_memoriesKey);
+  Future<List<AssistantMemory>> _loadAllInternal() async {
+    final raw = _preferences.getString(_memoriesKey);
     if (raw == null || raw.isEmpty) return <AssistantMemory>[];
     try {
       final arr = jsonDecode(raw) as List<dynamic>;
@@ -51,28 +76,28 @@ class MemoryStore {
     }
   }
 
-  static Future<List<AssistantMemory>> getAll() async {
+  Future<List<AssistantMemory>> getAll() async {
     _cache ??= await _loadAllInternal();
     return List<AssistantMemory>.of(_cache!);
   }
 
-  /// Replaces the whole memory list. Does NOT take the mutation lock.
+  /// Replaces the whole memory list under the mutation lock.
   ///
-  /// Callers outside the locked mutations (e.g. trash restore) must not run
-  /// concurrently with add/update/delete or they can clobber newer changes.
-  static Future<void> saveAll(List<AssistantMemory> list) async {
-    _cache = List<AssistantMemory>.of(list);
-    final prefs = await SharedPreferences.getInstance();
-    final json = jsonEncode(list.map((e) => e.toJson()).toList());
-    await prefs.setString(_memoriesKey, json);
+  /// The only way outside add/update/delete to rewrite the list (e.g. trash
+  /// restore). With the per-isolate shared instance the lock serializes this
+  /// against tool-call mutations, so an interleaved add does not observe a
+  /// half-written snapshot.
+  Future<void> saveAll(List<AssistantMemory> list) {
+    return _withLock(() => _saveAllUnlocked(list));
   }
 
-  static Future<void> _saveAll(List<AssistantMemory> list) async =>
-      saveAll(list);
+  Future<void> _saveAllUnlocked(List<AssistantMemory> list) async {
+    _cache = List<AssistantMemory>.of(list);
+    final json = jsonEncode(list.map((e) => e.toJson()).toList());
+    await _preferences.setString(_memoriesKey, json);
+  }
 
-  static Future<List<AssistantMemory>> getForAssistant(
-    String assistantId,
-  ) async {
+  Future<List<AssistantMemory>> getForAssistant(String assistantId) async {
     final all = await getAll();
     return all.where((m) => m.assistantId == assistantId).toList();
   }
@@ -85,10 +110,10 @@ class MemoryStore {
     return maxId + 1;
   }
 
-  static Future<AssistantMemory> add({
+  Future<AssistantMemory> add({
     required String assistantId,
     required String content,
-  }) {
+  }) async {
     return _withLock(() async {
       final all = await getAll();
       final id = _nextId(all);
@@ -98,42 +123,42 @@ class MemoryStore {
         content: content,
       );
       all.add(mem);
-      await _saveAll(all);
+      await _saveAllUnlocked(all);
       return mem;
     });
   }
 
-  static Future<AssistantMemory?> update({
+  Future<AssistantMemory?> update({
     required int id,
     required String content,
-  }) {
+  }) async {
     return _withLock(() async {
       final all = await getAll();
       final idx = all.indexWhere((m) => m.id == id);
       if (idx == -1) return null;
       final updated = all[idx].copyWith(content: content);
       all[idx] = updated;
-      await _saveAll(all);
+      await _saveAllUnlocked(all);
       return updated;
     });
   }
 
-  static Future<bool> delete({required int id}) {
+  Future<bool> delete({required int id}) async {
     return _withLock(() async {
       final all = await getAll();
       final before = all.length;
       all.removeWhere((m) => m.id == id);
       final changed = all.length != before;
-      if (changed) await _saveAll(all);
+      if (changed) await _saveAllUnlocked(all);
       return changed;
     });
   }
 
-  static Future<void> deleteForAssistant(String assistantId) {
-    return _withLock(() async {
+  Future<void> deleteForAssistant(String assistantId) async {
+    await _withLock(() async {
       final all = await getAll();
       all.removeWhere((m) => m.assistantId == assistantId);
-      await _saveAll(all);
+      await _saveAllUnlocked(all);
     });
   }
 }

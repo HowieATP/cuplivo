@@ -66,6 +66,11 @@ import 'core/services/proactive_care_alarm_service.dart';
 import 'core/services/proactive_care_message_flow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'core/database/business_preferences.dart';
+import 'core/database/business_repository.dart';
+import 'core/database/business_startup_gate.dart';
+import 'core/database/business_migration_engine.dart';
+import 'core/database/app_database.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -117,7 +122,30 @@ Future<void> main() async {
       // at input-bar mount is race-free: the user cannot type before the
       // draft is already in the controller.
       await InputDraftPersistence.ensureInitialized();
-      // Trim Flutter global image cache to reduce memory pressure from large images
+      // Business preferences: one-shot SharedPreferences → SQLite KV migration
+      // BEFORE any provider reads (async gap: no consumer can observe an empty
+      // business cache while legacy data still exists). Recoverable failures
+      // degrade to defaults and retain the legacy data for a retry.
+      late BusinessPreferences businessPreferences;
+      try {
+        businessPreferences = await BusinessStartupGate.migrateAndLoad(
+          repository: BusinessRepository(await AppDatabase.openShared()),
+          legacyPreferences:
+              await SharedPreferencesLegacyBusinessPreferences.open(),
+        );
+      } catch (e, st) {
+        debugPrint('[main] business preferences migration failed: $e\n$st');
+        FlutterLogger.log(
+          'Business preferences migration failed: $e\n$st',
+          tag: 'Startup',
+          force: true,
+        );
+        // No silent empty-state: fall back to a memory-backed facade so
+        // settings stay usable this session; next launch retries migration.
+        businessPreferences = await BusinessPreferences.memoryFallback();
+      }
+      DesktopWindowController.instance.preferences =
+          businessPreferences; // Trim Flutter global image cache to reduce memory pressure from large images
       try {
         PaintingBinding.instance.imageCache.maximumSize = 200;
         PaintingBinding.instance.imageCache.maximumSizeBytes =
@@ -156,7 +184,7 @@ Future<void> main() async {
         await ProactiveCareAlarmService.initialize();
       }
       // Start app (Flutter log capture is toggleable and off by default)
-      runApp(const MyApp());
+      runApp(MyApp(preferences: businessPreferences));
     },
     // Unhandled root-isolate errors must not kill the process silently: log
     // them (console + Flutter log file, forced regardless of the log toggle)
@@ -189,17 +217,24 @@ Future<void> _initDesktopWindow() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.preferences});
+
+  final BusinessPreferences preferences;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        Provider<BusinessPreferences>.value(value: preferences),
+        ChangeNotifierProvider(
+          create: (_) => ChatProvider(preferences: preferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => UserProvider(preferences: preferences),
+        ),
         ChangeNotifierProvider(
           create: (_) {
-            final settings = SettingsProvider();
+            final settings = SettingsProvider(preferences: preferences);
             unawaited(settings.incrementAppLaunchCount());
             return settings;
           },
@@ -215,14 +250,19 @@ class MyApp extends StatelessWidget {
           value: InputDraftPersistence.instance,
         ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
-        ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              SafMountSyncService(workspaces: ctx.read<WorkspaceProvider>()),
+          create: (_) => WorkspaceProvider(preferences: preferences),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => SafMountSyncService(
+            workspaces: ctx.read<WorkspaceProvider>(),
+            preferences: preferences,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => DependencyInstallController()),
         ChangeNotifierProvider(
           create: (ctx) => AssistantProvider(
+            preferences: preferences,
             chatService: ctx.read<ChatService>(),
             settings: ctx.read<SettingsProvider>(),
           ),
@@ -251,37 +291,53 @@ class MyApp extends StatelessWidget {
           create: (ctx) {
             final sp = ctx.read<SettingsProvider>();
             return McpProvider(
+              preferences: preferences,
               chatService: ctx.read<ChatService>(),
               contextProvider: () => navigatorKey.currentContext!,
               oauthClientFactory: () => _oauthHttpClient(sp),
             );
           },
         ),
-        ChangeNotifierProvider(create: (_) => TagProvider()),
-        ChangeNotifierProvider(create: (_) => TtsProvider()),
+        ChangeNotifierProvider(
+          create: (_) => TagProvider(preferences: preferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => TtsProvider(preferences: preferences),
+        ),
         ChangeNotifierProvider(
           create: (ctx) =>
               AsrProvider(settingsProvider: ctx.read<SettingsProvider>()),
         ),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              QuickPhraseProvider(chatService: ctx.read<ChatService>()),
-        ),
-        ChangeNotifierProvider(create: (_) => InstructionInjectionProvider()),
-        ChangeNotifierProvider(
-          create: (_) => InstructionInjectionGroupProvider(),
+          create: (ctx) => QuickPhraseProvider(
+            preferences: preferences,
+            chatService: ctx.read<ChatService>(),
+          ),
         ),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              WorldBookProvider(chatService: ctx.read<ChatService>()),
+          create: (_) => InstructionInjectionProvider(preferences: preferences),
         ),
         ChangeNotifierProvider(
-          create: (ctx) => MemoryProvider(chatService: ctx.read<ChatService>()),
+          create: (_) =>
+              InstructionInjectionGroupProvider(preferences: preferences),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => WorldBookProvider(
+            preferences: preferences,
+            chatService: ctx.read<ChatService>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => MemoryProvider(
+            preferences: preferences,
+            chatService: ctx.read<ChatService>(),
+          ),
         ),
         Provider(
           create: (ctx) => TrashRestoreCoordinator(
             chatService: ctx.read<ChatService>(),
+            preferences: preferences,
             assistantProvider: ctx.read<AssistantProvider>(),
             worldBookProvider: ctx.read<WorldBookProvider>(),
             quickPhraseProvider: ctx.read<QuickPhraseProvider>(),
@@ -289,13 +345,16 @@ class MyApp extends StatelessWidget {
             memoryProvider: ctx.read<MemoryProvider>(),
           ),
         ),
-        ChangeNotifierProvider(create: (_) => BackupReminderProvider()),
+        ChangeNotifierProvider(
+          create: (_) => BackupReminderProvider(preferences: preferences),
+        ),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BackupProvider(
             chatService: ctx.read<ChatService>(),
             trashRestoreCoordinator: ctx.read<TrashRestoreCoordinator>(),
+            preferences: preferences,
             initialConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
@@ -303,6 +362,7 @@ class MyApp extends StatelessWidget {
           create: (ctx) => S3BackupProvider(
             chatService: ctx.read<ChatService>(),
             trashRestoreCoordinator: ctx.read<TrashRestoreCoordinator>(),
+            preferences: preferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),
@@ -433,7 +493,9 @@ class MyApp extends StatelessWidget {
                     // docs/adr/0031-proactive-care-startup-reschedule-and-logging.md.
                     try {
                       if (ProactiveCareAlarmService.isSupported) {
-                        await ProactiveCareL10nSnapshot.save(
+                        await ProactiveCareMessageFlow(
+                          preferences: preferences,
+                        ).saveL10nSnapshot(
                           defaultConversationTitle:
                               l10n.chatServiceDefaultConversationTitle,
                           carePromptDefault:

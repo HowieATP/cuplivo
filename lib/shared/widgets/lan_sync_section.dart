@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../../core/database/business_preferences.dart';
 import '../../core/models/backup.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/restore_refresher.dart';
@@ -108,7 +109,12 @@ class _LanSyncSectionState extends State<LanSyncSection> {
   void initState() {
     super.initState();
     final chatService = context.read<ChatService>();
-    _dataSync = widget.dataSync ?? DataSync(chatService: chatService);
+    _dataSync =
+        widget.dataSync ??
+        DataSync(
+          chatService: chatService,
+          preferences: context.read<BusinessPreferences>(),
+        );
     _server = LanSyncServer(chatService: chatService, dataSync: _dataSync);
     _client = LanSyncClient(
       chatService: chatService,

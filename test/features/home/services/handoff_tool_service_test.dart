@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
@@ -23,13 +23,16 @@ import 'package:Cuplivo/features/home/services/handoff_tool_service.dart';
 import 'package:Cuplivo/features/home/services/local_tools_service.dart';
 import 'package:Cuplivo/features/home/services/tool_approval_service.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 class _FakeBuildContext implements BuildContext {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeAssistantProvider extends AssistantProvider {
-  _FakeAssistantProvider(this._assistants) : super();
+  _FakeAssistantProvider(BusinessPreferences preferences, this._assistants)
+    : super(preferences: preferences);
 
   final List<Assistant> _assistants;
 
@@ -176,8 +179,9 @@ void main() {
   }
 
   setUp(() {
+    businessPrefs = BusinessPreferences.memoryForTests();
     chatService = _FakeChatService();
-    assistants = _FakeAssistantProvider([
+    assistants = _FakeAssistantProvider(businessPrefs, [
       discoverable('research-bot', description: 'researches topics'),
       discoverable('code-helper'),
     ]);
@@ -236,7 +240,10 @@ void main() {
 
     test('rejects self-delegation and lists the remaining targets', () async {
       final self = discoverable('self-bot');
-      assistants = _FakeAssistantProvider([self, discoverable('research-bot')]);
+      assistants = _FakeAssistantProvider(businessPrefs, [
+        self,
+        discoverable('research-bot'),
+      ]);
 
       final result = await callTool({
         'assistant': 'self-bot',
@@ -286,7 +293,7 @@ void main() {
     testWidgets('wait-mode handoff returns the child full output on success', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final streamControllers = <String, StreamController<ChatStreamChunk>>{};
       final gen = GenerationEngine(
         chatService: chatService,
@@ -319,10 +326,16 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
-            ChangeNotifierProvider(create: (_) => SettingsProvider()),
-            ChangeNotifierProvider(create: (_) => AssistantProvider()),
+            Provider<BusinessPreferences>.value(value: businessPrefs),
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(preferences: businessPrefs),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(preferences: businessPrefs),
+            ),
             ChangeNotifierProvider(
               create: (_) => McpProvider(
+                preferences: businessPrefs,
                 contextProvider: () => throw UnimplementedError(),
               ),
             ),
@@ -333,10 +346,14 @@ void main() {
             // providers are absent; they must exist so the fake-async test
             // does not suspend on real file I/O.
             ChangeNotifierProvider(
-              create: (_) => InstructionInjectionProvider(),
+              create: (_) =>
+                  InstructionInjectionProvider(preferences: businessPrefs),
             ),
             ChangeNotifierProvider(
-              create: (_) => WorldBookProvider(chatService: chatService),
+              create: (_) => WorldBookProvider(
+                preferences: businessPrefs,
+                chatService: chatService,
+              ),
             ),
           ],
           child: Builder(builder: (context) => const SizedBox.shrink()),

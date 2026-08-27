@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/stdio_command_resolver.dart';
 import '../services/network/mcp_log_bridge.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../services/chat/chat_service.dart';
@@ -418,10 +418,12 @@ class McpServerConfig {
 }
 
 class McpProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
 
   McpProvider({
+    required this._preferences,
     this.chatService,
     required this.contextProvider,
     http.Client Function()? oauthClientFactory,
@@ -468,14 +470,14 @@ class McpProvider extends ChangeNotifier {
   }
 
   /// Re-reads `mcp_servers_v1` / `mcp_request_timeout_ms_v1` from
-  /// SharedPreferences, rebuilds the in-memory server list (including built-in
+  /// BusinessPreferences, rebuilds the in-memory server list (including built-in
   /// servers), and auto-connects enabled servers.
   ///
   /// Used by the constructor and by [reloadFromPrefs] after a backup/import
   /// restore rewrote the prefs, so the in-memory state never diverges from
   /// disk.
   Future<void> _reloadServersFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     var removedRetiredServer = false;
     final timeoutMs = prefs.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
@@ -516,7 +518,7 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
-  /// Reloads the server list and connections from SharedPreferences.
+  /// Reloads the server list and connections from BusinessPreferences.
   ///
   /// After a backup/import restore rewrote `mcp_servers_v1`, the in-memory
   /// list would otherwise keep the pre-restore servers while disk already
@@ -556,7 +558,7 @@ class McpProvider extends ChangeNotifier {
               server.name == '@kelivo/subagent'));
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _prefsKey,
       jsonEncode(_servers.map((e) => e.toJson()).toList()),
@@ -565,7 +567,7 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> _persistServers(List<McpServerConfig> servers) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _prefsKey,
       jsonEncode(servers.map((e) => e.toJson()).toList()),
@@ -573,7 +575,7 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> _persistTimeout(Duration timeout) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_prefsTimeoutKey, timeout.inMilliseconds);
   }
 

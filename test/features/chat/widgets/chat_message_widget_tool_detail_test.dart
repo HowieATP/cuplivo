@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -14,9 +14,11 @@ import 'package:Cuplivo/features/home/services/tool_approval_service.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/ios_tactile.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 SettingsProvider _createSettings() {
-  SharedPreferences.setMockInitialValues(const <String, Object>{});
-  return SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests(const <String, Object>{});
+  return SettingsProvider(preferences: businessPrefs);
 }
 
 Widget _buildHarness({
@@ -25,8 +27,11 @@ Widget _buildHarness({
 }) {
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider(create: (_) => TtsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => TtsProvider(preferences: businessPrefs),
+      ),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
     ],

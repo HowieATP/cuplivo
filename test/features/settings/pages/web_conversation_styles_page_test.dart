@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/models/web_conversation_style.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/settings/pages/display_settings_page.dart';
@@ -33,7 +34,9 @@ Future<SettingsProvider> pumpPage(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  final settings = SettingsProvider();
+  final settings = SettingsProvider(
+    preferences: BusinessPreferences.memoryForTests(),
+  );
   await settings.loaded;
   addTearDown(settings.dispose);
   await tester.pumpWidget(

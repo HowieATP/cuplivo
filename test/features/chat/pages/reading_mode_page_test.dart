@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/chat/pages/reading_mode_page.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 ChatMessage _message(String content) {
   return ChatMessage(role: 'assistant', content: content, conversationId: 'c1');
@@ -19,9 +22,10 @@ Widget _harness(
   String? assistantName,
   Map<String, Object> prefs = const <String, Object>{},
 }) {
-  SharedPreferences.setMockInitialValues(prefs);
+  SharedPreferences.setMockInitialValues({});
+  businessPrefs = BusinessPreferences.memoryForTests(prefs);
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(preferences: businessPrefs),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

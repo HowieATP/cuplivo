@@ -9,9 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const ttsChannel = MethodChannel('flutter_tts');
@@ -19,7 +20,8 @@ void main() {
   const audioChannel = MethodChannel('xyz.luan/audioplayers');
 
   setUp(() {
-    SharedPreferences.setMockInitialValues(const {});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests(const {});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(ttsChannel, (call) async {
           switch (call.method) {
@@ -51,13 +53,14 @@ void main() {
   testWidgets('mobile add network TTS opens a full page editor', (
     tester,
   ) async {
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
+    final tts = TtsProvider(preferences: businessPrefs);
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<BusinessPreferences>.value(value: businessPrefs),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<TtsProvider>.value(value: tts),
         ],
@@ -100,8 +103,8 @@ void main() {
   testWidgets('mobile TTS settings button opens playback settings', (
     tester,
   ) async {
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
+    final tts = TtsProvider(preferences: businessPrefs);
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(
@@ -135,8 +138,8 @@ void main() {
   testWidgets('mobile TTS editor exposes provider advanced fields', (
     tester,
   ) async {
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
+    final tts = TtsProvider(preferences: businessPrefs);
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(
@@ -260,8 +263,8 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
+    final tts = TtsProvider(preferences: businessPrefs);
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(

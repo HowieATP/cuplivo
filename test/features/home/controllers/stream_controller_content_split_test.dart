@@ -5,17 +5,19 @@ import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Cuplivo/features/home/controllers/stream_controller.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues(const {});
+  businessPrefs = BusinessPreferences.memoryForTests(const {});
 
   StreamController buildController({
     SettingsProvider? settings,
     String? currentConversationId,
   }) {
-    final settingsProvider = settings ?? SettingsProvider();
+    final settingsProvider =
+        settings ?? SettingsProvider(preferences: businessPrefs);
     return StreamController(
       chatService: ChatService(),
       onStateChanged: () {},

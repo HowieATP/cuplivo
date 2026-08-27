@@ -221,7 +221,7 @@ class WebConversationStyleImporter {
       if (fileInfo != null) {
         return [singleFile(fileInfo.sourceName, downloadedBytes)];
       }
-      return scanArchive(
+      return await scanArchive(
         downloadedBytes,
         subPath: repoInfo!.subPath,
         stripPrefix: repoInfo.stripPrefix,

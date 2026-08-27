@@ -1,11 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/features/home/services/message_builder_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakeBuildContext implements BuildContext {
   @override
@@ -46,8 +48,8 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 Future<SettingsProvider> _settingsWithOcrModel() async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await _waitForSettingsLoad();
   await settings.setProviderConfig('OcrProvider', _configWithOcrCandidates());
   await settings.setOcrModel('OcrProvider', 'vision-model');
@@ -65,6 +67,7 @@ Future<String> _processContent({
   required String modelId,
 }) async {
   final builder = MessageBuilderService(
+    preferences: businessPrefs,
     chatService: _FakeChatService(),
     contextProvider: _FakeBuildContext(),
     ocrHandler: (_) async => _ocrText,
@@ -136,8 +139,8 @@ void main() {
     });
 
     test('auto without an OCR model falls back to raw markers', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
         'OcrProvider',

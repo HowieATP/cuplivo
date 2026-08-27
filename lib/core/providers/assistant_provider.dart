@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
+import '../database/business_preferences.dart';
 import '../database/chat_database_repository.dart';
 import 'settings_provider.dart';
 import '../services/chat/chat_service.dart';
@@ -20,6 +21,7 @@ import '../../utils/app_directories.dart';
 import '../services/proactive_care_alarm_service.dart';
 
 class AssistantProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
@@ -48,7 +50,11 @@ class AssistantProvider extends ChangeNotifier {
   bool get isLoaded => _loaded;
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
-  AssistantProvider({this.chatService, this.settings});
+  AssistantProvider({
+    required this._preferences,
+    this.chatService,
+    this.settings,
+  });
 
   /// Ensures loading completes, then returns [currentAssistant].
   Future<Assistant?> getLoadedCurrentAssistant() async {
@@ -75,10 +81,11 @@ class AssistantProvider extends ChangeNotifier {
   @visibleForTesting
   Future<void> loadFromPrefs() async {
     if (_loaded) return;
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_assistantsKey);
+    final prefs = await _legacyPrefs();
+    final business = _preferences;
+    final raw = prefs?.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
-      final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
+      final legacySearchEnabled = business.getBool(_legacySearchEnabledKey);
       final migrated = _decodeAssistantsWithLegacySearch(
         raw,
         legacySearchEnabled: legacySearchEnabled,
@@ -89,7 +96,7 @@ class AssistantProvider extends ChangeNotifier {
     }
     if (_assistants.isEmpty) return;
     _loaded = true;
-    final savedId = prefs.getString(_currentAssistantKey);
+    final savedId = business.getString(_currentAssistantKey);
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     }
@@ -102,16 +109,35 @@ class AssistantProvider extends ChangeNotifier {
   ///
   /// Always replaces the in-memory list with disk state (including empty), so
   /// a wipe+restore cannot leave a stale pre-restore list.
+  /// Physical SharedPreferences handle for the legacy `assistants_v1` entity
+  /// key. Tolerates the plugin being unavailable (unit tests seeding only the
+  /// business mock): null means "no legacy blob", the standard no-op.
+  static SharedPreferences? _legacyPrefsStatic;
+
+  @visibleForTesting
+  static void debugSetLegacyPrefs(SharedPreferences? prefs) {
+    _legacyPrefsStatic = prefs;
+  }
+
+  Future<SharedPreferences?> _legacyPrefs() async {
+    if (_legacyPrefsStatic != null) return _legacyPrefsStatic;
+    try {
+      return await SharedPreferences.getInstance();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> reloadFromRepo() async {
     if (chatService == null || !chatService!.initialized) return;
-    final prefs = await SharedPreferences.getInstance();
+    final legacyPrefs = await _legacyPrefs();
+    if (_assistants.isEmpty) {
+      await _migrateFromPrefs(legacyPrefs, chatService!.repo);
+    }
     final rows = await chatService!.repo.getAllAssistants();
     _assistants
       ..clear()
       ..addAll(rows);
-    if (_assistants.isEmpty) {
-      await _migrateFromPrefs(prefs, chatService!.repo);
-    }
     if (_assistants.isEmpty) {
       _loaded = false;
       _currentAssistantId = null;
@@ -119,7 +145,7 @@ class AssistantProvider extends ChangeNotifier {
       return;
     }
     _loaded = true;
-    final savedId = prefs.getString(_currentAssistantKey);
+    final savedId = (_preferences).getString(_currentAssistantKey);
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     } else {
@@ -129,14 +155,13 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Future<void> _doLoad(ChatDatabaseRepository repo) async {
-    final prefs = await SharedPreferences.getInstance();
     final rows = await repo.getAllAssistants();
     if (rows.isNotEmpty) {
       _assistants
         ..clear()
         ..addAll(rows);
     } else {
-      await _migrateFromPrefs(prefs, repo);
+      await _migrateFromPrefs(await _legacyPrefs(), repo);
     }
 
     // One-time migration of the legacy global OCR toggle to per-assistant
@@ -144,7 +169,8 @@ class AssistantProvider extends ChangeNotifier {
     // write through the repo, and only then consume the key. On failure the
     // key is retained so the mapping is retried on the next launch. The
     // empty-list case is covered too (putAssistants([]) is a trivial delete).
-    final legacyOcrEnabled = prefs.getBool(_legacyOcrEnabledKey);
+    final businessPrefs = _preferences;
+    final legacyOcrEnabled = businessPrefs.getBool(_legacyOcrEnabledKey);
     if (legacyOcrEnabled != null) {
       try {
         final migrated = [
@@ -155,7 +181,7 @@ class AssistantProvider extends ChangeNotifier {
         _assistants
           ..clear()
           ..addAll(migrated);
-        await prefs.remove(_legacyOcrEnabledKey);
+        await businessPrefs.remove(_legacyOcrEnabledKey);
       } catch (e) {
         debugPrint('[AssistantProvider] legacy OCR mode migration failed: $e');
       }
@@ -196,7 +222,7 @@ class AssistantProvider extends ChangeNotifier {
       if (anyFsMigrate) {
         // Best-effort: enable full FS tool surface on the default workspace.
         try {
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = _preferences;
           final raw = prefs.getString('workspaces_meta_v1');
           if (raw != null && raw.isNotEmpty) {
             final list = Workspace.decodeList(raw);
@@ -234,21 +260,26 @@ class AssistantProvider extends ChangeNotifier {
     if (_assistants.isEmpty) return;
 
     _loaded = true;
-    final savedId = prefs.getString(_currentAssistantKey);
+    final savedId = (_preferences).getString(_currentAssistantKey);
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     }
     notifyListeners();
   }
 
+  /// Consumes the legacy `assistants_v1` blob (entity key, still on
+  /// SharedPreferences) — runs only for installs that never migrated
+  /// assistants to SQLite. Business companion keys (`search_enabled_v1`,
+  /// `current_assistant_id_v1`) are read from the business facade.
   Future<void> _migrateFromPrefs(
-    SharedPreferences prefs,
+    SharedPreferences? prefs,
     ChatDatabaseRepository? repo,
   ) async {
-    final raw = prefs.getString(_assistantsKey);
+    final raw = prefs?.getString(_assistantsKey);
     if (raw == null || raw.isEmpty) return;
+    final business = _preferences;
 
-    final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
+    final legacySearchEnabled = business.getBool(_legacySearchEnabledKey);
     final migrated = _decodeAssistantsWithLegacySearch(
       raw,
       legacySearchEnabled: legacySearchEnabled,
@@ -292,11 +323,10 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       try {
         await repo.putAssistants(_assistants);
-        await prefs.remove(_assistantsKey);
-        await prefs.remove(_legacySearchEnabledKey);
+        await prefs?.remove(_assistantsKey);
       } catch (_) {}
     } else if (changed) {
-      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+      await prefs?.setString(_assistantsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -386,7 +416,7 @@ class AssistantProvider extends ChangeNotifier {
     // Set current assistant if not set
     if (_currentAssistantId == null && _assistants.isNotEmpty) {
       _currentAssistantId = _assistants.first.id;
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       await prefs.setString(_currentAssistantKey, _currentAssistantId!);
     }
     notifyListeners();
@@ -510,13 +540,12 @@ class AssistantProvider extends ChangeNotifier {
 
   Future<void> _persist() async {
     final repo = _repo;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _legacyPrefs();
     if (repo != null) {
       await repo.putAssistants(_assistants);
-      await prefs.remove(_assistantsKey);
-      await prefs.remove(_legacySearchEnabledKey);
+      await prefs?.remove(_assistantsKey);
     } else {
-      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+      await prefs?.setString(_assistantsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -524,9 +553,8 @@ class AssistantProvider extends ChangeNotifier {
     final repo = _repo;
     if (repo != null) {
       await repo.putAssistant(a, sortOrder: sortOrder);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_assistantsKey);
-      await prefs.remove(_legacySearchEnabledKey);
+      final prefs = await _legacyPrefs();
+      await prefs?.remove(_assistantsKey);
     } else {
       await _persist();
     }
@@ -536,9 +564,8 @@ class AssistantProvider extends ChangeNotifier {
     final repo = _repo;
     if (repo != null) {
       await repo.deleteAssistant(id);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_assistantsKey);
-      await prefs.remove(_legacySearchEnabledKey);
+      final prefs = await _legacyPrefs();
+      await prefs?.remove(_assistantsKey);
     } else {
       await _persist();
     }
@@ -548,7 +575,7 @@ class AssistantProvider extends ChangeNotifier {
     if (_currentAssistantId == id) return;
     _currentAssistantId = id;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_currentAssistantKey, id);
   }
 
@@ -837,9 +864,12 @@ class AssistantProvider extends ChangeNotifier {
     if (settings != null) {
       await settings.clearPinnedAssistantIfPinned(id);
     } else {
-      await SettingsProvider.clearPinnedAssistantPrefsIfPinned(id);
+      await SettingsProvider.clearPinnedAssistantPrefsIfPinned(
+        id,
+        _preferences,
+      );
     }
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     if (_currentAssistantId != null) {
       await prefs.setString(_currentAssistantKey, _currentAssistantId!);
     } else {

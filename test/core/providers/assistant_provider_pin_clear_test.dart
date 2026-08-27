@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -30,6 +33,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
 Future<({AssistantProvider provider, SettingsProvider settings})>
 _createLoadedAssistantProvider({
+  required BusinessPreferences preferences,
   required ChatService chatService,
   String currentAssistantId = 'assistant-delete',
 }) async {
@@ -38,14 +42,17 @@ _createLoadedAssistantProvider({
       {'id': 'assistant-delete', 'name': 'Delete Me'},
       {'id': 'assistant-keep', 'name': 'Keep Me'},
     ]),
+  });
+  businessPrefs = BusinessPreferences.memoryForTests({
     'current_assistant_id_v1': currentAssistantId,
     'startup_assistant_mode_v1': 'pinned',
     'pinned_assistant_id_v1': 'assistant-delete',
   });
 
-  final settings = SettingsProvider();
+  final settings = SettingsProvider(preferences: businessPrefs);
   await settings.loaded;
   final provider = AssistantProvider(
+    preferences: businessPrefs,
     chatService: chatService,
     settings: settings,
   );
@@ -60,6 +67,7 @@ void main() {
   final services = <ChatService>[];
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tempDir = await Directory.systemTemp.createTemp(
       'kelivo_assistant_pin_clear_test_',
     );
@@ -88,6 +96,7 @@ void main() {
       final chatService = createService();
       await chatService.init();
       final loaded = await _createLoadedAssistantProvider(
+        preferences: businessPrefs,
         chatService: chatService,
       );
       final provider = loaded.provider;
@@ -98,7 +107,7 @@ void main() {
       // Live in-memory state must be cleared too (single source of truth).
       expect(settings.pinnedAssistantId, isNull);
       expect(settings.startupAssistantMode, StartupAssistantMode.mostRecent);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('startup_assistant_mode_v1'), 'mostRecent');
       expect(prefs.getString('pinned_assistant_id_v1'), isNull);
     },
@@ -108,6 +117,7 @@ void main() {
     final chatService = createService();
     await chatService.init();
     final loaded = await _createLoadedAssistantProvider(
+      preferences: businessPrefs,
       chatService: chatService,
     );
     final provider = loaded.provider;
@@ -117,7 +127,7 @@ void main() {
 
     expect(settings.pinnedAssistantId, 'assistant-delete');
     expect(settings.startupAssistantMode, StartupAssistantMode.pinned);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     expect(prefs.getString('startup_assistant_mode_v1'), 'pinned');
     expect(prefs.getString('pinned_assistant_id_v1'), 'assistant-delete');
   });

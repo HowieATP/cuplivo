@@ -8,12 +8,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
 import '../../models/assistant.dart';
 import '../../models/backup.dart';
-import '../../models/chat_input_data.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../models/group_chat.dart';
@@ -24,6 +22,8 @@ import '../deleted_records_store.dart';
 import '../mcp/kelivo_filesystem/kelivo_filesystem_server.dart'
     show isSafeWireSegment;
 import '../sync/lan_sync_models.dart' show FileManifestEntry;
+import '../../database/business_preferences.dart';
+import '../../database/business_key_registry.dart';
 import 'kelivo_image_settings_mapper.dart';
 import 'kelivo_v2_exception.dart';
 import 'double_pref_keys.dart';
@@ -95,17 +95,32 @@ enum BackupStage {
 /// do not surface progress (LAN sync, tests).
 typedef BackupStageCallback = void Function(BackupStage stage);
 
+/// Export wire format for a backup ZIP.
+enum BackupFormat {
+  /// Cuplivo v2: JSONL chat streams + chats_meta.json sentinel (default).
+  jsonl,
+
+  /// Kelivo-legacy v1: a single chats.json blob (version 1) + settings.json +
+  /// deleted.json. Kelivo's legacy importer only accepts that shape; the
+  /// JSONL v2 zips Cuplivo produces are NOT importable by Kelivo. Full
+  /// backups only (incremental/LAN-sync always use [jsonl]).
+  kelivoLegacy,
+}
+
 class DataSync {
   final ChatService chatService;
   final Future<Set<String>> Function(String type)? _localIdResolver;
-  DataSync({required this.chatService, this._localIdResolver});
+  final BusinessPreferences _preferences;
+  DataSync({
+    required this.chatService,
+    required this._preferences,
+    this._localIdResolver,
+  });
 
-  // Upstream (Kelivo) legacy chats.json importer only accepts version 1 (or a
-  // missing field); anything else is rejected with FormatException. Cuplivo's
-  // own importer never reads this field, so exporting v1 keeps backups
-  // importable into Kelivo without affecting Cuplivo round-trips. Never bump
-  // this past 1 without relaxing Kelivo's _parseChatBackup constraint first.
-  static const int _chatsJsonVersion = 1;
+  // Kelivo's legacy chats.json importer only accepts version 1 (or a missing
+  // field); anything else is rejected with FormatException. The legacy
+  // export writer must keep this at 1.
+  static const int _kelivoChatsJsonVersion = 1;
 
   // Proxy fields inside a provider config. Proxy is device-local: during a
   // merge restore these fields are never adopted from the backup for
@@ -246,6 +261,7 @@ class DataSync {
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
     BackupStageCallback? onStage,
+    BackupFormat format = BackupFormat.jsonl,
   }) async {
     onStage?.call(BackupStage.generating);
     final tmp = await _ensureTempDir();
@@ -263,23 +279,56 @@ class DataSync {
     if (await outFile.exists()) await outFile.delete();
 
     File? settingsTmp;
-    File? chatsTmp;
+    File? settingsMetaTmp;
+    File? chatsMetaTmp;
+    File? conversationsTmp;
+    File? messagesTmp;
+    File? legacyChatsTmp;
     File? deletedJsonTmp;
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json — full backup always includes settings
       if (incremental == null || incremental.includeSettings) {
-        final settingsJson = await _exportSettingsJson();
+        final payloads = await _exportSettingsPayloads();
         settingsTmp = await _writeTempText(
           workDir,
           '_bk_settings.json',
-          settingsJson,
+          jsonEncode(payloads.settings),
         );
+        if (payloads.updatedAt.isNotEmpty && format == BackupFormat.jsonl) {
+          settingsMetaTmp = await _writeTempText(
+            workDir,
+            '_bk_settings_meta.json',
+            jsonEncode(payloads.updatedAt),
+          );
+        }
       }
 
-      // chats.json — stream to file to avoid huge string in memory
+      // chats payload — JSONL streams by default; single v1 blob for the
+      // Kelivo-legacy format (whose importer cannot read JSONL).
       if (cfg.includeChats) {
-        chatsTmp = await _exportChatsToFile(workDir, incremental: incremental);
+        if (format == BackupFormat.kelivoLegacy) {
+          legacyChatsTmp = await _exportChatsToLegacyFile(
+            workDir,
+            incremental: incremental,
+          );
+        } else {
+          final metaFile = await _exportChatsToFile(
+            workDir,
+            incremental: incremental,
+          );
+          chatsMetaTmp = metaFile;
+          final conversationsFile = File(
+            p.join(workDir.path, '_bk_conversations.jsonl'),
+          );
+          final messagesFile = File(p.join(workDir.path, '_bk_messages.jsonl'));
+          if (await conversationsFile.exists()) {
+            conversationsTmp = conversationsFile;
+          }
+          if (await messagesFile.exists()) {
+            messagesTmp = messagesFile;
+          }
+        }
       }
 
       // deleted.json — id-only tombstones for sync/backup (origin='local' only)
@@ -305,7 +354,11 @@ class DataSync {
       final skillsDirPath = (await _getSkillsDir()).path;
       final workspacesDirPath = (await _getWorkspacesDir()).path;
       final settingsPath = settingsTmp?.path;
-      final chatsPath = chatsTmp?.path;
+      final settingsMetaPath = settingsMetaTmp?.path;
+      final chatsMetaPath = chatsMetaTmp?.path;
+      final conversationsPath = conversationsTmp?.path;
+      final messagesPath = messagesTmp?.path;
+      final legacyChatsPath = legacyChatsTmp?.path;
       final deletedJsonPath = deletedJsonTmp?.path;
       final effectiveIncludeFiles = isIncremental
           ? incremental.includeFiles
@@ -319,7 +372,11 @@ class DataSync {
         _packZipSync(
           outPath: outPath,
           settingsPath: settingsPath,
-          chatsPath: chatsPath,
+          settingsMetaPath: settingsMetaPath,
+          chatsMetaPath: chatsMetaPath,
+          conversationsPath: conversationsPath,
+          messagesPath: messagesPath,
+          legacyChatsPath: legacyChatsPath,
           deletedJsonPath: deletedJsonPath,
           includeFiles: effectiveIncludeFiles,
           since: packSince,
@@ -341,7 +398,11 @@ class DataSync {
       // Cleanup temp intermediate files. The final zip is returned to callers
       // and must be deleted by the upload/export caller after it is consumed.
       await _deleteFileQuietly(settingsTmp);
-      await _deleteFileQuietly(chatsTmp);
+      await _deleteFileQuietly(settingsMetaTmp);
+      await _deleteFileQuietly(chatsMetaTmp);
+      await _deleteFileQuietly(conversationsTmp);
+      await _deleteFileQuietly(messagesTmp);
+      await _deleteFileQuietly(legacyChatsTmp);
       await _deleteFileQuietly(deletedJsonTmp);
     }
   }
@@ -431,7 +492,11 @@ class DataSync {
             ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
                 (name.startsWith('cuplivo_incr_') && name.endsWith('.zip')) ||
                 name == '_bk_settings.json' ||
-                name == '_bk_chats.json')) {
+                name == '_bk_settings_meta.json' ||
+                name == '_bk_chats.json' ||
+                name == '_bk_chats_meta.json' ||
+                name == '_bk_conversations.jsonl' ||
+                name == '_bk_messages.jsonl')) {
           await _deleteFileQuietly(ent);
         }
       }
@@ -442,7 +507,11 @@ class DataSync {
   static void _packZipSync({
     required String outPath,
     String? settingsPath,
-    String? chatsPath,
+    String? settingsMetaPath,
+    String? chatsMetaPath,
+    String? conversationsPath,
+    String? messagesPath,
+    String? legacyChatsPath,
     String? deletedJsonPath,
     required bool includeFiles,
     required String uploadDirPath,
@@ -467,9 +536,28 @@ class DataSync {
         _addFileToZip(writer, settingsPath, 'settings.json');
       }
 
-      // chats.json
-      if (chatsPath != null) {
-        _addFileToZip(writer, chatsPath, 'chats.json');
+      // settings_meta.json — LWW timestamps companion (optional; legacy
+      // zips and old builds ignore/fall back)
+      if (settingsMetaPath != null) {
+        _addFileToZip(writer, settingsMetaPath, 'settings_meta.json');
+      }
+
+      // Kelivo-legacy chats.json (v1 blob) — used ONLY for the
+      // BackupFormat.kelivoLegacy export. JSONL v2 zips never ship it.
+      if (legacyChatsPath != null) {
+        _addFileToZip(writer, legacyChatsPath, 'chats.json');
+      }
+
+      // chats.jsonl stream set — conversations.jsonl/messages.jsonl + the
+      // chats_meta.json sentinel (v2 format, issue #123)
+      if (conversationsPath != null) {
+        _addFileToZip(writer, conversationsPath, 'conversations.jsonl');
+      }
+      if (messagesPath != null) {
+        _addFileToZip(writer, messagesPath, 'messages.jsonl');
+      }
+      if (chatsMetaPath != null) {
+        _addFileToZip(writer, chatsMetaPath, 'chats_meta.json');
       }
 
       // deleted.json — id-only tombstones (optional, backward compatible)
@@ -1080,7 +1168,13 @@ class DataSync {
     WebDavConfig cfg, {
     IncrementalBackupConfig? incremental,
     BackupStageCallback? onStage,
-  }) => prepareBackupFile(cfg, incremental: incremental, onStage: onStage);
+    BackupFormat format = BackupFormat.jsonl,
+  }) => prepareBackupFile(
+    cfg,
+    incremental: incremental,
+    onStage: onStage,
+    format: format,
+  );
 
   Future<void> restoreFromLocalFile(
     File file,
@@ -1392,8 +1486,15 @@ class DataSync {
     return result;
   }
 
-  Future<String> _exportSettingsJson() async {
-    final prefs = await SharedPreferencesAsync.instance;
+  /// Builds settings.json + its LWW companion settings_meta.json.
+  ///
+  /// The meta file maps each exported business key to its KV `updated_at`
+  /// (microseconds UTC). Keys missing from the KV table (not yet migrated or
+  /// written) are absent from the meta file and fall back to legacy merge
+  /// semantics on restore. Local-only/entity keys never appear in either.
+  Future<({Map<String, dynamic> settings, Map<String, int> updatedAt})>
+  _exportSettingsPayloads() async {
+    final prefs = SharedPreferencesAsync(_preferences);
     final map = await prefs.snapshot();
     // `assistants_v1` removed from SharedPreferences
     if (chatService.initialized) {
@@ -1444,11 +1545,151 @@ class DataSync {
         );
       }
     }
-    return jsonEncode(map);
+
+    final updatedAt = <String, int>{};
+    for (final key in map.keys) {
+      final ts = _preferences.updatedAtFor(key);
+      if (ts != null) updatedAt[key] = ts;
+    }
+    return (settings: map, updatedAt: updatedAt);
   }
 
-  /// Stream chat data to a temporary JSON file instead of building a huge
-  /// in-memory String.  Uses IOSink for low memory overhead.
+  /// Local KV updated_at for [key], or null when the key has no business row
+  /// (device-local or never-written; LWW cannot apply).
+  int? _localUpdatedAtFor(String key) => _preferences.updatedAtFor(key);
+
+  /// Streams chat data to the Kelivo-legacy `chats.json` v1 blob.
+  ///
+  /// Kelivo's legacy importer only accepts a single chats.json with
+  /// `version: 1` (or the field absent) — the JSONL v2 streams Cuplivo
+  /// normally exports would restore nothing there. Used exclusively by the
+  /// BackupFormat.kelivoLegacy export button; full backups only.
+  Future<File> _exportChatsToLegacyFile(
+    Directory directory, {
+    IncrementalBackupConfig? incremental,
+  }) async {
+    if (!chatService.initialized) {
+      await chatService.init();
+    }
+    var conversations = chatService.getAllCompleteConversations();
+    final perConvSince = incremental?.conversationSince;
+    if (incremental != null && perConvSince != null) {
+      conversations = conversations
+          .where((c) => perConvSince.containsKey(c.id))
+          .toList();
+    } else if (incremental != null) {
+      final sinceCheck = incremental.sinceCheck;
+      final since = incremental.since;
+      conversations = conversations.where((c) {
+        if (sinceCheck(c.createdAt)) {
+          return true;
+        }
+        if (c.updatedAt.isBefore(since)) return false;
+        final msgs = chatService.getMessages(c.id);
+        return _incrementalQualifiedMessages(msgs, sinceCheck).isNotEmpty;
+      }).toList();
+    }
+
+    final file = File(p.join(directory.path, '_bk_chats.json'));
+    final sink = file.openWrite();
+    try {
+      sink.write('{"version":$_kelivoChatsJsonVersion,');
+
+      // --- conversations ---
+      sink.write('"conversations":[');
+      for (var i = 0; i < conversations.length; i++) {
+        if (i > 0) sink.write(',');
+        sink.write(jsonEncode(conversations[i].toJson()));
+        if (i % 50 == 0) await Future<void>.delayed(Duration.zero);
+      }
+      sink.write('],');
+
+      // --- messages, toolEvents, geminiThoughtSigs ---
+      sink.write('"messages":[');
+      final toolEvents = <String, List<Map<String, dynamic>>>{};
+      final geminiThoughtSigs = <String, String>{};
+      bool firstMsg = true;
+      for (final c in conversations) {
+        var msgs = chatService.getMessages(c.id);
+        if (incremental != null && !c.isGroup) {
+          final perConv = incremental.conversationSince;
+          if (perConv != null) {
+            final convSince = perConv[c.id];
+            if (convSince != null) {
+              msgs = _incrementalQualifiedMessages(
+                msgs,
+                (t) => convSince.isBefore(t) || convSince.isAtSameMomentAs(t),
+              );
+            }
+          } else if (c.createdAt.isBefore(incremental.since)) {
+            msgs = _incrementalQualifiedMessages(msgs, incremental.sinceCheck);
+          }
+        }
+        for (final m in msgs) {
+          if (!firstMsg) sink.write(',');
+          firstMsg = false;
+          sink.write(jsonEncode(m.toJson()));
+          if (m.role == 'assistant') {
+            final ev = chatService.getToolEvents(m.id);
+            if (ev.isNotEmpty) toolEvents[m.id] = ev;
+            final sig = chatService.getGeminiThoughtSignature(m.id);
+            if (sig != null && sig.isNotEmpty) geminiThoughtSigs[m.id] = sig;
+          }
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
+      sink.write('],');
+
+      // --- toolEvents ---
+      sink.write('"toolEvents":');
+      sink.write(jsonEncode(toolEvents));
+      sink.write(',');
+
+      // --- geminiThoughtSigs ---
+      sink.write('"geminiThoughtSigs":');
+      sink.write(jsonEncode(geminiThoughtSigs));
+      sink.write(',');
+
+      // --- group chats ---
+      final groups = await chatService.repo.getAllGroupChats();
+      final groupPayload = <Map<String, dynamic>>[];
+      final memberPayload = <Map<String, dynamic>>[];
+      final exportedConversationIds = conversations.map((c) => c.id).toSet();
+      for (final g in groups) {
+        if (incremental != null &&
+            g.updatedAt.isBefore(incremental.since) &&
+            !exportedConversationIds.contains(g.conversationId)) {
+          continue;
+        }
+        groupPayload.add(g.toJson());
+        final members = await chatService.repo.getGroupMembers(g.id);
+        memberPayload.addAll(members.map((m) => m.toJson()));
+      }
+      sink.write('"groupChats":');
+      sink.write(jsonEncode(groupPayload));
+      sink.write(',');
+      sink.write('"groupMembers":');
+      sink.write(jsonEncode(memberPayload));
+
+      sink.write('}');
+    } finally {
+      await sink.flush();
+      await sink.close();
+    }
+    return file;
+  }
+
+  /// Streams chat data to JSONL temp files (v2 format; issue #123) instead
+  /// of a single chats.json blob. Returns the chats_meta.json file; the
+  /// conversations/messages streams sit alongside it in [directory].
+  ///
+  /// Wire format:
+  /// - `_bk_chats_meta.json` — sentinel + schema + counts + group payloads,
+  ///   written LAST so a half-written backup is never mistaken for complete.
+  /// - `_bk_conversations.jsonl` — one wrapped object per line:
+  ///   `{"conversation": {...}}`
+  /// - `_bk_messages.jsonl` — one wrapped object per message:
+  ///   `{"message": {...}, "toolEvents": [...], "geminiSignature": "..."}`
   Future<File> _exportChatsToFile(
     Directory directory, {
     IncrementalBackupConfig? incremental,
@@ -1486,27 +1727,27 @@ class DataSync {
         return _incrementalQualifiedMessages(msgs, sinceCheck).isNotEmpty;
       }).toList();
     }
-    final file = File(p.join(directory.path, '_bk_chats.json'));
-    final sink = file.openWrite();
 
+    final convFile = File(p.join(directory.path, '_bk_conversations.jsonl'));
+    final msgFile = File(p.join(directory.path, '_bk_messages.jsonl'));
+    final convSink = convFile.openWrite();
+    final msgSink = msgFile.openWrite();
+
+    var conversationCount = 0;
+    var messageCount = 0;
     try {
-      sink.write('{"version":$_chatsJsonVersion,');
-
       // --- conversations ---
-      sink.write('"conversations":[');
-      for (int i = 0; i < conversations.length; i++) {
-        if (i > 0) sink.write(',');
-        sink.write(jsonEncode(conversations[i].toJson()));
+      for (final c in conversations) {
+        convSink.write(jsonEncode({'conversation': c.toJson()}));
+        convSink.write('\n');
+        conversationCount++;
         // Yield periodically so the main isolate can process UI frames
-        if (i % 50 == 0) await Future<void>.delayed(Duration.zero);
+        if (conversationCount % 50 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
       }
-      sink.write('],');
 
-      // --- messages, toolEvents, geminiThoughtSigs ---
-      sink.write('"messages":[');
-      final toolEvents = <String, List<Map<String, dynamic>>>{};
-      final geminiThoughtSigs = <String, String>{};
-      bool firstMsg = true;
+      // --- messages (+ inline toolEvents/geminiThoughtSigs) ---
       for (final c in conversations) {
         var msgs = chatService.getMessages(c.id);
         // Group transcripts are all-or-nothing: a partial message list would
@@ -1529,63 +1770,288 @@ class DataSync {
           }
         }
         for (final m in msgs) {
-          if (!firstMsg) sink.write(',');
-          firstMsg = false;
-          sink.write(jsonEncode(m.toJson()));
+          final record = <String, dynamic>{'message': m.toJson()};
           if (m.role == 'assistant') {
             final ev = chatService.getToolEvents(m.id);
-            if (ev.isNotEmpty) toolEvents[m.id] = ev;
+            if (ev.isNotEmpty) record['toolEvents'] = ev;
             final sig = chatService.getGeminiThoughtSignature(m.id);
-            if (sig != null && sig.isNotEmpty) geminiThoughtSigs[m.id] = sig;
+            if (sig != null && sig.isNotEmpty) {
+              record['geminiSignature'] = sig;
+            }
           }
+          msgSink.write(jsonEncode(record));
+          msgSink.write('\n');
+          messageCount++;
         }
         // Yield after each conversation
         await Future<void>.delayed(Duration.zero);
       }
-      sink.write('],');
-
-      // --- toolEvents ---
-      sink.write('"toolEvents":');
-      sink.write(jsonEncode(toolEvents));
-      sink.write(',');
-
-      // --- geminiThoughtSigs ---
-      sink.write('"geminiThoughtSigs":');
-      sink.write(jsonEncode(geminiThoughtSigs));
-      sink.write(',');
-
-      // --- group chats ---
-      final groups = await chatService.repo.getAllGroupChats();
-      final groupPayload = <Map<String, dynamic>>[];
-      final memberPayload = <Map<String, dynamic>>[];
-      // Incremental scope: a group qualifies when it was active since `since`,
-      // or when its conversation made it into this export. A qualifying group
-      // carries its FULL members — the director session is ephemeral (rebuilt
-      // from the public transcript) and is never stored or exported.
-      final exportedConversationIds = conversations.map((c) => c.id).toSet();
-      for (final g in groups) {
-        if (incremental != null &&
-            g.updatedAt.isBefore(incremental.since) &&
-            !exportedConversationIds.contains(g.conversationId)) {
-          continue;
-        }
-        groupPayload.add(g.toJson());
-        final members = await chatService.repo.getGroupMembers(g.id);
-        memberPayload.addAll(members.map((m) => m.toJson()));
-      }
-      sink.write('"groupChats":');
-      sink.write(jsonEncode(groupPayload));
-      sink.write(',');
-      sink.write('"groupMembers":');
-      sink.write(jsonEncode(memberPayload));
-
-      sink.write('}');
     } finally {
-      await sink.flush();
-      await sink.close();
+      await convSink.flush();
+      await convSink.close();
+      await msgSink.flush();
+      await msgSink.close();
     }
 
-    return file;
+    // --- group chats (small; kept as a JSON payload inside the meta) ---
+    final groups = await chatService.repo.getAllGroupChats();
+    final groupPayload = <Map<String, dynamic>>[];
+    final memberPayload = <Map<String, dynamic>>[];
+    // Incremental scope: a group qualifies when it was active since `since`,
+    // or when its conversation made it into this export. A qualifying group
+    // carries its FULL members — the director session is ephemeral (rebuilt
+    // from the public transcript) and is never stored or exported.
+    final exportedConversationIds = conversations.map((c) => c.id).toSet();
+    for (final g in groups) {
+      if (incremental != null &&
+          g.updatedAt.isBefore(incremental.since) &&
+          !exportedConversationIds.contains(g.conversationId)) {
+        continue;
+      }
+      groupPayload.add(g.toJson());
+      final members = await chatService.repo.getGroupMembers(g.id);
+      memberPayload.addAll(members.map((m) => m.toJson()));
+    }
+
+    // Sentinel written LAST: a zip only ever packs it once complete.
+    final metaFile = File(p.join(directory.path, '_bk_chats_meta.json'));
+    await metaFile.writeAsString(
+      jsonEncode({
+        'format_version': 2,
+        'tables': ['conversations', 'messages'],
+        'conversation_count': conversationCount,
+        'message_count': messageCount,
+        'zip_tables': {
+          'conversations': 'conversations.jsonl',
+          'messages': 'messages.jsonl',
+        },
+        'groupChats': groupPayload,
+        'groupMembers': memberPayload,
+      }),
+    );
+    return metaFile;
+  }
+
+  /// Counts non-empty JSONL lines (tolerates a missing trailing newline).
+  static Future<int> _countJsonlLines(File file) async {
+    if (!await file.exists()) return 0;
+    var count = 0;
+    await file
+        .openRead()
+        .transform(const Utf8Decoder())
+        .transform(const LineSplitter())
+        .forEach((line) {
+          if (line.trim().isNotEmpty) count++;
+        });
+    return count;
+  }
+
+  /// Streaming JSONL chats restore (v2 format; issue #123).
+  ///
+  /// Memory is bounded by one conversation: each conversation's messages are
+  /// accumulated then written via [ChatService.restoreConversationsBatch].
+  /// Both overwrite and merge stream; merge keeps today's ID-skip semantics
+  /// (never LWW for chats). toolEvents/geminiSignatures ride inline per
+  /// message. Group chat metadata rides the chats_meta.json payload.
+  Future<void> _restoreChatsFromJsonl({
+    required Directory extractDir,
+    required Map<String, dynamic> chatsMeta,
+    required RestoreMode mode,
+    RestoreProgressCallback? onProgress,
+  }) async {
+    if (!chatService.initialized) await chatService.init();
+    final conversationsFile = File(
+      p.join(extractDir.path, 'conversations.jsonl'),
+    );
+    final messagesFile = File(p.join(extractDir.path, 'messages.jsonl'));
+
+    final convs = <Conversation>[];
+    await for (final line
+        in conversationsFile
+            .openRead()
+            .transform(const Utf8Decoder())
+            .transform(const LineSplitter())) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      try {
+        final obj = jsonDecode(trimmed) as Map<String, dynamic>;
+        final raw = obj['conversation'] as Map?;
+        if (raw == null) continue;
+        convs.add(Conversation.fromJson(raw.cast<String, dynamic>()));
+      } catch (e) {
+        throw StateError('backup_conversations_corrupt: $e');
+      }
+    }
+
+    if (mode == RestoreMode.overwrite) {
+      await chatService.clearAllData();
+    } else {
+      onProgress?.call(const RestoreProgress(stage: RestoreStage.mergingChats));
+    }
+
+    final existingConvIds = <String>{};
+    final existingMsgIds = <String>{};
+    if (mode == RestoreMode.merge) {
+      for (final conv in chatService.getAllCompleteConversations()) {
+        existingConvIds.add(conv.id);
+        existingMsgIds.addAll(
+          chatService.getMessages(conv.id).map((m) => m.id),
+        );
+      }
+    }
+
+    // Stream messages grouped by conversation (one conversation in memory).
+    final byConv = <String, List<ChatMessage>>{};
+    final toolEventsByMessageId = <String, List<Map<String, dynamic>>>{};
+    final geminiSigsByMessageId = <String, String>{};
+    var messageCount = 0;
+    await for (final line
+        in messagesFile
+            .openRead()
+            .transform(const Utf8Decoder())
+            .transform(const LineSplitter())) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      try {
+        final obj = jsonDecode(trimmed) as Map<String, dynamic>;
+        final raw = obj['message'] as Map?;
+        if (raw == null) continue;
+        final message = ChatMessage.fromJson(raw.cast<String, dynamic>());
+        (byConv[message.conversationId] ??= <ChatMessage>[]).add(message);
+        if (obj['toolEvents'] is List) {
+          toolEventsByMessageId[message.id] = (obj['toolEvents'] as List)
+              .cast<Map>()
+              .map((e) => e.cast<String, dynamic>())
+              .toList();
+        }
+        final sig = obj['geminiSignature'];
+        if (sig is String && sig.isNotEmpty) {
+          geminiSigsByMessageId[message.id] = sig;
+        }
+        messageCount++;
+      } catch (e) {
+        throw StateError('backup_messages_corrupt: $e');
+      }
+      // Flush when the conversation changes.
+      if (messageCount % 500 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    if (mode == RestoreMode.overwrite) {
+      await chatService.restoreConversationsBatch(
+        conversations: convs,
+        messagesByConversation: byConv,
+        toolEventsByMessageId: toolEventsByMessageId,
+        geminiSignaturesByMessageId: geminiSigsByMessageId,
+      );
+    } else {
+      final batchConvs = <Conversation>[];
+      final batchMsgs = <String, List<ChatMessage>>{};
+      final batchToolEvents = <String, List<Map<String, dynamic>>>{};
+      final batchGeminiSigs = <String, String>{};
+      var mergedConvs = 0;
+      final totalConvs = convs.length;
+      for (final c in convs) {
+        if (!existingConvIds.contains(c.id)) {
+          batchConvs.add(c);
+          final list = byConv[c.id] ?? const <ChatMessage>[];
+          batchMsgs[c.id] = list;
+          for (final msg in list) {
+            if (toolEventsByMessageId.containsKey(msg.id)) {
+              batchToolEvents[msg.id] = toolEventsByMessageId[msg.id]!;
+            }
+            if (geminiSigsByMessageId.containsKey(msg.id)) {
+              batchGeminiSigs[msg.id] = geminiSigsByMessageId[msg.id]!;
+            }
+          }
+        } else if (byConv.containsKey(c.id)) {
+          for (final msg in byConv[c.id]!) {
+            if (existingMsgIds.contains(msg.id)) continue;
+            await chatService.addMessageDirectly(c.id, msg);
+          }
+        }
+        mergedConvs++;
+        if (totalConvs > 0) {
+          onProgress?.call(
+            RestoreProgress(
+              stage: RestoreStage.mergingChats,
+              fraction: mergedConvs / totalConvs,
+              conversationsMerged: mergedConvs,
+              conversationsTotal: totalConvs,
+            ),
+          );
+        }
+      }
+      if (batchConvs.isNotEmpty) {
+        await chatService.restoreConversationsBatch(
+          conversations: batchConvs,
+          messagesByConversation: batchMsgs,
+          toolEventsByMessageId: batchToolEvents,
+          geminiSignaturesByMessageId: batchGeminiSigs,
+        );
+      }
+      // Merge remaining events/sigs (entries already handled are skipped).
+      for (final entry in toolEventsByMessageId.entries) {
+        if (batchToolEvents.containsKey(entry.key)) continue;
+        if (chatService.getToolEvents(entry.key).isEmpty) {
+          try {
+            await chatService.setToolEvents(entry.key, entry.value);
+          } catch (_) {}
+        }
+      }
+      for (final entry in geminiSigsByMessageId.entries) {
+        if (batchGeminiSigs.containsKey(entry.key)) continue;
+        if ((chatService.getGeminiThoughtSignature(entry.key) ?? '').isEmpty) {
+          try {
+            await chatService.setGeminiThoughtSignature(entry.key, entry.value);
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Group chat metadata rides the meta payload.
+    final groupChatsRaw =
+        (chatsMeta['groupChats'] as List?) ?? const <dynamic>[];
+    final groupMembersRaw =
+        (chatsMeta['groupMembers'] as List?) ?? const <dynamic>[];
+    if (groupChatsRaw.isNotEmpty) {
+      final existingGroupIds = mode == RestoreMode.merge
+          ? (await chatService.repo.getAllGroupChats()).map((g) => g.id).toSet()
+          : <String>{};
+      for (final raw in groupChatsRaw) {
+        try {
+          final g = GroupChat.fromJson((raw as Map).cast<String, dynamic>());
+          if (mode == RestoreMode.merge && existingGroupIds.contains(g.id)) {
+            continue;
+          }
+          await chatService.repo.putGroupChat(g);
+        } catch (e) {
+          debugPrint('restoreData: groupChat row: $e');
+        }
+      }
+      final membersByGroup = <String, List<GroupChatMember>>{};
+      for (final raw in groupMembersRaw) {
+        try {
+          final m = GroupChatMember.fromJson(
+            (raw as Map).cast<String, dynamic>(),
+          );
+          (membersByGroup[m.groupChatId] ??= []).add(m);
+        } catch (e) {
+          debugPrint('restoreData: groupMembers parse: $e');
+        }
+      }
+      for (final entry in membersByGroup.entries) {
+        if (mode == RestoreMode.merge && existingGroupIds.contains(entry.key)) {
+          continue;
+        }
+        try {
+          await chatService.repo.putGroupMembers(entry.key, entry.value);
+        } catch (e) {
+          debugPrint('restoreData: groupMembers: $e');
+        }
+      }
+    }
   }
 
   Future<void> _restoreFromBackupFile(
@@ -1623,6 +2089,31 @@ class DataSync {
         throw KelivoV2BackupException();
       }
 
+      // chats_meta.json sentinel → JSONL v2 format (issue #123)
+      final chatsMetaFile = File(p.join(extractDir.path, 'chats_meta.json'));
+      final isJsonlFormat = await chatsMetaFile.exists();
+      Map<String, dynamic> chatsMeta = const {};
+      if (isJsonlFormat) {
+        try {
+          chatsMeta =
+              jsonDecode(await chatsMetaFile.readAsString())
+                  as Map<String, dynamic>;
+        } catch (e) {
+          // Malformed sentinel: abort BEFORE any write — a half-written
+          // backup must never trigger a partial restore.
+          throw StateError('backup_chats_meta_corrupt: $e');
+        }
+        // Count validation: the streams must match the advertised counts
+        // (tolerant of a missing trailing newline; abort on mismatch).
+        final expected = chatsMeta['message_count'];
+        final actual = await _countJsonlLines(
+          File(p.join(extractDir.path, 'messages.jsonl')),
+        );
+        if (expected is int && expected != actual) {
+          throw StateError('backup_chats_count_mismatch');
+        }
+      }
+
       // Restore settings
       Object? backupAssistantsRaw;
       Object? backupLegacyOcrEnabled;
@@ -1656,12 +2147,33 @@ class DataSync {
           for (final key in KelivoImageSettingsMapper.upstreamKeys) {
             map.remove(key);
           }
-          final prefs = await SharedPreferencesAsync.instance;
+          final prefs = SharedPreferencesAsync(_preferences);
           if (mode == RestoreMode.overwrite) {
             // For overwrite mode, restore all settings
             await prefs.restore(map);
           } else {
-            // For merge mode, intelligently merge settings
+            // For merge mode, intelligently merge settings.
+            //
+            // LWW (issue #123): settings_meta.json maps business keys to
+            // their KV updated_at on the backup device. For non-mergeable
+            // scalar keys, "incoming strictly newer" wins wholesale; ties /
+            // absent meta fall back to the legacy fill-absent rule below.
+            final localMeta = <String, int>{};
+            final backupMetaFile = File(
+              p.join(extractDir.path, 'settings_meta.json'),
+            );
+            if (await backupMetaFile.exists()) {
+              try {
+                final raw = await backupMetaFile.readAsString();
+                final decoded = jsonDecode(raw) as Map<String, dynamic>;
+                for (final entry in decoded.entries) {
+                  final ts = entry.value;
+                  if (ts is int) localMeta[entry.key] = ts;
+                }
+              } catch (e) {
+                debugPrint('restore: settings_meta.json parse failed: $e');
+              }
+            }
             final existing = await prefs.snapshot();
 
             // Keys that should be merged as JSON arrays/objects
@@ -1937,6 +2449,16 @@ class DataSync {
                   // For new keys, add them
                   await prefs.restoreSingle(key, newValue);
                 }
+              } else if (existing.containsKey(key) && localMeta.isNotEmpty) {
+                // LWW scalar merge (issue #123): supply the incoming value
+                // only when the backup's KV updated_at is strictly newer than
+                // the local KV updated_at. No meta on either side → legacy
+                // fill-absent behavior (the branch below).
+                final backupTs = localMeta[key];
+                final localTs = _localUpdatedAtFor(key);
+                if (backupTs != null && localTs != null && backupTs > localTs) {
+                  await prefs.restoreSingle(key, newValue);
+                }
               } else if (!existing.containsKey(key)) {
                 // For non-mergeable keys, only add if not existing
                 await prefs.restoreSingle(key, newValue);
@@ -1974,207 +2496,220 @@ class DataSync {
 
       // Restore chats
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
-      if (cfg.includeChats && await chatsFile.exists()) {
-        try {
-          final obj =
-              jsonDecode(await chatsFile.readAsString())
-                  as Map<String, dynamic>;
-          final convs =
-              (obj['conversations'] as List?)
-                  ?.map(
-                    (e) => Conversation.fromJson(
-                      (e as Map).cast<String, dynamic>(),
-                    ),
-                  )
-                  .toList() ??
-              const <Conversation>[];
-          final msgs =
-              (obj['messages'] as List?)
-                  ?.map(
-                    (e) => ChatMessage.fromJson(
-                      (e as Map).cast<String, dynamic>(),
-                    ),
-                  )
-                  .toList() ??
-              const <ChatMessage>[];
-          final toolEvents =
-              ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map(
-                (k, v) => MapEntry(
-                  k.toString(),
-                  (v as List)
-                      .cast<Map>()
-                      .map((e) => e.cast<String, dynamic>())
-                      .toList(),
-                ),
-              );
-          final geminiThoughtSigs =
-              ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{})
-                  .map((k, v) => MapEntry(k.toString(), v.toString()));
-
-          if (mode == RestoreMode.overwrite) {
-            await chatService.clearAllData();
-            final byConv = <String, List<ChatMessage>>{};
-            for (final m in msgs) {
-              (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
-            }
-            await chatService.restoreConversationsBatch(
-              conversations: convs,
-              messagesByConversation: byConv,
-              toolEventsByMessageId: toolEvents,
-              geminiSignaturesByMessageId: geminiThoughtSigs,
-            );
-          } else {
-            // Merge mode: Add only non-existing conversations and messages
-            onProgress?.call(
-              const RestoreProgress(stage: RestoreStage.mergingChats),
-            );
-            final existingConvs = chatService.getAllCompleteConversations();
-            final existingConvIds = existingConvs.map((c) => c.id).toSet();
-
-            // Create a map of message IDs to avoid duplicates
-            final existingMsgIds = <String>{};
-            for (final conv in existingConvs) {
-              final messages = chatService.getMessages(conv.id);
-              existingMsgIds.addAll(messages.map((m) => m.id));
-            }
-
-            // Group messages by conversation
-            final byConv = <String, List<ChatMessage>>{};
-            for (final m in msgs) {
-              if (!existingMsgIds.contains(m.id)) {
-                (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
-              }
-            }
-
-            // Batch-write new conversations; per-message for existing ones
-            final batchConvs = <Conversation>[];
-            final batchMsgs = <String, List<ChatMessage>>{};
-            final batchToolEvents = <String, List<Map<String, dynamic>>>{};
-            final batchGeminiSigs = <String, String>{};
-            var mergedConvs = 0;
-            final totalConvs = convs.length;
-            for (final c in convs) {
-              if (!existingConvIds.contains(c.id)) {
-                batchConvs.add(c);
-                final list = byConv[c.id] ?? const <ChatMessage>[];
-                batchMsgs[c.id] = list;
-                for (final msg in list) {
-                  if (toolEvents.containsKey(msg.id)) {
-                    batchToolEvents[msg.id] = toolEvents[msg.id]!;
-                  }
-                  if (geminiThoughtSigs.containsKey(msg.id)) {
-                    batchGeminiSigs[msg.id] = geminiThoughtSigs[msg.id]!;
-                  }
-                }
-              } else if (byConv.containsKey(c.id)) {
-                final newMessages = byConv[c.id]!;
-                for (final msg in newMessages) {
-                  await chatService.addMessageDirectly(c.id, msg);
-                }
-              }
-              mergedConvs++;
-              if (totalConvs > 0) {
-                onProgress?.call(
-                  RestoreProgress(
-                    stage: RestoreStage.mergingChats,
-                    fraction: mergedConvs / totalConvs,
-                    conversationsMerged: mergedConvs,
-                    conversationsTotal: totalConvs,
+      if (cfg.includeChats &&
+          (await chatsFile.exists() || await chatsMetaFile.exists())) {
+        if (isJsonlFormat) {
+          await _restoreChatsFromJsonl(
+            extractDir: extractDir,
+            chatsMeta: chatsMeta,
+            mode: mode,
+            onProgress: onProgress,
+          );
+        } else {
+          try {
+            final obj =
+                jsonDecode(await chatsFile.readAsString())
+                    as Map<String, dynamic>;
+            final convs =
+                (obj['conversations'] as List?)
+                    ?.map(
+                      (e) => Conversation.fromJson(
+                        (e as Map).cast<String, dynamic>(),
+                      ),
+                    )
+                    .toList() ??
+                const <Conversation>[];
+            final msgs =
+                (obj['messages'] as List?)
+                    ?.map(
+                      (e) => ChatMessage.fromJson(
+                        (e as Map).cast<String, dynamic>(),
+                      ),
+                    )
+                    .toList() ??
+                const <ChatMessage>[];
+            final toolEvents =
+                ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map(
+                  (k, v) => MapEntry(
+                    k.toString(),
+                    (v as List)
+                        .cast<Map>()
+                        .map((e) => e.cast<String, dynamic>())
+                        .toList(),
                   ),
                 );
-              }
-            }
+            final geminiThoughtSigs =
+                ((obj['geminiThoughtSigs'] as Map?) ??
+                        const <String, dynamic>{})
+                    .map((k, v) => MapEntry(k.toString(), v.toString()));
 
-            if (batchConvs.isNotEmpty) {
+            if (mode == RestoreMode.overwrite) {
+              await chatService.clearAllData();
+              final byConv = <String, List<ChatMessage>>{};
+              for (final m in msgs) {
+                (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
+              }
               await chatService.restoreConversationsBatch(
-                conversations: batchConvs,
-                messagesByConversation: batchMsgs,
-                toolEventsByMessageId: batchToolEvents,
-                geminiSignaturesByMessageId: batchGeminiSigs,
+                conversations: convs,
+                messagesByConversation: byConv,
+                toolEventsByMessageId: toolEvents,
+                geminiSignaturesByMessageId: geminiThoughtSigs,
               );
-            }
+            } else {
+              // Merge mode: Add only non-existing conversations and messages
+              onProgress?.call(
+                const RestoreProgress(stage: RestoreStage.mergingChats),
+              );
+              final existingConvs = chatService.getAllCompleteConversations();
+              final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
-            // Merge remaining tool events and signatures
-            // (entries belonging to batch-handled messages are safely skipped
-            //  since they already exist in DB)
-            for (final entry in toolEvents.entries) {
-              if (batchToolEvents.containsKey(entry.key)) continue;
-              final existing = chatService.getToolEvents(entry.key);
-              if (existing.isEmpty) {
-                try {
-                  await chatService.setToolEvents(entry.key, entry.value);
-                } catch (_) {}
+              // Create a map of message IDs to avoid duplicates
+              final existingMsgIds = <String>{};
+              for (final conv in existingConvs) {
+                final messages = chatService.getMessages(conv.id);
+                existingMsgIds.addAll(messages.map((m) => m.id));
+              }
+
+              // Group messages by conversation
+              final byConv = <String, List<ChatMessage>>{};
+              for (final m in msgs) {
+                if (!existingMsgIds.contains(m.id)) {
+                  (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
+                }
+              }
+
+              // Batch-write new conversations; per-message for existing ones
+              final batchConvs = <Conversation>[];
+              final batchMsgs = <String, List<ChatMessage>>{};
+              final batchToolEvents = <String, List<Map<String, dynamic>>>{};
+              final batchGeminiSigs = <String, String>{};
+              var mergedConvs = 0;
+              final totalConvs = convs.length;
+              for (final c in convs) {
+                if (!existingConvIds.contains(c.id)) {
+                  batchConvs.add(c);
+                  final list = byConv[c.id] ?? const <ChatMessage>[];
+                  batchMsgs[c.id] = list;
+                  for (final msg in list) {
+                    if (toolEvents.containsKey(msg.id)) {
+                      batchToolEvents[msg.id] = toolEvents[msg.id]!;
+                    }
+                    if (geminiThoughtSigs.containsKey(msg.id)) {
+                      batchGeminiSigs[msg.id] = geminiThoughtSigs[msg.id]!;
+                    }
+                  }
+                } else if (byConv.containsKey(c.id)) {
+                  final newMessages = byConv[c.id]!;
+                  for (final msg in newMessages) {
+                    await chatService.addMessageDirectly(c.id, msg);
+                  }
+                }
+                mergedConvs++;
+                if (totalConvs > 0) {
+                  onProgress?.call(
+                    RestoreProgress(
+                      stage: RestoreStage.mergingChats,
+                      fraction: mergedConvs / totalConvs,
+                      conversationsMerged: mergedConvs,
+                      conversationsTotal: totalConvs,
+                    ),
+                  );
+                }
+              }
+
+              if (batchConvs.isNotEmpty) {
+                await chatService.restoreConversationsBatch(
+                  conversations: batchConvs,
+                  messagesByConversation: batchMsgs,
+                  toolEventsByMessageId: batchToolEvents,
+                  geminiSignaturesByMessageId: batchGeminiSigs,
+                );
+              }
+
+              // Merge remaining tool events and signatures
+              // (entries belonging to batch-handled messages are safely skipped
+              //  since they already exist in DB)
+              for (final entry in toolEvents.entries) {
+                if (batchToolEvents.containsKey(entry.key)) continue;
+                final existing = chatService.getToolEvents(entry.key);
+                if (existing.isEmpty) {
+                  try {
+                    await chatService.setToolEvents(entry.key, entry.value);
+                  } catch (_) {}
+                }
+              }
+              for (final entry in geminiThoughtSigs.entries) {
+                if (batchGeminiSigs.containsKey(entry.key)) continue;
+                final existingSig = chatService.getGeminiThoughtSignature(
+                  entry.key,
+                );
+                if (existingSig == null || existingSig.isEmpty) {
+                  try {
+                    await chatService.setGeminiThoughtSignature(
+                      entry.key,
+                      entry.value,
+                    );
+                  } catch (_) {}
+                }
               }
             }
-            for (final entry in geminiThoughtSigs.entries) {
-              if (batchGeminiSigs.containsKey(entry.key)) continue;
-              final existingSig = chatService.getGeminiThoughtSignature(
-                entry.key,
-              );
-              if (existingSig == null || existingSig.isEmpty) {
+
+            // Restore group chat metadata. The groupChats/groupMembers keys are
+            // present on both v1 and v2 exports and are always restored when
+            // non-empty.
+            final groupChatsRaw = obj['groupChats'] as List? ?? const [];
+            final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
+            if (groupChatsRaw.isNotEmpty) {
+              final existingGroupIds = mode == RestoreMode.merge
+                  ? (await chatService.repo.getAllGroupChats())
+                        .map((g) => g.id)
+                        .toSet()
+                  : <String>{};
+              for (final raw in groupChatsRaw) {
                 try {
-                  await chatService.setGeminiThoughtSignature(
+                  final g = GroupChat.fromJson(
+                    (raw as Map).cast<String, dynamic>(),
+                  );
+                  if (mode == RestoreMode.merge &&
+                      existingGroupIds.contains(g.id)) {
+                    continue;
+                  }
+                  await chatService.repo.putGroupChat(g);
+                } catch (e) {
+                  debugPrint('restoreData: groupChat row: $e');
+                }
+              }
+              final membersByGroup = <String, List<GroupChatMember>>{};
+              for (final raw in groupMembersRaw) {
+                try {
+                  final m = GroupChatMember.fromJson(
+                    (raw as Map).cast<String, dynamic>(),
+                  );
+                  (membersByGroup[m.groupChatId] ??= []).add(m);
+                } catch (e) {
+                  debugPrint('restoreData: groupMembers parse: $e');
+                }
+              }
+              for (final entry in membersByGroup.entries) {
+                if (mode == RestoreMode.merge &&
+                    existingGroupIds.contains(entry.key)) {
+                  continue;
+                }
+                try {
+                  await chatService.repo.putGroupMembers(
                     entry.key,
                     entry.value,
                   );
-                } catch (_) {}
-              }
-            }
-          }
-
-          // Restore group chat metadata. The groupChats/groupMembers keys are
-          // present on both v1 and v2 exports and are always restored when
-          // non-empty.
-          final groupChatsRaw = obj['groupChats'] as List? ?? const [];
-          final groupMembersRaw = obj['groupMembers'] as List? ?? const [];
-          if (groupChatsRaw.isNotEmpty) {
-            final existingGroupIds = mode == RestoreMode.merge
-                ? (await chatService.repo.getAllGroupChats())
-                      .map((g) => g.id)
-                      .toSet()
-                : <String>{};
-            for (final raw in groupChatsRaw) {
-              try {
-                final g = GroupChat.fromJson(
-                  (raw as Map).cast<String, dynamic>(),
-                );
-                if (mode == RestoreMode.merge &&
-                    existingGroupIds.contains(g.id)) {
-                  continue;
+                } catch (e) {
+                  debugPrint('restoreData: groupMembers: $e');
                 }
-                await chatService.repo.putGroupChat(g);
-              } catch (e) {
-                debugPrint('restoreData: groupChat row: $e');
               }
             }
-            final membersByGroup = <String, List<GroupChatMember>>{};
-            for (final raw in groupMembersRaw) {
-              try {
-                final m = GroupChatMember.fromJson(
-                  (raw as Map).cast<String, dynamic>(),
-                );
-                (membersByGroup[m.groupChatId] ??= []).add(m);
-              } catch (e) {
-                debugPrint('restoreData: groupMembers parse: $e');
-              }
-            }
-            for (final entry in membersByGroup.entries) {
-              if (mode == RestoreMode.merge &&
-                  existingGroupIds.contains(entry.key)) {
-                continue;
-              }
-              try {
-                await chatService.repo.putGroupMembers(entry.key, entry.value);
-              } catch (e) {
-                debugPrint('restoreData: groupMembers: $e');
-              }
-            }
+          } catch (e, st) {
+            debugPrint('restoreData: chats restore failed: $e\n$st');
           }
-        } catch (e, st) {
-          debugPrint('restoreData: chats restore failed: $e\n$st');
         }
       }
-
       // Restore assistants to SQLite. Runs AFTER clearAllData + chats but
       // BEFORE the fallible file/skill copying below, so a mid-restore file
       // failure can never leave the assistant table wiped-but-empty (issue
@@ -3404,52 +3939,44 @@ class _StreamingZipWrittenFile {
   final int uncompressedSize;
 }
 
-// ===== SharedPreferences async snapshot/restore helpers =====
+// ===== Business preferences snapshot/restore helpers =====
+
+/// Async snapshot/restore over the business-preferences facade (issue #123).
+///
+/// Storage is the SQLite KV table behind [BusinessPreferences]; the legacy
+/// `_localOnlyKeys` set is superseded by [BusinessKeyRegistry.localOnlyKeys]
+/// (device-bound keys never enter the facade and therefore never appear in
+/// backups). The interface is unchanged so restore-merge logic in this file
+/// keeps operating on key↔value maps.
 class SharedPreferencesAsync {
-  SharedPreferencesAsync._();
-  static SharedPreferencesAsync? _inst;
-  // Local-only UI state stays on device and is excluded from backups/restores.
-  static const _localOnlyKeys = {
-    'window_width_v1',
-    'window_height_v1',
-    'window_pos_x_v1',
-    'window_pos_y_v1',
-    'window_maximized_v1',
-    'display_chat_font_scale_v1',
-    'experimental_webview_rendering_v1',
-    'desktop_hotkeys_commands_v1',
-    'desktop_hotkeys_enabled_v1',
-    'codex_oauth_v1',
-    'grok_oauth_v1',
-    // Chat input draft is transient per-device UI state — restoring a backup
-    // on another device must never resurrect a stale unsent draft.
-    chatInputDraftPrefsKey,
-  };
+  SharedPreferencesAsync(this._preferences);
 
-  static Future<SharedPreferencesAsync> get instance async {
-    _inst ??= SharedPreferencesAsync._();
-    return _inst!;
-  }
+  final BusinessPreferences _preferences;
 
+  /// All business keys currently in the facade cache.
   Future<Map<String, dynamic>> snapshot() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-    final map = <String, dynamic>{};
-    for (final k in keys) {
-      if (_localOnlyKeys.contains(k)) continue;
-      map[k] = prefs.get(k);
-    }
-    return map;
+    final prefs = _preferences;
+    return {
+      for (final key in prefs.getKeys())
+        if (prefs.containsKey(key)) key: prefs.get(key),
+    };
   }
 
   /// Writes a single pref, normalizing int values for double-typed keys:
   /// kelivo-helper-migrated RikkaHub backups may carry them as int, and
-  /// storing them as int makes `getDouble` reads throw.
+  /// storing them as int makes `getDouble` reads throw. Device-bound keys
+  /// (localOnly) are skipped — they never leave/enter a device via backup.
   Future<void> _writePref(
-    SharedPreferences prefs,
+    BusinessPreferences prefs,
     String key,
     dynamic value,
   ) async {
+    final disposition = BusinessKeyRegistry.classify(key);
+    if (disposition == BusinessKeyDisposition.localOnly ||
+        disposition == BusinessKeyDisposition.discarded ||
+        disposition == BusinessKeyDisposition.entity) {
+      return;
+    }
     if (value is bool) {
       await prefs.setBool(key, value);
     } else if (value is int) {
@@ -3468,17 +3995,14 @@ class SharedPreferencesAsync {
   }
 
   Future<void> restore(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     for (final entry in data.entries) {
-      final k = entry.key;
-      if (_localOnlyKeys.contains(k)) continue;
-      await _writePref(prefs, k, entry.value);
+      await _writePref(prefs, entry.key, entry.value);
     }
   }
 
   Future<void> restoreSingle(String key, dynamic value) async {
-    if (_localOnlyKeys.contains(key)) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _writePref(prefs, key, value);
   }
 }

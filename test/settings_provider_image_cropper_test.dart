@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider image cropper toggle', () {
     test('defaults to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -23,10 +24,10 @@ void main() {
     });
 
     test('loads persisted enabled value', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'image_cropper_enabled_v1': true,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -34,14 +35,14 @@ void main() {
     });
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setImageCropperEnabled(true);
 
       expect(settings.imageCropperEnabled, isTrue);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getBool('image_cropper_enabled_v1'), isTrue);
     });
   });

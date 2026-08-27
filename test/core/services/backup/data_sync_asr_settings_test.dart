@@ -7,13 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/backup.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/asr/asr_service_options.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
@@ -40,6 +42,7 @@ void main() {
     late Directory root;
 
     setUp(() async {
+      businessPrefs = BusinessPreferences.memoryForTests();
       root = await Directory.systemTemp.createTemp('cuplivo_asr_sync_test_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
     });
@@ -53,7 +56,7 @@ void main() {
     test(
       'export strips device-bound ASR and keeps cloud services only',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'asr_services_v1': jsonEncode([
             {'id': 'system-asr', 'kind': 'system', 'localeId': 'zh_CN'},
             {
@@ -70,7 +73,10 @@ void main() {
           'asr_selected_service_id_v1': 'local-asr',
         });
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -92,7 +98,7 @@ void main() {
     );
 
     test('export keeps the selected id when a cloud service remains', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'asr_services_v1': jsonEncode([
           {'id': 'local-asr', 'kind': 'sherpa_onnx', 'modelDirectory': '/m'},
           {'id': 'cloud-asr', 'kind': 'step'},
@@ -100,7 +106,10 @@ void main() {
         'asr_selected_service_id_v1': 'cloud-asr',
       });
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: false),
       );
@@ -124,7 +133,7 @@ void main() {
     test(
       'merge restore deduplicates ASR services by id, preferring existing',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'asr_services_v1': jsonEncode([
             {
               'id': 'cloud-asr',
@@ -155,14 +164,17 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.close();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
           mode: RestoreMode.merge,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final merged = jsonDecode(prefs.getString('asr_services_v1')!) as List;
         expect(merged.map((entry) => (entry as Map)['id']), [
           'cloud-asr',
@@ -178,7 +190,7 @@ void main() {
     test(
       'ASR is opt-in and persists services with a stable selection',
       () async {
-        SharedPreferences.setMockInitialValues(const {});
+        businessPrefs = BusinessPreferences.memoryForTests(const {});
         final settings = await _newSettings();
 
         expect(settings.asrServices, isEmpty);
@@ -207,7 +219,7 @@ void main() {
     test(
       'removing the selected ASR falls back to the first remaining service',
       () async {
-        SharedPreferences.setMockInitialValues(const {});
+        businessPrefs = BusinessPreferences.memoryForTests(const {});
         final settings = await _newSettings();
         final first = SystemAsrOptions(id: 'first');
         final second = MimoAsrOptions(id: 'second', apiKey: 'test-key');
@@ -222,7 +234,7 @@ void main() {
     );
 
     test('copyWith carries the ASR snapshot without another load', () async {
-      SharedPreferences.setMockInitialValues(const {});
+      businessPrefs = BusinessPreferences.memoryForTests(const {});
       final settings = await _newSettings();
 
       await settings.setAsrServices(<AsrServiceOptions>[
@@ -238,7 +250,7 @@ void main() {
     test(
       'malformed service rows are skipped while valid ones survive',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'asr_services_v1': jsonEncode([
             {'id': 'valid', 'kind': 'step'},
             'not-a-map',
@@ -256,9 +268,7 @@ void main() {
 }
 
 Future<SettingsProvider> _newSettings() async {
-  final settings = SettingsProvider();
-  for (var i = 0; i < 128; i++) {
-    await Future<void>.value();
-  }
+  final settings = SettingsProvider(preferences: businessPrefs);
+  await settings.loaded;
   return settings;
 }

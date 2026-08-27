@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/mcp_provider.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 McpServerConfig _server(String id, String name) => McpServerConfig(
   id: id,
@@ -35,7 +37,7 @@ McpServerConfig _retiredSubagentServer() => McpServerConfig(
 );
 
 Future<Set<String>> _persistedServerIds() async {
-  final prefs = await SharedPreferences.getInstance();
+  final prefs = businessPrefs;
   final raw = prefs.getString('mcp_servers_v1');
   if (raw == null || raw.isEmpty) return <String>{};
   final list = jsonDecode(raw) as List;
@@ -53,7 +55,7 @@ void main() {
         toolPrefix: 'safe_',
         tools: [McpToolConfig(enabled: false, name: 'remote_tool')],
       );
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mcp_servers_v1': jsonEncode([
           _retiredFetchServer().toJson(),
           _retiredFilesystemServer().toJson(),
@@ -63,6 +65,7 @@ void main() {
       });
 
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
       );
       await pumpEventQueue();
@@ -94,15 +97,16 @@ void main() {
   test(
     'backup reload removes and persists the retired fetch, filesystem and subagent servers',
     () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mcp_servers_v1': jsonEncode([_server('before', 'Before').toJson()]),
       });
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
       );
       await pumpEventQueue();
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       await prefs.setString(
         'mcp_servers_v1',
         jsonEncode([
@@ -130,8 +134,9 @@ void main() {
   test(
     'all supported MCP JSON shapes discard only retired fetch, filesystem and subagent',
     () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
       );
       await pumpEventQueue();
@@ -196,8 +201,9 @@ void main() {
   );
 
   test('unknown in-memory JSON does not become a fetch server', () async {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
     final provider = McpProvider(
+      preferences: businessPrefs,
       contextProvider: () => throw UnimplementedError(),
     );
     await pumpEventQueue();
@@ -230,12 +236,13 @@ void main() {
   test(
     'reloadFromPrefs rebuilds the server list and timeout from SharedPreferences',
     () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mcp_servers_v1': jsonEncode([_server('srv-a', 'Server A').toJson()]),
         'mcp_request_timeout_ms_v1': 15000,
       });
 
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
       );
       await pumpEventQueue();
@@ -246,10 +253,11 @@ void main() {
       // Simulate a restore that rewrote the prefs (e.g. overwrite restore of
       // mcp_servers_v1). The in-memory list must follow disk, not keep the
       // pre-restore servers.
-      SharedPreferences.setMockInitialValues({
-        'mcp_servers_v1': jsonEncode([_server('srv-b', 'Server B').toJson()]),
-        'mcp_request_timeout_ms_v1': 42000,
-      });
+      await businessPrefs.setString(
+        'mcp_servers_v1',
+        jsonEncode([_server('srv-b', 'Server B').toJson()]),
+      );
+      await businessPrefs.setInt('mcp_request_timeout_ms_v1', 42000);
       await provider.reloadFromPrefs();
 
       final ids = provider.servers.map((s) => s.id).toList();
@@ -269,10 +277,11 @@ void main() {
     'refreshTools after disconnect never writes stale servers back to prefs',
     () async {
       // Start with the pre-restore list.
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mcp_servers_v1': jsonEncode([_server('srv-a', 'Server A').toJson()]),
       });
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
       );
       await pumpEventQueue();
@@ -281,7 +290,7 @@ void main() {
       // Restore rewrote prefs to the new list; the old client is disconnected
       // before the in-memory state is rebuilt. A tool refresh fired from the
       // old client (assistant-change listener) must not persist the old list.
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mcp_servers_v1': jsonEncode([_server('srv-b', 'Server B').toJson()]),
       });
       await provider.disconnect('ghost-server');
@@ -297,16 +306,17 @@ void main() {
   );
 
   test('refreshTools after reload keeps the restored list in prefs', () async {
-    SharedPreferences.setMockInitialValues({
+    businessPrefs = BusinessPreferences.memoryForTests({
       'mcp_servers_v1': jsonEncode([_server('srv-a', 'Server A').toJson()]),
     });
     final provider = McpProvider(
+      preferences: businessPrefs,
       contextProvider: () => throw UnimplementedError(),
     );
     await pumpEventQueue();
 
     // Restore rewrote prefs; reload rebuilds memory + connections.
-    SharedPreferences.setMockInitialValues({
+    businessPrefs = BusinessPreferences.memoryForTests({
       'mcp_servers_v1': jsonEncode([_server('srv-b', 'Server B').toJson()]),
     });
     await provider.reloadFromPrefs();

@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../database/business_preferences.dart';
+
 /// Pref keys that must always be persisted as `double`.
 ///
 /// Mirrors kelivo-helper's `DOUBLE_KEYS`: a RikkaHub backup migrated by
@@ -21,5 +23,17 @@ const List<String> doublePrefKeys = <String>[
 double prefDouble(SharedPreferences prefs, String key, double fallback) {
   final v = prefs.get(key);
   if (v is num) return v.toDouble();
+  return fallback;
+}
+
+/// Same tolerant read over the business facade (SQLite KV, no int/double
+/// platform coercion — `getDouble` already coerces int storage).
+double businessPrefDouble(
+  BusinessPreferences prefs,
+  String key,
+  double fallback,
+) {
+  final v = prefs.getDouble(key);
+  if (v != null) return v;
   return fallback;
 }

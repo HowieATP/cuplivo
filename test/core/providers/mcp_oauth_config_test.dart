@@ -4,10 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/mcp_provider.dart';
 import 'package:Cuplivo/core/services/oauth/oauth_flow_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 McpOAuthConfig _fullOAuth() => const McpOAuthConfig(
   authorizationEndpoint: 'https://auth.example.com/authorize',
@@ -153,6 +155,7 @@ void main() {
     late MockClient tokenServer;
 
     setUp(() {
+      businessPrefs = BusinessPreferences.memoryForTests();
       tokenServer = MockClient((request) async {
         if (request.url.toString().contains('/token')) {
           return http.Response(
@@ -171,12 +174,13 @@ void main() {
     });
 
     McpProvider buildProvider() => McpProvider(
+      preferences: businessPrefs,
       contextProvider: () => throw UnimplementedError(),
       oauthFlowService: OAuthFlowService(clientFactory: () => tokenServer),
     );
 
     test('beginOAuthFlow throws StateError without OAuth config', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = buildProvider();
       final id = await provider.addServer(
         enabled: false,
@@ -193,7 +197,7 @@ void main() {
 
     test('beginOAuthFlow with configOverride starts from the form config '
         'and persists discovered values onto a server without OAuth', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final discoveryServer = MockClient((request) async {
         final path = request.url.path;
         if (path == '/.well-known/oauth-authorization-server') {
@@ -218,6 +222,7 @@ void main() {
         return http.Response('not found', 404);
       });
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
         oauthFlowService: OAuthFlowService(
           clientFactory: () => discoveryServer,
@@ -259,7 +264,7 @@ void main() {
     });
 
     test('beginOAuthFlow returns an authorize URL with client_id', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = buildProvider();
       final id = await provider.addServer(
         enabled: false,
@@ -277,7 +282,7 @@ void main() {
     test(
       'completeOAuthFlow persists the token into the server config',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         final provider = buildProvider();
         final id = await provider.addServer(
           enabled: false,
@@ -299,14 +304,14 @@ void main() {
         expect(updated.oauthToken?.refreshToken, 'rt-1');
 
         // Persisted to SharedPreferences as well.
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final raw = prefs.getString('mcp_servers_v1');
         expect(raw, contains('oauthToken'));
       },
     );
 
     test('clearOAuthToken removes the persisted token', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = buildProvider();
       final id = await provider.addServer(
         enabled: false,
@@ -329,7 +334,7 @@ void main() {
 
     test('enabled server with OAuth but no token does NOT auto-connect '
         '(avoids stale "no token yet" error state)', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = buildProvider();
       final id = await provider.addServer(
         enabled: true,
@@ -346,7 +351,7 @@ void main() {
 
     test('legacy auto-registered client (version 1) is re-registered on the '
         'next flow and the version is bumped', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final fullServer = MockClient((request) async {
         final path = request.url.path;
         if (path == '/.well-known/oauth-authorization-server') {
@@ -378,6 +383,7 @@ void main() {
         return http.Response('not found', 404);
       });
       final provider = McpProvider(
+        preferences: businessPrefs,
         contextProvider: () => throw UnimplementedError(),
         oauthFlowService: OAuthFlowService(clientFactory: () => fullServer),
       );

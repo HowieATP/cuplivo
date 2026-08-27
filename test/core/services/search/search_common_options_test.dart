@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/search/search_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   test('legacy search common JSON enables fallback fetch by default', () {
     final options = SearchCommonOptions.fromJson({
       'resultSize': 7,
@@ -35,10 +36,10 @@ void main() {
   });
 
   test('SettingsProvider persists an explicitly disabled fallback', () async {
-    SharedPreferences.setMockInitialValues({
+    businessPrefs = BusinessPreferences.memoryForTests({
       'search_common_v1': jsonEncode({'resultSize': 3, 'timeout': 4000}),
     });
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await pumpEventQueue();
     expect(
       settings.searchCommonOptions.enableFetchForUnsupportedProviders,
@@ -50,7 +51,7 @@ void main() {
         enableFetchForUnsupportedProviders: false,
       ),
     );
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     final persisted = SearchCommonOptions.fromJson(
       jsonDecode(prefs.getString('search_common_v1')!) as Map<String, dynamic>,
     );

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider chat suggestions', () {
     test('defaults suggestion model to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -29,8 +30,8 @@ void main() {
     });
 
     test('persists selected suggestion model and prompt', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setSuggestionModel('OpenAI', 'gpt-test');
@@ -41,7 +42,7 @@ void main() {
       expect(settings.suggestionModelKey, 'OpenAI::gpt-test');
       expect(settings.suggestionPrompt, 'Custom {content} {locale}');
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('suggestion_model_v1'), 'OpenAI::gpt-test');
       expect(
         prefs.getString('suggestion_prompt_v1'),
@@ -50,8 +51,8 @@ void main() {
     });
 
     test('defaults suggestion tap to auto-send', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -59,10 +60,10 @@ void main() {
     });
 
     test('loads and persists insert-only suggestion tap mode', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'suggestion_insert_on_tap_only_v1': true,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -71,24 +72,24 @@ void main() {
       await settings.setInsertSuggestionOnTapOnly(false);
 
       expect(settings.insertSuggestionOnTapOnly, isFalse);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getBool('suggestion_insert_on_tap_only_v1'), isFalse);
     });
 
     test(
       'clears suggestion model when provider selection is cleared',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'suggestion_model_v1': 'OpenAI::gpt-test',
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
         await settings.clearSelectionsForProvider('OpenAI');
 
         expect(settings.suggestionModelProvider, isNull);
         expect(settings.suggestionModelId, isNull);
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getString('suggestion_model_v1'), isNull);
       },
     );

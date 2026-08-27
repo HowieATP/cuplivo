@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
@@ -70,6 +70,7 @@ class _FakeChatService extends ChatService {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('lanSyncFindProxy', () {
@@ -157,6 +158,7 @@ void main() {
     late SyncPlan emptyPlan;
 
     setUp(() async {
+      businessPrefs = BusinessPreferences.memoryForTests();
       // getMessageIdsSync reads a separate raw-sqlite sync connection, which
       // only exists for file-based repos after ensureReady().
       tempDir = await Directory.systemTemp.createTemp('cuplivo_lan_sync_test');
@@ -171,7 +173,7 @@ void main() {
       repo = ChatDatabaseRepository.open(file: dbFile);
       await repo.ensureReady();
       chatService = _FakeChatService(repo);
-      dataSync = DataSync(chatService: chatService);
+      dataSync = DataSync(preferences: businessPrefs, chatService: chatService);
       emptyPlan = SyncPlan(
         conversations: const [],
         missingAssistantIds: const [],
@@ -397,7 +399,7 @@ void main() {
       'exchange zip includes settings.json so settings/assistants sync',
       () async {
         // Full DataSync export path needs prefs + path provider fakes.
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
 
         final conversation = Conversation(id: 'c1', title: 'Chat 1');
@@ -459,7 +461,7 @@ void main() {
         final archive = ZipDecoder().decodeBytes(zipBytes!);
         try {
           expect(archive.findFile('settings.json'), isNotNull);
-          expect(archive.findFile('chats.json'), isNotNull);
+          expect(archive.findFile('chats_meta.json'), isNotNull);
         } finally {
           archive.clearSync();
         }
@@ -519,7 +521,7 @@ void main() {
     test(
       'modern peer: exchange packs exactly the file delta plus sync_manifest.json',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         // setUp already installed the fake path provider rooted at
         // tempDir/support — drop files under its sync trees.
         final support = Directory('${tempDir.path}/support');
@@ -618,7 +620,7 @@ void main() {
     test(
       'per-conversation since exports only that conversation\u2019s increments',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         final conversation = Conversation(id: 'c1', title: 'Chat 1');
         await repo.putConversation(conversation);
         // Pre-fork history (before this conversation's fork point) and the
@@ -715,12 +717,9 @@ void main() {
         final parts = parseMultipartBytes(captured.bodyBytes, boundary);
         final archive = ZipDecoder().decodeBytes(parts['zip']!);
         try {
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-          final chats =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                  as Map<String, dynamic>;
-          final messages = (chats['messages'] as List).cast<Map>();
+          final chatsMetaEntry = archive.findFile('chats_meta.json');
+          expect(chatsMetaEntry, isNotNull);
+          final messages = _readJsonlMessages(archive, 'messages.jsonl');
           // Only the post-fork increment is exported; pre-fork m_old is not.
           expect(messages, hasLength(1));
           expect(messages.single['id'], 'm_new');
@@ -731,7 +730,7 @@ void main() {
     );
 
     test('one-sided conversations export their whole transcript', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final conversation = Conversation(id: 'c1', title: 'Chat 1');
       await repo.putConversation(conversation);
       await repo.putMessage(
@@ -786,13 +785,10 @@ void main() {
       final parts = parseMultipartBytes(captured.bodyBytes, boundary);
       final archive = ZipDecoder().decodeBytes(parts['zip']!);
       try {
-        final chatsEntry = archive.findFile('chats.json');
-        expect(chatsEntry, isNotNull);
-        final chats =
-            jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                as Map<String, dynamic>;
+        final chatsMetaEntry = archive.findFile('chats_meta.json');
+        expect(chatsMetaEntry, isNotNull);
         // Null per-conversation since → the whole (ancient) transcript rides.
-        final messages = (chats['messages'] as List).cast<Map>();
+        final messages = _readJsonlMessages(archive, 'messages.jsonl');
         expect(messages, hasLength(1));
         expect(messages.single['id'], 'm1');
       } finally {
@@ -803,7 +799,7 @@ void main() {
     test(
       'old peer: client falls back to the global since for the chat export',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         final conversation = Conversation(
           id: 'c1',
           title: 'Chat 1',
@@ -882,15 +878,12 @@ void main() {
         final parts = parseMultipartBytes(captured.bodyBytes, boundary);
         final archive = ZipDecoder().decodeBytes(parts['zip']!);
         try {
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-          final chats =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                  as Map<String, dynamic>;
+          final chatsMetaEntry = archive.findFile('chats_meta.json');
+          expect(chatsMetaEntry, isNotNull);
           // Global-since window: only the post-since increment rides; the
           // pre-since history is not re-sent (a full transcript would include
           // m_old and indicate per-conversation mode leaked in).
-          final messages = (chats['messages'] as List).cast<Map>();
+          final messages = _readJsonlMessages(archive, 'messages.jsonl');
           expect(messages, hasLength(1));
           expect(messages.single['id'], 'm_new');
         } finally {
@@ -899,4 +892,20 @@ void main() {
       },
     );
   });
+}
+
+/// Decodes the JSONL messages table (backup v2 format) into a list of
+/// message payload maps.
+List<Map> _readJsonlMessages(Archive archive, String table) {
+  final entry = archive.findFile(table);
+  expect(entry, isNotNull);
+  final output = <Map>[];
+  for (final raw in utf8.decode(entry!.readBytes() ?? <int>[]).split('\n')) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) continue;
+    final obj = jsonDecode(trimmed) as Map<String, dynamic>;
+    final message = obj['message'];
+    if (message != null) output.add(message as Map);
+  }
+  return output;
 }

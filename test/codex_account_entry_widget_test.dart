@@ -14,6 +14,9 @@ import 'package:Cuplivo/l10n/app_localizations_en.dart';
 import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
 import 'package:Cuplivo/shared/widgets/codex_device_code_flow.dart';
 import 'package:Cuplivo/shared/widgets/snackbar.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 final AppLocalizations _l10n = AppLocalizationsEn();
 
@@ -87,6 +90,7 @@ class _ScriptedFlowClient extends http.BaseClient {
 /// retry until the test releases it. This makes duplicate retry taps
 /// observable while the first retry is still in flight.
 class _RetryGatedSettingsProvider extends SettingsProvider {
+  _RetryGatedSettingsProvider({required super.preferences});
   int calls = 0;
   final Completer<void> retryGate = Completer<void>();
 
@@ -132,6 +136,7 @@ Widget _harness(
 }) {
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<CodexDeviceCodeController>.value(
         value: controller,
       ),
@@ -154,6 +159,7 @@ void main() {
   late CodexDeviceCodeController controller;
 
   setUp(() {
+    businessPrefs = BusinessPreferences.memoryForTests();
     SharedPreferences.setMockInitialValues(const {});
     controller = CodexDeviceCodeController();
     CodexDeviceCodeController.debugOverrideInstance(controller);
@@ -245,7 +251,7 @@ void main() {
               value: controller,
             ),
             ChangeNotifierProvider<SettingsProvider>(
-              create: (_) => SettingsProvider(),
+              create: (_) => SettingsProvider(preferences: businessPrefs),
             ),
           ],
           child: MaterialApp(
@@ -353,7 +359,7 @@ void main() {
     );
     CodexDeviceCodeController.debugOverrideInstance(hanging);
     addTearDown(hanging.resetForTest);
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     addTearDown(settings.dispose);
 
     await tester.pumpWidget(_harness(hanging, settings: settings));
@@ -407,7 +413,7 @@ void main() {
       );
       CodexDeviceCodeController.debugOverrideInstance(flowController);
       addTearDown(flowController.resetForTest);
-      final settings = _RetryGatedSettingsProvider();
+      final settings = _RetryGatedSettingsProvider(preferences: businessPrefs);
       addTearDown(settings.dispose);
 
       await tester.pumpWidget(

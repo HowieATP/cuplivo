@@ -11,14 +11,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import '../../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues(const {}));
+  setUp(() => businessPrefs = BusinessPreferences.memoryForTests(const {}));
 
   testWidgets('ASR add editor uses the voice-service component vocabulary', (
     tester,

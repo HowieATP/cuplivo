@@ -12,7 +12,9 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakeChatService extends ChatService {
   _FakeChatService(this.messages, this.conversation);
@@ -55,7 +57,8 @@ class _FakeGroupChatProvider extends GroupChatProvider {
 }
 
 class _FakeAssistantProvider extends AssistantProvider {
-  _FakeAssistantProvider(this.items) : super();
+  _FakeAssistantProvider(BusinessPreferences preferences, this.items)
+    : super(preferences: preferences);
 
   final List<Assistant> items;
 
@@ -64,7 +67,8 @@ class _FakeAssistantProvider extends AssistantProvider {
 }
 
 class _FakeUserProvider extends UserProvider {
-  _FakeUserProvider(this.value) : super();
+  _FakeUserProvider(BusinessPreferences preferences, this.value)
+    : super(preferences: preferences);
 
   final String value;
 
@@ -74,7 +78,8 @@ class _FakeUserProvider extends UserProvider {
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   testWidgets('cards start collapsed and reveal context and runtime details', (
@@ -126,6 +131,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          Provider<BusinessPreferences>.value(value: businessPrefs),
           ChangeNotifierProvider<ChatService>.value(value: chatService),
           ChangeNotifierProvider<GroupChatProvider>.value(
             value: _FakeGroupChatProvider(
@@ -136,10 +142,10 @@ void main() {
             ),
           ),
           ChangeNotifierProvider<AssistantProvider>.value(
-            value: _FakeAssistantProvider([assistant]),
+            value: _FakeAssistantProvider(businessPrefs, [assistant]),
           ),
           ChangeNotifierProvider<UserProvider>.value(
-            value: _FakeUserProvider('User'),
+            value: _FakeUserProvider(businessPrefs, 'User'),
           ),
         ],
         child: MaterialApp(

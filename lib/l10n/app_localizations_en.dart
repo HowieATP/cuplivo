@@ -2184,6 +2184,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExportToFile => 'Export to File';
 
   @override
+  String get backupPageExportKelivoCompatible => 'Export for Kelivo';
+
+  @override
   String get backupPageExportToFileSubtitle => 'Export app data to a file';
 
   @override

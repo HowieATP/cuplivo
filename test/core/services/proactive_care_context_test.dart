@@ -13,7 +13,9 @@ import 'package:Cuplivo/core/services/proactive_care_decision_tools.dart';
 import 'package:Cuplivo/core/services/proactive_care_message_flow.dart';
 import 'package:Cuplivo/core/services/world_book_store.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 ChatMessage message({
   required String id,
@@ -36,8 +38,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    await WorldBookStore.clear();
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests(<String, Object>{});
+    await WorldBookStore(businessPrefs).clear();
   });
 
   group('ProactiveCareMessageFlow context', () {
@@ -91,18 +94,20 @@ void main() {
           ),
         ];
 
-        final careHistory = ProactiveCareMessageFlow.buildHistory(
-          conversation: conversation,
-          messages: messages,
-          assistant: assistant,
-          applySendRegexes: true,
-        );
-        final decisionHistory = ProactiveCareMessageFlow.buildHistory(
-          conversation: conversation,
-          messages: messages,
-          assistant: assistant,
-          applySendRegexes: false,
-        );
+        final careHistory = ProactiveCareMessageFlow(preferences: businessPrefs)
+            .buildHistory(
+              conversation: conversation,
+              messages: messages,
+              assistant: assistant,
+              applySendRegexes: true,
+            );
+        final decisionHistory =
+            ProactiveCareMessageFlow(preferences: businessPrefs).buildHistory(
+              conversation: conversation,
+              messages: messages,
+              assistant: assistant,
+              applySendRegexes: false,
+            );
 
         expect(careHistory, [
           {'role': 'user', 'content': 'beta\n\n(Tue 26-08-18 09:07:05)'},
@@ -121,19 +126,20 @@ void main() {
       final assistant = Assistant(id: 'assistant-1', name: 'Assistant');
       final conversation = Conversation(id: 'conversation-1', title: 'Chat');
 
-      final history = ProactiveCareMessageFlow.buildHistory(
-        conversation: conversation,
-        messages: [
-          message(
-            id: 'user',
-            role: 'user',
-            content: 'hello',
-            timestamp: DateTime(2026, 8, 18),
-          ),
-        ],
-        assistant: assistant,
-        applySendRegexes: false,
-      );
+      final history = ProactiveCareMessageFlow(preferences: businessPrefs)
+          .buildHistory(
+            conversation: conversation,
+            messages: [
+              message(
+                id: 'user',
+                role: 'user',
+                content: 'hello',
+                timestamp: DateTime(2026, 8, 18),
+              ),
+            ],
+            assistant: assistant,
+            applySendRegexes: false,
+          );
 
       expect(history.single['content'], 'hello');
     });
@@ -155,21 +161,22 @@ void main() {
       );
       final conversation = Conversation(id: 'conversation-1', title: 'Chat');
 
-      final history = ProactiveCareMessageFlow.buildHistory(
-        conversation: conversation,
-        messages: [
-          message(
-            id: 'user',
-            role: 'user',
-            content:
-                'alpha [image:/tmp/alpha.png] '
-                '[file:/tmp/alpha.pdf|alpha.pdf|application/pdf] omega',
-            timestamp: DateTime(2026, 8, 18),
-          ),
-        ],
-        assistant: assistant,
-        applySendRegexes: true,
-      );
+      final history = ProactiveCareMessageFlow(preferences: businessPrefs)
+          .buildHistory(
+            conversation: conversation,
+            messages: [
+              message(
+                id: 'user',
+                role: 'user',
+                content:
+                    'alpha [image:/tmp/alpha.png] '
+                    '[file:/tmp/alpha.pdf|alpha.pdf|application/pdf] omega',
+                timestamp: DateTime(2026, 8, 18),
+              ),
+            ],
+            assistant: assistant,
+            applySendRegexes: true,
+          );
 
       expect(
         history.single['content'],
@@ -192,9 +199,9 @@ void main() {
             ),
           ],
         );
-        await WorldBookStore.save(const [worldBook]);
+        await WorldBookStore(businessPrefs).save(const [worldBook]);
         // No assistant-specific selection: exercise the global fallback.
-        await WorldBookStore.setActiveIds(const ['book-1']);
+        await WorldBookStore(businessPrefs).setActiveIds(const ['book-1']);
         final assistant = Assistant(
           id: 'assistant-1',
           name: 'Assistant',
@@ -204,25 +211,31 @@ void main() {
           limitContextMessages: false,
         );
 
-        final apiMessages = await ProactiveCareMessageFlow.buildCareApiMessages(
-          assistant: assistant,
-          userNickname: 'User',
-          modelId: 'model',
-          history: const [
-            {'role': 'user', 'content': 'history\n\n(Tue 26-08-18 09:07:05)'},
-          ],
-          carePrompt: 'care-keyword',
-          now: DateTime(2026, 8, 18, 10),
-          recentChats: [
-            Conversation(
-              id: 'recent',
-              title: 'Trip',
-              updatedAt: DateTime(2026, 8, 17),
-              assistantId: 'assistant-1',
-              summary: 'Pack tonight',
-            ),
-          ],
-        );
+        final apiMessages =
+            await ProactiveCareMessageFlow(
+              preferences: businessPrefs,
+            ).buildCareApiMessages(
+              assistant: assistant,
+              userNickname: 'User',
+              modelId: 'model',
+              history: const [
+                {
+                  'role': 'user',
+                  'content': 'history\n\n(Tue 26-08-18 09:07:05)',
+                },
+              ],
+              carePrompt: 'care-keyword',
+              now: DateTime(2026, 8, 18, 10),
+              recentChats: [
+                Conversation(
+                  id: 'recent',
+                  title: 'Trip',
+                  updatedAt: DateTime(2026, 8, 17),
+                  assistantId: 'assistant-1',
+                  summary: 'Pack tonight',
+                ),
+              ],
+            );
 
         final system = apiMessages.first['content'] as String;
         expect(system, startsWith('persona'));
@@ -238,7 +251,7 @@ void main() {
     );
 
     test('assistant world-book selection overrides global fallback', () async {
-      await WorldBookStore.save(const [
+      await WorldBookStore(businessPrefs).save(const [
         WorldBook(
           id: 'global-book',
           entries: [
@@ -260,19 +273,22 @@ void main() {
           ],
         ),
       ]);
-      await WorldBookStore.setActiveIds(const ['global-book']);
-      await WorldBookStore.setActiveIds(const [
-        'assistant-book',
-      ], assistantId: 'assistant-1');
+      await WorldBookStore(businessPrefs).setActiveIds(const ['global-book']);
+      await WorldBookStore(
+        businessPrefs,
+      ).setActiveIds(const ['assistant-book'], assistantId: 'assistant-1');
 
-      final messages = await ProactiveCareMessageFlow.buildCareApiMessages(
-        assistant: Assistant(id: 'assistant-1', name: 'Assistant'),
-        userNickname: 'User',
-        modelId: 'model',
-        history: const <Map<String, dynamic>>[],
-        carePrompt: 'send care',
-        now: DateTime(2026, 8, 18, 10),
-      );
+      final messages =
+          await ProactiveCareMessageFlow(
+            preferences: businessPrefs,
+          ).buildCareApiMessages(
+            assistant: Assistant(id: 'assistant-1', name: 'Assistant'),
+            userNickname: 'User',
+            modelId: 'model',
+            history: const <Map<String, dynamic>>[],
+            carePrompt: 'send care',
+            now: DateTime(2026, 8, 18, 10),
+          );
 
       expect(messages.toString(), contains('assistant-content'));
       expect(messages.toString(), isNot(contains('global-content')));
@@ -311,11 +327,13 @@ void main() {
             ),
           ],
         );
-        await WorldBookStore.save(const [staleBook, cachedFreshBook]);
-        await WorldBookStore.setActiveIds(const ['stale-book']);
-        expect(await WorldBookStore.getAll(), hasLength(2));
+        await WorldBookStore(
+          businessPrefs,
+        ).save(const [staleBook, cachedFreshBook]);
+        await WorldBookStore(businessPrefs).setActiveIds(const ['stale-book']);
+        expect(await WorldBookStore(businessPrefs).getAll(), hasLength(2));
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         await prefs.setString(
           'world_books_v1',
           jsonEncode(
@@ -329,15 +347,18 @@ void main() {
           }),
         );
 
-        final messages = await ProactiveCareMessageFlow.buildCareApiMessages(
-          assistant: Assistant(id: 'assistant-1', name: 'Assistant'),
-          userNickname: 'User',
-          modelId: 'model',
-          history: const <Map<String, dynamic>>[],
-          carePrompt: 'send care',
-          now: DateTime(2026, 8, 18, 10),
-          reloadWorldBooks: true,
-        );
+        final messages =
+            await ProactiveCareMessageFlow(
+              preferences: businessPrefs,
+            ).buildCareApiMessages(
+              assistant: Assistant(id: 'assistant-1', name: 'Assistant'),
+              userNickname: 'User',
+              modelId: 'model',
+              history: const <Map<String, dynamic>>[],
+              carePrompt: 'send care',
+              now: DateTime(2026, 8, 18, 10),
+              reloadWorldBooks: true,
+            );
 
         expect(messages.toString(), contains('fresh-world-book-content'));
         expect(
@@ -360,19 +381,22 @@ void main() {
         limitContextMessages: true,
       );
 
-      final apiMessages = await ProactiveCareMessageFlow.buildCareApiMessages(
-        assistant: assistant,
-        userNickname: 'User',
-        modelId: 'model',
-        history: const [
-          {'role': 'user', 'content': 'old-user'},
-          {'role': 'assistant', 'content': 'old-assistant'},
-          {'role': 'user', 'content': 'latest-user'},
-          {'role': 'assistant', 'content': 'latest-assistant'},
-        ],
-        carePrompt: 'send care',
-        now: DateTime(2026, 8, 18, 10),
-      );
+      final apiMessages =
+          await ProactiveCareMessageFlow(
+            preferences: businessPrefs,
+          ).buildCareApiMessages(
+            assistant: assistant,
+            userNickname: 'User',
+            modelId: 'model',
+            history: const [
+              {'role': 'user', 'content': 'old-user'},
+              {'role': 'assistant', 'content': 'old-assistant'},
+              {'role': 'user', 'content': 'latest-user'},
+              {'role': 'assistant', 'content': 'latest-assistant'},
+            ],
+            carePrompt: 'send care',
+            now: DateTime(2026, 8, 18, 10),
+          );
 
       expect(apiMessages.map((item) => item['content']), [
         'persona',
@@ -394,48 +418,51 @@ void main() {
           limitContextMessages: true,
         );
 
-        final result = await ProactiveCareMessageFlow.decideNextCareTime(
-          config: ProviderConfig.defaultsFor('TestProvider'),
-          modelId: 'test-model',
-          assistant: assistant,
-          userNickname: 'User',
-          history: const [
-            {'role': 'user', 'content': 'first\n\n(Tue 26-08-18 09:00:00)'},
-            {'role': 'assistant', 'content': 'second'},
-            {'role': 'user', 'content': 'third\n\n(Tue 26-08-18 09:05:00)'},
-          ],
-          decisionPrompt: 'decide',
-          sendMessageStream:
-              ({
-                required config,
-                required modelId,
-                required messages,
-                tools,
-                onToolCall,
-                thinkingBudget,
-                temperature,
-                topP,
-                maxTokens,
-                stream = true,
-                requestId,
-              }) {
-                capturedMessages = messages;
-                return Stream<ChatStreamChunk>.value(
-                  ChatStreamChunk(
-                    content: '',
-                    isDone: false,
-                    totalTokens: 0,
-                    toolCalls: [
-                      ToolCallInfo(
-                        id: 'keep',
-                        name: ProactiveCareDecisionTools.keepTime,
-                        arguments: <String, dynamic>{},
+        final result =
+            await ProactiveCareMessageFlow(
+              preferences: businessPrefs,
+            ).decideNextCareTime(
+              config: ProviderConfig.defaultsFor('TestProvider'),
+              modelId: 'test-model',
+              assistant: assistant,
+              userNickname: 'User',
+              history: const [
+                {'role': 'user', 'content': 'first\n\n(Tue 26-08-18 09:00:00)'},
+                {'role': 'assistant', 'content': 'second'},
+                {'role': 'user', 'content': 'third\n\n(Tue 26-08-18 09:05:00)'},
+              ],
+              decisionPrompt: 'decide',
+              sendMessageStream:
+                  ({
+                    required config,
+                    required modelId,
+                    required messages,
+                    tools,
+                    onToolCall,
+                    thinkingBudget,
+                    temperature,
+                    topP,
+                    maxTokens,
+                    stream = true,
+                    requestId,
+                  }) {
+                    capturedMessages = messages;
+                    return Stream<ChatStreamChunk>.value(
+                      ChatStreamChunk(
+                        content: '',
+                        isDone: false,
+                        totalTokens: 0,
+                        toolCalls: [
+                          ToolCallInfo(
+                            id: 'keep',
+                            name: ProactiveCareDecisionTools.keepTime,
+                            arguments: <String, dynamic>{},
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
-        );
+                    );
+                  },
+            );
 
         expect(result, isNull);
         final captured = capturedMessages!;

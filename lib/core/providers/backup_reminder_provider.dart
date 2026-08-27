@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 class BackupReminderProvider extends ChangeNotifier {
-  BackupReminderProvider({bool autoLoad = true}) {
+  final BusinessPreferences _preferences;
+  BackupReminderProvider({required this._preferences, bool autoLoad = true}) {
     if (autoLoad) {
       unawaited(load());
     }
@@ -46,7 +47,7 @@ class BackupReminderProvider extends ChangeNotifier {
   }
 
   Future<void> load({bool startTimer = true}) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     _enabled = prefs.getBool(_enabledKey) ?? false;
     _intervalDays = _normalizeIntervalDays(prefs.getInt(_intervalDaysKey) ?? 7);
     _reminderMinutesOfDay = _normalizeMinutesOfDay(
@@ -144,7 +145,7 @@ class BackupReminderProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_enabledKey, _enabled);
     await prefs.setInt(_intervalDaysKey, _intervalDays);
     if (_reminderMinutesOfDay == null) {
@@ -228,7 +229,7 @@ class BackupReminderProvider extends ChangeNotifier {
   }
 
   static Future<void> _setDate(
-    SharedPreferences prefs,
+    BusinessPreferences prefs,
     String key,
     DateTime? value,
   ) async {

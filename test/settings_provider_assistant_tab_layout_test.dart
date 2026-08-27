@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -11,12 +11,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider mobile assistant tab layout', () {
     test('defaults to no custom order or hidden tabs', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -25,11 +26,11 @@ void main() {
     });
 
     test('loads persisted order and hidden tab ids', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'mobile_assistant_edit_tab_order_v1': <String>['mcp', 'basic'],
         'mobile_assistant_edit_tab_hidden_v1': <String>['prompts'],
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -38,14 +39,14 @@ void main() {
     });
 
     test('persists order and hidden tab changes', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setMobileAssistantEditTabOrder(['memory', 'basic']);
       await settings.setHiddenMobileAssistantEditTabs({'regex', 'custom'});
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getStringList('mobile_assistant_edit_tab_order_v1'), [
         'memory',
         'basic',
@@ -59,8 +60,8 @@ void main() {
 
   group('SettingsProvider chat input background opacity', () {
     test('defaults to the current rendered input background opacity', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -69,11 +70,11 @@ void main() {
     });
 
     test('loads persisted input background opacity per brightness', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'display_chat_input_background_opacity_light_v1': 0.35,
         'display_chat_input_background_opacity_dark_v1': 0.45,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -82,14 +83,14 @@ void main() {
     });
 
     test('selects and persists input background opacity with bounds', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setChatInputBackgroundOpacity(Brightness.light, -0.2);
       await settings.setChatInputBackgroundOpacity(Brightness.dark, 1.2);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(settings.chatInputBackgroundOpacityLight, 0.0);
       expect(settings.chatInputBackgroundOpacityDark, 1.0);
       expect(settings.chatInputBackgroundOpacityFor(Brightness.light), 0.0);

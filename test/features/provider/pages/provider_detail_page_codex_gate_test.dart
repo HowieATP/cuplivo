@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/codex_device_code_controller.dart';
@@ -10,6 +10,8 @@ import 'package:Cuplivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/codex_account_entry.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<SettingsProvider> _createSettings(
   WidgetTester tester, {
   required String keyName,
@@ -17,8 +19,8 @@ Future<SettingsProvider> _createSettings(
   required String baseUrl,
   bool multiKey = false,
 }) async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   // Drain the async _load() kicked off by the SettingsProvider constructor so
   // the setProviderConfig below does not race an in-flight load.
   await tester.pump(const Duration(milliseconds: 300));
@@ -47,9 +49,10 @@ Widget _harness(
 }) {
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<AssistantProvider>(
-        create: (_) => AssistantProvider(),
+        create: (_) => AssistantProvider(preferences: businessPrefs),
       ),
       ChangeNotifierProvider<CodexDeviceCodeController>.value(
         value: controller,
@@ -69,7 +72,8 @@ void main() {
   late CodexDeviceCodeController controller;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
     controller = CodexDeviceCodeController();
     CodexDeviceCodeController.debugOverrideInstance(controller);
   });

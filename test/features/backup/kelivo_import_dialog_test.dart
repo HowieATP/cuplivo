@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/providers/backup_provider.dart';
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
 import 'package:Cuplivo/core/providers/s3_backup_provider.dart';
@@ -14,11 +15,16 @@ import 'package:Cuplivo/desktop/setting/backup_pane.dart';
 import 'package:Cuplivo/features/backup/pages/backup_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 const _urlLauncherChannel = MethodChannel('plugins.flutter.io/url_launcher');
 const _kelivoUrl = 'https://kelivo-helper.netlify.app/#/compat';
 
 Future<BackupReminderProvider> _createReminderProvider() async {
-  final provider = BackupReminderProvider(autoLoad: false);
+  final provider = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await provider.load(startTimer: false);
   return provider;
 }
@@ -28,12 +34,16 @@ Future<void> _pumpBackupPage(
   required SettingsProvider settings,
 }) async {
   final chatService = ChatService();
-  final coordinator = TrashRestoreCoordinator(chatService: chatService);
+  final coordinator = TrashRestoreCoordinator(
+    preferences: businessPrefs,
+    chatService: chatService,
+  );
   final reminder = await _createReminderProvider();
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -58,16 +68,22 @@ Future<void> _pumpDesktopBackupPane(
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         Provider(
-          create: (_) => TrashRestoreCoordinator(chatService: chatService),
+          create: (_) => TrashRestoreCoordinator(
+            preferences: businessPrefs,
+            chatService: chatService,
+          ),
         ),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
         ChangeNotifierProvider<BackupProvider>(
           create: (_) => BackupProvider(
+            preferences: businessPrefs,
             chatService: chatService,
             trashRestoreCoordinator: TrashRestoreCoordinator(
+              preferences: businessPrefs,
               chatService: chatService,
             ),
             initialConfig: settings.webDavConfig,
@@ -75,8 +91,10 @@ Future<void> _pumpDesktopBackupPane(
         ),
         ChangeNotifierProvider<S3BackupProvider>(
           create: (_) => S3BackupProvider(
+            preferences: businessPrefs,
             chatService: chatService,
             trashRestoreCoordinator: TrashRestoreCoordinator(
+              preferences: businessPrefs,
               chatService: chatService,
             ),
             initialConfig: settings.s3Config,
@@ -147,7 +165,10 @@ void main() {
         await tester.binding.setSurfaceSize(const Size(900, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
 
-        await _pumpBackupPage(tester, settings: SettingsProvider());
+        await _pumpBackupPage(
+          tester,
+          settings: SettingsProvider(preferences: businessPrefs),
+        );
 
         expect(find.text('Import from New Kelivo'), findsOneWidget);
         _expectAbove(tester, 'Import Backup File', 'Import from New Kelivo');
@@ -161,7 +182,10 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await _pumpBackupPage(tester, settings: SettingsProvider());
+      await _pumpBackupPage(
+        tester,
+        settings: SettingsProvider(preferences: businessPrefs),
+      );
 
       await tester.tap(find.text('Import from New Kelivo'));
       await tester.pumpAndSettle();
@@ -188,7 +212,10 @@ void main() {
         },
       );
 
-      await _pumpBackupPage(tester, settings: SettingsProvider());
+      await _pumpBackupPage(
+        tester,
+        settings: SettingsProvider(preferences: businessPrefs),
+      );
       await tester.tap(find.text('Import from New Kelivo'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(_kelivoUrl));
@@ -215,7 +242,10 @@ void main() {
         },
       );
 
-      await _pumpBackupPage(tester, settings: SettingsProvider());
+      await _pumpBackupPage(
+        tester,
+        settings: SettingsProvider(preferences: businessPrefs),
+      );
       await tester.tap(find.text('Import from New Kelivo'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(_kelivoUrl));
@@ -230,8 +260,18 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(420, 480));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await _pumpBackupPage(tester, settings: SettingsProvider());
-      await tester.tap(find.text('Import from New Kelivo'));
+      await _pumpBackupPage(
+        tester,
+        settings: SettingsProvider(preferences: businessPrefs),
+      );
+      final entry = find.text('Import from New Kelivo');
+      await tester.scrollUntilVisible(
+        entry,
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(entry);
       await tester.pumpAndSettle();
 
       expect(find.byType(SingleChildScrollView), findsOneWidget);
@@ -251,7 +291,10 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1100, 1300));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await _pumpDesktopBackupPane(tester, settings: SettingsProvider());
+      await _pumpDesktopBackupPane(
+        tester,
+        settings: SettingsProvider(preferences: businessPrefs),
+      );
 
       final button = find.text('Import from New Kelivo');
       await tester.scrollUntilVisible(

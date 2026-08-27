@@ -8,7 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +25,8 @@ void main() {
   late String? audioPlayerEventChannel;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues(const {});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests(const {});
     audioEventChannels = <String>{};
     speakCallCount = 0;
     spokenTexts = <String>[];
@@ -96,7 +99,7 @@ void main() {
   test(
     'changing system TTS speed keeps the current playback position',
     () async {
-      final provider = TtsProvider();
+      final provider = TtsProvider(preferences: businessPrefs);
       addTearDown(provider.dispose);
 
       await _waitUntil(() => provider.isAvailable);
@@ -127,7 +130,7 @@ void main() {
   test(
     'finished system TTS can be replayed from the floating player',
     () async {
-      final provider = TtsProvider();
+      final provider = TtsProvider(preferences: businessPrefs);
       addTearDown(provider.dispose);
 
       await _waitUntil(() => provider.isAvailable);
@@ -164,12 +167,12 @@ void main() {
       // prefs.getDouble would throw and permanently disable system TTS.
       // Values differ from the fallbacks (rate 0.5 / pitch 1.0) so the
       // assertions prove int->double conversion, not fallback.
-      SharedPreferences.setMockInitialValues(const {
+      businessPrefs = BusinessPreferences.memoryForTests(const {
         'tts_speech_rate_v1': 1,
         'tts_pitch_v1': 2,
       });
 
-      final provider = TtsProvider();
+      final provider = TtsProvider(preferences: businessPrefs);
       addTearDown(provider.dispose);
 
       await _waitUntil(() => provider.isAvailable);
@@ -211,13 +214,13 @@ void main() {
     });
     addTearDown(() => server.close(force: true));
 
-    final provider = TtsProvider();
+    final provider = TtsProvider(preferences: businessPrefs);
     addTearDown(provider.dispose);
     await _waitUntil(() => provider.isAvailable);
 
     expect(provider.cacheNetworkAudioForReplay, isFalse);
     await provider.setCacheNetworkAudioForReplay(true);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     expect(prefs.getBool('tts_cache_network_audio_for_replay_v1'), isTrue);
 
     final service = OpenAiTtsOptions(

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider default model seed', () {
     test('seeds DeepSeek once on a fresh install', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -24,8 +25,8 @@ void main() {
     });
 
     test('does not re-seed after the user resets the model', () async {
-      SharedPreferences.setMockInitialValues({});
-      final first = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final first = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       expect(first.currentModelProvider, 'DeepSeek');
@@ -34,7 +35,7 @@ void main() {
       expect(first.currentModelProvider, isNull);
 
       // Simulate a restart: a fresh provider instance re-reads prefs.
-      final second = SettingsProvider();
+      final second = SettingsProvider(preferences: businessPrefs);
       await _waitForSettingsLoad();
 
       expect(second.currentModelProvider, isNull);
@@ -42,10 +43,10 @@ void main() {
     });
 
     test('keeps a persisted model selection untouched', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'selected_model_v1': 'OpenAI::gpt-4o',
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -56,17 +57,17 @@ void main() {
     test(
       'does not re-seed an install that already had a model and reset it',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'selected_model_v1': 'OpenAI::gpt-4o',
         });
-        final first = SettingsProvider();
+        final first = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
         expect(first.currentModelProvider, 'OpenAI');
 
         await first.resetCurrentModel();
 
-        final second = SettingsProvider();
+        final second = SettingsProvider(preferences: businessPrefs);
         await _waitForSettingsLoad();
 
         expect(second.currentModelProvider, isNull);

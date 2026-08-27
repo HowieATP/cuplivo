@@ -7,10 +7,13 @@ import 'package:Cuplivo/features/stats/models/stats_models.dart';
 import 'package:Cuplivo/features/stats/pages/stats_page.dart';
 import 'package:Cuplivo/features/stats/widgets/stats_heatmap.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 Widget _harness(StatsSnapshot snapshot) {
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(preferences: businessPrefs),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

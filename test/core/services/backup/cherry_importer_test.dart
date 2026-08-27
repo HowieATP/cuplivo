@@ -5,12 +5,14 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/backup.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/backup/cherry_importer.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -36,9 +38,10 @@ void main() {
   late Directory tempDir;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tempDir = await Directory.systemTemp.createTemp('kelivo_cherry_test_');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   Future<void> retryDelete(Directory dir, {int attempts = 5}) async {
@@ -93,9 +96,10 @@ void main() {
       final chatService = ChatService();
       await chatService.init();
       final result = await CherryImporter.importFromCherryStudio(
+        preferences: businessPrefs,
         file: backup,
         mode: RestoreMode.overwrite,
-        settings: SettingsProvider(),
+        settings: SettingsProvider(preferences: businessPrefs),
         chatService: chatService,
       );
 
@@ -144,7 +148,7 @@ void main() {
       expect(standaloneMessage.role, 'user');
       expect(standaloneMessage.content, 'hello from standalone message');
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('provider_configs_v1'), contains('openai'));
       // 助手已迁移到 DB，SharedPreferences 中不存在
       expect(prefs.containsKey('assistants_v1'), isFalse);
@@ -196,9 +200,10 @@ void main() {
       final chatService = ChatService();
       await chatService.init();
       final result = await CherryImporter.importFromCherryStudio(
+        preferences: businessPrefs,
         file: backup,
         mode: RestoreMode.overwrite,
-        settings: SettingsProvider(),
+        settings: SettingsProvider(preferences: businessPrefs),
         chatService: chatService,
       );
 
@@ -225,9 +230,10 @@ void main() {
       await service.init();
       await expectLater(
         CherryImporter.importFromCherryStudio(
+          preferences: businessPrefs,
           file: backup,
           mode: RestoreMode.overwrite,
-          settings: SettingsProvider(),
+          settings: SettingsProvider(preferences: businessPrefs),
           chatService: service,
         ),
         throwsA(anything),

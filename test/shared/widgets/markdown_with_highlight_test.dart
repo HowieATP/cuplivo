@@ -27,6 +27,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 Finder _findMathWidget() {
   return find.byType(Math);
@@ -316,9 +319,10 @@ Widget _markdownHarness(
   ThemeMode? themeMode,
   TextStyle? baseStyle,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
+  SharedPreferences.setMockInitialValues({});
+  businessPrefs = BusinessPreferences.memoryForTests(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(preferences: businessPrefs),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -360,9 +364,10 @@ Widget _streamingMarkdownHarness(
   double? width,
   Map<String, Object>? preferences,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
+  SharedPreferences.setMockInitialValues({});
+  businessPrefs = BusinessPreferences.memoryForTests(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(preferences: businessPrefs),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -392,10 +397,11 @@ Widget _settingsHarness({
   Map<String, Object>? preferences,
   required void Function(SettingsProvider settings) onSettingsReady,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
+  SharedPreferences.setMockInitialValues({});
+  businessPrefs = BusinessPreferences.memoryForTests(preferences ?? {});
   return ChangeNotifierProvider(
     create: (_) {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       onSettingsReady(settings);
       return settings;
     },
@@ -3185,12 +3191,12 @@ void main() {}
       addTearDown(text.dispose);
       addTearDown(streaming.dispose);
 
-      SharedPreferences.setMockInitialValues(const {
+      businessPrefs = BusinessPreferences.memoryForTests(const {
         'display_html_streaming_show_code_v1': true,
       });
       await tester.pumpWidget(
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(),
+          create: (_) => SettingsProvider(preferences: businessPrefs),
           child: MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -4330,10 +4336,10 @@ $$
       markdownMathTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => markdownMathTargetPlatformOverride = null);
 
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       await tester.pumpWidget(
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(),
+          create: (_) => SettingsProvider(preferences: businessPrefs),
           child: MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,

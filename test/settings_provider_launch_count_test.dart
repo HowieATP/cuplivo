@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider app launch count', () {
     test('defaults to zero', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -23,8 +24,10 @@ void main() {
     });
 
     test('loads persisted count', () async {
-      SharedPreferences.setMockInitialValues({'app_launch_count_v1': 7});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({
+        'app_launch_count_v1': 7,
+      });
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -32,15 +35,17 @@ void main() {
     });
 
     test('increments and persists count once per explicit call', () async {
-      SharedPreferences.setMockInitialValues({'app_launch_count_v1': 2});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({
+        'app_launch_count_v1': 2,
+      });
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.incrementAppLaunchCount();
       await settings.incrementAppLaunchCount();
 
       expect(settings.appLaunchCount, 4);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getInt('app_launch_count_v1'), 4);
     });
   });

@@ -4,18 +4,19 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/tts/network_tts.dart';
 import 'package:Cuplivo/core/services/tts/tts_text_selection.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('loads and persists TTS playback settings', () async {
-    SharedPreferences.setMockInitialValues(const {
+    businessPrefs = BusinessPreferences.memoryForTests(const {
       'tts_auto_play_assistant_replies_v1': true,
       'tts_text_selection_mode_v1': 'quotedOnly',
     });
 
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await _waitUntil(() => settings.ttsAutoPlayAssistantReplies);
 
     expect(settings.ttsAutoPlayAssistantReplies, isTrue);
@@ -24,18 +25,18 @@ void main() {
     await settings.setTtsTextSelectionMode(TtsTextSelectionMode.nonItalic);
     await settings.setTtsAutoPlayAssistantReplies(false);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     expect(prefs.getString('tts_text_selection_mode_v1'), 'nonItalic');
     expect(prefs.getBool('tts_auto_play_assistant_replies_v1'), isFalse);
   });
 
   test('falls back to full text when persisted TTS mode is invalid', () async {
-    SharedPreferences.setMockInitialValues(const {
+    businessPrefs = BusinessPreferences.memoryForTests(const {
       'tts_auto_play_assistant_replies_v1': true,
       'tts_text_selection_mode_v1': 'unknown-mode',
     });
 
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await _waitUntil(() => settings.ttsAutoPlayAssistantReplies);
 
     expect(settings.ttsTextSelectionMode, TtsTextSelectionMode.fullText);
@@ -60,15 +61,15 @@ void main() {
           'apiKey': 'key',
         },
       ];
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'tts_services_v1': jsonEncode(services),
         'tts_selected_v1': 1,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _waitUntil(() => settings.ttsServices.length == 2);
 
       expect(settings.selectedTtsServiceId, 'second-service');
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('tts_selected_service_id_v1'), 'second-service');
       expect(prefs.getInt('tts_selected_v1'), isNull);
 
@@ -83,20 +84,20 @@ void main() {
   );
 
   test('persists generated UUIDs for legacy TTS rows across reloads', () async {
-    SharedPreferences.setMockInitialValues({
+    businessPrefs = BusinessPreferences.memoryForTests({
       'tts_services_v1': jsonEncode(<Map<String, dynamic>>[
         {'kind': 'openai', 'enabled': true, 'name': 'First', 'apiKey': 'key'},
         {'kind': 'groq', 'enabled': true, 'name': 'Second', 'apiKey': 'key'},
       ]),
       'tts_selected_v1': 1,
     });
-    final firstLoad = SettingsProvider();
+    final firstLoad = SettingsProvider(preferences: businessPrefs);
     await _waitUntil(() => firstLoad.selectedTtsServiceId != null);
     final selectedId = firstLoad.selectedTtsServiceId;
 
     expect(selectedId, isNotNull);
     expect(firstLoad.selectedTtsService?.name, 'Second');
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     final persistedRows =
         jsonDecode(prefs.getString('tts_services_v1')!) as List<dynamic>;
     expect(
@@ -106,7 +107,7 @@ void main() {
       isTrue,
     );
 
-    final secondLoad = SettingsProvider();
+    final secondLoad = SettingsProvider(preferences: businessPrefs);
     await _waitUntil(() => secondLoad.selectedTtsServiceId == selectedId);
     expect(secondLoad.selectedTtsService?.name, 'Second');
   });

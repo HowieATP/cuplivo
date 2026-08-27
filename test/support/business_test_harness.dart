@@ -1,19 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
-/// Cuplivo keeps business settings in SharedPreferences, so this replaces
-/// Kelivo's SQLite-backed business test harness. The returned provider has
-/// already finished its asynchronous [SettingsProvider._load] (a pure
-/// microtask chain under the mock preferences backend), so callers can use
-/// it synchronously afterwards.
+var businessPrefs = BusinessPreferences.memoryForTests();
+
+/// Cuplivo keeps business settings in the SQLite-backed business facade
+/// (core/database/business_preferences.dart); this harness seeds its mock
+/// memory store. The returned provider has already finished its asynchronous
+/// [SettingsProvider._load] (a pure microtask chain under the mock
+/// preferences backend), so callers can use it synchronously afterwards.
 Future<SettingsProvider> createBusinessTestPreferences({
   Map<String, Object> localInitial = const <String, Object>{},
 }) async {
-  SharedPreferences.setMockInitialValues(localInitial);
-  final settings = SettingsProvider();
-  for (var i = 0; i < 128; i++) {
+  businessPrefs = BusinessPreferences.memoryForTests(localInitial);
+  final settings = SettingsProvider(preferences: businessPrefs);
+  // Microtask pumps, NOT `settings.loaded`: fake-async testWidgets bodies
+  // cannot await real futures; every await in _load is a microtask under the
+  // mock facade, so a pump tail settles it deterministically.
+  for (var i = 0; i < 256; i++) {
     await Future<void>.value();
   }
   return settings;

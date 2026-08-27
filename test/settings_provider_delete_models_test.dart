@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -26,12 +26,13 @@ ProviderConfig _configWithModels() {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider model deletion', () {
     test('deleteModels removes selected models and their overrides', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig('TestProvider', _configWithModels());
@@ -48,8 +49,8 @@ void main() {
     });
 
     test('deleteModels does nothing for empty selection', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig('TestProvider', _configWithModels());
@@ -66,8 +67,8 @@ void main() {
     });
 
     test('deleteModels clears selections for deleted models only', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig('TestProvider', _configWithModels());
@@ -88,8 +89,8 @@ void main() {
     test(
       'deleteModels clears orphan overrides when every model is removed',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        businessPrefs = BusinessPreferences.memoryForTests({});
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
         await settings.setProviderConfig(

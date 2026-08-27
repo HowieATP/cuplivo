@@ -12050,26 +12050,20 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditLocalToolHandoffTitle.
   ///
   /// In en, this message translates to:
-  /// **'Task Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffTitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Delegate a task to another assistant in a new conversation without waiting for the result.'**
+  /// **'Hand a task to a delegated sub-agent and wait for its full output; watch progress in the sub-agent panel.'**
   String get assistantEditLocalToolHandoffSubtitle;
 
   /// No description provided for @assistantEditLocalToolHandoffSyncTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sync Handoff'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditLocalToolHandoffSyncTitle;
-
-  /// No description provided for @assistantEditLocalToolHandoffSyncSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delegate a task and wait for the sub-assistant\'s complete output as the tool result.'**
-  String get assistantEditLocalToolHandoffSyncSubtitle;
 
   /// No description provided for @assistantEditSkillDownloadTitle.
   ///
@@ -14537,12 +14531,6 @@ abstract class AppLocalizations {
   /// **'Speak'**
   String get chatMessageWidgetSpeak;
 
-  /// No description provided for @handoffForwardChip.
-  ///
-  /// In en, this message translates to:
-  /// **'→ {assistantName} · {convIdPrefix}'**
-  String handoffForwardChip(Object assistantName, Object convIdPrefix);
-
   /// No description provided for @handoffBackwardChip.
   ///
   /// In en, this message translates to:
@@ -14558,25 +14546,31 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Handoff / Delegation'**
+  /// **'Sub-agent Delegation'**
   String get assistantEditHandoffSectionTitle;
 
   /// No description provided for @assistantEditHandoffDiscoverable.
   ///
   /// In en, this message translates to:
-  /// **'Discoverable by other assistants'**
+  /// **'Delegateable as a sub-agent by other assistants'**
   String get assistantEditHandoffDiscoverable;
+
+  /// No description provided for @assistantEditHandoffDiscoverableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other assistants can delegate tasks to this assistant via Sub-agent Delegation.'**
+  String get assistantEditHandoffDiscoverableSubtitle;
 
   /// No description provided for @assistantEditHandoffId.
   ///
   /// In en, this message translates to:
-  /// **'Handoff ID'**
+  /// **'Delegation ID'**
   String get assistantEditHandoffId;
 
   /// No description provided for @assistantEditHandoffDescription.
   ///
   /// In en, this message translates to:
-  /// **'Description for other assistants'**
+  /// **'Describe your specialty so other assistants know when to delegate to you.'**
   String get assistantEditHandoffDescription;
 
   /// No description provided for @assistantEditHandoffIdInvalid.
@@ -14588,14 +14582,8 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditHandoffIdUnique.
   ///
   /// In en, this message translates to:
-  /// **'This Handoff ID is already in use'**
+  /// **'This Delegation ID is already in use'**
   String get assistantEditHandoffIdUnique;
-
-  /// No description provided for @handoffForwardChipTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Open the spawned conversation'**
-  String get handoffForwardChipTooltip;
 
   /// No description provided for @handoffBackwardChipTooltip.
   ///
@@ -14704,6 +14692,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My group chats'**
   String get groupChatMyGroupChats;
+
+  /// No description provided for @subagentTargetStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No sub-agent targets available} =1{1 sub-agent target} other{{count} sub-agent targets}}'**
+  String subagentTargetStatus(num count);
+
+  /// No description provided for @subagentTargetBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 targets} =1{1 target} other{{count} targets}}'**
+  String subagentTargetBadge(num count);
+
+  /// No description provided for @subagentNoTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-agent delegation is on, but no sub-agent targets are available. Enable “Delegateable as a sub-agent” on another assistant first.'**
+  String get subagentNoTargetHint;
+
+  /// No description provided for @subagentGoSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up'**
+  String get subagentGoSetup;
+
+  /// No description provided for @subagentTargetListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegatable assistants'**
+  String get subagentTargetListTitle;
+
+  /// No description provided for @subagentTargetListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No delegatable assistants yet.'**
+  String get subagentTargetListEmpty;
 
   /// No description provided for @groupChatCreate.
   ///

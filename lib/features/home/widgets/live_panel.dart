@@ -81,7 +81,7 @@ class _LivePanelState extends State<LivePanel> {
   }
 
   /// All running wait-mode jobs spawned by the current conversation.
-  /// Concurrent `kelivo_handoff_sync` calls produce multiple jobs — every one
+  /// Concurrent `kelivo_handoff` calls produce multiple jobs — every one
   /// gets its own pill/expanded card.
   List<GenerationSlot> _activeJobs() {
     final chatService = context.read<ChatService>();

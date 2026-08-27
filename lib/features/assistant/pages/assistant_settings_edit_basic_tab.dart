@@ -550,6 +550,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               context,
               icon: Lucide.ArrowRight,
               label: l10n.assistantEditHandoffDiscoverable,
+              subtitle: l10n.assistantEditHandoffDiscoverableSubtitle,
               value: a.discoverable,
               onChanged: (v) => context
                   .read<AssistantProvider>()

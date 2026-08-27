@@ -6373,17 +6373,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任务交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任务交给可被委派的子代理，等待完整输出；可在子代理面板查看进度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任务并等待子助手的完整输出作为工具结果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下载技能';
@@ -7729,11 +7726,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetSpeak => '朗读';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -7742,25 +7734,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get handoffBadgeTooltip => '从交接创建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+  String get assistantEditHandoffDiscoverable => '可作为子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接标识';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '开启后，其他助手的「子代理委派」可以把任务交给你。';
 
   @override
-  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派标识';
+
+  @override
+  String get assistantEditHandoffDescription => '描述你的专长，供其他助手判断是否委派。';
 
   @override
   String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
-
-  @override
-  String get handoffForwardChipTooltip => '打开创建的新对话';
+  String get assistantEditHandoffIdUnique => '此委派标识已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
@@ -7828,6 +7821,35 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目标：$count 个',
+      zero: '还没有可委派的目标助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 个目标';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已开启，但还没有可委派的目标助手。请在另一个助手上开启「可作为子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去设置';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目标助手';
+
+  @override
+  String get subagentTargetListEmpty => '还没有可委派的目标助手。';
 
   @override
   String get groupChatCreate => '新建群聊';
@@ -14995,17 +15017,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '日历权限已被拒绝。请在系统设置中开启日历权限，然后重新开启该工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任务交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '将任务委派给另一个助手的新对话，无需等待结果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任务交给可被委派的子代理，等待完整输出；可在子代理面板查看进度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任务并等待子助手的完整输出作为工具结果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下载技能';
@@ -16351,11 +16370,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetSpeak => '朗读';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -16364,25 +16378,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get handoffBadgeTooltip => '从交接创建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手发现';
+  String get assistantEditHandoffDiscoverable => '可作为子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接标识';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '开启后，其他助手的「子代理委派」可以把任务交给你。';
 
   @override
-  String get assistantEditHandoffDescription => '对其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派标识';
+
+  @override
+  String get assistantEditHandoffDescription => '描述你的专长，供其他助手判断是否委派。';
 
   @override
   String get assistantEditHandoffIdInvalid => '只允许小写字母、数字和连字符';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接标识已被使用';
-
-  @override
-  String get handoffForwardChipTooltip => '打开创建的新对话';
+  String get assistantEditHandoffIdUnique => '此委派标识已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一级对话';
@@ -16450,6 +16465,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目标：$count 个',
+      zero: '还没有可委派的目标助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 个目标';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已开启，但还没有可委派的目标助手。请在另一个助手上开启「可作为子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去设置';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目标助手';
+
+  @override
+  String get subagentTargetListEmpty => '还没有可委派的目标助手。';
 
   @override
   String get groupChatCreate => '新建群聊';
@@ -23618,17 +23662,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '行事曆權限已被拒絕。請在系統設定中開啟行事曆權限，然後重新開啟該工具。';
 
   @override
-  String get assistantEditLocalToolHandoffTitle => '任務交接';
+  String get assistantEditLocalToolHandoffTitle => '子代理委派';
 
   @override
-  String get assistantEditLocalToolHandoffSubtitle => '將任務委派給另一個助手的新對話，無需等待結果。';
+  String get assistantEditLocalToolHandoffSubtitle =>
+      '把任務交給可被委派的子代理，等待完整輸出；可在子代理面板查看進度。';
 
   @override
-  String get assistantEditLocalToolHandoffSyncTitle => '同步交接';
-
-  @override
-  String get assistantEditLocalToolHandoffSyncSubtitle =>
-      '委派任務並等待子助手的完整輸出作為工具結果。';
+  String get assistantEditLocalToolHandoffSyncTitle => '子代理委派';
 
   @override
   String get assistantEditSkillDownloadTitle => '下載技能';
@@ -24974,11 +25015,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetSpeak => '朗讀';
 
   @override
-  String handoffForwardChip(Object assistantName, Object convIdPrefix) {
-    return '→ $assistantName · $convIdPrefix';
-  }
-
-  @override
   String handoffBackwardChip(Object assistantName, Object convIdPrefix) {
     return '← $assistantName · $convIdPrefix';
   }
@@ -24987,25 +25023,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get handoffBadgeTooltip => '從交接創建';
 
   @override
-  String get assistantEditHandoffSectionTitle => '交接 / 委派';
+  String get assistantEditHandoffSectionTitle => '子代理 / 委派';
 
   @override
-  String get assistantEditHandoffDiscoverable => '可被其他助手發現';
+  String get assistantEditHandoffDiscoverable => '可作為子代理被其他助手委派';
 
   @override
-  String get assistantEditHandoffId => '交接標識';
+  String get assistantEditHandoffDiscoverableSubtitle =>
+      '開啟後，其他助手的「子代理委派」可以把任務交給你。';
 
   @override
-  String get assistantEditHandoffDescription => '對其他助手描述此助手的用途';
+  String get assistantEditHandoffId => '委派標識';
 
   @override
-  String get assistantEditHandoffIdInvalid => '只允許小寫字母、數字和連字符';
+  String get assistantEditHandoffDescription => '描述你的專長，供其他助手判斷是否委派。';
 
   @override
-  String get assistantEditHandoffIdUnique => '此交接標識已被使用';
+  String get assistantEditHandoffIdInvalid => '只允許小寫字母、數字和連字號';
 
   @override
-  String get handoffForwardChipTooltip => '打開創建的新對話';
+  String get assistantEditHandoffIdUnique => '此委派標識已被使用';
 
   @override
   String get handoffBackwardChipTooltip => '返回上一級對話';
@@ -25073,6 +25110,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get groupChatMyGroupChats => '我的群聊';
+
+  @override
+  String subagentTargetStatus(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '可用目標：$count 個',
+      zero: '還沒有可委派的目標助手',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String subagentTargetBadge(num count) {
+    return '$count 個目標';
+  }
+
+  @override
+  String get subagentNoTargetHint =>
+      '子代理委派已開啟，但還沒有可委派的目標助手。請在另一個助手上開啟「可作為子代理被其他助手委派」。';
+
+  @override
+  String get subagentGoSetup => '去設定';
+
+  @override
+  String get subagentTargetListTitle => '可委派的目標助手';
+
+  @override
+  String get subagentTargetListEmpty => '還沒有可委派的目標助手。';
 
   @override
   String get groupChatCreate => '新建群聊';

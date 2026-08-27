@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 const int webChatProtocolVersion = 3;
-const String webChatAssetVersion = 'web-chat-v15';
+const String webChatAssetVersion = 'web-chat-v16';
 const int webChatMaxChunkBytes = 128 * 1024;
 const int webChatMaxChunkPayloadBytes = 95 * 1024;
 
@@ -238,34 +238,4 @@ List<Map<String, dynamic>> chunkWebChatEnvelope({
         ),
       },
   ];
-}
-
-Map<String, dynamic> reassembleWebChatChunks(
-  List<Map<String, dynamic>> chunks,
-) {
-  if (chunks.isEmpty) {
-    throw const WebChatProtocolException('empty transfer');
-  }
-  final sorted = List<Map<String, dynamic>>.of(chunks)
-    ..sort((a, b) => (a['index'] as int).compareTo(b['index'] as int));
-  final transferId = sorted.first['transferId'];
-  final total = sorted.first['total'];
-  if (total is! int || total != sorted.length) {
-    throw const WebChatProtocolException('incomplete transfer');
-  }
-  final bytes = <int>[];
-  for (var index = 0; index < sorted.length; index++) {
-    final chunk = sorted[index];
-    if (chunk['transferId'] != transferId ||
-        chunk['total'] != total ||
-        chunk['index'] != index) {
-      throw const WebChatProtocolException('invalid transfer sequence');
-    }
-    bytes.addAll(base64Decode(chunk['data'] as String));
-  }
-  final decoded = jsonDecode(utf8.decode(bytes));
-  if (decoded is! Map) {
-    throw const WebChatProtocolException('transfer payload is not an object');
-  }
-  return decoded.map((key, value) => MapEntry(key.toString(), value));
 }

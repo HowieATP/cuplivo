@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 
 void main() {
-  test('Web chat uses protocol v3 and bundled assets v15', () {
+  test('Web chat uses protocol v3 and bundled assets v16', () {
     expect(webChatProtocolVersion, 3);
-    expect(webChatAssetVersion, 'web-chat-v15');
+    expect(webChatAssetVersion, 'web-chat-v16');
   });
 
   group('Web streaming patch buffer', () {
@@ -129,7 +129,7 @@ void main() {
           lessThanOrEqualTo(webChatMaxChunkBytes),
         );
       }
-      expect(reassembleWebChatChunks(chunks), payload);
+      expect(_reassembleWebChatChunks(chunks), payload);
     });
 
     test('rejects incomplete transfers', () {
@@ -142,7 +142,7 @@ void main() {
       )..removeLast();
 
       expect(
-        () => reassembleWebChatChunks(chunks),
+        () => _reassembleWebChatChunks(chunks),
         throwsA(isA<WebChatProtocolException>()),
       );
     });
@@ -252,4 +252,35 @@ void main() {
       );
     });
   });
+}
+
+Map<String, dynamic> _reassembleWebChatChunks(
+  List<Map<String, dynamic>> chunks,
+) {
+  if (chunks.isEmpty) {
+    throw const WebChatProtocolException('missing chunks');
+  }
+  final ordered = List<Map<String, dynamic>>.of(chunks)
+    ..sort(
+      (left, right) => (left['index'] as num).toInt().compareTo(
+        (right['index'] as num).toInt(),
+      ),
+    );
+  final total = (ordered.first['total'] as num).toInt();
+  if (ordered.length != total ||
+      ordered.indexed.any(
+        (entry) =>
+            (entry.$2['index'] as num).toInt() != entry.$1 ||
+            (entry.$2['total'] as num).toInt() != total,
+      )) {
+    throw const WebChatProtocolException('incomplete transfer');
+  }
+  final bytes = <int>[
+    for (final chunk in ordered) ...base64Decode(chunk['data'] as String),
+  ];
+  final decoded = jsonDecode(utf8.decode(bytes));
+  if (decoded is! Map) {
+    throw const WebChatProtocolException('invalid transfer payload');
+  }
+  return decoded.map((key, value) => MapEntry(key.toString(), value));
 }

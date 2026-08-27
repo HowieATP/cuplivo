@@ -7,6 +7,7 @@ import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/features/chat/models/tool_ui_part.dart';
 import 'package:Cuplivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
+import 'package:Cuplivo/features/home/webview/web_chat_protocol.dart';
 import 'package:Cuplivo/features/home/webview/web_chat_snapshot.dart';
 
 void main() {
@@ -91,7 +92,7 @@ void main() {
 
     final rendered = (snapshot['messages'] as List).single as Map;
     expect(snapshot['protocolVersion'], 3);
-    expect(snapshot['assetVersion'], 'web-chat-v15');
+    expect(snapshot['assetVersion'], 'web-chat-v16');
     expect(snapshot['initialViewportMode'], 'anchor');
     expect(snapshot['locale'], 'zh-Hans');
     expect(snapshot['textDirection'], 'ltr');
@@ -241,6 +242,202 @@ void main() {
     expect(attachments.first['reference'], startsWith('local:'));
     expect(attachments.first['reference'], isNot(contains('/private')));
     expect(attachments.last['name'], 'Doc');
+  });
+
+  test(
+    'complete snapshots strip local attachment markers from Web strings',
+    () {
+      final message = ChatMessage(
+        id: 'private-paths',
+        role: 'assistant',
+        content:
+            'Answer\n[image:/private/photo.png]\n'
+            r'[file:C:\sensitive\doc.pdf|Doc|application/pdf]',
+        translation: r'Translated [image:D:\translation-only.png]',
+        conversationId: 'c1',
+      );
+      final reasoning = stream_ctrl.ReasoningData()
+        ..text = 'Thought [file:/private/reasoning.txt|Reasoning|text/plain]';
+      final snapshot = _minimalWebChatSnapshot(
+        <ChatMessage>[message],
+        reasoning: <String, stream_ctrl.ReasoningData>{message.id: reasoning},
+        toolParts: <String, List<ToolUIPart>>{
+          message.id: const <ToolUIPart>[
+            ToolUIPart(
+              id: 'tool',
+              toolName: 'read_file',
+              arguments: <String, dynamic>{},
+              content: 'Tool output [image:/private/tool.png]',
+            ),
+          ],
+        },
+      );
+
+      final rendered = (snapshot['messages'] as List).single as Map;
+      final serialized = jsonEncode(snapshot);
+      expect(rendered['content'], 'Answer');
+      expect(rendered['translation'], 'Translated');
+      expect((rendered['reasoning'] as List).single['text'], 'Thought');
+      expect((rendered['tools'] as List).single['content'], 'Tool output');
+      expect((rendered['attachments'] as List), hasLength(2));
+      expect(serialized, isNot(contains('/private')));
+      expect(serialized, isNot(contains('sensitive')));
+      expect(serialized, isNot(contains('translation-only')));
+    },
+  );
+
+  test('HTML preview registry binds current fences to their messages', () {
+    const sharedSource = '<button onclick="counter++">Run</button>';
+    final first = ChatMessage(
+      id: 'html-first',
+      role: 'assistant',
+      content:
+          '```html\r\n$sharedSource\r\n```\n'
+          '  ```html\n  <p>Indented preview</p>\n  ```\n'
+          '```dart\n<div>not HTML</div>\n```\n'
+          '    ```html\n    <p>not a fence</p>\n    ```',
+      translation: '~~~HTML\n<p>Translated preview</p>\n~~~',
+      conversationId: 'c1',
+    );
+    final second = ChatMessage(
+      id: 'html-second',
+      role: 'assistant',
+      content: '```html\n$sharedSource\n```',
+      conversationId: 'c1',
+    );
+    final snapshot = _minimalWebChatSnapshot(<ChatMessage>[first, second]);
+    final registry = buildWebChatHtmlPreviewRegistry(snapshot);
+
+    final firstHandle = webChatHtmlPreviewHandle(first.id, sharedSource);
+    final secondHandle = webChatHtmlPreviewHandle(second.id, sharedSource);
+    expect(firstHandle, isNot(secondHandle));
+    expect(registry[firstHandle]?.messageId, first.id);
+    expect(registry[secondHandle]?.messageId, second.id);
+    expect(
+      registry.values.map((entry) => entry.source),
+      contains('<p>Translated preview</p>'),
+    );
+    expect(
+      registry.values.map((entry) => entry.source),
+      contains('<p>Indented preview</p>'),
+    );
+    expect(
+      registry.values.map((entry) => entry.source),
+      isNot(contains('<div>not HTML</div>')),
+    );
+    expect(
+      registry.values.map((entry) => entry.source),
+      isNot(contains('<p>not a fence</p>')),
+    );
+    expect(
+      resolveWebChatHtmlPreviewSource(
+        messageId: first.id,
+        rawSource: '$sharedSource\n',
+        registry: registry,
+      ).source,
+      sharedSource,
+    );
+    expect(
+      () => resolveWebChatHtmlPreviewSource(
+        messageId: first.id,
+        rawSource: '<p>forged</p>',
+        registry: registry,
+      ),
+      throwsA(isA<WebChatProtocolException>()),
+    );
+    expect(
+      () => resolveWebChatHtmlPreviewSource(
+        messageId: second.id,
+        rawSource: '<p>Translated preview</p>',
+        registry: registry,
+      ),
+      throwsA(isA<WebChatProtocolException>()),
+    );
+  });
+
+  test('HTML preview registry rejects over-limit fences and actions', () {
+    final oversized = List<String>.filled(
+      webChatMaxHtmlPreviewCodeUnits + 1,
+      'x',
+    ).join();
+    final registry = <String, WebChatHtmlPreviewSource>{};
+    registerWebChatHtmlPreviews(
+      messageId: 'oversized',
+      serialized: <String, dynamic>{'content': '```html\n$oversized\n```'},
+      registry: registry,
+    );
+
+    expect(registry, isEmpty);
+    expect(
+      () => resolveWebChatHtmlPreviewSource(
+        messageId: 'oversized',
+        rawSource: oversized,
+        registry: registry,
+      ),
+      throwsA(isA<WebChatProtocolException>()),
+    );
+  });
+
+  test('streaming HTML preview registry replaces stale message sources', () {
+    const contentSource = '<p>Current answer</p>';
+    const oldTranslationSource = '<p>Old translation</p>';
+    const newTranslationSource = '<p>New translation</p>';
+    final registry = <String, WebChatHtmlPreviewSource>{};
+    final serialized = <String, dynamic>{
+      'content': '```html\n$contentSource\n```',
+      'translation': '```html\n$oldTranslationSource\n```',
+    };
+    registerWebChatHtmlPreviews(
+      messageId: 'streaming',
+      serialized: serialized,
+      registry: registry,
+    );
+    serialized['translation'] = '```html\n$newTranslationSource\n```';
+
+    replaceWebChatHtmlPreviews(
+      messageId: 'streaming',
+      serialized: serialized,
+      registry: registry,
+    );
+
+    final sources = registry.values.map((entry) => entry.source).toSet();
+    expect(sources, contains(contentSource));
+    expect(sources, contains(newTranslationSource));
+    expect(sources, isNot(contains(oldTranslationSource)));
+  });
+
+  test('HTML preview registry excludes content that is still streaming', () {
+    final streaming = ChatMessage(
+      id: 'streaming-html',
+      role: 'assistant',
+      content: '```html\n<p>Partial</p>\n```',
+      conversationId: 'c1',
+      isStreaming: true,
+    );
+    final snapshot = _minimalWebChatSnapshot(<ChatMessage>[streaming]);
+    final registry = buildWebChatHtmlPreviewRegistry(snapshot);
+    registerWebChatHtmlPreviews(
+      messageId: 'translation',
+      serialized: <String, dynamic>{
+        'content': '```html\n<p>Stable answer</p>\n```',
+        'translation': '```html\n<p>Partial translation</p>\n```',
+        'translationStreaming': true,
+      },
+      registry: registry,
+    );
+
+    expect(
+      registry.values.map((entry) => entry.source),
+      contains('<p>Stable answer</p>'),
+    );
+    expect(
+      registry.values.map((entry) => entry.source),
+      isNot(contains('<p>Partial</p>')),
+    );
+    expect(
+      registry.values.map((entry) => entry.source),
+      isNot(contains('<p>Partial translation</p>')),
+    );
   });
 
   test('media registry keeps local and bundled asset paths opaque', () {
@@ -419,3 +616,38 @@ void main() {
     );
   });
 }
+
+Map<String, dynamic> _minimalWebChatSnapshot(
+  List<ChatMessage> messages, {
+  Map<String, stream_ctrl.ReasoningData> reasoning =
+      const <String, stream_ctrl.ReasoningData>{},
+  Map<String, List<ToolUIPart>> toolParts = const <String, List<ToolUIPart>>{},
+}) => const WebChatSnapshotBuilder().build(
+  renderSessionId: 'test-session',
+  conversationId: 'c1',
+  renderRevision: 1,
+  actionEpoch: 1,
+  messages: messages,
+  byGroup: const <String, List<ChatMessage>>{},
+  versionSelections: const <String, int>{},
+  reasoning: reasoning,
+  reasoningSegments: const <String, List<stream_ctrl.ReasoningSegmentData>>{},
+  contentSplits: const <String, stream_ctrl.ContentSplitData>{},
+  toolParts: toolParts,
+  selectedItems: const <String>{},
+  selecting: false,
+  truncCollapsedIndex: -1,
+  suggestions: const <String>[],
+  hasMoreBefore: false,
+  hasMoreAfter: false,
+  strings: const <String, String>{},
+  theme: const <String, String>{},
+  user: const <String, dynamic>{'name': 'User'},
+  display: const <String, dynamic>{},
+  topContentPadding: 0,
+  bottomContentPadding: 0,
+  assistant: null,
+  fontScale: 1,
+  canStartMultiAI: false,
+  autoCollapseThinking: true,
+);

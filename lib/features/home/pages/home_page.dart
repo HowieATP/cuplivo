@@ -50,6 +50,7 @@ import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/skills_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../../desktop/document_processing_popover.dart';
+import '../../../desktop/html_preview_dialog.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
@@ -57,6 +58,7 @@ import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../chat/pages/reading_mode_page.dart';
 import '../../chat/pages/image_viewer_page.dart';
+import '../../chat/pages/html_preview_page.dart';
 import '../../chat/models/tool_ui_part.dart';
 import '../../chat/utils/message_visual_content.dart';
 import '../../chat/widgets/citation_sources_sheet.dart';
@@ -1562,6 +1564,17 @@ class _HomePageState extends State<HomePage>
               entry.value.value: entry.key,
         },
       );
+      final htmlPreviewRegistry = buildWebChatHtmlPreviewRegistry(snapshot);
+      final htmlPreviewMessages = <String, Map<String, dynamic>>{};
+      for (final raw
+          in snapshot['messages'] as List<dynamic>? ?? const <dynamic>[]) {
+        if (raw is! Map) continue;
+        final message = raw.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final messageId = message['id']?.toString() ?? '';
+        if (messageId.isNotEmpty) htmlPreviewMessages[messageId] = message;
+      }
       return WebConversationViewport(
         key: const ValueKey<String>('web-conversation-viewport'),
         snapshot: snapshot,
@@ -1572,6 +1585,21 @@ class _HomePageState extends State<HomePage>
           final patch = _buildWebStreamingPatch(messageId, data, assistant);
           if (patch != null) {
             _registerWebPatchMedia(messageId, patch, mediaRegistry);
+            final current = htmlPreviewMessages[messageId];
+            if (current != null) {
+              current.addAll(patch);
+              if (patch['isStreaming'] == true) {
+                htmlPreviewRegistry.removeWhere(
+                  (_, entry) => entry.messageId == messageId,
+                );
+              } else {
+                replaceWebChatHtmlPreviews(
+                  messageId: messageId,
+                  serialized: current,
+                  registry: htmlPreviewRegistry,
+                );
+              }
+            }
           }
           return patch;
         },
@@ -1579,6 +1607,7 @@ class _HomePageState extends State<HomePage>
           request,
           visibleMessages: messages,
           mediaRegistry: mediaRegistry,
+          htmlPreviewRegistry: htmlPreviewRegistry,
         ),
         onUseFlutter: () {
           setState(() {
@@ -1820,9 +1849,11 @@ class _HomePageState extends State<HomePage>
         'expandCode': l10n.codeBlockExpandButton,
         'collapseCode': l10n.codeBlockCollapseButton,
         'htmlPreview': l10n.webChatHtmlPreview,
+        'openHtmlPreview': l10n.htmlOpenFullScreenPreview,
         'thinking': l10n.chatMessageWidgetThinking,
         'reasoning': l10n.chatMessageWidgetDeepThinking,
         'collapseThinkingSteps': l10n.chainOfThoughtCollapse,
+        'expandThinkingSteps': l10n.chainOfThoughtExpandSteps('{count}'),
         'toolCall': l10n.webChatToolCall,
         'toolResult': l10n.webChatToolResult,
         'translation': l10n.webChatTranslation,
@@ -1958,11 +1989,6 @@ class _HomePageState extends State<HomePage>
     for (final message in snapshot['messages'] as List<dynamic>) {
       final map = message as Map<String, dynamic>;
       final tools = map['tools'] as List<dynamic>;
-      final stepCount =
-          (map['reasoning'] as List<dynamic>).length + tools.length;
-      if (stepCount > 2) {
-        map['expandStepsLabel'] = l10n.chainOfThoughtExpandSteps(stepCount - 2);
-      }
       for (final tool in tools) {
         final toolMap = tool as Map<String, dynamic>;
         final toolId = toolMap['id']?.toString() ?? '';
@@ -2000,7 +2026,7 @@ class _HomePageState extends State<HomePage>
       return <String, dynamic>{
         'id': messageId,
         'patchKind': 'translation',
-        'translation': data.translation,
+        'translation': stripWebChatAttachmentMarkers(data.translation!),
       };
     }
     final visual = messageVisualContent(
@@ -2009,10 +2035,9 @@ class _HomePageState extends State<HomePage>
     );
     final reasoning = _webStreamingReasoning(messageId, data);
     final tools = _webStreamingToolParts(messageId);
-    final hiddenStepCount = reasoning.length + tools.length - 2;
     return <String, dynamic>{
       'id': messageId,
-      'content': visual,
+      'content': stripWebChatAttachmentMarkers(visual),
       'isStreaming': message.isStreaming,
       'tokens': data.totalTokens,
       'reasoning': reasoning,
@@ -2022,11 +2047,9 @@ class _HomePageState extends State<HomePage>
         'toolCounts': data.toolCountAtSplit ?? const <int>[],
       },
       'tools': tools,
-      if (hiddenStepCount > 0)
-        'expandStepsLabel': AppLocalizations.of(
-          context,
-        )!.chainOfThoughtExpandSteps(hiddenStepCount),
-      'translation': data.translation,
+      'translation': data.translation == null
+          ? null
+          : stripWebChatAttachmentMarkers(data.translation!),
     };
   }
 
@@ -2065,6 +2088,9 @@ class _HomePageState extends State<HomePage>
     return (_controller.toolParts[messageId] ?? const <ToolUIPart>[])
         .map((part) {
           final json = part.toJson();
+          if (json['content'] case final String content) {
+            json['content'] = stripWebChatAttachmentMarkers(content);
+          }
           final arguments = Map<String, dynamic>.of(part.arguments);
           if (approvalService.isPending(part.id)) {
             arguments['approvalRequired'] = true;
@@ -2092,7 +2118,7 @@ class _HomePageState extends State<HomePage>
               'kind': 'segment',
               'index': entry.key,
               'key': '$messageId:reasoning:segment:${entry.key}',
-              'text': entry.value.text,
+              'text': stripWebChatAttachmentMarkers(entry.value.text),
               'expanded': entry.value.expanded,
               'loading': entry.value.finishedAt == null,
               'startAt': entry.value.startAt?.toIso8601String(),
@@ -2110,7 +2136,7 @@ class _HomePageState extends State<HomePage>
         'kind': 'single',
         'index': 0,
         'key': '$messageId:reasoning:single:0',
-        'text': data.reasoningText,
+        'text': stripWebChatAttachmentMarkers(data.reasoningText!),
         'expanded':
             _controller.reasoning[messageId]?.expanded ??
             !context.read<SettingsProvider>().autoCollapseThinking,
@@ -2126,6 +2152,7 @@ class _HomePageState extends State<HomePage>
     WebChatActionRequest request, {
     required List<ChatMessage> visibleMessages,
     required Map<String, WebChatMediaSource> mediaRegistry,
+    required Map<String, WebChatHtmlPreviewSource> htmlPreviewRegistry,
   }) async {
     final message = request.messageId == null
         ? null
@@ -2246,6 +2273,13 @@ class _HomePageState extends State<HomePage>
         return;
       case 'showCitations':
         _showWebCitations(message);
+        return;
+      case 'openHtmlPreview':
+        await _openWebHtmlPreview(
+          message,
+          request.payload,
+          htmlPreviewRegistry,
+        );
         return;
       case 'setReasoningExpanded':
         final target = WebChatReasoningTarget.fromPayload(request.payload);
@@ -2622,6 +2656,49 @@ class _HomePageState extends State<HomePage>
     await _controller.handleMultiAIAction(message);
   }
 
+  Future<void> _openWebHtmlPreview(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatHtmlPreviewSource> registry,
+  ) async {
+    final registered = resolveWebChatHtmlPreviewSource(
+      messageId: message.id,
+      rawSource: payload['source'],
+      registry: registry,
+    );
+    if (!mounted) return;
+    if (Platform.isAndroid || Platform.isIOS) {
+      await Navigator.of(context).push<void>(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) =>
+              HtmlPreviewPage(html: registered.source, isolated: true),
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 240),
+          transitionsBuilder: (context, animation, _, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(opacity: curved, child: child);
+          },
+        ),
+      );
+      return;
+    }
+    if (Platform.isMacOS || Platform.isWindows) {
+      await showHtmlPreviewDesktopDialog(
+        context,
+        html: registered.source,
+        isolated: true,
+      );
+      return;
+    }
+    throw const WebChatProtocolException(
+      'HTML preview is unsupported on this platform',
+    );
+  }
+
   ChatMessage? _findWebActionMessage(
     String messageId,
     List<ChatMessage> visibleMessages,
@@ -2656,6 +2733,7 @@ class _HomePageState extends State<HomePage>
       'openAttachment',
       'openCitation',
       'showCitations',
+      'openHtmlPreview',
     };
     if (common.contains(action)) return true;
     if (action == 'edit' || action == 'resend') return message.role == 'user';
@@ -2744,9 +2822,30 @@ class _HomePageState extends State<HomePage>
     _webFlutterConversationOverrides.add(conversationId);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      await _confirmWebMultiAIFallback();
+      await _showWebMultiAIFallbackNotice();
       if (mounted) setState(() {});
     });
+  }
+
+  Future<void> _showWebMultiAIFallbackNotice() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(l10n.webChatMultiAIFallbackNoticeTitle),
+          content: Text(l10n.webChatMultiAIFallbackNoticeBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n.webChatMultiAIFallbackNoticeAcknowledge),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<bool> _confirmWebMultiAIFallback() async {

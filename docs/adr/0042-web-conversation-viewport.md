@@ -15,15 +15,29 @@ updates are coalesced per animation frame and patch only affected messages.
 
 Browser assets and reviewed Markdown dependencies are committed locally. The
 shell has a deny-by-default CSP, sanitizes generated HTML, denies native
-permissions and navigation, and delegates external links to Dart. Scripted HTML
-previews run only in sandboxed, network-denied iframes. A failed rich-content
+permissions and navigation, and delegates external links to Dart. DOMPurify is
+pinned to the reviewed official 3.4.14 bundle, and Markdown uses an explicit
+tag and attribute allowlist. Windows loads the versioned cache through a
+WebView2 HTTPS virtual-host mapping with folder access set to `deny`; the chat
+shell never uses a `file://` origin. Local attachment paths remain only in Dart
+registries, while the Web surface receives opaque handles.
+
+The chat shell never executes HTML fences. An `openHtmlPreview` action is
+accepted only when Dart can match its bounded source to a current HTML fence in
+the targeted message. The source then runs in a separate preview WebView with
+no chat-domain bridge or console bridge, denied native permissions, denied
+network access, and a sandboxed opaque-origin iframe. A failed rich-content
 block is isolated; shell, runtime, resource, and protocol failures use a
 Flutter-hosted error surface with retry, content-free diagnostics, and a
 conversation-scoped Flutter fallback.
 
-The setting is device-local, defaults off, and is absent on Linux and Flutter
-Web. Group chat and MultiAI remain Flutter-rendered. The same 360-message window
-and 20-message pagination contract applies to both renderers.
+The setting is persisted in SharedPreferences, is device-local, defaults off,
+and is excluded from backup/import/export. It is absent on Linux and Flutter
+Web. Group chat and MultiAI remain Flutter-rendered. Existing MultiAI cards
+force the current conversation to Flutter with a non-cancelable notice;
+starting MultiAI from Web remains an explicit confirm/cancel transition. The
+same 360-message window and 20-message pagination contract applies to both
+renderers.
 
 ## Alternatives rejected
 

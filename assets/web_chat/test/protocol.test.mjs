@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
@@ -15,6 +16,7 @@ import {
   createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
   createRenderGate,
+  formatCountTemplate,
   formatReasoningElapsed,
   longestStablePrefix,
   mountCodeBlock,
@@ -22,7 +24,7 @@ import {
   verticalGestureIntent,
   normalizeMeasuredHeight,
   normalizeContentInset,
-  rangeChanged,
+  partitionThinkingSteps,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
@@ -39,6 +41,7 @@ const appSource = readFileSync(new URL('../app.mjs', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 const htmlSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const markedSource = readFileSync(new URL('../vendor/marked.min.js', import.meta.url), 'utf8');
+const purifySource = readFileSync(new URL('../vendor/purify.min.js', import.meta.url), 'utf8');
 const highlightSource = readFileSync(new URL('../vendor/highlight.min.js', import.meta.url), 'utf8');
 const katexStyleSource = readFileSync(new URL('../vendor/katex.min.css', import.meta.url), 'utf8');
 
@@ -100,14 +103,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -185,7 +188,7 @@ test('stream patches can register opaque media without leaking it into messages'
 
 test('same-session streaming snapshots preserve a newer live patch', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
   };
@@ -200,7 +203,7 @@ test('same-session streaming snapshots preserve a newer live patch', () => {
 
 test('live translation survives unrelated snapshots until it is finalized', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v15',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{
       id: 'm', content: 'answer', isStreaming: false,
@@ -594,17 +597,6 @@ test('logical message index resolves when no rendered DOM anchor is available', 
   assert.equal(messageIndexAtOffset([100, 120, 140], 999), 2);
   assert.equal(messageIndexAtOffset([], 20), -1);
   assert.equal(messageIndexAtOffset([100, Number.NaN, 140], 150), 1);
-});
-
-test('measured heights rebuild only when the visible range changes', () => {
-  assert.equal(
-    rangeChanged({ start: 4, end: 12 }, { start: 4, end: 12 }),
-    false,
-  );
-  assert.equal(
-    rangeChanged({ start: 4, end: 12 }, { start: 3, end: 12 }),
-    true,
-  );
 });
 
 test('offscreen zero-size observations never replace stable message heights', () => {
@@ -1205,6 +1197,60 @@ test('thinking step toggle stays above every step and supports collapse', () => 
   assert.match(collapseBody, /aria-expanded/);
   assert.doesNotMatch(collapseBody, /show\.remove\(\)/);
   assert.match(collapseBody, /beginLayoutInteraction\(toggle\)/);
+  assert.match(collapseBody, /partitionThinkingSteps\(steps\)/);
+  assert.match(
+    collapseBody,
+    /formatCountTemplate\([\s\S]*?t\('expandThinkingSteps'\)[\s\S]*?collapsibleSteps\.length/,
+  );
+  assert.doesNotMatch(collapseBody, /message\.expandStepsLabel/);
+});
+
+test('thinking collapse counts hidden steps independently for every chain card', () => {
+  const firstCard = partitionThinkingSteps(['a', 'b', 'c', 'd', 'e']);
+  const secondCard = partitionThinkingSteps(['f', 'g', 'h']);
+  const boundaryCard = partitionThinkingSteps(['i', 'j']);
+
+  assert.deepEqual(firstCard.collapsed, ['a', 'b', 'c']);
+  assert.deepEqual(firstCard.visible, ['d', 'e']);
+  assert.deepEqual(secondCard.collapsed, ['f']);
+  assert.deepEqual(secondCard.visible, ['g', 'h']);
+  assert.deepEqual(boundaryCard.collapsed, []);
+  assert.deepEqual(boundaryCard.visible, ['i', 'j']);
+  assert.equal(formatCountTemplate('Show {count} more steps', 3), 'Show 3 more steps');
+  assert.equal(formatCountTemplate('展开更多 {count} 步', 1), '展开更多 1 步');
+});
+
+test('streaming thinking counts track the current card without a message total', () => {
+  const steps = ['reasoning', 'tool-1'];
+  assert.equal(partitionThinkingSteps(steps).collapsed.length, 0);
+  steps.push('tool-2');
+  assert.equal(partitionThinkingSteps(steps).collapsed.length, 1);
+  steps.push('tool-3', 'tool-4');
+  assert.equal(partitionThinkingSteps(steps).collapsed.length, 3);
+  assert.throws(() => formatCountTemplate('Missing placeholder', 1));
+});
+
+test('HTML preview stays outside the chat shell and Markdown uses an allowlist', () => {
+  const sanitizerStart = appSource.indexOf('function sanitizeMarkdownHtml');
+  const sanitizerEnd = appSource.indexOf('function markMarkdownViewportAnchors', sanitizerStart);
+  const sanitizer = appSource.slice(sanitizerStart, sanitizerEnd);
+  assert.match(sanitizer, /ALLOWED_TAGS/);
+  assert.match(sanitizer, /ALLOWED_ATTR/);
+  assert.match(sanitizer, /ALLOW_DATA_ATTR:\s*false/);
+  assert.match(sanitizer, /SANITIZE_NAMED_PROPS:\s*true/);
+  assert.doesNotMatch(sanitizer, /USE_PROFILES/);
+  assert.match(appSource, /sendAction\('openHtmlPreview', messageId, \{ source \}\)/);
+  assert.doesNotMatch(appSource, /createElement\(['"]iframe['"]\)/);
+  assert.doesNotMatch(appSource, /\.srcdoc\s*=/);
+  assert.match(htmlSource, /frame-src 'none'/);
+});
+
+test('bundled DOMPurify version and official bundle digest stay pinned', () => {
+  assert.match(purifySource, /DOMPurify 3\.4\.14/);
+  assert.equal(
+    createHash('sha256').update(purifySource).digest('hex'),
+    'c2f26ea4fc0d88141c9aa430eb515ac86fce59418ceebd85fa475b87a8d6c3e6',
+  );
 });
 
 test('virtual boundaries show a localized loader and use budgeted detached work', () => {

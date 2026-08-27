@@ -6795,6 +6795,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webChatMultiAIFallbackConfirm => 'Switch and continue';
 
   @override
+  String get webChatMultiAIFallbackNoticeTitle =>
+      'This conversation is using Flutter rendering';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI is currently rendered by Flutter, so this conversation switched to Flutter rendering until the app restarts or WebView rendering is turned off.';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => 'Got it';
+
+  @override
   String get webChatTimelineLabel => 'Conversation messages';
 
   @override

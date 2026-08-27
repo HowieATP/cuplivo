@@ -13,12 +13,14 @@ import {
   createRenderGate,
   createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
+  formatCountTemplate,
   formatReasoningElapsed,
   longestStablePrefix,
   mountCodeBlock,
   messageIndexAtOffset,
   normalizeMeasuredHeight,
   normalizeContentInset,
+  partitionThinkingSteps,
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
@@ -35,6 +37,7 @@ const timeline = document.getElementById('timeline');
 const backgroundLayer = document.getElementById('chat-background');
 const virtualWindowLoader = document.getElementById('virtual-window-loader');
 const virtualWindowLoaderLabel = document.getElementById('virtual-window-loader-label');
+const maxHtmlPreviewCodeUnits = 1024 * 1024;
 let state = null;
 let requestSequence = 0;
 const heights = new Map();
@@ -613,10 +616,25 @@ function stableTextKey(prefix, source) {
 
 function sanitizeMarkdownHtml(html) {
   return window.DOMPurify.sanitize(html, {
-    USE_PROFILES: { html: true, svg: true, svgFilters: true },
-    ADD_ATTR: ['target', 'rel', 'referrerpolicy'],
-    FORBID_TAGS: ['style', 'form', 'object', 'iframe', 'script'],
+    ALLOWED_TAGS: [
+      'a', 'abbr', 'b', 'blockquote', 'br', 'code', 'del', 'details', 'div',
+      'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'kbd',
+      'li', 'mark', 'ol', 'p', 'pre', 's', 'small', 'span', 'strong', 'sub',
+      'summary', 'sup', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul',
+    ],
+    ALLOWED_ATTR: [
+      'alt', 'class', 'colspan', 'dir', 'height', 'href', 'lang', 'loading',
+      'referrerpolicy', 'rel', 'rowspan', 'scope', 'src', 'start', 'target',
+      'title', 'width',
+    ],
+    ALLOW_ARIA_ATTR: false,
+    ALLOW_DATA_ATTR: false,
+    FORBID_TAGS: [
+      'style', 'form', 'object', 'embed', 'iframe', 'script', 'template',
+      'textarea', 'title', 'xmp', 'noembed', 'noframes', 'noscript',
+    ],
     FORBID_ATTR: ['style', 'srcset'],
+    SANITIZE_NAMED_PROPS: true,
   });
 }
 
@@ -848,7 +866,12 @@ function enhanceMarkdown(root, streaming, messageId = null) {
       continue;
     }
     if (highlightLanguage === 'html' && !streaming) {
-      addHtmlPreview(pre, code.textContent ?? '', `${expansionKey}:preview`);
+      addHtmlPreview(
+        pre,
+        code.textContent ?? '',
+        `${expansionKey}:preview`,
+        messageId,
+      );
     }
     const displaySource = source.replace(/(?:\r\n|\r|\n)+$/, '');
     if (!streaming && !readyRenderers.has('highlight')) {
@@ -1047,15 +1070,19 @@ async function renderMermaid(pre, source, messageId) {
   }
 }
 
-function addHtmlPreview(pre, source, key) {
-  const frame = document.createElement('iframe');
-  frame.setAttribute('sandbox', 'allow-scripts');
-  frame.referrerPolicy = 'no-referrer';
-  frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:">${source}`;
+function addHtmlPreview(pre, source, key, messageId) {
+  if (!messageId || source.length > maxHtmlPreviewCodeUnits) return;
+  const body = document.createElement('div');
+  body.className = 'html-preview-body';
+  body.append(button(
+    t('openHtmlPreview'),
+    () => sendAction('openHtmlPreview', messageId, { source }),
+    'action html-preview-open',
+  ));
   pre.after(disclosure({
     key,
     label: t('htmlPreview'),
-    body: frame,
+    body,
     expanded: localExpansion(key, false),
     className: 'html-preview',
     onToggle: (next) => {
@@ -1324,10 +1351,9 @@ function applyThinkingStepCollapse(message, parent) {
   for (const [cardIndex, card] of [...parent.querySelectorAll(':scope > .chain-card')].entries()) {
     const steps = [...card.children].filter((node) =>
       node.dataset?.component === 'reasoning' || node.dataset?.component === 'tool');
-    const hiddenCount = steps.length - 2;
-    if (hiddenCount <= 0) continue;
+    const { collapsed: collapsibleSteps } = partitionThinkingSteps(steps);
+    if (collapsibleSteps.length === 0) continue;
     const key = `${message.id}:thinking-steps:${cardIndex}`;
-    const collapsibleSteps = steps.slice(0, hiddenCount);
     const toggle = button(
       '',
       () => {
@@ -1346,7 +1372,10 @@ function applyThinkingStepCollapse(message, parent) {
       for (const step of collapsibleSteps) step.hidden = !expanded;
       const label = expanded
         ? t('collapseThinkingSteps')
-        : message.expandStepsLabel ?? String(hiddenCount);
+        : formatCountTemplate(
+            t('expandThinkingSteps'),
+            collapsibleSteps.length,
+          );
       toggle.textContent = label;
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('aria-expanded', String(expanded));
@@ -1748,7 +1777,6 @@ function streamStructureSignature(message) {
     contentSplits: message.contentSplits,
     tools: message.tools,
     translation: message.translation,
-    expandStepsLabel: message.expandStepsLabel,
   }));
   streamStructureSignatureCache.set(message, signature);
   return signature;

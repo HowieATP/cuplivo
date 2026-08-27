@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 3;
-export const ASSET_VERSION = 'web-chat-v15';
+export const ASSET_VERSION = 'web-chat-v16';
 
 const transfers = new Map();
 
@@ -60,7 +60,6 @@ export function reduceEnvelope(state, envelope) {
               reasoning: live.reasoning,
               contentSplits: live.contentSplits,
               tools: live.tools,
-              expandStepsLabel: live.expandStepsLabel,
               translation: live.translation,
               streamRevision: live.streamRevision,
             };
@@ -436,14 +435,32 @@ export function messageIndexAtOffset(heights, scrollTop, fallbackHeight = 170) {
   return heights.length - 1;
 }
 
-export function rangeChanged(previous, next) {
-  return previous.start !== next.start || previous.end !== next.end;
-}
-
 export function normalizeContentInset(value, fallback = 8) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? value
     : fallback;
+}
+
+export function partitionThinkingSteps(steps, retainedCount = 2) {
+  const retained = Number.isInteger(retainedCount) && retainedCount >= 0
+    ? retainedCount
+    : 2;
+  const hiddenCount = Math.max(0, steps.length - retained);
+  return {
+    collapsed: steps.slice(0, hiddenCount),
+    visible: steps.slice(hiddenCount),
+  };
+}
+
+export function formatCountTemplate(template, count) {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error('invalid_count_template_value');
+  }
+  const source = String(template ?? '');
+  if (!source.includes('{count}')) {
+    throw new Error('count_template_placeholder_missing');
+  }
+  return source.split('{count}').join(String(count));
 }
 
 export function normalizeMeasuredHeight(value) {

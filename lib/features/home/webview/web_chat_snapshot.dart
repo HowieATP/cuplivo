@@ -14,6 +14,156 @@ import '../controllers/stream_controller.dart' as stream_ctrl;
 import 'web_chat_protocol.dart';
 
 final DateFormat _webChatTimestampFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+const int webChatMaxHtmlPreviewCodeUnits = 1024 * 1024;
+
+String stripWebChatAttachmentMarkers(String content) => content
+    .replaceAll(RegExp(r'\[image:[^\]]+\]'), '')
+    .replaceAll(RegExp(r'\[file:[^\]]+\]'), '')
+    .trim();
+
+String normalizeWebChatHtmlPreviewSource(String source) =>
+    source.replaceAll(RegExp(r'\r\n?'), '\n').replaceFirst(RegExp(r'\n+$'), '');
+
+String webChatHtmlPreviewHandle(String messageId, String source) {
+  final normalized = normalizeWebChatHtmlPreviewSource(source);
+  final digest = sha256.convert(utf8.encode('$messageId\u0000$normalized'));
+  return 'html:$digest';
+}
+
+class WebChatHtmlPreviewSource {
+  const WebChatHtmlPreviewSource({
+    required this.messageId,
+    required this.source,
+  });
+
+  final String messageId;
+  final String source;
+}
+
+WebChatHtmlPreviewSource resolveWebChatHtmlPreviewSource({
+  required String messageId,
+  required Object? rawSource,
+  required Map<String, WebChatHtmlPreviewSource> registry,
+}) {
+  if (rawSource is! String ||
+      rawSource.length > webChatMaxHtmlPreviewCodeUnits) {
+    throw const WebChatProtocolException('invalid HTML preview source');
+  }
+  final source = normalizeWebChatHtmlPreviewSource(rawSource);
+  final handle = webChatHtmlPreviewHandle(messageId, source);
+  final registered = registry[handle];
+  if (registered == null ||
+      registered.messageId != messageId ||
+      registered.source != source) {
+    throw const WebChatProtocolException('HTML preview source is stale');
+  }
+  return registered;
+}
+
+Map<String, WebChatHtmlPreviewSource> buildWebChatHtmlPreviewRegistry(
+  Map<String, dynamic> snapshot,
+) {
+  final registry = <String, WebChatHtmlPreviewSource>{};
+  for (final rawMessage
+      in snapshot['messages'] as List<dynamic>? ?? const <dynamic>[]) {
+    if (rawMessage is! Map) continue;
+    final message = rawMessage.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+    final messageId = message['id']?.toString() ?? '';
+    if (messageId.isEmpty || message['isStreaming'] == true) continue;
+    registerWebChatHtmlPreviews(
+      messageId: messageId,
+      serialized: message,
+      registry: registry,
+    );
+  }
+  return registry;
+}
+
+void registerWebChatHtmlPreviews({
+  required String messageId,
+  required Map<String, dynamic> serialized,
+  required Map<String, WebChatHtmlPreviewSource> registry,
+}) {
+  void registerMarkdown(Object? raw) {
+    if (raw is! String || raw.isEmpty) return;
+    for (final source in webChatHtmlPreviewSources(raw)) {
+      if (source.length > webChatMaxHtmlPreviewCodeUnits) continue;
+      final handle = webChatHtmlPreviewHandle(messageId, source);
+      registry[handle] = WebChatHtmlPreviewSource(
+        messageId: messageId,
+        source: source,
+      );
+    }
+  }
+
+  registerMarkdown(serialized['content']);
+  if (serialized['translationStreaming'] != true) {
+    registerMarkdown(serialized['translation']);
+  }
+  for (final raw
+      in serialized['reasoning'] as List<dynamic>? ?? const <dynamic>[]) {
+    if (raw is Map && raw['loading'] != true) registerMarkdown(raw['text']);
+  }
+  for (final raw
+      in serialized['tools'] as List<dynamic>? ?? const <dynamic>[]) {
+    if (raw is Map && raw['loading'] != true) {
+      registerMarkdown(raw['content']);
+    }
+  }
+}
+
+void replaceWebChatHtmlPreviews({
+  required String messageId,
+  required Map<String, dynamic> serialized,
+  required Map<String, WebChatHtmlPreviewSource> registry,
+}) {
+  registry.removeWhere((_, entry) => entry.messageId == messageId);
+  registerWebChatHtmlPreviews(
+    messageId: messageId,
+    serialized: serialized,
+    registry: registry,
+  );
+}
+
+Iterable<String> webChatHtmlPreviewSources(String markdown) sync* {
+  final normalized = markdown.replaceAll(RegExp(r'\r\n?'), '\n');
+  final lines = normalized.split('\n');
+  final openingPattern = RegExp(r'^( {0,3})((`{3,})|(~{3,}))[ \t]*(.*)$');
+  for (var index = 0; index < lines.length; index++) {
+    final opening = openingPattern.firstMatch(lines[index]);
+    if (opening == null) continue;
+    final indent = opening.group(1)!.length;
+    final fence = opening.group(2)!;
+    final marker = fence[0];
+    final info = (opening.group(5) ?? '').trim();
+    if (marker == '`' && info.contains('`')) continue;
+    final language = info.isEmpty
+        ? ''
+        : info.split(RegExp(r'\s+')).first.toLowerCase();
+    final code = <String>[];
+    final closingPattern = RegExp(
+      '^ {0,3}${RegExp.escape(marker)}{${fence.length},}[ \\t]*\$',
+    );
+    var cursor = index + 1;
+    while (cursor < lines.length && !closingPattern.hasMatch(lines[cursor])) {
+      final line = lines[cursor];
+      var removed = 0;
+      while (removed < indent &&
+          removed < line.length &&
+          line.codeUnitAt(removed) == 0x20) {
+        removed++;
+      }
+      code.add(line.substring(removed));
+      cursor++;
+    }
+    index = cursor < lines.length ? cursor : lines.length;
+    if (language == 'html') {
+      yield normalizeWebChatHtmlPreviewSource(code.join('\n'));
+    }
+  }
+}
 
 class WebChatSnapshotBuilder {
   const WebChatSnapshotBuilder();
@@ -149,9 +299,10 @@ class WebChatSnapshotBuilder {
       (item) => item.version == selectedVersion,
     );
     final legacy = ThinkingTagParser.parseLegacyInlineBlocks(message.content);
-    final visualContent = message.role == 'assistant'
+    final rawVisualContent = message.role == 'assistant'
         ? messageVisualContent(message, assistant: assistant)
-        : _userVisualContent(message.content);
+        : message.content;
+    final visualContent = stripWebChatAttachmentMarkers(rawVisualContent);
     return <String, dynamic>{
       'id': message.id,
       'index': index,
@@ -170,7 +321,9 @@ class WebChatSnapshotBuilder {
       'durationMs': message.durationMs,
       'isStreaming': message.isStreaming,
       'isPreset': message.isPreset,
-      'translation': message.translation,
+      'translation': message.translation == null
+          ? null
+          : stripWebChatAttachmentMarkers(message.translation!),
       'translationStreaming': translationStreaming,
       'reasoning': _reasoning(
         message,
@@ -187,7 +340,13 @@ class WebChatSnapshotBuilder {
               'toolCounts': contentSplit.toolCounts,
             },
       'tools': (toolParts ?? const <ToolUIPart>[])
-          .map((part) => part.toJson())
+          .map((part) {
+            final serialized = part.toJson();
+            if (serialized['content'] case final String content) {
+              serialized['content'] = stripWebChatAttachmentMarkers(content);
+            }
+            return serialized;
+          })
           .toList(growable: false),
       'citations': buildWebChatCitationSources(
         toolParts ?? const <ToolUIPart>[],
@@ -233,7 +392,7 @@ class WebChatSnapshotBuilder {
               'kind': 'segment',
               'index': entry.key,
               'key': _reasoningKey(message.id, 'segment', entry.key),
-              'text': entry.value.text,
+              'text': stripWebChatAttachmentMarkers(entry.value.text),
               'expanded': entry.value.expanded,
               'loading': entry.value.finishedAt == null && message.isStreaming,
               'startAt': entry.value.startAt?.toIso8601String(),
@@ -259,7 +418,9 @@ class WebChatSnapshotBuilder {
                   'kind': 'segment',
                   'index': entry.key,
                   'key': _reasoningKey(message.id, 'segment', entry.key),
-                  'text': entry.value['text']?.toString() ?? '',
+                  'text': stripWebChatAttachmentMarkers(
+                    entry.value['text']?.toString() ?? '',
+                  ),
                   'expanded': entry.value['expanded'] is bool
                       ? entry.value['expanded']
                       : !autoCollapseThinking,
@@ -287,7 +448,7 @@ class WebChatSnapshotBuilder {
           'kind': 'single',
           'index': 0,
           'key': _reasoningKey(message.id, 'single', 0),
-          'text': text,
+          'text': stripWebChatAttachmentMarkers(text),
           'expanded': live?.expanded ?? !autoCollapseThinking,
           'loading': message.isStreaming && live?.finishedAt == null,
           'startAt': (live?.startAt ?? message.reasoningStartAt)
@@ -306,7 +467,7 @@ class WebChatSnapshotBuilder {
             'kind': 'legacy',
             'index': entry.key,
             'key': _reasoningKey(message.id, 'legacy', entry.key),
-            'text': entry.value,
+            'text': stripWebChatAttachmentMarkers(entry.value),
             'expanded': !autoCollapseThinking,
             'loading': false,
             'startAt': null,
@@ -344,11 +505,6 @@ bool _modelIconIsMonochrome(ChatMessage message) {
   if (asset == null) return false;
   return !asset.contains('-color.');
 }
-
-String _userVisualContent(String content) => content
-    .replaceAll(RegExp(r'\[image:[^\]]+\]'), '')
-    .replaceAll(RegExp(r'\[file:[^\]]+\]'), '')
-    .trim();
 
 List<Map<String, dynamic>> parseWebChatAttachments(String content) {
   final attachments = <Map<String, dynamic>>[];

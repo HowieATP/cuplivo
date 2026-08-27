@@ -59,6 +59,7 @@ class WebConversationViewport extends StatefulWidget {
 
 class _WebConversationViewportState extends State<WebConversationViewport> {
   static const Duration _initializationTimeout = Duration(seconds: 10);
+  static const String _windowsVirtualHost = 'cuplivo-web-chat.invalid';
   static const String _webView2Url =
       'https://developer.microsoft.com/microsoft-edge/webview2/';
   static const List<String> _windowsAssets = <String>[
@@ -257,10 +258,18 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       },
     );
     final shell = await _prepareWindowsShell();
+    await controller.addVirtualHostNameMapping(
+      _windowsVirtualHost,
+      shell.parent.path,
+      winweb.WebviewHostResourceAccessKind.deny,
+    );
     _windowsController = controller;
-    final shellUri = Uri.file(
-      shell.path,
-    ).replace(queryParameters: <String, String>{'platform': 'windows'});
+    final shellUri = Uri(
+      scheme: 'https',
+      host: _windowsVirtualHost,
+      path: '/index.html',
+      queryParameters: <String, String>{'platform': 'windows'},
+    );
     await controller.loadUrl(shellUri.toString());
   }
 
@@ -344,6 +353,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       url.startsWith('file:') ||
       url.startsWith('data:') ||
       url.startsWith('about:') ||
+      url.startsWith('https://$_windowsVirtualHost/') ||
       url.startsWith('https://appassets.androidplatform.net/');
 
   Future<File> _prepareWindowsShell() async {

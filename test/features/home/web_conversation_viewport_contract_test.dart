@@ -162,6 +162,49 @@ void main() {
     expect(targetLookup, isNot(contains('groupedMessages')));
   });
 
+  test('HTML preview actions require a current Dart registry entry', () {
+    final homeSource = File(
+      'lib/features/home/pages/home_page.dart',
+    ).readAsStringSync();
+    final previewSource = File(
+      'lib/shared/widgets/isolated_html_preview_document.dart',
+    ).readAsStringSync();
+
+    expect(homeSource, contains('buildWebChatHtmlPreviewRegistry(snapshot)'));
+    expect(homeSource, contains('replaceWebChatHtmlPreviews('));
+    expect(homeSource, contains('resolveWebChatHtmlPreviewSource('));
+    expect(homeSource, contains("case 'openHtmlPreview':"));
+    expect(homeSource, contains('isolated: true'));
+    expect(previewSource, contains('sandbox="allow-scripts"'));
+    expect(previewSource, isNot(contains('allow-same-origin')));
+    expect(previewSource, contains("connect-src 'none'"));
+    expect(previewSource, contains("form-action 'none'"));
+  });
+
+  test('automatic and explicit MultiAI fallback use distinct dialogs', () {
+    final source = File(
+      'lib/features/home/pages/home_page.dart',
+    ).readAsStringSync();
+    final scheduleStart = source.indexOf('void _scheduleMultiAIFallbackPrompt');
+    final confirmStart = source.indexOf(
+      'Future<bool> _confirmWebMultiAIFallback',
+      scheduleStart,
+    );
+    final automaticBody = source.substring(scheduleStart, confirmStart);
+    final explicitBody = source.substring(
+      confirmStart,
+      source.indexOf('String _webCssColor', confirmStart),
+    );
+
+    expect(automaticBody, contains('_showWebMultiAIFallbackNotice()'));
+    expect(automaticBody, contains('barrierDismissible: false'));
+    expect(automaticBody, contains('PopScope'));
+    expect(automaticBody, contains('canPop: false'));
+    expect(automaticBody, isNot(contains('_confirmWebMultiAIFallback()')));
+    expect(explicitBody, contains('l10n.homePageCancel'));
+    expect(explicitBody, contains('l10n.webChatMultiAIFallbackConfirm'));
+  });
+
   test(
     'conversation switching restores a saved Web viewport before bottoming',
     () {
@@ -225,6 +268,11 @@ void main() {
       source,
       contains("queryParameters: <String, String>{'platform': 'windows'}"),
     );
+    expect(source, contains('addVirtualHostNameMapping'));
+    expect(source, contains("scheme: 'https'"));
+    expect(source, contains("host: _windowsVirtualHost"));
+    expect(source, contains('winweb.WebviewHostResourceAccessKind.deny'));
+    expect(source, isNot(contains('Uri.file(shell.path)')));
     expect(RegExp(r'flush: true').allMatches(source), hasLength(1));
   });
 

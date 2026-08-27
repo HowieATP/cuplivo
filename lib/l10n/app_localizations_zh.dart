@@ -6503,6 +6503,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webChatMultiAIFallbackConfirm => '切换并继续';
 
   @override
+  String get webChatMultiAIFallbackNoticeTitle => '当前会话已使用 Flutter 渲染';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 渲染，因此当前会话已切换到 Flutter 渲染，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
+
+  @override
   String get webChatTimelineLabel => '对话消息';
 
   @override
@@ -15190,6 +15200,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get webChatMultiAIFallbackConfirm => '切换并继续';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle => '当前会话已使用 Flutter 渲染';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 渲染，因此当前会话已切换到 Flutter 渲染，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
 
   @override
   String get webChatTimelineLabel => '对话消息';
@@ -23880,6 +23900,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get webChatMultiAIFallbackConfirm => '切換並繼續';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle => '目前對話已使用 Flutter 算繪';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 算繪，因此目前對話已切換到 Flutter 算繪，直到應用程式重新啟動或關閉 WebView 算繪。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
 
   @override
   String get webChatTimelineLabel => '對話訊息';

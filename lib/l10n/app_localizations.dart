@@ -12293,6 +12293,24 @@ abstract class AppLocalizations {
   /// **'Switch and continue'**
   String get webChatMultiAIFallbackConfirm;
 
+  /// No description provided for @webChatMultiAIFallbackNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is using Flutter rendering'**
+  String get webChatMultiAIFallbackNoticeTitle;
+
+  /// No description provided for @webChatMultiAIFallbackNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MultiAI is currently rendered by Flutter, so this conversation switched to Flutter rendering until the app restarts or WebView rendering is turned off.'**
+  String get webChatMultiAIFallbackNoticeBody;
+
+  /// No description provided for @webChatMultiAIFallbackNoticeAcknowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get webChatMultiAIFallbackNoticeAcknowledge;
+
   /// No description provided for @webChatTimelineLabel.
   ///
   /// In en, this message translates to:

@@ -87,6 +87,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   Timer? _streamFlushTimer;
   Timer? _initializationTimer;
   Timer? _renderCommitTimer;
+  _RenderCommitIdentity? _renderCommitIdentity;
   bool _ready = false;
   bool _firstRenderCommitted = false;
   bool _initializing = false;
@@ -97,6 +98,9 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   bool _snapshotTransferActive = false;
   String? _lastSnapshotSignature;
   String? _errorCode;
+  String? _lastWebDiagnosticCode;
+  int? _failedRenderRevision;
+  int? _failedMessageCount;
   late final String _capabilityToken = _randomCapabilityToken();
   late WebChatActionGate _actionGate = _newActionGate();
   late final WebViewportCommandSender _viewportCommandSender =
@@ -135,10 +139,13 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       _streamFlushTimer = null;
       _streamPatchBuffer.clear();
       _snapshotQueue.clear();
-      _renderCommitTimer?.cancel();
+      _clearRenderCommitWatchdog();
       _firstRenderCommitted = false;
       _nextRenderRevision = 0;
       _lastSnapshotSignature = null;
+      _lastWebDiagnosticCode = null;
+      _failedRenderRevision = null;
+      _failedMessageCount = null;
     }
     if (!identical(oldWidget.viewportPort, widget.viewportPort)) {
       oldWidget.viewportPort.detach(_viewportCommandSender);
@@ -154,7 +161,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     _transportGeneration++;
     _initializationTimer?.cancel();
     _streamFlushTimer?.cancel();
-    _renderCommitTimer?.cancel();
+    _clearRenderCommitWatchdog();
     _streamPatchBuffer.clear();
     _snapshotQueue.clear();
     _detachStreamingListeners();
@@ -188,6 +195,8 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     if (_initializing || _ready) return;
     _initializing = true;
     _errorCode = null;
+    _failedRenderRevision = null;
+    _failedMessageCount = null;
     _webView2Missing = false;
     if (mounted) setState(() {});
     final generation = ++_generation;
@@ -465,8 +474,11 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         // when Flutter's semantic snapshot has not changed since a reload.
         _transportGeneration++;
         _snapshotQueue.clear();
-        _renderCommitTimer?.cancel();
+        _clearRenderCommitWatchdog();
         _lastSnapshotSignature = null;
+        _lastWebDiagnosticCode = null;
+        _failedRenderRevision = null;
+        _failedMessageCount = null;
         _ready = true;
         _firstRenderCommitted = false;
         _initializing = false;
@@ -489,7 +501,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
           debugPrint('WebConversationViewport: ignored stale render ACK');
           return;
         }
-        _renderCommitTimer?.cancel();
+        _clearRenderCommitWatchdog();
         if (!_firstRenderCommitted) {
           _firstRenderCommitted = true;
           if (mounted) setState(() {});
@@ -518,15 +530,42 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       case 'viewportMetrics':
         final wasUserScrolling = widget.viewportPort.isUserScrolling;
         widget.viewportPort.updateMetrics(message);
-        if (!wasUserScrolling && widget.viewportPort.isUserScrolling) {
+        final isUserScrolling = widget.viewportPort.isUserScrolling;
+        if (!wasUserScrolling && isUserScrolling) {
           widget.onUserScrollIntent();
+          _pauseRenderCommitWatchdog();
+        } else if (wasUserScrolling && !isUserScrolling) {
+          _resumeRenderCommitWatchdog();
+          unawaited(_drainSnapshotQueue());
         }
         return;
       case 'diagnostic':
-        debugPrint(
-          'WebConversationViewport: web diagnostic '
-          '${message['code']?.toString() ?? 'unknown'}',
-        );
+        final code = message['code']?.toString() ?? 'unknown';
+        if (code == 'render_failed' && !_isAuthorizedBridgeRequest(message)) {
+          debugPrint(
+            'WebConversationViewport: rejected render failure diagnostic',
+          );
+          return;
+        }
+        _lastWebDiagnosticCode = code;
+        debugPrint('WebConversationViewport: web diagnostic $code');
+        if (code == 'render_failed') {
+          final revision = (message['renderRevision'] as num?)?.toInt();
+          final inFlight = _snapshotQueue.inFlight;
+          final identity =
+              _renderCommitIdentity ??
+              (inFlight == null
+                  ? null
+                  : _RenderCommitIdentity.fromSnapshot(inFlight));
+          if (revision == null ||
+              identity == null ||
+              revision != identity.renderRevision ||
+              !identity.matches(inFlight)) {
+            debugPrint('WebConversationViewport: ignored stale render failure');
+            return;
+          }
+          _fail(_generation, 'render_failed', renderRevision: revision);
+        }
         return;
     }
   }
@@ -708,7 +747,10 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
   }
 
   Future<void> _drainSnapshotQueue() async {
-    if (!_ready || _streamPatchBuffer.inFlight || _snapshotTransferActive) {
+    if (!_ready ||
+        widget.viewportPort.isUserScrolling ||
+        _streamPatchBuffer.inFlight ||
+        _snapshotTransferActive) {
       return;
     }
     final payload = _snapshotQueue.takeNext();
@@ -736,12 +778,65 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
         !_snapshotQueue.hasInFlight) {
       return;
     }
+    final identity = _RenderCommitIdentity.fromSnapshot(payload);
+    if (identity.matches(_snapshotQueue.inFlight)) {
+      _beginRenderCommitWatchdog(identity);
+    }
+  }
+
+  void _beginRenderCommitWatchdog(_RenderCommitIdentity identity) {
+    _renderCommitTimer?.cancel();
+    _renderCommitTimer = null;
+    _renderCommitIdentity = identity;
+    if (!widget.viewportPort.isUserScrolling) {
+      _armRenderCommitWatchdog(identity);
+    }
+  }
+
+  void _armRenderCommitWatchdog(_RenderCommitIdentity identity) {
     _renderCommitTimer?.cancel();
     final generation = _generation;
     _renderCommitTimer = Timer(_initializationTimeout, () {
+      if (_isStale(generation)) return;
+      if (widget.viewportPort.isUserScrolling) {
+        _pauseRenderCommitWatchdog();
+        return;
+      }
+      if (_renderCommitIdentity?.sameAs(identity) != true ||
+          !identity.matches(_snapshotQueue.inFlight)) {
+        return;
+      }
       debugPrint('WebConversationViewport: render commit timed out');
-      _fail(generation, 'render_commit_timeout');
+      _fail(
+        generation,
+        'render_commit_timeout',
+        renderRevision: identity.renderRevision,
+      );
     });
+  }
+
+  void _pauseRenderCommitWatchdog() {
+    // User-controlled scrolling is not part of the Web renderer's effective
+    // commit deadline. The exact in-flight identity remains resumable.
+    _renderCommitTimer?.cancel();
+    _renderCommitTimer = null;
+  }
+
+  void _resumeRenderCommitWatchdog() {
+    if (!_ready || widget.viewportPort.isUserScrolling) return;
+    final identity = _renderCommitIdentity;
+    if (identity == null) return;
+    if (!identity.matches(_snapshotQueue.inFlight)) {
+      _clearRenderCommitWatchdog();
+      return;
+    }
+    _armRenderCommitWatchdog(identity);
+  }
+
+  void _clearRenderCommitWatchdog() {
+    _renderCommitTimer?.cancel();
+    _renderCommitTimer = null;
+    _renderCommitIdentity = null;
   }
 
   Future<void> _sendActionResult(
@@ -896,8 +991,15 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     }
   }
 
-  void _fail(int generation, String code) {
+  void _fail(int generation, String code, {int? renderRevision}) {
     if (_isStale(generation)) return;
+    final inFlightMessages = _snapshotQueue.inFlight?['messages'];
+    final messages = inFlightMessages is List
+        ? inFlightMessages
+        : widget.snapshot['messages'];
+    _failedRenderRevision =
+        renderRevision ?? _renderCommitIdentity?.renderRevision;
+    _failedMessageCount = messages is List ? messages.length : 0;
     _transportGeneration++;
     _streamFlushTimer?.cancel();
     _streamFlushTimer = null;
@@ -907,7 +1009,7 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     _initializing = false;
     _errorCode = code;
     _initializationTimer?.cancel();
-    _renderCommitTimer?.cancel();
+    _clearRenderCommitWatchdog();
     _snapshotQueue.clear();
     if (mounted) setState(() {});
   }
@@ -924,9 +1026,12 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
     _firstRenderCommitted = false;
     _initializing = false;
     _errorCode = null;
-    _renderCommitTimer?.cancel();
+    _clearRenderCommitWatchdog();
     _snapshotQueue.clear();
     _lastSnapshotSignature = null;
+    _lastWebDiagnosticCode = null;
+    _failedRenderRevision = null;
+    _failedMessageCount = null;
     unawaited(_windowsMessageSubscription?.cancel());
     _windowsMessageSubscription = null;
     final windowsController = _windowsController;
@@ -993,6 +1098,10 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       'platform': Platform.operatingSystem,
       'protocolVersion': webChatProtocolVersion,
       'assetVersion': webChatAssetVersion,
+      'renderRevision': _failedRenderRevision,
+      'messageCount': _failedMessageCount,
+      if (_lastWebDiagnosticCode != null)
+        'lastWebDiagnosticCode': _lastWebDiagnosticCode,
     };
     return ColoredBox(
       color: colors.surface,
@@ -1052,6 +1161,36 @@ class _WebConversationViewportState extends State<WebConversationViewport> {
       ),
     );
   }
+}
+
+class _RenderCommitIdentity {
+  const _RenderCommitIdentity({
+    required this.renderSessionId,
+    required this.conversationId,
+    required this.renderRevision,
+  });
+
+  factory _RenderCommitIdentity.fromSnapshot(Map<String, dynamic> snapshot) =>
+      _RenderCommitIdentity(
+        renderSessionId: snapshot['renderSessionId']?.toString() ?? '',
+        conversationId: snapshot['conversationId']?.toString() ?? '',
+        renderRevision: (snapshot['renderRevision'] as num?)?.toInt() ?? -1,
+      );
+
+  final String renderSessionId;
+  final String conversationId;
+  final int renderRevision;
+
+  bool matches(Map<String, dynamic>? snapshot) =>
+      snapshot != null &&
+      snapshot['renderSessionId'] == renderSessionId &&
+      snapshot['conversationId'] == conversationId &&
+      snapshot['renderRevision'] == renderRevision;
+
+  bool sameAs(_RenderCommitIdentity other) =>
+      renderSessionId == other.renderSessionId &&
+      conversationId == other.conversationId &&
+      renderRevision == other.renderRevision;
 }
 
 class _ErrorAction extends StatelessWidget {

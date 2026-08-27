@@ -3,10 +3,13 @@ import {
   PROTOCOL_VERSION,
   buildWithFrameBudget,
   captureAnchor,
+  captureInteractionAnchor,
   captureViewport,
+  commitPendingMeasurements,
   createAdaptiveStreamPresenter,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createRenderCommitCoordinator,
   createRenderGate,
   createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
@@ -19,6 +22,7 @@ import {
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
+  restoreInteractionAnchor,
   restoreViewport,
   virtualCoverage,
   virtualOverscan,
@@ -34,6 +38,7 @@ const virtualWindowLoaderLabel = document.getElementById('virtual-window-loader-
 let state = null;
 let requestSequence = 0;
 const heights = new Map();
+const pendingMeasuredHeights = new Map();
 const pendingActions = new Map();
 const pendingMedia = new Set();
 const localExpansions = new Map();
@@ -77,8 +82,9 @@ let virtualWindowLoading = false;
 let lastTimelineScrollTop = 0;
 let programmaticNavigationActive = false;
 let measuredHeightsPending = false;
+let pendingInteractionAnchor = null;
+let interactionMeasureFrame = 0;
 let bottomHoldTimer = null;
-let renderAckFrame = 0;
 const rendererLoads = new Map();
 const readyRenderers = new Set();
 const pendingRendererRenders = new Set();
@@ -90,6 +96,20 @@ const bridge = {
     else window.CuplivoChat?.postMessage(encoded);
   },
 };
+const renderCommitCoordinator = createRenderCommitCoordinator({
+  commit: (identity) => {
+    if (!state || state.renderSessionId !== identity.renderSessionId ||
+        state.conversationId !== identity.conversationId ||
+        state.renderRevision !== identity.renderRevision) return;
+    bridge.post({
+      type: 'renderCommitted',
+      renderSessionId: identity.renderSessionId,
+      conversationId: identity.conversationId,
+      renderRevision: identity.renderRevision,
+      capabilityToken: state.capabilityToken,
+    });
+  },
+});
 const safeProtocolDiagnostics = new Set([
   'protocol_mismatch',
   'invalid_transfer_sequence',
@@ -382,19 +402,21 @@ function localExpansion(key, defaultValue) {
   return localExpansions.get(key);
 }
 
-function updateDisclosure(root, header, body, expanded) {
+function updateDisclosure(root, header, body, expanded, onLayoutSettled = null) {
   const previous = header.getAttribute('aria-expanded') === 'true';
   root.classList.toggle('is-expanded', expanded);
   header.setAttribute('aria-expanded', String(expanded));
   disclosureAnimations.get(body)?.cancel();
   if (!root.isConnected || previous === expanded) {
     body.hidden = !expanded;
+    onLayoutSettled?.();
     return;
   }
   body.hidden = false;
   if (typeof body.animate !== 'function' ||
       window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
     body.hidden = !expanded;
+    onLayoutSettled?.();
     return;
   }
   const animation = body.animate(
@@ -408,6 +430,7 @@ function updateDisclosure(root, header, body, expanded) {
     if (disclosureAnimations.get(body) !== animation) return;
     disclosureAnimations.delete(body);
     body.hidden = header.getAttribute('aria-expanded') !== 'true';
+    onLayoutSettled?.();
   }).catch((error) => {
     if (error?.name !== 'AbortError') {
       bridge.post({ type: 'diagnostic', code: 'disclosure_animation_failed' });
@@ -430,12 +453,39 @@ function disclosure({
   root.dataset.expansionKey = key;
   const header = button(label, () => {
     const previous = header.getAttribute('aria-expanded') === 'true';
+    let interactionAnchor = captureInteractionAnchor(timeline, header);
     try {
       const requested = !previous;
       const resolved = onToggle?.(requested) ?? requested;
-      updateDisclosure(root, header, body, Boolean(resolved));
+      interactionAnchor = interactionAnchor == null
+        ? null
+        : {
+          ...interactionAnchor,
+          controlled: expansionCoordinator.isPending(key),
+          releaseRequested: false,
+        };
+      const layoutSettled = () => queueInteractionLayoutReconcile(
+        interactionAnchor,
+        true,
+      );
+      updateDisclosure(
+        root,
+        header,
+        body,
+        Boolean(resolved),
+        layoutSettled,
+      );
+      queueInteractionLayoutReconcile(interactionAnchor);
     } catch (error) {
-      updateDisclosure(root, header, body, previous);
+      const rollbackAnchor = interactionAnchor == null
+        ? null
+        : { ...interactionAnchor, releaseRequested: false };
+      const rollbackSettled = () => queueInteractionLayoutReconcile(
+        rollbackAnchor,
+        true,
+      );
+      updateDisclosure(root, header, body, previous, rollbackSettled);
+      queueInteractionLayoutReconcile(rollbackAnchor);
       bridge.post({
         type: 'diagnostic',
         code: safeDiagnosticCode(error, 'disclosure_toggle_failed'),
@@ -1552,7 +1602,7 @@ function updateMountedStreamingContent(messageId, content) {
     bridge.post({ type: 'diagnostic', code: 'stream_markdown_patch_failed' });
     return false;
   }
-  restoreViewport(timeline, viewport);
+  restorePreferredViewport(viewport);
   enforceNavigationEdge();
   sendViewportMetrics();
   reportSlowRender(startedAt, 'stream_markdown_render_slow');
@@ -1576,7 +1626,7 @@ function updateMountedMessage(messageId) {
     state.messages.length,
   );
   slot.replaceChildren(...replacement.children);
-  restoreViewport(timeline, viewport);
+  restorePreferredViewport(viewport);
   enforceNavigationEdge();
   ensureReasoningElapsedTimer();
   sendViewportMetrics();
@@ -1638,7 +1688,7 @@ function render() {
     renderedSessionId = state.renderSessionId;
     renderedConversationId = state.conversationId;
     ensureReasoningElapsedTimer();
-    restoreViewport(timeline, viewport);
+    restorePreferredViewport(viewport, true, true);
     lastTimelineScrollTop = timeline.scrollTop;
     pendingMountedUpdates.clear();
     enforceNavigationEdge();
@@ -1681,7 +1731,7 @@ function render() {
   renderedSessionId = state.renderSessionId;
   renderedConversationId = state.conversationId;
   ensureReasoningElapsedTimer();
-  restoreViewport(timeline, viewport);
+  restorePreferredViewport(viewport, true, true);
   lastTimelineScrollTop = timeline.scrollTop;
   pendingMountedUpdates.clear();
   enforceNavigationEdge();
@@ -1692,21 +1742,81 @@ function render() {
 
 function acknowledgeCommittedRender() {
   if (!state) return;
-  const session = state.renderSessionId;
-  const conversation = state.conversationId;
-  const revision = state.renderRevision;
-  cancelAnimationFrame(renderAckFrame);
-  renderAckFrame = requestAnimationFrame(() => {
-    renderAckFrame = 0;
-    if (!state || state.renderSessionId !== session ||
-        state.conversationId !== conversation || state.renderRevision !== revision) return;
-    bridge.post({
-      type: 'renderCommitted',
-      renderSessionId: session,
-      conversationId: conversation,
-      renderRevision: revision,
-      capabilityToken: state.capabilityToken,
-    });
+  renderCommitCoordinator.request({
+    renderSessionId: state.renderSessionId,
+    conversationId: state.conversationId,
+    renderRevision: state.renderRevision,
+  });
+}
+
+function interactionAnchorCanRelease(anchor) {
+  if (!anchor) return false;
+  if (anchor.controlled) {
+    return !expansionCoordinator.isPending(anchor.expansionKey);
+  }
+  return anchor.releaseRequested === true;
+}
+
+function restorePreferredViewport(
+  viewport,
+  allowInteractionRelease = false,
+  dropMissingInteraction = false,
+) {
+  if (pendingInteractionAnchor) {
+    if (restoreInteractionAnchor(timeline, pendingInteractionAnchor)) {
+      if (allowInteractionRelease &&
+          interactionAnchorCanRelease(pendingInteractionAnchor)) {
+        pendingInteractionAnchor = null;
+      }
+      return;
+    }
+    if (dropMissingInteraction) pendingInteractionAnchor = null;
+  }
+  restoreViewport(timeline, viewport);
+}
+
+function stageMeasuredHeight(id, rawHeight) {
+  const height = normalizeMeasuredHeight(rawHeight);
+  if (!id || height == null) return false;
+  const current = pendingMeasuredHeights.get(id) ?? heights.get(id) ?? 0;
+  if (Math.abs(current - height) <= 1) return false;
+  pendingMeasuredHeights.set(id, height);
+  measuredHeightsPending = true;
+  return true;
+}
+
+function queueInteractionLayoutReconcile(anchor, releaseRequested = false) {
+  if (!anchor) return;
+  const previous = pendingInteractionAnchor;
+  const sameAnchor = previous?.messageId === anchor.messageId &&
+    previous?.expansionKey === anchor.expansionKey;
+  pendingInteractionAnchor = {
+    ...anchor,
+    releaseRequested: Boolean(
+      releaseRequested || anchor.releaseRequested ||
+      (sameAnchor && previous.releaseRequested),
+    ),
+  };
+  // Correct the click-triggered layout change before the browser can paint;
+  // the next frame measures and commits the matching height generation.
+  restoreInteractionAnchor(timeline, pendingInteractionAnchor);
+  cancelVirtualPrefetch();
+  clearTimeout(virtualPruneTimer);
+  if (interactionMeasureFrame) return;
+  interactionMeasureFrame = requestAnimationFrame(() => {
+    interactionMeasureFrame = 0;
+    const activeAnchor = pendingInteractionAnchor;
+    const slot = activeAnchor == null
+      ? null
+      : mountedSlots.get(activeAnchor.messageId);
+    if (slot?.isConnected) {
+      stageMeasuredHeight(
+        activeAnchor.messageId,
+        slot.getBoundingClientRect().height,
+      );
+    }
+    restoreInteractionAnchor(timeline, activeAnchor);
+    scheduleMeasuredHeightReconcile();
   });
 }
 
@@ -1718,48 +1828,72 @@ function handleMeasuredHeights(entries) {
     const height = normalizeMeasuredHeight(
       entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
     );
-    if (id && mountedSlots.get(id) === entry.target && height != null &&
-        Math.abs((heights.get(id) ?? 0) - height) > 1) {
-      heights.set(id, height);
-      changed = true;
+    if (id && mountedSlots.get(id) === entry.target) {
+      changed = stageMeasuredHeight(id, height) || changed;
     }
   }
   if (!changed) return;
-  measuredHeightsPending = true;
   scheduleMeasuredHeightReconcile();
 }
 
 function reconcileMeasuredHeights() {
-  if (!measuredHeightsPending || !state?.messages?.length ||
+  if ((!measuredHeightsPending && !pendingInteractionAnchor) ||
+      !state?.messages?.length ||
       touchActive || userScrolling || virtualWindowLoading ||
       !topSpacer || !bottomSpacer || renderedRange.start < 0) return;
-  measuredHeightsPending = false;
   const viewport = captureViewport(timeline);
-  const coverage = coverageFor(viewport.scrollTop);
-  if (!coverage.covered) {
-    beginVirtualWindowLoad(coverage.requested, coverage.clamped);
+  const changed = measuredHeightsPending
+    ? commitPendingMeasurements(heights, pendingMeasuredHeights)
+    : false;
+  measuredHeightsPending = false;
+  if (!changed) {
+    restorePreferredViewport(viewport, true);
+    sendViewportMetrics();
     return;
   }
   const messages = state.messages;
+  // Publish the ledger and both spacers within one frame before restoring the
+  // interaction anchor. A paint with mixed generations reintroduces jumps.
   topSpacer.style.height = `${messages.slice(0, renderedRange.start)
     .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
   bottomSpacer.style.height = `${messages.slice(renderedRange.end)
     .reduce((sum, message) => sum + messageHeight(message), 0)}px`;
-  restoreViewport(timeline, viewport);
+  restorePreferredViewport(viewport, true);
+  const restoredScrollTop = timeline.scrollTop;
+  const coverage = coverageFor(restoredScrollTop);
+  if (!coverage.covered) {
+    beginVirtualWindowLoad(coverage.requested, restoredScrollTop);
+    return;
+  }
   enforceNavigationEdge();
   sendViewportMetrics();
   const range = visibleRange({
     heights: messages.map(messageHeight),
-    scrollTop: viewport.scrollTop,
+    scrollTop: restoredScrollTop,
     viewportHeight: viewport.viewportHeight,
     overscan: virtualOverscan(viewport.viewportHeight),
   });
   if (range.start < renderedRange.start || range.end > renderedRange.end) {
-    scheduleVirtualPrefetch(viewport.scrollTop);
+    scheduleVirtualPrefetch(restoredScrollTop);
   }
 }
 
-const scheduleRender = createFrameCoalescer(render);
+function renderSafely() {
+  try {
+    render();
+  } catch (error) {
+    bridge.post({
+      type: 'diagnostic',
+      code: 'render_failed',
+      renderSessionId: state?.renderSessionId,
+      conversationId: state?.conversationId,
+      renderRevision: state?.renderRevision,
+      capabilityToken: state?.capabilityToken,
+    });
+  }
+}
+
+const scheduleRender = createFrameCoalescer(renderSafely);
 const scheduleMeasuredHeightReconcile = createFrameCoalescer(
   reconcileMeasuredHeights,
 );
@@ -1827,9 +1961,9 @@ function setVirtualWindowLoading(value) {
 function clampVirtualScroll(scrollTop) {
   const top = Math.max(0, Number(scrollTop) || 0);
   scrollStopLock = true;
-  scrollStopTop = top;
   scrollStopLeft = timeline.scrollLeft;
   timeline.scrollTo({ left: scrollStopLeft, top, behavior: 'auto' });
+  scrollStopTop = timeline.scrollTop;
   if (!scrollStopFrame) scrollStopFrame = requestAnimationFrame(enforceScrollStop);
 }
 
@@ -1917,9 +2051,18 @@ const virtualWindowCoordinator = createVirtualWindowCoordinator({
   clamp: clampVirtualScroll,
   renderTarget: renderVirtualTarget,
   settleTarget: (target) => {
-    scrollStopTop = Math.max(0, Number(target) || 0);
+    const requested = Math.max(0, Number(target) || 0);
+    const restoredInteraction = pendingInteractionAnchor != null &&
+      restoreInteractionAnchor(timeline, pendingInteractionAnchor);
+    if (restoredInteraction &&
+        interactionAnchorCanRelease(pendingInteractionAnchor)) {
+      pendingInteractionAnchor = null;
+    }
+    if (!restoredInteraction) {
+      timeline.scrollTo({ top: requested, behavior: 'auto' });
+    }
+    scrollStopTop = timeline.scrollTop;
     lastTimelineScrollTop = scrollStopTop;
-    timeline.scrollTo({ top: scrollStopTop, behavior: 'auto' });
     sendViewportMetrics();
   },
   onError: (error) => {
@@ -1932,10 +2075,10 @@ const virtualWindowCoordinator = createVirtualWindowCoordinator({
   },
 });
 
-function beginVirtualWindowLoad(target, safe, onSettled = null) {
+function beginVirtualWindowLoad(target, hold = target, onSettled = null) {
   cancelVirtualPrefetch();
   setRenderBlocked(true);
-  virtualWindowCoordinator.request({ target, safe, onSettled });
+  virtualWindowCoordinator.request({ target, hold, onSettled });
 }
 
 function createPresetNode() {
@@ -1948,7 +2091,8 @@ function createPresetNode() {
 }
 
 async function extendVirtualRange(targetTop, prefetchRevision) {
-  if (!state?.messages?.length || virtualWindowLoading || !topSpacer || !bottomSpacer) {
+  if (!state?.messages?.length || virtualWindowLoading ||
+      pendingInteractionAnchor || !topSpacer || !bottomSpacer) {
     return false;
   }
   const messages = state.messages;
@@ -2032,6 +2176,7 @@ async function extendVirtualRange(targetTop, prefetchRevision) {
 }
 
 function scheduleVirtualPrefetch(targetTop) {
+  if (pendingInteractionAnchor) return;
   virtualPrefetchTarget = Math.max(0, Number(targetTop) || 0);
   if (virtualPrefetchFrame || virtualPrefetchActive) return;
   virtualPrefetchFrame = requestAnimationFrame(async () => {
@@ -2069,7 +2214,8 @@ function cancelVirtualPrefetch() {
 
 function pruneVirtualRange() {
   if (!state?.messages?.length || touchActive || userScrolling ||
-      virtualWindowLoading || virtualPrefetchActive || !topSpacer || !bottomSpacer) return;
+      virtualWindowLoading || virtualPrefetchActive || pendingInteractionAnchor ||
+      !topSpacer || !bottomSpacer) return;
   const messages = state.messages;
   const viewport = captureViewport(timeline);
   const desired = visibleRange({
@@ -2145,6 +2291,18 @@ function stopScrolling() {
   restoreScrollStopPosition();
   if (!scrollStopFrame) scrollStopFrame = requestAnimationFrame(enforceScrollStop);
 }
+function finishUserScrollWhenIdle() {
+  if (touchActive || gestureActive) {
+    userScrollTimer = setTimeout(finishUserScrollWhenIdle, 100);
+    return;
+  }
+  userScrolling = false;
+  sendViewportMetrics();
+  if (!virtualWindowLoading) setRenderBlocked(false);
+  flushMountedUpdates();
+  scheduleMeasuredHeightReconcile();
+  scheduleVirtualPrune();
+}
 function markUserScroll() {
   const firstIntent = !userScrolling;
   if (firstIntent) {
@@ -2159,14 +2317,7 @@ function markUserScroll() {
   setRenderBlocked(true);
   if (firstIntent) sendViewportMetrics();
   clearTimeout(userScrollTimer);
-  userScrollTimer = setTimeout(() => {
-    userScrolling = false;
-    sendViewportMetrics();
-    if (!touchActive && !virtualWindowLoading) setRenderBlocked(false);
-    flushMountedUpdates();
-    scheduleMeasuredHeightReconcile();
-    scheduleVirtualPrune();
-  }, 800);
+  userScrollTimer = setTimeout(finishUserScrollWhenIdle, 800);
 }
 timeline.addEventListener('wheel', markUserScroll, { passive: true });
 timeline.addEventListener('pointerdown', (event) => {
@@ -2283,7 +2434,7 @@ timeline.addEventListener('scroll', () => {
     if (!coverage.covered) {
       navigationCursorId = null;
       navigationEdge = null;
-      beginVirtualWindowLoad(coverage.requested, coverage.clamped);
+      beginVirtualWindowLoad(coverage.requested, attemptedTop);
       return;
     }
     const viewport = Math.max(1, timeline.clientHeight);
@@ -2387,7 +2538,7 @@ function navigateToEdge(edge) {
   };
   const coverage = coverageFor(edge === 'top' ? 0 : Number.POSITIVE_INFINITY);
   if (!coverage.covered) {
-    beginVirtualWindowLoad(coverage.requested, coverage.clamped, () => {
+    beginVirtualWindowLoad(coverage.requested, coverage.requested, () => {
       settle();
       complete();
     });
@@ -2427,7 +2578,7 @@ function restoreMessageAnchor(anchor) {
   };
   const coverage = coverageFor(viewport.scrollTop);
   if (!coverage.covered) {
-    beginVirtualWindowLoad(coverage.requested, coverage.clamped, complete);
+    beginVirtualWindowLoad(coverage.requested, coverage.requested, complete);
     return true;
   }
   timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
@@ -2464,7 +2615,7 @@ function scrollToMessage(messageId) {
   };
   const coverage = coverageFor(viewport.scrollTop);
   if (!coverage.covered) {
-    beginVirtualWindowLoad(coverage.requested, coverage.clamped, complete);
+    beginVirtualWindowLoad(coverage.requested, coverage.requested, complete);
     return true;
   }
   timeline.scrollTo({ top: viewport.scrollTop, behavior: 'auto' });
@@ -2591,8 +2742,11 @@ window.CuplivoWeb = {
           handleMediaResult(payload);
         } else {
           const previousSessionId = state?.renderSessionId;
+          const previousConversationId = state?.conversationId;
           state = reduceEnvelope(state, payload);
-          if (previousSessionId && previousSessionId !== state?.renderSessionId) {
+          if (previousSessionId &&
+              (previousSessionId !== state?.renderSessionId ||
+                previousConversationId !== state?.conversationId)) {
             viewportNavigation.cancel();
             virtualWindowCoordinator.cancel();
             streamPresenter.clear();
@@ -2606,11 +2760,16 @@ window.CuplivoWeb = {
             pendingActions.clear();
             pendingMedia.clear();
             heights.clear();
+            pendingMeasuredHeights.clear();
             mountedSlots.clear();
             presentedStreamContent.clear();
             pendingMountedUpdates.clear();
             markdownHtmlCache.clear();
             measuredHeightsPending = false;
+            pendingInteractionAnchor = null;
+            if (interactionMeasureFrame) cancelAnimationFrame(interactionMeasureFrame);
+            interactionMeasureFrame = 0;
+            renderCommitCoordinator.clear();
             cancelVirtualPrefetch();
             clearTimeout(virtualPruneTimer);
           }

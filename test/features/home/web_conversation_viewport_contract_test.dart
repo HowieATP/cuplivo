@@ -53,6 +53,55 @@ void main() {
   });
 
   test(
+    'snapshot commits pause during scrolling and fail with exact context',
+    () {
+      final source = File(
+        'lib/features/home/webview/web_conversation_viewport.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('widget.viewportPort.isUserScrolling'));
+      expect(source, contains('_pauseRenderCommitWatchdog'));
+      expect(source, contains('_resumeRenderCommitWatchdog'));
+      expect(source, contains('_renderCommitIdentity'));
+      expect(source, contains("code == 'render_failed'"));
+      expect(source, contains("'renderRevision': _failedRenderRevision"));
+      expect(source, contains("'messageCount': _failedMessageCount"));
+
+      final drainStart = source.indexOf('Future<void> _drainSnapshotQueue()');
+      final watchdogStart = source.indexOf(
+        'void _beginRenderCommitWatchdog',
+        drainStart,
+      );
+      final drainBody = source.substring(drainStart, watchdogStart);
+      expect(
+        drainBody.indexOf('widget.viewportPort.isUserScrolling'),
+        lessThan(drainBody.indexOf('_snapshotQueue.takeNext()')),
+      );
+
+      final armStart = source.indexOf('void _armRenderCommitWatchdog');
+      final pauseStart = source.indexOf(
+        'void _pauseRenderCommitWatchdog',
+        armStart,
+      );
+      final watchdogBody = source.substring(armStart, pauseStart);
+      expect(
+        watchdogBody,
+        contains('identity.matches(_snapshotQueue.inFlight)'),
+      );
+      expect(watchdogBody, contains("'render_commit_timeout'"));
+
+      final sessionStart = source.indexOf('if (sessionChanged)');
+      final portSwapStart = source.indexOf(
+        'if (!identical(oldWidget.viewportPort',
+        sessionStart,
+      );
+      final sessionBody = source.substring(sessionStart, portSwapStart);
+      expect(sessionBody, contains('_snapshotQueue.clear()'));
+      expect(sessionBody, contains('_clearRenderCommitWatchdog()'));
+    },
+  );
+
+  test(
     'translation listeners detach from the notifier instance they bound',
     () {
       final source = File(

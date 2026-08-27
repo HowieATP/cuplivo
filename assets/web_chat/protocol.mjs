@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 3;
-export const ASSET_VERSION = 'web-chat-v13';
+export const ASSET_VERSION = 'web-chat-v14';
 
 const transfers = new Map();
 
@@ -221,8 +221,8 @@ export function createVirtualWindowCoordinator({
             return;
           }
           try {
-            settleTarget(request.target, request.revision);
-            request.onSettled?.(request.target, request.revision);
+            settleTarget(request.hold, request.revision, request.target);
+            request.onSettled?.(request.hold, request.revision, request.target);
             active = false;
             latest = null;
             setLoading(false);
@@ -249,20 +249,20 @@ export function createVirtualWindowCoordinator({
   };
 
   return {
-    request({ target, safe, onSettled = null }) {
+    request({ target, hold = target, onSettled = null }) {
       const nextTarget = Math.max(0, Number(target) || 0);
-      const nextSafe = Math.max(0, Number(safe) || 0);
+      const nextHold = Math.max(0, Number(hold) || 0);
       const wasActive = active;
       active = true;
       const requestRevision = ++revision;
       latest = {
         target: nextTarget,
-        safe: nextSafe,
+        hold: nextHold,
         revision: requestRevision,
         onSettled,
       };
       if (!wasActive) setLoading(true);
-      clamp(nextSafe);
+      clamp(nextHold);
       scheduleLatest();
       return requestRevision;
     },
@@ -451,6 +451,19 @@ export function normalizeMeasuredHeight(value) {
   return Number.isFinite(height) && height > 0 ? Math.ceil(height) : null;
 }
 
+export function commitPendingMeasurements(committed, pending) {
+  if (!(committed instanceof Map) || !(pending instanceof Map)) return false;
+  let changed = false;
+  for (const [id, rawHeight] of pending) {
+    const height = normalizeMeasuredHeight(rawHeight);
+    if (height == null || committed.get(id) === height) continue;
+    committed.set(id, height);
+    changed = true;
+  }
+  pending.clear();
+  return changed;
+}
+
 export function verticalGestureIntent({
   startX,
   startY,
@@ -581,6 +594,11 @@ export function createExpansionCoordinator() {
       entries.clear();
       requests.clear();
     },
+
+    isPending(key) {
+      const entry = entries.get(key);
+      return entry?.inFlight != null || entry?.awaitingTarget != null;
+    },
   };
 }
 
@@ -602,6 +620,48 @@ export function restoreAnchor(container, anchor) {
   if (!node) return false;
   const top = container.getBoundingClientRect().top;
   container.scrollTop += node.getBoundingClientRect().top - top - anchor.offset;
+  return true;
+}
+
+export function captureInteractionAnchor(container, header, bottomTolerance = 2) {
+  const message = header?.closest?.('[data-message-id]');
+  const disclosure = header?.closest?.('[data-expansion-key]');
+  const messageId = message?.dataset?.messageId;
+  const expansionKey = disclosure?.dataset?.expansionKey;
+  if (!messageId || !expansionKey) return null;
+  const containerTop = Number(container?.getBoundingClientRect?.().top);
+  const headerTop = Number(header?.getBoundingClientRect?.().top);
+  if (!Number.isFinite(containerTop) || !Number.isFinite(headerTop)) return null;
+  const remaining = Number(container.scrollHeight) - Number(container.clientHeight) -
+    Number(container.scrollTop);
+  return {
+    messageId,
+    expansionKey,
+    offset: headerTop - containerTop,
+    pinnedToBottom: Number.isFinite(remaining) && remaining <= bottomTolerance,
+  };
+}
+
+export function restoreInteractionAnchor(container, anchor) {
+  if (!anchor) return false;
+  if (anchor.pinnedToBottom) {
+    container.scrollTop = Math.max(
+      0,
+      Number(container.scrollHeight) - Number(container.clientHeight),
+    );
+    return true;
+  }
+  const message = [...container.querySelectorAll('[data-message-id]')]
+    .find((node) => node.dataset?.messageId === anchor.messageId);
+  const disclosure = [...(message?.querySelectorAll?.('[data-expansion-key]') ?? [])]
+    .find((node) => node.dataset?.expansionKey === anchor.expansionKey);
+  const header = disclosure?.querySelector?.('.disclosure-header');
+  if (!header) return false;
+  const containerTop = Number(container.getBoundingClientRect().top);
+  const headerTop = Number(header.getBoundingClientRect().top);
+  const offset = Number(anchor.offset);
+  if (![containerTop, headerTop, offset].every(Number.isFinite)) return false;
+  container.scrollTop += headerTop - containerTop - offset;
   return true;
 }
 
@@ -670,6 +730,53 @@ export function createFrameCoalescer(callback, schedule = requestAnimationFrame)
       pending = false;
       callback();
     });
+  };
+}
+
+export function createRenderCommitCoordinator({
+  schedule = requestAnimationFrame,
+  cancel = cancelAnimationFrame,
+  commit,
+}) {
+  let frame = 0;
+  let pendingKey = null;
+  let pendingIdentity = null;
+  let committedKey = null;
+
+  const identityKey = (identity) => [
+    identity?.renderSessionId ?? '',
+    identity?.conversationId ?? '',
+    Number(identity?.renderRevision),
+  ].join('\u0000');
+
+  return {
+    request(identity) {
+      const key = identityKey(identity);
+      if (key === pendingKey || key === committedKey) return false;
+      if (frame) cancel(frame);
+      pendingKey = key;
+      pendingIdentity = { ...identity };
+      frame = schedule(() => {
+        frame = 0;
+        const currentKey = pendingKey;
+        const currentIdentity = pendingIdentity;
+        pendingKey = null;
+        pendingIdentity = null;
+        committedKey = currentKey;
+        commit(currentIdentity);
+      });
+      return true;
+    },
+
+    clear() {
+      if (frame) cancel(frame);
+      frame = 0;
+      pendingKey = null;
+      pendingIdentity = null;
+      committedKey = null;
+    },
+
+    get pending() { return pendingIdentity != null; },
   };
 }
 

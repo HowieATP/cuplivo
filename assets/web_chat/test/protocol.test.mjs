@@ -4,11 +4,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
   captureAnchor,
+  captureInteractionAnchor,
   captureViewport,
   buildWithFrameBudget,
+  commitPendingMeasurements,
   createAdaptiveStreamPresenter,
   createExpansionCoordinator,
   createFrameCoalescer,
+  createRenderCommitCoordinator,
   createVirtualWindowCoordinator,
   createViewportNavigationCoordinator,
   createRenderGate,
@@ -23,6 +26,7 @@ import {
   receiveTransferChunk,
   reduceEnvelope,
   restoreAnchor,
+  restoreInteractionAnchor,
   restoreViewport,
   safeUtf16SliceEnd,
   virtualCoverage,
@@ -96,14 +100,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -181,7 +185,7 @@ test('stream patches can register opaque media without leaking it into messages'
 
 test('same-session streaming snapshots preserve a newer live patch', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
   };
@@ -196,7 +200,7 @@ test('same-session streaming snapshots preserve a newer live patch', () => {
 
 test('live translation survives unrelated snapshots until it is finalized', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v13',
+    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v14',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{
       id: 'm', content: 'answer', isStreaming: false,
@@ -244,6 +248,10 @@ test('heavy Markdown renderers are loaded only when matching content appears', (
 
 test('render commit, selection, attachment, and citation bridges stay opaque', () => {
   assert.match(appSource, /type: 'renderCommitted'/);
+  assert.match(
+    appSource,
+    /function renderSafely[\s\S]*?code: 'render_failed'[\s\S]*?capabilityToken:/,
+  );
   assert.match(appSource, /role', 'checkbox'/);
   assert.match(appSource, /aria-checked/);
   assert.match(appSource, /window\.getSelection\(\)/);
@@ -296,7 +304,7 @@ test('virtual coverage clamps an uncovered viewport to rendered messages', () =>
   }).covered, true);
 });
 
-test('virtual window paints a loader before rendering and latest target wins', async () => {
+test('virtual window holds the requested position while rendering and latest target wins', async () => {
   const frames = [];
   const events = [];
   const coordinator = createVirtualWindowCoordinator({
@@ -307,19 +315,19 @@ test('virtual window paints a loader before rendering and latest target wins', a
     settleTarget: (value) => events.push(`settle:${value}`),
     timeoutMs: 0,
   });
-  coordinator.request({ target: 9000, safe: 3300 });
-  coordinator.request({ target: 1200, safe: 2000 });
-  assert.deepEqual(events, ['loading:true', 'clamp:3300', 'clamp:2000']);
+  coordinator.request({ target: 9000 });
+  coordinator.request({ target: 1200 });
+  assert.deepEqual(events, ['loading:true', 'clamp:9000', 'clamp:1200']);
   assert.equal(frames.length, 1);
   frames.shift()(16);
   await Promise.resolve();
   assert.deepEqual(events, [
-    'loading:true', 'clamp:3300', 'clamp:2000', 'render:1200',
+    'loading:true', 'clamp:9000', 'clamp:1200', 'render:1200',
   ]);
   assert.equal(frames.length, 1);
   frames.shift()(32);
   assert.deepEqual(events, [
-    'loading:true', 'clamp:3300', 'clamp:2000', 'render:1200',
+    'loading:true', 'clamp:9000', 'clamp:1200', 'render:1200',
     'settle:1200', 'loading:false',
   ]);
 });
@@ -335,7 +343,7 @@ test('canceling a virtual window prevents stale completion', async () => {
     renderTarget: () => new Promise((resolve) => { finishRender = resolve; }),
     settleTarget: () => events.push('settled'),
   });
-  coordinator.request({ target: 9000, safe: 3300 });
+  coordinator.request({ target: 9000 });
   frames.shift()(16);
   coordinator.cancel();
   finishRender();
@@ -343,7 +351,7 @@ test('canceling a virtual window prevents stale completion', async () => {
   assert.deepEqual(events, ['loading:true', 'loading:false']);
 });
 
-test('virtual window timeout stays at the safe boundary and reports failure', async () => {
+test('virtual window timeout stays at the requested position and reports failure', async () => {
   const events = [];
   const coordinator = createVirtualWindowCoordinator({
     schedule: (callback) => callback(),
@@ -354,11 +362,11 @@ test('virtual window timeout stays at the safe boundary and reports failure', as
     onError: (error) => events.push(error.message),
     timeoutMs: 5,
   });
-  coordinator.request({ target: 9000, safe: 3300 });
+  coordinator.request({ target: 9000 });
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(events, [
     'loading:true',
-    'clamp:3300',
+    'clamp:9000',
     'loading:false',
     'virtual_window_timeout',
   ]);
@@ -607,6 +615,17 @@ test('offscreen zero-size observations never replace stable message heights', ()
   assert.doesNotMatch(styleSource, /content-visibility:\s*auto/);
 });
 
+test('measured heights remain staged until one atomic commit', () => {
+  const committed = new Map([['a', 120], ['b', 180]]);
+  const pending = new Map([['a', 260], ['b', 180], ['c', 90]]);
+
+  assert.equal(committed.get('a'), 120);
+  assert.equal(commitPendingMeasurements(committed, pending), true);
+  assert.deepEqual([...committed], [['a', 260], ['b', 180], ['c', 90]]);
+  assert.equal(pending.size, 0);
+  assert.equal(commitPendingMeasurements(committed, pending), false);
+});
+
 test('content insets accept finite non-negative values only', () => {
   assert.equal(normalizeContentInset(88), 88);
   assert.equal(normalizeContentInset(-1), 8);
@@ -640,6 +659,7 @@ test('controlled expansion coalesces rapid clicks and ignores stale state', () =
 
   coordinator.toggle({ key: 'reasoning', authoritative: false, dispatch });
   assert.equal(coordinator.value('reasoning', false), true);
+  assert.equal(coordinator.isPending('reasoning'), true);
   coordinator.toggle({ key: 'reasoning', authoritative: false, dispatch });
   assert.equal(coordinator.value('reasoning', false), false);
   assert.deepEqual(sent.map((item) => item.target), [true]);
@@ -649,6 +669,7 @@ test('controlled expansion coalesces rapid clicks and ignores stale state', () =
   assert.equal(coordinator.value('reasoning', true), false);
   coordinator.resolve('r2', true);
   assert.equal(coordinator.value('reasoning', false), false);
+  assert.equal(coordinator.isPending('reasoning'), false);
 });
 
 test('controlled expansion rolls back after a failed action', () => {
@@ -661,6 +682,7 @@ test('controlled expansion rolls back after a failed action', () => {
   assert.equal(coordinator.value('reasoning', false), true);
   coordinator.resolve('failed-request', false);
   assert.equal(coordinator.value('reasoning', false), false);
+  assert.equal(coordinator.isPending('reasoning'), false);
 });
 
 test('anchor capture and restore preserve the message offset', () => {
@@ -678,6 +700,128 @@ test('anchor capture and restore preserve the message offset', () => {
   nodes[1].getBoundingClientRect = () => ({ top: 24, bottom: 124 });
   assert.equal(restoreAnchor(container, anchor), true);
   assert.equal(container.scrollTop, 106);
+});
+
+test('interaction anchors preserve a disclosure header and honor bottom pinning', () => {
+  let headerTop = 140;
+  const header = {
+    getBoundingClientRect: () => ({ top: headerTop, bottom: headerTop + 42 }),
+  };
+  const disclosure = {
+    dataset: { expansionKey: 'm:tool:t1' },
+    querySelector: () => header,
+  };
+  const message = {
+    dataset: { messageId: 'm' },
+    querySelectorAll: () => [disclosure],
+  };
+  const container = {
+    scrollTop: 400,
+    scrollHeight: 1400,
+    clientHeight: 600,
+    getBoundingClientRect: () => ({ top: 20 }),
+    querySelectorAll: () => [message],
+  };
+  header.closest = (selector) => selector === '[data-message-id]'
+    ? message
+    : disclosure;
+
+  const anchor = captureInteractionAnchor(container, header);
+  assert.deepEqual(anchor, {
+    messageId: 'm',
+    expansionKey: 'm:tool:t1',
+    offset: 120,
+    pinnedToBottom: false,
+  });
+  headerTop = 205;
+  assert.equal(restoreInteractionAnchor(container, anchor), true);
+  assert.equal(container.scrollTop, 465);
+
+  container.scrollTop = 800;
+  const bottomAnchor = captureInteractionAnchor(container, header);
+  container.scrollHeight = 1100;
+  container.scrollTop = 350;
+  assert.equal(restoreInteractionAnchor(container, bottomAnchor), true);
+  assert.equal(container.scrollTop, 500);
+});
+
+test('render commit coordinator does not starve an ACK on same-revision renders', () => {
+  const frames = [];
+  const canceled = [];
+  const commits = [];
+  const coordinator = createRenderCommitCoordinator({
+    schedule: (callback) => {
+      frames.push(callback);
+      return frames.length;
+    },
+    cancel: (frame) => canceled.push(frame),
+    commit: (identity) => commits.push(identity.renderRevision),
+  });
+  const revision1 = {
+    renderSessionId: 's',
+    conversationId: 'c',
+    renderRevision: 1,
+  };
+
+  coordinator.request(revision1);
+  coordinator.request({ ...revision1 });
+  assert.equal(frames.length, 1);
+  assert.deepEqual(canceled, []);
+  frames.shift()();
+  assert.deepEqual(commits, [1]);
+
+  coordinator.request({ ...revision1 });
+  assert.equal(frames.length, 0);
+  coordinator.request({ ...revision1, renderRevision: 2 });
+  assert.equal(frames.length, 1);
+  frames.shift()();
+  assert.deepEqual(commits, [1, 2]);
+});
+
+test('a newer render identity cancels a stale pending ACK', () => {
+  let nextFrame = 0;
+  const frames = new Map();
+  const commits = [];
+  const coordinator = createRenderCommitCoordinator({
+    schedule: (callback) => {
+      const frame = nextFrame += 1;
+      frames.set(frame, callback);
+      return frame;
+    },
+    cancel: (frame) => frames.delete(frame),
+    commit: (identity) => commits.push([
+      identity.renderSessionId,
+      identity.conversationId,
+      identity.renderRevision,
+    ]),
+  });
+
+  coordinator.request({
+    renderSessionId: 'old-session',
+    conversationId: 'old-conversation',
+    renderRevision: 3,
+  });
+  coordinator.request({
+    renderSessionId: 'new-session',
+    conversationId: 'new-conversation',
+    renderRevision: 1,
+  });
+
+  assert.equal(frames.size, 1);
+  [...frames.values()][0]();
+  assert.deepEqual(commits, [['new-session', 'new-conversation', 1]]);
+});
+
+test('a conversation switch clears staged layout and render transaction state', () => {
+  assert.match(appSource, /const previousConversationId = state\?\.conversationId/);
+  const resetStart = appSource.indexOf('if (previousSessionId &&');
+  const resetEnd = appSource.indexOf('for (const message of state?.messages', resetStart);
+  const resetBody = appSource.slice(resetStart, resetEnd);
+
+  assert.match(resetBody, /previousConversationId !== state\?\.conversationId/);
+  assert.match(resetBody, /pendingMeasuredHeights\.clear\(\)/);
+  assert.match(resetBody, /pendingInteractionAnchor = null/);
+  assert.match(resetBody, /renderCommitCoordinator\.clear\(\)/);
 });
 
 test('virtual rendering keeps the pre-replacement viewport position', () => {
@@ -907,17 +1051,31 @@ test('virtual DOM replacement captures scroll state first and applies Flutter in
 test('touch and inertial scrolling defer every virtual DOM replacement', () => {
   assert.match(appSource, /touchstart[\s\S]*?setRenderBlocked\(true\)/);
   assert.match(appSource, /function markUserScroll[\s\S]*?setRenderBlocked\(true\)/);
+  assert.match(
+    appSource,
+    /function finishUserScrollWhenIdle[\s\S]*?touchActive \|\| gestureActive/,
+  );
   assert.match(appSource, /messagePatches[\s\S]*?handleMessagePatches\(envelope\)/);
   assert.match(appSource, /function updateMountedStreamingContent/);
   assert.match(appSource, /patchStreamingMarkdownRoot/);
   assert.match(appSource, /function handleMediaResult/);
   assert.doesNotMatch(appSource, /payload\.type === 'mediaResult'[\s\S]{0,300}requestRender\(\)/);
   assert.doesNotMatch(appSource, /messagePatches[^\n]*scheduleRender\(\)/);
-  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?measuredHeightsPending = true/);
+  assert.match(appSource, /function handleMeasuredHeights[\s\S]*?stageMeasuredHeight/);
+  assert.match(appSource, /function reconcileMeasuredHeights[\s\S]*?commitPendingMeasurements/);
   assert.match(appSource, /createFrameCoalescer\(\s*reconcileMeasuredHeights/);
   const measureStart = appSource.indexOf('function handleMeasuredHeights');
   const measureEnd = appSource.indexOf('function reconcileMeasuredHeights', measureStart);
   assert.doesNotMatch(appSource.slice(measureStart, measureEnd), /requestRender\(\)/);
+  assert.doesNotMatch(appSource.slice(measureStart, measureEnd), /heights\.set\(/);
+  const reconcileEnd = appSource.indexOf('function renderSafely', measureEnd);
+  const reconcile = appSource.slice(measureEnd, reconcileEnd);
+  const commitIndex = reconcile.indexOf('commitPendingMeasurements');
+  const spacerIndex = reconcile.indexOf('topSpacer.style.height');
+  const restoreIndex = reconcile.indexOf('restorePreferredViewport', spacerIndex);
+  const coverageIndex = reconcile.indexOf('coverageFor', restoreIndex);
+  assert.ok(commitIndex >= 0 && spacerIndex > commitIndex);
+  assert.ok(restoreIndex > spacerIndex && coverageIndex > restoreIndex);
 });
 
 test('virtual boundaries show a localized loader and use budgeted detached work', () => {

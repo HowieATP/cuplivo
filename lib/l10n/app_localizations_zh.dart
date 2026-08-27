@@ -4588,8 +4588,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '为无 Fetch 功能的提供商启用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '为无浏览功能的提供商增加浏览功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
@@ -13178,8 +13177,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用选项';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '为无 Fetch 功能的提供商启用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '为无浏览功能的提供商增加浏览功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
@@ -21766,8 +21764,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageGeneralOptions => '通用選項';
 
   @override
-  String get searchServicesPageEnableFallbackFetchTitle =>
-      '為不支援 Fetch 的提供商啟用 Fetch';
+  String get searchServicesPageEnableFallbackFetchTitle => '為無瀏覽功能的提供商增加瀏覽功能';
 
   @override
   String get searchServicesPageAutoTestTitle => '啟動時自動測試連線';

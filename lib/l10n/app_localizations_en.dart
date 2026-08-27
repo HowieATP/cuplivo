@@ -4768,7 +4768,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServicesPageEnableFallbackFetchTitle =>
-      'Enable fetch for providers without native fetch';
+      'Add browsing for providers without native browsing';
 
   @override
   String get searchServicesPageAutoTestTitle =>

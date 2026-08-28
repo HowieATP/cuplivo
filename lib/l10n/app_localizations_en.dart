@@ -6790,6 +6790,122 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageRenderingSettingsTitle => 'Rendering settings';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      'Experimental: WebView rendering';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      'Render one-to-one conversation content in an isolated local WebView. Restarting the app clears per-conversation fallbacks.';
+
+  @override
+  String get webChatLoading => 'Loading Web conversation view…';
+
+  @override
+  String get webChatInitializationFailed =>
+      'The Web conversation view could not start.';
+
+  @override
+  String get webChatRetry => 'Retry';
+
+  @override
+  String get webChatUseFlutterThisConversation =>
+      'Use Flutter for this conversation';
+
+  @override
+  String get webChatCopyDiagnostics => 'Copy diagnostics';
+
+  @override
+  String get webChatDiagnosticsCopied => 'Diagnostics copied';
+
+  @override
+  String get webChatWebView2Missing =>
+      'Microsoft Edge WebView2 Runtime is required.';
+
+  @override
+  String get webChatInstallWebView2 => 'Install WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock =>
+      'This content block could not be rendered.';
+
+  @override
+  String get webChatEmptyConversation =>
+      'Start a conversation to see messages here.';
+
+  @override
+  String get webChatMultiAIFallbackTitle =>
+      'Switch this conversation to Flutter?';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI is currently rendered by Flutter. This conversation will use Flutter until the app restarts or WebView rendering is turned off.';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => 'Switch and continue';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle =>
+      'This conversation is using Flutter rendering';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI is currently rendered by Flutter, so this conversation switched to Flutter rendering until the app restarts or WebView rendering is turned off.';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => 'Got it';
+
+  @override
+  String get webChatTimelineLabel => 'Conversation messages';
+
+  @override
+  String get webChatUser => 'You';
+
+  @override
+  String get webChatAssistant => 'Assistant';
+
+  @override
+  String get webChatTokens => 'tokens';
+
+  @override
+  String get webChatCode => 'Code';
+
+  @override
+  String get webChatCopyCode => 'Copy code';
+
+  @override
+  String get webChatHtmlPreview => 'HTML preview';
+
+  @override
+  String get webChatReasoning => 'Reasoning';
+
+  @override
+  String get webChatToolCall => 'Tool call:';
+
+  @override
+  String get webChatToolResult => 'Tool result:';
+
+  @override
+  String get webChatTranslation => 'Translation';
+
+  @override
+  String get webChatTop => 'Top';
+
+  @override
+  String get webChatBottom => 'Bottom';
+
+  @override
+  String get webChatPreviousVersion => 'Previous version';
+
+  @override
+  String get webChatNextVersion => 'Next version';
+
+  @override
+  String get webChatAssistantInitial => 'A';
+
+  @override
+  String get webChatUserInitial => 'U';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => 'Behavior & startup';
 
   @override
@@ -9171,4 +9287,111 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => 'Task in progress…';
+
+  @override
+  String get webConversationStylesTitle => 'Web conversation styles';
+
+  @override
+  String get webConversationStylesEntrySubtitle =>
+      'Import styles for bubbles and process cards';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView rendering is off. You can manage styles now, but the selected style will not take effect yet.';
+
+  @override
+  String get webConversationStylesDefaultName => 'Default style';
+
+  @override
+  String get webConversationStylesDefaultDescription =>
+      'Use the current theme and display settings without style overrides.';
+
+  @override
+  String get webConversationStylesActive => 'Active';
+
+  @override
+  String get webConversationStylesUseStyle => 'Use style';
+
+  @override
+  String get webConversationStylesImport => 'Import';
+
+  @override
+  String get webConversationStylesImportChoiceTitle =>
+      'Import Web conversation style';
+
+  @override
+  String get webConversationStylesImportManual => 'Paste JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => 'Paste style JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      'Paste one complete .cuplivo-style.json object';
+
+  @override
+  String get webConversationStylesImportFile => 'Local file or ZIP';
+
+  @override
+  String get webConversationStylesImportGithub =>
+      'GitHub repository or style file';
+
+  @override
+  String get webConversationStylesGithubTitle => 'Import from GitHub';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'GitHub repository, tree, blob, or raw style file URL';
+
+  @override
+  String get webConversationStylesSelectTitle => 'Select styles to import';
+
+  @override
+  String get webConversationStylesSelectAll => 'Select all';
+
+  @override
+  String get webConversationStylesDeselectAll => 'Deselect all';
+
+  @override
+  String get webConversationStylesEmpty => 'No imported styles yet.';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return 'Imported $count style(s)';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return 'Imported with $count compatibility warning(s). Unknown fields were preserved but not applied.';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return 'Could not import styles: $detail';
+  }
+
+  @override
+  String get webConversationStylesExport => 'Export';
+
+  @override
+  String get webConversationStylesExportSuccess => 'Style exported';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return 'Could not export style: $detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => 'Delete style';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return 'Delete “$name”? This cannot be undone.';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => 'Delete';
+
+  @override
+  String get webConversationStylesNoDescription => 'No description';
 }

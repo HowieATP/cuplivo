@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -35,6 +36,7 @@ import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
 import '../features/home/pages/input_bar_buttons_customization_page.dart'
     show showInputBarButtonsCustomizationDialog;
+import '../features/home/webview/web_chat_platform.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/group_chat_provider.dart';
 import '../features/assistant/widgets/assistant_select_sheet.dart';
@@ -72,6 +74,7 @@ import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/skills_pane.dart';
+import 'setting/web_conversation_styles_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -112,6 +115,7 @@ enum _SettingsMenuItem {
   quickPhrases,
   instructionInjection,
   skills,
+  webConversationStyles,
   worldBook,
   tts,
   networkProxy,
@@ -251,6 +255,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopSkillsPane(
                             key: ValueKey('skills'),
                           );
+                        case _SettingsMenuItem.webConversationStyles:
+                          return const DesktopWebConversationStylesPane(
+                            key: ValueKey('webConversationStyles'),
+                          );
                         case _SettingsMenuItem.worldBook:
                           return const DesktopWorldBookPane(
                             key: ValueKey('worldBook'),
@@ -327,6 +335,15 @@ class _SettingsMenu extends StatelessWidget {
         lucide.Lucide.BookOpen,
         l10n.settingsPageSkills,
       ),
+      if (supportsWebConversationViewport(
+        isWeb: kIsWeb,
+        platform: defaultTargetPlatform,
+      ))
+        (
+          _SettingsMenuItem.webConversationStyles,
+          lucide.Lucide.Palette,
+          l10n.webConversationStylesTitle,
+        ),
       (
         _SettingsMenuItem.worldBook,
         lucide.Lucide.BookOpen,

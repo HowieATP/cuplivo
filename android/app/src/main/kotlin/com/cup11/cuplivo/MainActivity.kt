@@ -28,6 +28,10 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "cuplivo/web_chat",
+            AndroidWebChatViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
         flutterEngine.plugins.add(LinuxSandboxPlugin())
         flutterEngine.plugins.add(SafMountPlugin())
         deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {

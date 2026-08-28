@@ -12281,6 +12281,216 @@ abstract class AppLocalizations {
   /// **'Rendering settings'**
   String get displaySettingsPageRenderingSettingsTitle;
 
+  /// No description provided for @displaySettingsPageExperimentalWebViewRenderingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental: WebView rendering'**
+  String get displaySettingsPageExperimentalWebViewRenderingTitle;
+
+  /// No description provided for @displaySettingsPageExperimentalWebViewRenderingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Render one-to-one conversation content in an isolated local WebView. Restarting the app clears per-conversation fallbacks.'**
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle;
+
+  /// No description provided for @webChatLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading Web conversation view…'**
+  String get webChatLoading;
+
+  /// No description provided for @webChatInitializationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Web conversation view could not start.'**
+  String get webChatInitializationFailed;
+
+  /// No description provided for @webChatRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get webChatRetry;
+
+  /// No description provided for @webChatUseFlutterThisConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Flutter for this conversation'**
+  String get webChatUseFlutterThisConversation;
+
+  /// No description provided for @webChatCopyDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get webChatCopyDiagnostics;
+
+  /// No description provided for @webChatDiagnosticsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics copied'**
+  String get webChatDiagnosticsCopied;
+
+  /// No description provided for @webChatWebView2Missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Microsoft Edge WebView2 Runtime is required.'**
+  String get webChatWebView2Missing;
+
+  /// No description provided for @webChatInstallWebView2.
+  ///
+  /// In en, this message translates to:
+  /// **'Install WebView2 Runtime'**
+  String get webChatInstallWebView2;
+
+  /// No description provided for @webChatUnsupportedBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'This content block could not be rendered.'**
+  String get webChatUnsupportedBlock;
+
+  /// No description provided for @webChatEmptyConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a conversation to see messages here.'**
+  String get webChatEmptyConversation;
+
+  /// No description provided for @webChatMultiAIFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch this conversation to Flutter?'**
+  String get webChatMultiAIFallbackTitle;
+
+  /// No description provided for @webChatMultiAIFallbackBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MultiAI is currently rendered by Flutter. This conversation will use Flutter until the app restarts or WebView rendering is turned off.'**
+  String get webChatMultiAIFallbackBody;
+
+  /// No description provided for @webChatMultiAIFallbackConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch and continue'**
+  String get webChatMultiAIFallbackConfirm;
+
+  /// No description provided for @webChatMultiAIFallbackNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is using Flutter rendering'**
+  String get webChatMultiAIFallbackNoticeTitle;
+
+  /// No description provided for @webChatMultiAIFallbackNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MultiAI is currently rendered by Flutter, so this conversation switched to Flutter rendering until the app restarts or WebView rendering is turned off.'**
+  String get webChatMultiAIFallbackNoticeBody;
+
+  /// No description provided for @webChatMultiAIFallbackNoticeAcknowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get webChatMultiAIFallbackNoticeAcknowledge;
+
+  /// No description provided for @webChatTimelineLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation messages'**
+  String get webChatTimelineLabel;
+
+  /// No description provided for @webChatUser.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get webChatUser;
+
+  /// No description provided for @webChatAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get webChatAssistant;
+
+  /// No description provided for @webChatTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'tokens'**
+  String get webChatTokens;
+
+  /// No description provided for @webChatCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get webChatCode;
+
+  /// No description provided for @webChatCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get webChatCopyCode;
+
+  /// No description provided for @webChatHtmlPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'HTML preview'**
+  String get webChatHtmlPreview;
+
+  /// No description provided for @webChatReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning'**
+  String get webChatReasoning;
+
+  /// No description provided for @webChatToolCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool call:'**
+  String get webChatToolCall;
+
+  /// No description provided for @webChatToolResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool result:'**
+  String get webChatToolResult;
+
+  /// No description provided for @webChatTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'Translation'**
+  String get webChatTranslation;
+
+  /// No description provided for @webChatTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get webChatTop;
+
+  /// No description provided for @webChatBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get webChatBottom;
+
+  /// No description provided for @webChatPreviousVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous version'**
+  String get webChatPreviousVersion;
+
+  /// No description provided for @webChatNextVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Next version'**
+  String get webChatNextVersion;
+
+  /// No description provided for @webChatAssistantInitial.
+  ///
+  /// In en, this message translates to:
+  /// **'A'**
+  String get webChatAssistantInitial;
+
+  /// No description provided for @webChatUserInitial.
+  ///
+  /// In en, this message translates to:
+  /// **'U'**
+  String get webChatUserInitial;
+
   /// No description provided for @displaySettingsPageBehaviorStartupTitle.
   ///
   /// In en, this message translates to:
@@ -16492,6 +16702,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Task in progress…'**
   String get iosBackgroundGenerationPrivacyActiveDetail;
+
+  /// No description provided for @webConversationStylesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web conversation styles'**
+  String get webConversationStylesTitle;
+
+  /// No description provided for @webConversationStylesEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import styles for bubbles and process cards'**
+  String get webConversationStylesEntrySubtitle;
+
+  /// No description provided for @webConversationStylesInactiveNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'WebView rendering is off. You can manage styles now, but the selected style will not take effect yet.'**
+  String get webConversationStylesInactiveNotice;
+
+  /// No description provided for @webConversationStylesDefaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Default style'**
+  String get webConversationStylesDefaultName;
+
+  /// No description provided for @webConversationStylesDefaultDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the current theme and display settings without style overrides.'**
+  String get webConversationStylesDefaultDescription;
+
+  /// No description provided for @webConversationStylesActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get webConversationStylesActive;
+
+  /// No description provided for @webConversationStylesUseStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use style'**
+  String get webConversationStylesUseStyle;
+
+  /// No description provided for @webConversationStylesImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get webConversationStylesImport;
+
+  /// No description provided for @webConversationStylesImportChoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Web conversation style'**
+  String get webConversationStylesImportChoiceTitle;
+
+  /// No description provided for @webConversationStylesImportManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste JSON'**
+  String get webConversationStylesImportManual;
+
+  /// No description provided for @webConversationStylesImportManualTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste style JSON'**
+  String get webConversationStylesImportManualTitle;
+
+  /// No description provided for @webConversationStylesImportManualHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste one complete .cuplivo-style.json object'**
+  String get webConversationStylesImportManualHint;
+
+  /// No description provided for @webConversationStylesImportFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Local file or ZIP'**
+  String get webConversationStylesImportFile;
+
+  /// No description provided for @webConversationStylesImportGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub repository or style file'**
+  String get webConversationStylesImportGithub;
+
+  /// No description provided for @webConversationStylesGithubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from GitHub'**
+  String get webConversationStylesGithubTitle;
+
+  /// No description provided for @webConversationStylesGithubHint.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub repository, tree, blob, or raw style file URL'**
+  String get webConversationStylesGithubHint;
+
+  /// No description provided for @webConversationStylesSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select styles to import'**
+  String get webConversationStylesSelectTitle;
+
+  /// No description provided for @webConversationStylesSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get webConversationStylesSelectAll;
+
+  /// No description provided for @webConversationStylesDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get webConversationStylesDeselectAll;
+
+  /// No description provided for @webConversationStylesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No imported styles yet.'**
+  String get webConversationStylesEmpty;
+
+  /// No description provided for @webConversationStylesImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} style(s)'**
+  String webConversationStylesImportSuccess(int count);
+
+  /// No description provided for @webConversationStylesImportWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported with {count} compatibility warning(s). Unknown fields were preserved but not applied.'**
+  String webConversationStylesImportWarnings(int count);
+
+  /// No description provided for @webConversationStylesImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import styles: {detail}'**
+  String webConversationStylesImportFailed(String detail);
+
+  /// No description provided for @webConversationStylesExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get webConversationStylesExport;
+
+  /// No description provided for @webConversationStylesExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Style exported'**
+  String get webConversationStylesExportSuccess;
+
+  /// No description provided for @webConversationStylesExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export style: {detail}'**
+  String webConversationStylesExportFailed(String detail);
+
+  /// No description provided for @webConversationStylesDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete style'**
+  String get webConversationStylesDeleteTitle;
+
+  /// No description provided for @webConversationStylesDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”? This cannot be undone.'**
+  String webConversationStylesDeleteMessage(String name);
+
+  /// No description provided for @webConversationStylesDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get webConversationStylesDeleteAction;
+
+  /// No description provided for @webConversationStylesNoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get webConversationStylesNoDescription;
 }
 
 class _AppLocalizationsDelegate

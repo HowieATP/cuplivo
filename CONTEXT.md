@@ -1,5 +1,27 @@
 # Cuplivo Domain Glossary
 
+## Web Conversation Styles
+
+- **Web 对话样式 (Web conversation style)**: A declarative
+  `.cuplivo-style.json` document that overrides the user bubble, assistant
+  answer bubble, and unified tool/thinking/chain process card in the optional
+  one-to-one Web conversation viewport. It is typed data, never CSS/HTML/JS,
+  and does not apply to Flutter fallback, group chat, MultiAI, Linux, or
+  Flutter Web.
+- **样式库 (style library)**: The global set of imported original JSON
+  objects, keyed by stable style `id`. It is stored under
+  `web_conversation_style_library_v1` and participates in `settings.json`
+  backup and LAN sync. The built-in default is a virtual row, not a stored
+  library entry.
+- **当前样式 (active style)**: The library `activeId`, or `null` for default.
+  Import does not change it; deleting the active entry clears it. It resolves
+  as current theme/display settings → `common` → current `light`/`dark` layer,
+  then only the validated projection enters Web snapshot `appearance`.
+- **Not an M3 Custom Theme**: An M3 Custom Theme generates the app-wide
+  `ColorScheme`/semantic tokens. A Web conversation style consumes those as
+  defaults and only decorates three Web chat surfaces; it cannot recolor app
+  navigation, settings, Flutter-rendered messages, or the viewport background.
+
 ## Title Preset System
 - **Hash Fingerprint matching**: `detect()` uses `trim()` only (conservative), exact character match after stripping leading/trailing whitespace.
 - **PromptPreset data class**: `id`, `label`, `prompt` fields only. No `recommendedThinking` — presets are style-only, Thinking is independently controlled.
@@ -893,6 +915,15 @@
 - **Sentinel unset (未自定义 = 现状)**: While the config is unset, every platform keeps today's behavior verbatim (phone: first 5 direct + rest in `BottomToolsSheet`; tablet/desktop: all direct with width auto-overflow). The first customization writes an explicit config that then applies globally. Future new button ids are appended as direct by default for customized configs.
 - **Editing surface (编辑面)**: Mobile pushes a full page; desktop opens a centered Dialog (assistant-edit parity). Both = assistant-settings pattern: `ReorderableListView`/`ReorderableDragStartListener` (long-press on mobile, drag on desktop) over a single ordered list of all 15 items, each row = icon + label + `IosSwitch` (ON = direct, OFF = in-more). Entries: a row in Display & Behavior settings (mobile `display_settings_page.dart` / desktop `display_pane.dart`); the customize button itself also opens the surface from the row/More bucket.
 - **Platform-unavailable items (平台不可用项)**: An item a given platform cannot render (e.g. camera on desktop) is still configurable in the shared list and simply skipped where unavailable — the config is platform-agnostic.
+
+## Conversation Viewports (对话视口)
+
+- **Conversation viewport (对话视口)**: The replaceable middle surface that presents one conversation's timeline and navigation. It excludes the app sidebar, title bar, composer, and selection action bars.
+- **Web conversation viewport (Web 对话视口)**: The experimental conversation viewport that presents the timeline with local browser technology. It is a presentation surface, not a second chat client.
+- **Domain snapshot (领域快照)**: Dart's authoritative, renderer-neutral description of visible messages, live reasoning and tools, action capabilities, display settings, and localized labels.
+- **Render session (渲染会话)**: One ordered lifetime of a viewport bound to one conversation. Results and actions from an older render session are stale and must not affect the active conversation.
+- **Conversation-scoped fallback (会话级回退)**: A process-local choice that keeps one conversation on the Flutter viewport after a Web viewport failure or an unsupported MultiAI surface. It is not persisted.
+- **Rich content block (富内容块)**: An independently rendered unit inside a message, such as Markdown, code, math, Mermaid, SVG, HTML preview, an attachment, reasoning, or a tool card. Failure of one block does not invalidate the surrounding message.
 
 ## Fork Conversation (创建分支)
 

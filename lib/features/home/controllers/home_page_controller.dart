@@ -34,7 +34,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/models/message_edit_result.dart';
-import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
+import '../../chat/models/tool_ui_part.dart';
 import '../../chat/widgets/message_edit_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
 import '../../../desktop/message_edit_dialog.dart';
@@ -43,6 +43,7 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import 'chat_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
+import 'conversation_viewport_port.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
@@ -154,6 +155,8 @@ class HomePageController extends ChangeNotifier {
   late TranslationService _translationService;
   late FileUploadService _fileUploadService;
   late scroll_ctrl.ChatScrollController _scrollCtrl;
+  late FlutterConversationViewportPort _flutterViewportPort;
+  ConversationViewportPort? _conversationViewportOverride;
 
   McpProvider? _mcpProvider;
   GenerationEngine? _generationEngine;
@@ -295,6 +298,13 @@ class HomePageController extends ChangeNotifier {
   // Delegate to scroll controller
   scroll_ctrl.ChatScrollController get scrollCtrl => _scrollCtrl;
 
+  ConversationViewportPort get _activeViewportPort =>
+      _conversationViewportOverride ?? _flutterViewportPort;
+
+  void attachConversationViewportPort(ConversationViewportPort? port) {
+    _conversationViewportOverride = port;
+  }
+
   bool get isDesktopPlatform => PlatformUtils.isDesktopTarget;
 
   bool get isCurrentConversationLoading {
@@ -409,7 +419,11 @@ class HomePageController extends ChangeNotifier {
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
-      onStreamTick: () => _scrollCtrl.autoScrollToBottomIfNeeded(),
+      onStreamTick: () {
+        if (_context.read<SettingsProvider>().autoScrollEnabled) {
+          _activeViewportPort.onStreamTick();
+        }
+      },
     );
   }
 
@@ -506,8 +520,8 @@ class HomePageController extends ChangeNotifier {
       }
     };
     _viewModel.onScrollToBottom = () {
-      _scrollCtrl.resetUserScrolling();
-      _scrollCtrl.scrollToBottom(
+      _activeViewportPort.resetUserScrolling();
+      _activeViewportPort.scrollToBottom(
         animate: !_chatController.isCurrentConversationLoading,
       );
     };
@@ -519,12 +533,14 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollCtrl.positionAtBottomOnNextLayout();
+      _activeViewportPort.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
       notifyListeners();
-      _scrollCtrl.stickToBottomAfterGeneration();
+      if (_context.read<SettingsProvider>().autoScrollEnabled) {
+        _activeViewportPort.stickToBottomAfterGeneration();
+      }
     };
     _viewModel.onAssistantMessageFinished = _handleAssistantMessageFinished;
   }
@@ -552,6 +568,7 @@ class HomePageController extends ChangeNotifier {
           kToolbarHeight + MediaQuery.paddingOf(_context).top,
       isGenerating: () => _chatController.isCurrentConversationLoading,
     );
+    _flutterViewportPort = FlutterConversationViewportPort(_scrollCtrl);
   }
 
   /// Give a newly opened conversation its own scroll state.
@@ -1222,7 +1239,13 @@ class HomePageController extends ChangeNotifier {
     try {
       await WidgetsBinding.instance.endOfFrame;
     } catch (_) {}
-    _scrollToBottom(animate: false);
+    final savedAnchor = _activeViewportPort.savedAnchorForConversation(id);
+    if (savedAnchor != null &&
+        _chatController.indexOfCollapsedMessageId(savedAnchor.messageId) >= 0) {
+      await _activeViewportPort.restoreAnchor(savedAnchor);
+    } else {
+      _scrollToBottom(animate: false);
+    }
 
     if (!isDesktopPlatform) {
       try {
@@ -2368,19 +2391,19 @@ class HomePageController extends ChangeNotifier {
 
   void toggleReasoning(String messageId) {
     final r = reasoning[messageId];
-    if (r != null) {
-      r.expanded = !r.expanded;
-      // Check if reasoning is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
-      final isStillStreaming = r.finishedAt == null && r.text.isNotEmpty;
-      if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
-        streamingContentNotifier.forceRebuild(messageId);
-      } else {
-        // For non-streaming messages, trigger full page rebuild
-        notifyListeners();
-      }
-    }
+    if (r != null) setReasoningExpanded(messageId, !r.expanded);
+  }
+
+  bool setReasoningExpanded(String messageId, bool expanded) {
+    final r = reasoning[messageId];
+    if (r == null) return false;
+    if (r.expanded == expanded) return true;
+    r.expanded = expanded;
+    _notifyReasoningExpansionChanged(
+      messageId,
+      isStillStreaming: r.finishedAt == null && r.text.isNotEmpty,
+    );
+    return true;
   }
 
   void toggleTranslation(String messageId) {
@@ -2393,19 +2416,47 @@ class HomePageController extends ChangeNotifier {
 
   void toggleReasoningSegment(String messageId, int segmentIndex) {
     final segments = reasoningSegments[messageId];
-    if (segments != null && segmentIndex < segments.length) {
-      final seg = segments[segmentIndex];
-      seg.expanded = !seg.expanded;
-      // Check if this segment is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
-      final isStillStreaming = seg.finishedAt == null && seg.text.isNotEmpty;
-      if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
-        streamingContentNotifier.forceRebuild(messageId);
-      } else {
-        // For non-streaming messages, trigger full page rebuild
-        notifyListeners();
-      }
+    if (segments == null ||
+        segmentIndex < 0 ||
+        segmentIndex >= segments.length) {
+      return;
+    }
+    setReasoningSegmentExpanded(
+      messageId,
+      segmentIndex,
+      !segments[segmentIndex].expanded,
+    );
+  }
+
+  bool setReasoningSegmentExpanded(
+    String messageId,
+    int segmentIndex,
+    bool expanded,
+  ) {
+    final segments = reasoningSegments[messageId];
+    if (segments == null ||
+        segmentIndex < 0 ||
+        segmentIndex >= segments.length) {
+      return false;
+    }
+    final segment = segments[segmentIndex];
+    if (segment.expanded == expanded) return true;
+    segment.expanded = expanded;
+    _notifyReasoningExpansionChanged(
+      messageId,
+      isStillStreaming: segment.finishedAt == null && segment.text.isNotEmpty,
+    );
+    return true;
+  }
+
+  void _notifyReasoningExpansionChanged(
+    String messageId, {
+    required bool isStillStreaming,
+  }) {
+    if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
+      streamingContentNotifier.forceRebuild(messageId);
+    } else {
+      notifyListeners();
     }
   }
 
@@ -2632,10 +2683,13 @@ class HomePageController extends ChangeNotifier {
   void scrollToBottom({bool animate = true}) =>
       _scrollToBottom(animate: animate);
   void forceScrollToBottomSoon({bool animate = true}) =>
-      _scrollCtrl.forceScrollToBottomSoon(
+      _activeViewportPort.forceScrollToBottomSoon(
         animate: animate,
         postSwitchDelay: _postSwitchScrollDelay,
       );
+
+  bool pinBottomDuringViewportResizeIfNeeded() =>
+      _activeViewportPort.pinBottomDuringViewportResizeIfNeeded();
 
   bool loadMoreBefore() => _viewModel.loadMoreBefore();
 
@@ -2653,18 +2707,21 @@ class HomePageController extends ChangeNotifier {
     }
     final index = _chatController.indexOfCollapsedMessageId(targetId);
     if (index < 0) return;
-    await _scrollCtrl.scrollToMessageId(targetId: targetId, targetIndex: index);
+    await _activeViewportPort.scrollToMessageId(
+      targetId: targetId,
+      targetIndex: index,
+    );
   }
 
   Future<void> jumpToPreviousQuestion() async {
-    await _scrollCtrl.jumpToPreviousQuestion(
+    await _activeViewportPort.jumpToPreviousQuestion(
       messages: _chatController.collapsedMessages,
       indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
     );
   }
 
   Future<void> jumpToNextQuestion() async {
-    await _scrollCtrl.jumpToNextQuestion(
+    await _activeViewportPort.jumpToNextQuestion(
       messages: _chatController.collapsedMessages,
       indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
     );
@@ -2677,7 +2734,7 @@ class HomePageController extends ChangeNotifier {
         _viewModel.restoreMessageUiState();
       }
     }
-    _scrollCtrl.scrollToTop(animate: animate);
+    _activeViewportPort.scrollToTop(animate: animate);
   }
 
   void forceScrollToBottom({bool animate = true}) {
@@ -2733,9 +2790,9 @@ class HomePageController extends ChangeNotifier {
 
   bool shouldPinStreamingIndicator(String? messageId) {
     if (messageId == null) return false;
-    if (_scrollCtrl.isUserScrolling) return false;
-    if (!_scrollCtrl.hasEnoughContentToScroll(56.0)) return false;
-    if (!_scrollCtrl.isNearBottom(48)) return false;
+    if (_activeViewportPort.isUserScrolling) return false;
+    if (!_activeViewportPort.hasEnoughContentToScroll(56.0)) return false;
+    if (!_activeViewportPort.isNearBottom(48)) return false;
     return true;
   }
 
@@ -2775,9 +2832,9 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _scrollToBottom({bool animate = true}) =>
-      _scrollCtrl.scrollToBottom(animate: animate);
+      _activeViewportPort.scrollToBottom(animate: animate);
   void _scrollToBottomSoon({bool animate = true}) =>
-      _scrollCtrl.scrollToBottomSoon(animate: animate);
+      _activeViewportPort.scrollToBottomSoon(animate: animate);
 
   // _getViewportBounds removed: ListObserverController handles visibility.
 

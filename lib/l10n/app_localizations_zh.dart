@@ -6499,6 +6499,115 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageRenderingSettingsTitle => '渲染设置';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '实验性功能：WebView 渲染';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔离的本地 WebView 中渲染一对一对话内容。重启应用会清除按会话设置的回退。';
+
+  @override
+  String get webChatLoading => '正在加载 Web 对话视图…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 对话视图无法启动。';
+
+  @override
+  String get webChatRetry => '重试';
+
+  @override
+  String get webChatUseFlutterThisConversation => '当前会话使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '复制诊断信息';
+
+  @override
+  String get webChatDiagnosticsCopied => '诊断信息已复制';
+
+  @override
+  String get webChatWebView2Missing => '需要安装 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安装 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '无法渲染此内容块。';
+
+  @override
+  String get webChatEmptyConversation => '开始对话后，消息会显示在这里。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '将当前会话切换到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 渲染。当前会话将使用 Flutter，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切换并继续';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle => '当前会话已使用 Flutter 渲染';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 渲染，因此当前会话已切换到 Flutter 渲染，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
+
+  @override
+  String get webChatTimelineLabel => '对话消息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCode => '代码';
+
+  @override
+  String get webChatCopyCode => '复制代码';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 预览';
+
+  @override
+  String get webChatReasoning => '思维链';
+
+  @override
+  String get webChatToolCall => '工具调用：';
+
+  @override
+  String get webChatToolResult => '工具结果：';
+
+  @override
+  String get webChatTranslation => '翻译';
+
+  @override
+  String get webChatTop => '顶部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一个版本';
+
+  @override
+  String get webChatNextVersion => '下一个版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => '行为与启动';
 
   @override
@@ -8750,6 +8859,109 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 对话样式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '导入气泡与过程卡片样式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 渲染尚未开启。你仍可管理样式，但当前样式暂不会生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '默认样式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不添加样式覆盖，使用当前主题和显示设置。';
+
+  @override
+  String get webConversationStylesActive => '当前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用样式';
+
+  @override
+  String get webConversationStylesImport => '导入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '导入 Web 对话样式';
+
+  @override
+  String get webConversationStylesImportManual => '粘贴 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '粘贴样式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '粘贴一个完整的 .cuplivo-style.json 对象';
+
+  @override
+  String get webConversationStylesImportFile => '本地文件或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 仓库或样式文件';
+
+  @override
+  String get webConversationStylesGithubTitle => '从 GitHub 导入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'GitHub 仓库、tree、blob 或 raw 样式文件 URL';
+
+  @override
+  String get webConversationStylesSelectTitle => '选择要导入的样式';
+
+  @override
+  String get webConversationStylesSelectAll => '全选';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全选';
+
+  @override
+  String get webConversationStylesEmpty => '尚未导入样式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已导入 $count 个样式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '导入完成，但有 $count 条兼容性警告。未知字段已保留，但不会生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '无法导入样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '导出';
+
+  @override
+  String get webConversationStylesExportSuccess => '样式已导出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '无法导出样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '删除样式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '删除“$name”？此操作无法撤销。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '删除';
+
+  @override
+  String get webConversationStylesNoDescription => '无描述';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15247,6 +15459,115 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageRenderingSettingsTitle => '渲染设置';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '实验性功能：WebView 渲染';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔离的本地 WebView 中渲染一对一对话内容。重启应用会清除按会话设置的回退。';
+
+  @override
+  String get webChatLoading => '正在加载 Web 对话视图…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 对话视图无法启动。';
+
+  @override
+  String get webChatRetry => '重试';
+
+  @override
+  String get webChatUseFlutterThisConversation => '当前会话使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '复制诊断信息';
+
+  @override
+  String get webChatDiagnosticsCopied => '诊断信息已复制';
+
+  @override
+  String get webChatWebView2Missing => '需要安装 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安装 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '无法渲染此内容块。';
+
+  @override
+  String get webChatEmptyConversation => '开始对话后，消息会显示在这里。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '将当前会话切换到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 渲染。当前会话将使用 Flutter，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切换并继续';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle => '当前会话已使用 Flutter 渲染';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 渲染，因此当前会话已切换到 Flutter 渲染，直到应用重启或关闭 WebView 渲染。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
+
+  @override
+  String get webChatTimelineLabel => '对话消息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCode => '代码';
+
+  @override
+  String get webChatCopyCode => '复制代码';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 预览';
+
+  @override
+  String get webChatReasoning => '思维链';
+
+  @override
+  String get webChatToolCall => '工具调用：';
+
+  @override
+  String get webChatToolResult => '工具结果：';
+
+  @override
+  String get webChatTranslation => '翻译';
+
+  @override
+  String get webChatTop => '顶部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一个版本';
+
+  @override
+  String get webChatNextVersion => '下一个版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => '行为与启动';
 
   @override
@@ -17498,6 +17819,109 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 对话样式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '导入气泡与过程卡片样式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 渲染尚未开启。你仍可管理样式，但当前样式暂不会生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '默认样式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不添加样式覆盖，使用当前主题和显示设置。';
+
+  @override
+  String get webConversationStylesActive => '当前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用样式';
+
+  @override
+  String get webConversationStylesImport => '导入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '导入 Web 对话样式';
+
+  @override
+  String get webConversationStylesImportManual => '粘贴 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '粘贴样式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '粘贴一个完整的 .cuplivo-style.json 对象';
+
+  @override
+  String get webConversationStylesImportFile => '本地文件或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 仓库或样式文件';
+
+  @override
+  String get webConversationStylesGithubTitle => '从 GitHub 导入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'GitHub 仓库、tree、blob 或 raw 样式文件 URL';
+
+  @override
+  String get webConversationStylesSelectTitle => '选择要导入的样式';
+
+  @override
+  String get webConversationStylesSelectAll => '全选';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全选';
+
+  @override
+  String get webConversationStylesEmpty => '尚未导入样式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已导入 $count 个样式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '导入完成，但有 $count 条兼容性警告。未知字段已保留，但不会生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '无法导入样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '导出';
+
+  @override
+  String get webConversationStylesExportSuccess => '样式已导出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '无法导出样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '删除样式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '删除“$name”？此操作无法撤销。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '删除';
+
+  @override
+  String get webConversationStylesNoDescription => '无描述';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -23996,6 +24420,115 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageRenderingSettingsTitle => '渲染設定';
 
   @override
+  String get displaySettingsPageExperimentalWebViewRenderingTitle =>
+      '實驗性功能：WebView 算繪';
+
+  @override
+  String get displaySettingsPageExperimentalWebViewRenderingSubtitle =>
+      '在隔離的本機 WebView 中算繪一對一對話內容。重新啟動應用程式會清除按對話設定的回退。';
+
+  @override
+  String get webChatLoading => '正在載入 Web 對話檢視…';
+
+  @override
+  String get webChatInitializationFailed => 'Web 對話檢視無法啟動。';
+
+  @override
+  String get webChatRetry => '重試';
+
+  @override
+  String get webChatUseFlutterThisConversation => '目前對話使用 Flutter';
+
+  @override
+  String get webChatCopyDiagnostics => '複製診斷資訊';
+
+  @override
+  String get webChatDiagnosticsCopied => '診斷資訊已複製';
+
+  @override
+  String get webChatWebView2Missing => '需要安裝 Microsoft Edge WebView2 Runtime。';
+
+  @override
+  String get webChatInstallWebView2 => '安裝 WebView2 Runtime';
+
+  @override
+  String get webChatUnsupportedBlock => '無法算繪此內容區塊。';
+
+  @override
+  String get webChatEmptyConversation => '開始對話後，訊息會顯示在這裡。';
+
+  @override
+  String get webChatMultiAIFallbackTitle => '將目前對話切換到 Flutter？';
+
+  @override
+  String get webChatMultiAIFallbackBody =>
+      'MultiAI 目前由 Flutter 算繪。目前對話將使用 Flutter，直到應用程式重新啟動或關閉 WebView 算繪。';
+
+  @override
+  String get webChatMultiAIFallbackConfirm => '切換並繼續';
+
+  @override
+  String get webChatMultiAIFallbackNoticeTitle => '目前對話已使用 Flutter 算繪';
+
+  @override
+  String get webChatMultiAIFallbackNoticeBody =>
+      'MultiAI 目前由 Flutter 算繪，因此目前對話已切換到 Flutter 算繪，直到應用程式重新啟動或關閉 WebView 算繪。';
+
+  @override
+  String get webChatMultiAIFallbackNoticeAcknowledge => '知道了';
+
+  @override
+  String get webChatTimelineLabel => '對話訊息';
+
+  @override
+  String get webChatUser => '你';
+
+  @override
+  String get webChatAssistant => '助手';
+
+  @override
+  String get webChatTokens => 'Token';
+
+  @override
+  String get webChatCode => '程式碼';
+
+  @override
+  String get webChatCopyCode => '複製程式碼';
+
+  @override
+  String get webChatHtmlPreview => 'HTML 預覽';
+
+  @override
+  String get webChatReasoning => '思維鏈';
+
+  @override
+  String get webChatToolCall => '工具呼叫：';
+
+  @override
+  String get webChatToolResult => '工具結果：';
+
+  @override
+  String get webChatTranslation => '翻譯';
+
+  @override
+  String get webChatTop => '頂部';
+
+  @override
+  String get webChatBottom => '底部';
+
+  @override
+  String get webChatPreviousVersion => '上一個版本';
+
+  @override
+  String get webChatNextVersion => '下一個版本';
+
+  @override
+  String get webChatAssistantInitial => '助';
+
+  @override
+  String get webChatUserInitial => '我';
+
+  @override
   String get displaySettingsPageBehaviorStartupTitle => '行為與啟動';
 
   @override
@@ -26248,4 +26781,107 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任務進行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 對話樣式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '匯入氣泡與過程卡片樣式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 算繪尚未開啟。你仍可管理樣式，但目前樣式暫不會生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '預設樣式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不加入樣式覆寫，使用目前主題和顯示設定。';
+
+  @override
+  String get webConversationStylesActive => '目前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用樣式';
+
+  @override
+  String get webConversationStylesImport => '匯入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '匯入 Web 對話樣式';
+
+  @override
+  String get webConversationStylesImportManual => '貼上 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '貼上樣式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '貼上一個完整的 .cuplivo-style.json 物件';
+
+  @override
+  String get webConversationStylesImportFile => '本機檔案或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 儲存庫或樣式檔案';
+
+  @override
+  String get webConversationStylesGithubTitle => '從 GitHub 匯入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'GitHub 儲存庫、tree、blob 或 raw 樣式檔案 URL';
+
+  @override
+  String get webConversationStylesSelectTitle => '選擇要匯入的樣式';
+
+  @override
+  String get webConversationStylesSelectAll => '全選';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全選';
+
+  @override
+  String get webConversationStylesEmpty => '尚未匯入樣式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已匯入 $count 個樣式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '匯入完成，但有 $count 條相容性警告。未知欄位已保留，但不會生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '無法匯入樣式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '匯出';
+
+  @override
+  String get webConversationStylesExportSuccess => '樣式已匯出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '無法匯出樣式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '刪除樣式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '刪除「$name」？此操作無法復原。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '刪除';
+
+  @override
+  String get webConversationStylesNoDescription => '無描述';
 }

@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
@@ -17,10 +21,13 @@ import '../../../theme/design_tokens.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/tts_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/trash_restore_coordinator.dart';
+import '../../../core/services/streaming_content_notifier.dart';
 import '../../settings/pages/trash_detail_page.dart';
 import '../widgets/live_panel.dart';
 import '../widgets/image_generation_options.dart';
@@ -30,6 +37,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/chat/external_chat_draft_handoff.dart';
 import '../../../core/services/android_process_text.dart';
+import '../../../core/services/network/dio_http_client.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
@@ -41,11 +49,18 @@ import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/skills_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../../desktop/document_processing_popover.dart';
+import '../../../desktop/html_preview_dialog.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/pages/reading_mode_page.dart';
+import '../../chat/pages/image_viewer_page.dart';
+import '../../chat/pages/html_preview_page.dart';
+import '../../chat/models/tool_ui_part.dart';
+import '../../chat/utils/message_visual_content.dart';
+import '../../chat/widgets/citation_sources_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -66,6 +81,8 @@ import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/multi_ai_comparison_view.dart';
 import '../services/multi_ai_engine.dart' show MultiAIMode;
+import '../services/ask_user_interaction_service.dart';
+import '../services/tool_approval_service.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
@@ -78,7 +95,12 @@ import '../utils/input_bar_button_layout.dart';
 import 'input_bar_buttons_customization_page.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
+import '../controllers/conversation_viewport_port.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
+import '../webview/web_chat_protocol.dart';
+import '../webview/web_chat_platform.dart';
+import '../webview/web_chat_snapshot.dart';
+import '../webview/web_conversation_viewport.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
@@ -599,6 +621,15 @@ class _HomePageState extends State<HomePage>
   bool _scrollNavHovering = false;
   bool _presetsExpanded = false;
   String? _scrollConversationId;
+  final Set<String> _webFlutterConversationOverrides = <String>{};
+  final Set<String> _webMultiAIPromptedConversations = <String>{};
+  final WebConversationViewportPort _webViewportPort =
+      WebConversationViewportPort();
+  final Map<String, WebChatMediaSource> _webMediaRegistry =
+      <String, WebChatMediaSource>{};
+  String? _webRenderConversationId;
+  String _webRenderSessionId = '';
+  int _webActionEpoch = 0;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
@@ -691,7 +722,7 @@ class _HomePageState extends State<HomePage>
     final keyboardOpening = nextInset > _lastViewInsetBottom + 0.5;
     _lastViewInsetBottom = nextInset;
     if (!keyboardOpening) return;
-    _controller.scrollCtrl.pinBottomDuringViewportResizeIfNeeded();
+    _controller.pinBottomDuringViewportResizeIfNeeded();
   }
 
   @override
@@ -1392,16 +1423,23 @@ class _HomePageState extends State<HomePage>
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
+    final settings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final conversationId =
+        _controller.currentConversation?.id ??
+        'temporary:${assistant?.id ?? 'unbound'}';
+    var useWebViewport = _webViewportRequested(settings, conversationId);
+
     if (_controller.isTemporaryConversation &&
-        _controller.chatController.collapsedMessages.isEmpty) {
+        _controller.chatController.collapsedMessages.isEmpty &&
+        !useWebViewport) {
+      _controller.attachConversationViewportPort(null);
       return _TemporaryConversationEmptyState(
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
       );
     }
 
-    final settings = context.watch<SettingsProvider>();
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
@@ -1440,12 +1478,147 @@ class _HomePageState extends State<HomePage>
       );
     }
 
+    if (useWebViewport && afterMessageWidgets.isNotEmpty) {
+      useWebViewport = false;
+      _scheduleMultiAIFallbackPrompt(conversationId);
+    }
+
     final truncIndex = HomeViewModel.adjustTruncIndexForPresetFolding(
       truncIndex: _computeTruncCollapsedIndex(),
       presetCount: presetCount,
       showPresetToggle: showPresetToggle,
       presetsExpanded: _presetsExpanded,
     );
+
+    final suggestions = suggestionsEnabled
+        ? (_controller.currentConversation?.chatSuggestions ?? const <String>[])
+        : const <String>[];
+
+    if (useWebViewport) {
+      context.watch<ToolApprovalService>();
+      context.watch<AskUserInteractionService>();
+      final user = context.watch<UserProvider>();
+      final ttsActive = context.select<TtsProvider, bool>(
+        (provider) => provider.playbackState.isActive,
+      );
+      _webViewportPort.activateConversation(conversationId);
+      _controller.attachConversationViewportPort(_webViewportPort);
+      _ensureWebRenderSession(conversationId);
+      final activeLiveMessageIds = <String>{
+        for (final message in messages)
+          if (_controller.streamingContentNotifier.hasNotifier(message.id))
+            message.id,
+      };
+      final snapshotMediaRegistry = buildWebChatMediaRegistry(
+        messages,
+        assistant: assistant,
+        userAvatarType: user.avatarType,
+        userAvatarValue: user.avatarValue,
+        toolParts: _controller.toolParts,
+      );
+      final retainedLiveMedia = <String, WebChatMediaSource>{
+        for (final entry in _webMediaRegistry.entries)
+          if (entry.value.messageIds.any(activeLiveMessageIds.contains))
+            entry.key: WebChatMediaSource(
+              kind: entry.value.kind,
+              value: entry.value.value,
+              messageIds: entry.value.messageIds
+                  .where(activeLiveMessageIds.contains)
+                  .toSet(),
+            ),
+      };
+      _webMediaRegistry
+        ..clear()
+        ..addAll(snapshotMediaRegistry);
+      for (final entry in retainedLiveMedia.entries) {
+        final current = _webMediaRegistry[entry.key];
+        _webMediaRegistry[entry.key] = WebChatMediaSource(
+          kind: entry.value.kind,
+          value: entry.value.value,
+          messageIds: <String>{
+            ...?current?.messageIds,
+            ...entry.value.messageIds,
+          },
+        );
+      }
+      final mediaRegistry = _webMediaRegistry;
+      final snapshot = _buildWebChatSnapshot(
+        context: context,
+        conversationId: conversationId,
+        messages: messages,
+        assistant: assistant,
+        settings: settings,
+        truncIndex: truncIndex,
+        suggestions: suggestions,
+        presetCount: presetCount,
+        showPresetToggle: showPresetToggle,
+        user: user,
+        ttsActive: ttsActive,
+        topContentPadding: topContentPadding,
+        bottomContentPadding: bottomContentPadding,
+        activeLiveMessageIds: activeLiveMessageIds,
+        remoteMediaHandles: <String, String>{
+          for (final entry in mediaRegistry.entries)
+            if (entry.value.kind == WebChatMediaSourceKind.remoteImage)
+              entry.value.value: entry.key,
+        },
+      );
+      final htmlPreviewRegistry = buildWebChatHtmlPreviewRegistry(snapshot);
+      final htmlPreviewMessages = <String, Map<String, dynamic>>{};
+      for (final raw
+          in snapshot['messages'] as List<dynamic>? ?? const <dynamic>[]) {
+        if (raw is! Map) continue;
+        final message = raw.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final messageId = message['id']?.toString() ?? '';
+        if (messageId.isNotEmpty) htmlPreviewMessages[messageId] = message;
+      }
+      return WebConversationViewport(
+        key: const ValueKey<String>('web-conversation-viewport'),
+        snapshot: snapshot,
+        mediaRegistry: mediaRegistry,
+        viewportPort: _webViewportPort,
+        streamingContentNotifier: _controller.streamingContentNotifier,
+        buildStreamingPatch: (messageId, data) {
+          final patch = _buildWebStreamingPatch(messageId, data, assistant);
+          if (patch != null) {
+            _registerWebPatchMedia(messageId, patch, mediaRegistry);
+            final current = htmlPreviewMessages[messageId];
+            if (current != null) {
+              current.addAll(patch);
+              if (patch['isStreaming'] == true) {
+                htmlPreviewRegistry.removeWhere(
+                  (_, entry) => entry.messageId == messageId,
+                );
+              } else {
+                replaceWebChatHtmlPreviews(
+                  messageId: messageId,
+                  serialized: current,
+                  registry: htmlPreviewRegistry,
+                );
+              }
+            }
+          }
+          return patch;
+        },
+        onAction: (request) => _handleWebChatAction(
+          request,
+          visibleMessages: messages,
+          mediaRegistry: mediaRegistry,
+          htmlPreviewRegistry: htmlPreviewRegistry,
+        ),
+        onUseFlutter: () {
+          setState(() {
+            _webFlutterConversationOverrides.add(conversationId);
+          });
+        },
+        onUserScrollIntent: _controller.scrollCtrl.revealNavButtons,
+        remoteMediaClientFactory: () => _webChatHttpClient(settings),
+      );
+    }
+
+    _controller.attachConversationViewportPort(null);
 
     final messageList = MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
@@ -1464,10 +1637,7 @@ class _HomePageState extends State<HomePage>
       translations: _buildTranslationUiStates(),
       selecting: _controller.selecting,
       selectedItems: _controller.selectedItems,
-      suggestions: suggestionsEnabled
-          ? (_controller.currentConversation?.chatSuggestions ??
-                const <String>[])
-          : const <String>[],
+      suggestions: suggestions,
       topContentPadding: topContentPadding,
       bottomContentPadding: bottomContentPadding,
       dividerPadding: dividerPadding,
@@ -1551,6 +1721,1177 @@ class _HomePageState extends State<HomePage>
       backdropKey: _messageListBackdropKey,
       child: messageList,
     );
+  }
+
+  bool _webViewportRequested(SettingsProvider settings, String conversationId) {
+    if (!settings.experimentalWebViewRendering) {
+      _webFlutterConversationOverrides.clear();
+      _webMultiAIPromptedConversations.clear();
+      _webMediaRegistry.clear();
+      return false;
+    }
+    return supportsWebConversationViewport(
+          isWeb: kIsWeb,
+          platform: defaultTargetPlatform,
+        ) &&
+        !_webFlutterConversationOverrides.contains(conversationId);
+  }
+
+  DioHttpClient _webChatHttpClient(SettingsProvider settings) {
+    final host = settings.globalProxyHost.trim();
+    final port = settings.globalProxyPort.trim();
+    if (!settings.globalProxyEnabled || host.isEmpty || port.isEmpty) {
+      return DioHttpClient(forceCloseOnDispose: true);
+    }
+    return DioHttpClient(
+      forceCloseOnDispose: true,
+      proxy: NetworkProxyConfig(
+        enabled: true,
+        type: settings.globalProxyType,
+        host: host,
+        port: int.tryParse(port) ?? 8080,
+        username: settings.globalProxyUsername.trim().isEmpty
+            ? null
+            : settings.globalProxyUsername.trim(),
+        password: settings.globalProxyPassword.isEmpty
+            ? null
+            : settings.globalProxyPassword,
+      ),
+    );
+  }
+
+  void _ensureWebRenderSession(String conversationId) {
+    if (_webRenderConversationId == conversationId) return;
+    _webRenderConversationId = conversationId;
+    _webMediaRegistry.clear();
+    _webRenderSessionId =
+        '$conversationId:${DateTime.now().microsecondsSinceEpoch}';
+    _webActionEpoch++;
+  }
+
+  Map<String, dynamic> _buildWebChatSnapshot({
+    required BuildContext context,
+    required String conversationId,
+    required List<ChatMessage> messages,
+    required Assistant? assistant,
+    required SettingsProvider settings,
+    required int truncIndex,
+    required List<String> suggestions,
+    required int presetCount,
+    required bool showPresetToggle,
+    required UserProvider user,
+    required bool ttsActive,
+    required double topContentPadding,
+    required double bottomContentPadding,
+    required Set<String> activeLiveMessageIds,
+    required Map<String, String> remoteMediaHandles,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    final semantic = context.appColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final display = <String, dynamic>{
+      'userMarkdown': settings.enableUserMarkdown,
+      'assistantMarkdown': settings.enableAssistantMarkdown,
+      'reasoningMarkdown': settings.enableReasoningMarkdown,
+      'math': settings.enableMathRendering,
+      'dollarMath': settings.enableDollarLatex,
+      'wrapCode':
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      'collapsedCodeLines': settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+      'backgroundStyle': settings.chatMessageBackgroundStyle.name,
+      'backgroundOwner': 'flutter',
+      'isDark': isDark,
+      'showUserAvatar': settings.showUserAvatar,
+      'showUserName': settings.showUserName,
+      'showUserTimestamp': settings.showUserTimestamp,
+      'showUserMessageActions': settings.showUserMessageActions,
+      'showModelIcon': settings.showModelIcon,
+      'showModelName': settings.showModelName,
+      'showModelTimestamp': settings.showModelTimestamp,
+      'showTokenStats': settings.showTokenStats,
+      'autoCollapseThinking': settings.autoCollapseThinking,
+      'collapseThinkingSteps': settings.collapseThinkingSteps,
+      'showToolResultSummary': settings.showToolResultSummary,
+      'ttsActive': ttsActive,
+    };
+    final snapshot = const WebChatSnapshotBuilder().build(
+      renderSessionId: _webRenderSessionId,
+      conversationId: conversationId,
+      // The viewport assigns a revision only after semantic deduplication.
+      renderRevision: 0,
+      actionEpoch: _webActionEpoch,
+      messages: messages,
+      byGroup: _controller.chatController.groupedMessages,
+      versionSelections: _controller.versionSelections,
+      reasoning: _controller.reasoning,
+      reasoningSegments: _controller.reasoningSegments,
+      contentSplits: _controller.contentSplits,
+      toolParts: _controller.toolParts,
+      selectedItems: _controller.selectedItems,
+      selecting: _controller.selecting,
+      truncCollapsedIndex: truncIndex,
+      suggestions: suggestions,
+      hasMoreBefore: _controller.chatController.hasMoreBefore,
+      hasMoreAfter: _controller.chatController.hasMoreAfter,
+      strings: <String, String>{
+        'timeline': l10n.webChatTimelineLabel,
+        'loading': l10n.webChatLoading,
+        'empty': l10n.webChatEmptyConversation,
+        'user': l10n.webChatUser,
+        'assistant': l10n.webChatAssistant,
+        'tokens': l10n.webChatTokens,
+        'code': l10n.webChatCode,
+        'copyCode': l10n.webChatCopyCode,
+        'expandCode': l10n.codeBlockExpandButton,
+        'collapseCode': l10n.codeBlockCollapseButton,
+        'htmlPreview': l10n.webChatHtmlPreview,
+        'openHtmlPreview': l10n.htmlOpenFullScreenPreview,
+        'thinking': l10n.chatMessageWidgetThinking,
+        'reasoning': l10n.chatMessageWidgetDeepThinking,
+        'collapseThinkingSteps': l10n.chainOfThoughtCollapse,
+        'expandThinkingSteps': l10n.chainOfThoughtExpandSteps('{count}'),
+        'toolCall': l10n.webChatToolCall,
+        'toolResult': l10n.webChatToolResult,
+        'translation': l10n.webChatTranslation,
+        'contextDivider': l10n.homePageClearContext,
+        'unsupportedBlock': l10n.webChatUnsupportedBlock,
+        'copy': l10n.chatMessageWidgetCopyAsMarkdown,
+        'edit': l10n.messageMoreSheetEdit,
+        'resend': l10n.chatMessageWidgetResendTooltip,
+        'regenerate': l10n.chatMessageWidgetRegenerateTooltip,
+        'quote': l10n.chatMessageWidgetQuote,
+        'translate': l10n.chatMessageWidgetTranslateTooltip,
+        'speak': l10n.chatMessageWidgetSpeakTooltip,
+        'stop': l10n.chatMessageWidgetStopTooltip,
+        'more': l10n.chatMessageWidgetMoreTooltip,
+        'share': l10n.messageMoreSheetShare,
+        'fork': l10n.messageMoreSheetCreateBranch,
+        'select': l10n.messageMoreSheetSelectMessages,
+        'delete': l10n.messageMoreSheetDelete,
+        'multiAI': l10n.messageMoreSheetMultiAI,
+        'approve': l10n.toolApprovalApprove,
+        'deny': l10n.toolApprovalDeny,
+        'submit': l10n.askUserCardSubmit,
+        'customAnswer': l10n.askUserCardCustomHint,
+        'skip': l10n.askUserCardSkip,
+        'skipped': l10n.askUserCardSkipped,
+        'previousVersion': l10n.webChatPreviousVersion,
+        'nextVersion': l10n.webChatNextVersion,
+        'sources': l10n.chatMessageWidgetSearchResultsTitle,
+      },
+      theme: <String, String>{
+        'surface': _webCssColor(colors.surface),
+        'on-surface': _webCssColor(colors.onSurface),
+        'primary': _webCssColor(colors.primary),
+        'on-primary': _webCssColor(colors.onPrimary),
+        'secondary': _webCssColor(colors.secondary),
+        'error': _webCssColor(colors.error),
+        'card': _webCssColor(semantic.surfaceCard),
+        'surface-fill': _webCssColor(semantic.surfaceFill),
+        'code-body': _webCssColor(
+          colors.surfaceContainer.withValues(alpha: 0.90),
+        ),
+        'code-header': _webCssColor(
+          colors.surfaceContainerHighest.withValues(alpha: 0.90),
+        ),
+        'code-border': _webCssColor(colors.outlineVariant),
+        'code-header-text': _webCssColor(
+          colors.onSurfaceVariant.withValues(alpha: 0.72),
+        ),
+        'code-action': _webCssColor(
+          colors.onSurfaceVariant.withValues(alpha: 0.50),
+        ),
+        'outline': _webCssColor(colors.outlineVariant),
+        'outline-soft': _webCssColor(
+          colors.outlineVariant.withValues(alpha: isDark ? 0.24 : 0.18),
+        ),
+        'outline-frosted': _webCssColor(
+          colors.outlineVariant.withValues(alpha: 0.14),
+        ),
+        'outline-solid': _webCssColor(
+          colors.outlineVariant.withValues(alpha: 0.16),
+        ),
+        'user': _webCssColor(
+          colors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+        ),
+        'thinking': _webCssColor(
+          colors.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30),
+        ),
+        'frosted': _webCssColor(
+          isDark
+              // Matches the shared Flutter frosted message surface.
+              // color-gate: ignore
+              ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+              : Colors.white.withValues(alpha: 0.66),
+        ),
+        'muted': _webCssColor(
+          colors.onSurface.withValues(alpha: isDark ? 0.56 : 0.50),
+        ),
+        'model-icon-background': _webCssColor(
+          colors.secondary.withValues(alpha: 0.10),
+        ),
+        'user-avatar-background': _webCssColor(
+          colors.primary.withValues(alpha: 0.10),
+        ),
+        'assistant-avatar-background': _webCssColor(
+          colors.primary.withValues(alpha: 0.10),
+        ),
+        'background-mask-top': _webCssColor(
+          colors.surface.withValues(
+            alpha: (0.20 * settings.chatBackgroundMaskStrength).clamp(0, 1),
+          ),
+        ),
+        'background-mask-bottom': _webCssColor(
+          colors.surface.withValues(
+            alpha: (0.50 * settings.chatBackgroundMaskStrength).clamp(0, 1),
+          ),
+        ),
+      },
+      appearance:
+          settings.activeWebConversationStyle?.resolveAppearance(
+            isDark: isDark,
+          ) ??
+          const <String, dynamic>{},
+      user: buildWebChatUserSnapshot(
+        name: user.name,
+        avatarType: user.avatarType,
+        avatarValue: user.avatarValue,
+      ),
+      display: display,
+      topContentPadding: topContentPadding,
+      bottomContentPadding: bottomContentPadding,
+      assistant: assistant,
+      fontScale: settings.chatFontScale,
+      canStartMultiAI: _controller.canStartMultiAIComparison,
+      autoCollapseThinking: settings.autoCollapseThinking,
+      initialViewportAnchor: _webViewportPort
+          .savedAnchorForConversation(conversationId)
+          ?.toJson(),
+      locale: Localizations.localeOf(context).toLanguageTag(),
+      textDirection: Directionality.of(context) == TextDirection.rtl
+          ? 'rtl'
+          : 'ltr',
+      remoteMediaHandles: remoteMediaHandles,
+      liveTranslationMessageIds: <String>{
+        for (final message in messages)
+          if (!message.isStreaming && activeLiveMessageIds.contains(message.id))
+            message.id,
+      },
+    );
+    if (showPresetToggle) {
+      snapshot['preset'] = <String, dynamic>{
+        'count': presetCount,
+        'expanded': _presetsExpanded,
+        'label': l10n.homePagePresetMessagesCount(presetCount),
+      };
+    }
+    final approvalService = context.read<ToolApprovalService>();
+    final askUserService = context.read<AskUserInteractionService>();
+    for (final message in snapshot['messages'] as List<dynamic>) {
+      final map = message as Map<String, dynamic>;
+      final tools = map['tools'] as List<dynamic>;
+      for (final tool in tools) {
+        final toolMap = tool as Map<String, dynamic>;
+        final toolId = toolMap['id']?.toString() ?? '';
+        final arguments = Map<String, dynamic>.of(
+          (toolMap['arguments'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{},
+        );
+        if (approvalService.isPending(toolId)) {
+          arguments['approvalRequired'] = true;
+        }
+        if (askUserService.isPending(toolId)) {
+          arguments['askUserActive'] = true;
+        }
+        toolMap['arguments'] = arguments;
+      }
+    }
+    return snapshot;
+  }
+
+  Map<String, dynamic>? _buildWebStreamingPatch(
+    String messageId,
+    StreamingContentData data,
+    Assistant? assistant,
+  ) {
+    ChatMessage? message;
+    for (final candidate in _controller.chatController.collapsedMessages) {
+      if (candidate.id == messageId) {
+        message = candidate;
+        break;
+      }
+    }
+    if (message == null) return null;
+    if (!message.isStreaming) {
+      if (data.translation == null) return null;
+      return <String, dynamic>{
+        'id': messageId,
+        'patchKind': 'translation',
+        'translation': stripWebChatAttachmentMarkers(data.translation!),
+      };
+    }
+    final visual = messageVisualContent(
+      message.copyWith(content: data.content),
+      assistant: assistant,
+    );
+    final reasoning = _webStreamingReasoning(messageId, data);
+    final tools = _webStreamingToolParts(messageId);
+    return <String, dynamic>{
+      'id': messageId,
+      'content': stripWebChatAttachmentMarkers(visual),
+      'isStreaming': message.isStreaming,
+      'tokens': data.totalTokens,
+      'reasoning': reasoning,
+      'contentSplits': <String, dynamic>{
+        'offsets': data.contentSplitOffsets ?? const <int>[],
+        'reasoningCounts': data.reasoningCountAtSplit ?? const <int>[],
+        'toolCounts': data.toolCountAtSplit ?? const <int>[],
+      },
+      'tools': tools,
+      'translation': data.translation == null
+          ? null
+          : stripWebChatAttachmentMarkers(data.translation!),
+    };
+  }
+
+  void _registerWebPatchMedia(
+    String messageId,
+    Map<String, dynamic> patch,
+    Map<String, WebChatMediaSource> registry,
+  ) {
+    final content = <String>[
+      if (patch['content'] case final String value) value,
+      if (patch['translation'] case final String value) value,
+      for (final reasoning in patch['reasoning'] as List<dynamic>? ?? const [])
+        if (reasoning is Map && reasoning['text'] is String)
+          reasoning['text'] as String,
+      for (final tool in patch['tools'] as List<dynamic>? ?? const [])
+        if (tool is Map && tool['content'] is String) tool['content'] as String,
+    ];
+    final handles = <String, String>{};
+    for (final text in content) {
+      for (final url in webChatRemoteImageReferences(text)) {
+        final handle = webChatRemoteMediaHandle(url);
+        registry[handle] = WebChatMediaSource(
+          kind: WebChatMediaSourceKind.remoteImage,
+          value: url,
+          messageIds: <String>{...?registry[handle]?.messageIds, messageId},
+        );
+        handles[url] = handle;
+      }
+    }
+    if (handles.isNotEmpty) patch['remoteMediaHandles'] = handles;
+  }
+
+  List<Map<String, dynamic>> _webStreamingToolParts(String messageId) {
+    final approvalService = context.read<ToolApprovalService>();
+    final askUserService = context.read<AskUserInteractionService>();
+    return (_controller.toolParts[messageId] ?? const <ToolUIPart>[])
+        .map((part) {
+          final json = part.toJson();
+          if (json['content'] case final String content) {
+            json['content'] = stripWebChatAttachmentMarkers(content);
+          }
+          final arguments = Map<String, dynamic>.of(part.arguments);
+          if (approvalService.isPending(part.id)) {
+            arguments['approvalRequired'] = true;
+          }
+          if (askUserService.isPending(part.id)) {
+            arguments['askUserActive'] = true;
+          }
+          json['arguments'] = arguments;
+          return json;
+        })
+        .toList(growable: false);
+  }
+
+  List<Map<String, dynamic>> _webStreamingReasoning(
+    String messageId,
+    StreamingContentData data,
+  ) {
+    final segments = _controller.reasoningSegments[messageId];
+    if (segments != null && segments.isNotEmpty) {
+      return segments
+          .asMap()
+          .entries
+          .map(
+            (entry) => <String, dynamic>{
+              'kind': 'segment',
+              'index': entry.key,
+              'key': '$messageId:reasoning:segment:${entry.key}',
+              'text': stripWebChatAttachmentMarkers(entry.value.text),
+              'expanded': entry.value.expanded,
+              'loading': entry.value.finishedAt == null,
+              'startAt': entry.value.startAt?.toIso8601String(),
+              'finishedAt': entry.value.finishedAt?.toIso8601String(),
+              'toolStartIndex': entry.value.toolStartIndex,
+            },
+          )
+          .toList(growable: false);
+    }
+    if (data.reasoningText?.isNotEmpty != true) {
+      return const <Map<String, dynamic>>[];
+    }
+    return <Map<String, dynamic>>[
+      <String, dynamic>{
+        'kind': 'single',
+        'index': 0,
+        'key': '$messageId:reasoning:single:0',
+        'text': stripWebChatAttachmentMarkers(data.reasoningText!),
+        'expanded':
+            _controller.reasoning[messageId]?.expanded ??
+            !context.read<SettingsProvider>().autoCollapseThinking,
+        'loading': data.reasoningFinishedAt == null,
+        'startAt': data.reasoningStartAt?.toIso8601String(),
+        'finishedAt': data.reasoningFinishedAt?.toIso8601String(),
+        'toolStartIndex': 0,
+      },
+    ];
+  }
+
+  Future<void> _handleWebChatAction(
+    WebChatActionRequest request, {
+    required List<ChatMessage> visibleMessages,
+    required Map<String, WebChatMediaSource> mediaRegistry,
+    required Map<String, WebChatHtmlPreviewSource> htmlPreviewRegistry,
+  }) async {
+    final message = request.messageId == null
+        ? null
+        : _findWebActionMessage(request.messageId!, visibleMessages);
+    switch (request.action) {
+      case 'loadMoreBefore':
+        _controller.loadMoreBefore();
+        return;
+      case 'loadMoreAfter':
+        _controller.loadMoreAfter();
+        return;
+      case 'suggestion':
+        await _controller.sendSuggestion(
+          request.payload['text']?.toString() ?? '',
+        );
+        return;
+      case 'togglePresets':
+        setState(() => _presetsExpanded = !_presetsExpanded);
+        return;
+      case 'copyText':
+        final text = request.payload['text']?.toString() ?? '';
+        if (text.length > 1024 * 1024) {
+          throw const WebChatProtocolException(
+            'copy payload exceeds size limit',
+          );
+        }
+        await Clipboard.setData(ClipboardData(text: text));
+        return;
+    }
+    if (message == null) {
+      throw const WebChatProtocolException('message target is not active');
+    }
+    if (!_webMessageActionAllowed(request.action, message)) {
+      throw const WebChatProtocolException('message action is not allowed');
+    }
+    switch (request.action) {
+      case 'copy':
+        await Clipboard.setData(
+          ClipboardData(text: messageVisualContent(message)),
+        );
+        return;
+      case 'edit':
+        await _controller.editMessage(message);
+        return;
+      case 'resend':
+      case 'regenerate':
+        await _controller.regenerateAtMessage(message);
+        return;
+      case 'quote':
+        _controller.insertQuote(messageVisualContent(message));
+        return;
+      case 'translate':
+        await _controller.translateMessage(message);
+        return;
+      case 'speak':
+        await _controller.speakMessage(message);
+        return;
+      case 'more':
+        await _showWebMessageMore(message, visibleMessages);
+        return;
+      case 'share':
+        _controller.shareMessage(
+          visibleMessages.indexOf(message),
+          visibleMessages,
+        );
+        return;
+      case 'fork':
+        await _controller.forkConversation(message);
+        return;
+      case 'select':
+        if (_controller.selecting) {
+          _controller.toggleSelection(
+            message.id,
+            !_controller.selectedItems.contains(message.id),
+          );
+          return;
+        }
+        _controller.startMessageSelection(
+          messageIndex: visibleMessages.indexOf(message),
+          messageList: visibleMessages,
+          mode: ChatSelectionMode.delete,
+        );
+        return;
+      case 'delete':
+        if (!mounted) return;
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+        );
+        return;
+      case 'version':
+        final versions = List<ChatMessage>.of(
+          _controller.chatController.groupedMessages[message.groupId] ??
+              <ChatMessage>[message],
+        )..sort((a, b) => a.version.compareTo(b.version));
+        final current = versions.indexWhere(
+          (item) =>
+              item.version ==
+              (_controller.versionSelections[message.groupId] ??
+                  message.version),
+        );
+        final delta = (request.payload['delta'] as num?)?.toInt() ?? 0;
+        final next = (current + delta).clamp(0, versions.length - 1);
+        await _controller.setSelectedVersion(
+          message.groupId ?? message.id,
+          versions[next].version,
+        );
+        return;
+      case 'previewImage':
+        await _previewWebImage(message, request.payload, mediaRegistry);
+        return;
+      case 'openAttachment':
+        await _openWebAttachment(message, request.payload, mediaRegistry);
+        return;
+      case 'openCitation':
+        await _openWebCitation(message, request.payload);
+        return;
+      case 'showCitations':
+        _showWebCitations(message);
+        return;
+      case 'openHtmlPreview':
+        await _openWebHtmlPreview(
+          message,
+          request.payload,
+          htmlPreviewRegistry,
+        );
+        return;
+      case 'setReasoningExpanded':
+        final target = WebChatReasoningTarget.fromPayload(request.payload);
+        final updated = switch (target.kind) {
+          WebChatReasoningKind.single => _controller.setReasoningExpanded(
+            message.id,
+            target.expanded,
+          ),
+          WebChatReasoningKind.segment =>
+            _controller.setReasoningSegmentExpanded(
+              message.id,
+              target.index,
+              target.expanded,
+            ),
+        };
+        if (!updated) {
+          throw const WebChatProtocolException('reasoning target is stale');
+        }
+        return;
+      case 'approveTool':
+        if (!mounted) return;
+        final toolId = request.payload['toolId']?.toString() ?? '';
+        final service = context.read<ToolApprovalService>();
+        if (!service.isPending(toolId) ||
+            !_webMessageHasTool(message.id, toolId)) {
+          throw const WebChatProtocolException('tool approval is stale');
+        }
+        service.approve(toolId);
+        return;
+      case 'denyTool':
+        if (!mounted) return;
+        final toolId = request.payload['toolId']?.toString() ?? '';
+        final service = context.read<ToolApprovalService>();
+        if (!service.isPending(toolId) ||
+            !_webMessageHasTool(message.id, toolId)) {
+          throw const WebChatProtocolException('tool approval is stale');
+        }
+        service.deny(toolId);
+        return;
+      case 'answerTool':
+        _submitWebAskUserAnswer(message, request.payload);
+        return;
+      case 'multiAI':
+        await _startWebMultiAI(message);
+        return;
+      default:
+        throw WebChatProtocolException('unsupported action ${request.action}');
+    }
+  }
+
+  Future<void> _showWebMessageMore(
+    ChatMessage message,
+    List<ChatMessage> visibleMessages,
+  ) async {
+    if (!mounted) return;
+    final versions =
+        _controller.chatController.groupedMessages[message.groupId] ??
+        <ChatMessage>[message];
+    final hide = <MessageMoreAction>{};
+    if (!_controller.canStartMultiAIComparison) {
+      hide.add(MessageMoreAction.multiAI);
+    }
+    final action = await showMessageMoreSheet(
+      context,
+      message,
+      canDeleteAllVersions: versions.length > 1,
+      hideActions: hide,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case MessageMoreAction.deleteCurrentVersion:
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+        );
+        return;
+      case MessageMoreAction.deleteAllVersions:
+        await _handleDeleteMessage(
+          context,
+          message,
+          _controller.chatController.groupedMessages,
+          deleteAllVersions: true,
+        );
+        return;
+      case MessageMoreAction.edit:
+        await _controller.editMessage(message);
+        return;
+      case MessageMoreAction.fork:
+        await _controller.forkConversation(message);
+        return;
+      case MessageMoreAction.share:
+        _controller.shareMessage(
+          visibleMessages.indexOf(message),
+          visibleMessages,
+        );
+        return;
+      case MessageMoreAction.selectMessages:
+        _controller.startMessageSelection(
+          messageIndex: visibleMessages.indexOf(message),
+          messageList: visibleMessages,
+          mode: ChatSelectionMode.delete,
+        );
+        return;
+      case MessageMoreAction.multiAI:
+        await _startWebMultiAI(message);
+        return;
+      case MessageMoreAction.readingMode:
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ReadingModePage(
+              message: message,
+              assistantName: context
+                  .read<AssistantProvider>()
+                  .currentAssistant
+                  ?.name,
+            ),
+          ),
+        );
+        return;
+      case MessageMoreAction.reply:
+        _controller.startReplyTo(message);
+        return;
+    }
+  }
+
+  Future<void> _previewWebImage(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatMediaSource> mediaRegistry,
+  ) async {
+    final handle = payload['handle']?.toString() ?? '';
+    final source = mediaRegistry[handle];
+    if (source == null || source.kind == WebChatMediaSourceKind.bundledAsset) {
+      throw const WebChatProtocolException('image handle is not active');
+    }
+    final imageAttachments = parseWebChatAttachments(
+      message.content,
+    ).where((item) => item['kind'] == 'image').toList(growable: false);
+    final allowed =
+        imageAttachments.any(
+          (item) => _webMediaReferenceMatches(
+            item['reference']?.toString(),
+            handle,
+            source,
+          ),
+        ) ||
+        source.messageIds.contains(message.id);
+    if (!allowed) {
+      throw const WebChatProtocolException('image handle is not in message');
+    }
+    final images = <String>[
+      for (final attachment in imageAttachments)
+        if (_resolveWebMediaValue(
+              attachment['reference']?.toString(),
+              mediaRegistry,
+            )
+            case final value?)
+          value,
+    ];
+    if (!images.contains(source.value)) images.add(source.value);
+    if (!mounted || images.isEmpty) return;
+    final initialIndex = images
+        .indexOf(source.value)
+        .clamp(0, images.length - 1);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ImageViewerPage(images: images, initialIndex: initialIndex),
+      ),
+    );
+  }
+
+  Future<void> _openWebAttachment(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatMediaSource> mediaRegistry,
+  ) async {
+    final handle = payload['handle']?.toString() ?? '';
+    final source = mediaRegistry[handle];
+    if (source == null || source.kind != WebChatMediaSourceKind.localFile) {
+      throw const WebChatProtocolException('file handle is not active');
+    }
+    Map<String, dynamic>? attachment;
+    for (final candidate in parseWebChatAttachments(message.content)) {
+      if (candidate['kind'] == 'file' &&
+          _webMediaReferenceMatches(
+            candidate['reference']?.toString(),
+            handle,
+            source,
+          )) {
+        attachment = candidate;
+        break;
+      }
+    }
+    if (attachment == null) {
+      throw const WebChatProtocolException('file handle is not in message');
+    }
+    final l10n = AppLocalizations.of(context)!;
+    final name = attachment['name']?.toString() ?? '';
+    try {
+      final path = SandboxPathResolver.fix(source.value);
+      final file = File(path);
+      if (!await file.exists()) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetFileNotFound(name),
+          type: NotificationType.error,
+        );
+        return;
+      }
+      final result = await OpenFilex.open(
+        path,
+        type: attachment['mime']?.toString(),
+      );
+      if (result.type != ResultType.done && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenFile(
+            result.message.isNotEmpty ? result.message : result.type.toString(),
+          ),
+          type: NotificationType.error,
+        );
+      }
+    } catch (error) {
+      debugPrint('HomePage: Web attachment open failed ($error)');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenFileError(error.toString()),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  bool _webMediaReferenceMatches(
+    String? reference,
+    String handle,
+    WebChatMediaSource source,
+  ) => reference == handle || reference == source.value;
+
+  String? _resolveWebMediaValue(
+    String? reference,
+    Map<String, WebChatMediaSource> registry,
+  ) {
+    if (reference == null || reference.isEmpty) return null;
+    final direct = registry[reference];
+    if (direct != null) return direct.value;
+    for (final source in registry.values) {
+      if (source.value == reference) return source.value;
+    }
+    if (reference.startsWith('https://')) return reference;
+    return null;
+  }
+
+  Future<void> _openWebCitation(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+  ) async {
+    final citationId = payload['citationId']?.toString() ?? '';
+    final requestedIndex = payload['index']?.toString() ?? '';
+    final sources = buildWebChatCitationSources(
+      _controller.toolParts[message.id] ?? const <ToolUIPart>[],
+    );
+    Map<String, dynamic>? match;
+    for (final source in sources) {
+      if ((source['id']?.toString() ?? '') == citationId) {
+        match = source;
+        break;
+      }
+    }
+    final fallbackIndex = int.tryParse(
+      citationId.isEmpty ? requestedIndex : citationId.trim(),
+    );
+    if (match == null && fallbackIndex != null) {
+      for (final source in sources) {
+        if (source['index']?.toString() == fallbackIndex.toString()) {
+          match = source;
+          break;
+        }
+      }
+    }
+    var url = match?['url']?.toString() ?? '';
+    if (url.isEmpty && (citationId.contains('/') || citationId.contains('.'))) {
+      url = citationId;
+    }
+    if (url.isEmpty) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.chatMessageWidgetCitationNotFound,
+          type: NotificationType.warning,
+        );
+      }
+      return;
+    }
+    await _openWebCitationUrl(url);
+  }
+
+  void _showWebCitations(ChatMessage message) {
+    final items = buildWebChatCitationSources(
+      _controller.toolParts[message.id] ?? const <ToolUIPart>[],
+    );
+    if (items.isEmpty || !mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final sources = <CitationSourceItem>[
+      for (var index = 0; index < items.length; index++)
+        CitationSourceItem.fromMap(items[index], fallbackIndex: index + 1),
+    ];
+    unawaited(
+      showCitationSourcesBottomSheet(
+        context: context,
+        title: l10n.chatMessageWidgetSearchResultsTitle,
+        closeSemanticLabel: l10n.mcpPageClose,
+        items: sources,
+        onOpen: (item) => unawaited(_openWebCitationUrl(item.url)),
+      ),
+    );
+  }
+
+  Future<void> _openWebCitationUrl(String raw) async {
+    final l10n = AppLocalizations.of(context)!;
+    var value = raw.trim();
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.substring(1, value.length - 1).trim();
+    }
+    if (value.startsWith('//')) {
+      value = 'https:$value';
+    } else if (!RegExp(r'^[A-Za-z][A-Za-z0-9+.-]*:').hasMatch(value)) {
+      value = 'https://$value';
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetOpenLinkError,
+          type: NotificationType.error,
+        );
+      }
+      return;
+    }
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
+          type: NotificationType.error,
+        );
+      }
+    } catch (error) {
+      debugPrint('HomePage: Web citation open failed ($error)');
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetOpenLinkError,
+          type: NotificationType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _startWebMultiAI(ChatMessage message) async {
+    if (!await _confirmWebMultiAIFallback() || !mounted) return;
+    final conversationId =
+        _controller.currentConversation?.id ?? message.conversationId;
+    setState(() {
+      _webFlutterConversationOverrides.add(conversationId);
+    });
+    await _controller.handleMultiAIAction(message);
+  }
+
+  Future<void> _openWebHtmlPreview(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+    Map<String, WebChatHtmlPreviewSource> registry,
+  ) async {
+    final registered = resolveWebChatHtmlPreviewSource(
+      messageId: message.id,
+      rawSource: payload['source'],
+      registry: registry,
+    );
+    if (!mounted) return;
+    if (Platform.isAndroid || Platform.isIOS) {
+      await Navigator.of(context).push<void>(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, _, _) =>
+              HtmlPreviewPage(html: registered.source, isolated: true),
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 240),
+          transitionsBuilder: (context, animation, _, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(opacity: curved, child: child);
+          },
+        ),
+      );
+      return;
+    }
+    if (Platform.isMacOS || Platform.isWindows) {
+      await showHtmlPreviewDesktopDialog(
+        context,
+        html: registered.source,
+        isolated: true,
+      );
+      return;
+    }
+    throw const WebChatProtocolException(
+      'HTML preview is unsupported on this platform',
+    );
+  }
+
+  ChatMessage? _findWebActionMessage(
+    String messageId,
+    List<ChatMessage> visibleMessages,
+  ) {
+    for (final message in visibleMessages) {
+      if (message.id == messageId) return message;
+    }
+    return null;
+  }
+
+  bool _webMessageActionAllowed(String action, ChatMessage message) {
+    if (message.isStreaming &&
+        const <String>{
+          'copy',
+          'more',
+          'regenerate',
+          'translate',
+          'speak',
+        }.contains(action)) {
+      return false;
+    }
+    const common = <String>{
+      'copy',
+      'more',
+      'quote',
+      'share',
+      'fork',
+      'select',
+      'delete',
+      'version',
+      'previewImage',
+      'openAttachment',
+      'openCitation',
+      'showCitations',
+      'openHtmlPreview',
+    };
+    if (common.contains(action)) return true;
+    if (action == 'edit' || action == 'resend') return message.role == 'user';
+    const assistantOnly = <String>{
+      'regenerate',
+      'translate',
+      'speak',
+      'setReasoningExpanded',
+      'approveTool',
+      'denyTool',
+      'answerTool',
+    };
+    if (assistantOnly.contains(action)) return message.role == 'assistant';
+    if (action == 'multiAI') {
+      return message.role == 'assistant' &&
+          _controller.canStartMultiAIComparison;
+    }
+    return false;
+  }
+
+  bool _webMessageHasTool(String messageId, String toolId) {
+    return (_controller.toolParts[messageId] ?? const []).any(
+      (part) => part.id == toolId,
+    );
+  }
+
+  void _submitWebAskUserAnswer(
+    ChatMessage message,
+    Map<String, dynamic> payload,
+  ) {
+    final toolId = payload['toolId']?.toString() ?? '';
+    final service = context.read<AskUserInteractionService>();
+    final request = service.pendingRequests[toolId];
+    if (request == null || !_webMessageHasTool(message.id, toolId)) {
+      throw const WebChatProtocolException(
+        'ask user request is no longer active',
+      );
+    }
+    final rawAnswers = payload['answers'] is Map
+        ? (payload['answers'] as Map).map(
+            (key, value) => MapEntry(
+              key.toString(),
+              value is List
+                  ? value.map((item) => item.toString()).toList()
+                  : <String>[value.toString()],
+            ),
+          )
+        : const <String, List<String>>{};
+    final skipped = (payload['skipped'] as List? ?? const <dynamic>[])
+        .map((value) => value.toString())
+        .toSet();
+    final custom = (payload['custom'] as List? ?? const <dynamic>[])
+        .map((value) => value.toString())
+        .toSet();
+    final answers = <String, AskUserAnswerValue>{};
+    for (final question in request.questions) {
+      if (skipped.contains(question.id)) {
+        answers[question.id] = AskUserAnswerValue.skipped(kind: question.kind);
+        continue;
+      }
+      final values = rawAnswers[question.id] ?? const <String>[];
+      if (values.isEmpty ||
+          values.length > 50 ||
+          values.any((value) => value.trim().isEmpty || value.length > 4000) ||
+          (question.kind == AskUserQuestionKind.single && values.length != 1) ||
+          (!custom.contains(question.id) &&
+              question.options.isNotEmpty &&
+              values.any((value) => !question.options.contains(value)))) {
+        throw const WebChatProtocolException('invalid ask user answer');
+      }
+      answers[question.id] = question.kind == AskUserQuestionKind.multi
+          ? AskUserAnswerValue.multi(
+              value: values,
+              custom: custom.contains(question.id),
+            )
+          : AskUserAnswerValue.single(
+              value: values.isEmpty ? '' : values.first,
+              custom: custom.contains(question.id),
+            );
+    }
+    service.answer(toolId, answers);
+  }
+
+  void _scheduleMultiAIFallbackPrompt(String conversationId) {
+    if (!_webMultiAIPromptedConversations.add(conversationId)) return;
+    _webFlutterConversationOverrides.add(conversationId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _showWebMultiAIFallbackNotice();
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _showWebMultiAIFallbackNotice() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(l10n.webChatMultiAIFallbackNoticeTitle),
+          content: Text(l10n.webChatMultiAIFallbackNoticeBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n.webChatMultiAIFallbackNoticeAcknowledge),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmWebMultiAIFallback() async {
+    final l10n = AppLocalizations.of(context)!;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.webChatMultiAIFallbackTitle),
+            content: Text(l10n.webChatMultiAIFallbackBody),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.homePageCancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(l10n.webChatMultiAIFallbackConfirm),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  String _webCssColor(Color color) {
+    final value = color.toARGB32();
+    final alpha = (value >> 24) & 0xff;
+    final red = (value >> 16) & 0xff;
+    final green = (value >> 8) & 0xff;
+    final blue = value & 0xff;
+    if (alpha == 0xff) {
+      final rgb = value & 0x00ffffff;
+      return '#${rgb.toRadixString(16).padLeft(6, '0')}';
+    }
+    return 'rgba($red, $green, $blue, '
+        '${(alpha / 255).toStringAsFixed(3)})';
   }
 
   Widget _buildChatInputBar(BuildContext context, {required bool isTablet}) {

@@ -60,8 +60,25 @@ on:
         type: boolean
 
 jobs:
+  # Shared, build-free validation for the offline Web conversation shell.
+  web-chat-checks:
+    name: 校验 Web 对话视图
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🟢 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 🧪 运行 Web 协议测试
+        run: node --test assets/web_chat/test/*.test.mjs
+
   # Android 构建
   android:
+    needs: web-chat-checks
     if: ${{ github.event.inputs.build_android == 'true' }}
     name: 构建 Android
     runs-on: ubuntu-latest
@@ -193,6 +210,7 @@ jobs:
 
   # iOS 构建
   ios:
+    needs: web-chat-checks
     if: ${{ github.event.inputs.build_ios == 'true' }}
     name: 构建 iOS
     runs-on: macos-latest
@@ -275,6 +293,7 @@ jobs:
 
   # macOS 构建
   macos:
+    needs: web-chat-checks
     if: ${{ github.event.inputs.build_mac == 'true' }}
     name: 构建 macOS
     runs-on: macos-latest
@@ -357,6 +376,7 @@ jobs:
 
   # Windows 构建
   windows:
+    needs: web-chat-checks
     if: ${{ github.event.inputs.build_windows == 'true' }}
     name: 构建 Windows
     runs-on: windows-latest
@@ -528,6 +548,7 @@ jobs:
 
   # Linux 构建
   linux:
+    needs: web-chat-checks
     if: ${{ github.event.inputs.build_linux == 'true' }}
     name: 构建 Linux
     runs-on: ubuntu-22.04

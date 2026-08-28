@@ -54,45 +54,52 @@ class _DisplaySettingsBody extends StatelessWidget {
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.displaySettingsPageChatItemDisplayTitle,
-                children: const [
-                  _ToggleRowShowProviderInCapsule(),
-                  _RowDivider(),
-                  _ToggleRowShowUserAvatar(),
-                  _RowDivider(),
-                  _ToggleRowShowUserName(),
-                  _RowDivider(),
-                  _ToggleRowShowUserTimestamp(),
-                  _RowDivider(),
-                  _ToggleRowShowUserMsgActions(),
-                  _RowDivider(),
-                  _ToggleRowShowModelIcon(),
-                  _RowDivider(),
-                  _ToggleRowUseNewAssistantAvatarUx(),
-                  _RowDivider(),
-                  _ToggleRowShowModelName(),
-                  _RowDivider(),
-                  _ToggleRowShowModelTimestamp(),
-                  _RowDivider(),
-                  _ToggleRowShowProviderInChatMessage(),
-                  _RowDivider(),
-                  _ToggleRowShowTokenStats(),
+                children: [
+                  const _ToggleRowShowProviderInCapsule(),
+                  const _RowDivider(),
+                  const _ToggleRowShowUserAvatar(),
+                  const _RowDivider(),
+                  const _ToggleRowShowUserName(),
+                  const _RowDivider(),
+                  const _ToggleRowShowUserTimestamp(),
+                  const _RowDivider(),
+                  const _ToggleRowShowUserMsgActions(),
+                  const _RowDivider(),
+                  const _ToggleRowShowModelIcon(),
+                  const _RowDivider(),
+                  const _ToggleRowUseNewAssistantAvatarUx(),
+                  const _RowDivider(),
+                  const _ToggleRowShowModelName(),
+                  const _RowDivider(),
+                  const _ToggleRowShowModelTimestamp(),
+                  const _RowDivider(),
+                  const _ToggleRowShowProviderInChatMessage(),
+                  const _RowDivider(),
+                  const _ToggleRowShowTokenStats(),
                 ],
               ),
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.displaySettingsPageRenderingSettingsTitle,
-                children: const [
-                  _ToggleRowDollarLatex(),
-                  _RowDivider(),
-                  _ToggleRowMathRendering(),
-                  _RowDivider(),
-                  _ToggleRowUserMarkdown(),
-                  _RowDivider(),
-                  _ToggleRowReasoningMarkdown(),
-                  _RowDivider(),
-                  _ToggleRowAssistantMarkdown(),
-                  _RowDivider(),
-                  _AutoCollapseCodeBlocksSection(),
+                children: [
+                  if (supportsWebConversationViewport(
+                    isWeb: kIsWeb,
+                    platform: defaultTargetPlatform,
+                  )) ...[
+                    const _ToggleRowExperimentalWebViewRendering(),
+                    const _RowDivider(),
+                  ],
+                  const _ToggleRowDollarLatex(),
+                  const _RowDivider(),
+                  const _ToggleRowMathRendering(),
+                  const _RowDivider(),
+                  const _ToggleRowUserMarkdown(),
+                  const _RowDivider(),
+                  const _ToggleRowReasoningMarkdown(),
+                  const _RowDivider(),
+                  const _ToggleRowAssistantMarkdown(),
+                  const _RowDivider(),
+                  const _AutoCollapseCodeBlocksSection(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2326,6 +2333,24 @@ class _ToggleRowMathRendering extends StatelessWidget {
   }
 }
 
+class _ToggleRowExperimentalWebViewRendering extends StatelessWidget {
+  const _ToggleRowExperimentalWebViewRendering();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
+      subtitle: l10n.displaySettingsPageExperimentalWebViewRenderingSubtitle,
+      value: settings.experimentalWebViewRendering,
+      onChanged: (value) => context
+          .read<SettingsProvider>()
+          .setExperimentalWebViewRendering(value),
+    );
+  }
+}
+
 class _ToggleRowUserMarkdown extends StatelessWidget {
   const _ToggleRowUserMarkdown();
   @override
@@ -2917,10 +2942,12 @@ class _StartupAssistantPickerRow extends StatelessWidget {
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
+    this.subtitle,
     required this.value,
     required this.onChanged,
   });
   final String label;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool>? onChanged;
   @override
@@ -2944,6 +2971,17 @@ class _ToggleRow extends StatelessWidget {
                     decoration: TextDecoration.none,
                   ),
                 ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.56),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

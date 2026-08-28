@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import '../../../core/services/android_background.dart';
@@ -19,8 +20,10 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
+import 'web_conversation_styles_page.dart';
 import '../../../features/assistant/widgets/assistant_select_sheet.dart';
 import '../../home/pages/input_bar_buttons_customization_page.dart';
+import '../../home/webview/web_chat_platform.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
@@ -1895,6 +1898,36 @@ class RenderingSettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
+              if (supportsWebConversationViewport(
+                isWeb: kIsWeb,
+                platform: defaultTargetPlatform,
+              )) ...[
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Globe,
+                  label:
+                      l10n.displaySettingsPageExperimentalWebViewRenderingTitle,
+                  subtitle: l10n
+                      .displaySettingsPageExperimentalWebViewRenderingSubtitle,
+                  value: sp.experimentalWebViewRendering,
+                  onChanged: (value) => context
+                      .read<SettingsProvider>()
+                      .setExperimentalWebViewRendering(value),
+                ),
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Palette,
+                  label: l10n.webConversationStylesTitle,
+                  detailText: l10n.webConversationStylesEntrySubtitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WebConversationStylesPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Hash,

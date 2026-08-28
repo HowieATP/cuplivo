@@ -36,6 +36,16 @@ class ChatDatabaseRepository {
     return ChatDatabaseRepository(db, databaseFile: file);
   }
 
+  /// Opens (or reuses) the process-wide shared [AppDatabase] for the backing
+  /// file — the same connection the business startup gate holds. Keeps a
+  /// single Drift instance per SQLite file so the gate and [ChatService] can
+  /// never interleave two open/migrate sequences (drift multi-instance
+  /// warning; PR #403 class).
+  static Future<ChatDatabaseRepository> openShared({File? file}) async {
+    final db = await AppDatabase.openShared(file: file);
+    return ChatDatabaseRepository(db, databaseFile: file);
+  }
+
   static sqlite.Database _openSync(File file) {
     final db = sqlite.sqlite3.open(file.path);
     db.execute('PRAGMA journal_mode = WAL;');

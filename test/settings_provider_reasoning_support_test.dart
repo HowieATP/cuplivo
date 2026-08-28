@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/model_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -11,6 +11,7 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider reasoning support', () {
@@ -41,10 +42,10 @@ void main() {
     });
 
     test('built-in provider order does not add Kimi preset', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'providers_order_v1': <String>['OpenAI', 'Zhipu AI', 'Grok'],
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -104,8 +105,8 @@ void main() {
     test(
       'OpenAI-compatible latest models expose documented effort caps',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        businessPrefs = BusinessPreferences.memoryForTests({});
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
 
@@ -167,8 +168,8 @@ void main() {
     test(
       'Claude provider resolves apiModelId before DeepSeek xhigh check',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        businessPrefs = BusinessPreferences.memoryForTests({});
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
 
@@ -201,8 +202,8 @@ void main() {
     );
 
     test('Claude supports xhigh and max for fable / mythos series', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -231,8 +232,8 @@ void main() {
     test(
       'Claude latest models expose xhigh and max reasoning without presets',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        businessPrefs = BusinessPreferences.memoryForTests({});
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
         await settings.setProviderConfig(
@@ -274,8 +275,8 @@ void main() {
       },
     );
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -308,8 +309,8 @@ void main() {
     });
 
     test('Kimi K3 supports max but not xhigh reasoning (kimi-k3)', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -330,8 +331,8 @@ void main() {
     });
 
     test('Kimi K3 supports max but not xhigh reasoning (bare k3)', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(

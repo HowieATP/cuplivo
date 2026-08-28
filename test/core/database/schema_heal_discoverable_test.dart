@@ -270,6 +270,50 @@ void main() {
     await repo.close();
   });
 
+  test('heal creates preference_rows (v21 table shape)', () async {
+    _createLegacyDb(
+      dbFile,
+      userVersion: 21,
+      missingIsPreset: false,
+      missingHandoffColumns: false,
+      missingV15RequestMetadata: false,
+      missingQuoteJson: false,
+      missingPreferenceRows: true,
+    );
+
+    final repo = ChatDatabaseRepository.open(file: dbFile);
+    await repo.ensureReady();
+
+    // Must succeed: heal creates the KV table before BusinessPreferences
+    // writes run, and a key round-trips through it.
+    final table = await repo.db
+        .customSelect(
+          "SELECT COUNT(*) AS c FROM sqlite_master "
+          "WHERE type = 'table' AND name = ?",
+          variables: [Variable.withString('preference_rows')],
+        )
+        .get();
+    expect(
+      table.single.read<int>('c'),
+      1,
+      reason: 'heal should create preference_rows',
+    );
+
+    await repo.db.customStatement(
+      "INSERT INTO preference_rows (key, value, updated_at) "
+      "VALUES ('test_key_v1', 'true', 1)",
+    );
+    final stored = await repo.db
+        .customSelect(
+          "SELECT value FROM preference_rows WHERE key = ?",
+          variables: [Variable.withString('test_key_v1')],
+        )
+        .get();
+    expect(stored.single.read<String>('value'), 'true');
+
+    await repo.close();
+  });
+
   test('heal adds inject_group_members column on group_chat_rows '
       '(v17 column shape)', () async {
     _createLegacyDb(
@@ -468,6 +512,7 @@ void _createLegacyDb(
   bool missingQuoteJson = true,
   bool includeWorkspaceBindingColumns = false,
   bool includeWorkspaceV20Columns = false,
+  bool missingPreferenceRows = true,
 }) {
   final raw = sqlite.sqlite3.open(dbFile.path);
   raw.execute('PRAGMA user_version = $userVersion;');
@@ -623,5 +668,14 @@ CREATE TABLE conversation_mcp_server_rows (
   PRIMARY KEY (conversation_id, server_id)
 );
 ''');
+  if (!missingPreferenceRows) {
+    raw.execute('''
+CREATE TABLE preference_rows (
+  key TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+''');
+  }
   raw.close();
 }

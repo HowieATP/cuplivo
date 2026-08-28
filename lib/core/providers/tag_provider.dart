@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../models/assistant_tag.dart';
 
 /// Manages assistant group tags, assignments, order and collapse state.
 class TagProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _tagsKey = 'assistant_tags_v1';
   static const String _assignKey =
       'assistant_tag_map_v1'; // assistantId -> tagId
@@ -20,12 +21,12 @@ class TagProvider extends ChangeNotifier {
   Map<String, String> get assignment => Map.unmodifiable(_assignment);
   bool isCollapsed(String tagId) => _collapsed[tagId] ?? false;
 
-  TagProvider() {
+  TagProvider({required this._preferences}) {
     _load();
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final rawTags = prefs.getString(_tagsKey);
     if (rawTags != null && rawTags.isNotEmpty) {
       _tags
@@ -58,17 +59,17 @@ class TagProvider extends ChangeNotifier {
   }
 
   Future<void> _persistTags() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_tagsKey, AssistantTag.encodeList(_tags));
   }
 
   Future<void> _persistAssignment() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_assignKey, jsonEncode(_assignment));
   }
 
   Future<void> _persistCollapsed() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_collapsedKey, jsonEncode(_collapsed));
   }
 

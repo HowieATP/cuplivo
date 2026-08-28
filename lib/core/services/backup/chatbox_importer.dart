@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/assistant.dart';
@@ -48,6 +48,7 @@ class ChatboxImporter {
     required RestoreMode mode,
     required SettingsProvider settings,
     required ChatService chatService,
+    required BusinessPreferences preferences,
   }) async {
     final root = await _readChatboxBackupFile(file);
 
@@ -76,13 +77,17 @@ class ChatboxImporter {
       }
     }
 
-    final importedProviders = await _importProviders(root, mode);
+    final importedProviders = await _importProviders(root, mode, preferences);
     final assistantConvRes = await _importAssistantsAndConversations(
       root,
       mode,
       chatService,
     );
-    await _tagImportedAssistants(assistantConvRes.assistantIds, mode);
+    await _tagImportedAssistants(
+      assistantConvRes.assistantIds,
+      mode,
+      preferences,
+    );
 
     return ChatboxImportResult(
       providers: importedProviders,
@@ -141,6 +146,7 @@ class ChatboxImporter {
   static Future<int> _importProviders(
     Map<String, dynamic> root,
     RestoreMode mode,
+    BusinessPreferences preferences,
   ) async {
     final rawSettings = root['settings'];
     if (rawSettings is! Map) return 0;
@@ -206,7 +212,7 @@ class ChatboxImporter {
       };
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = preferences;
 
     if (mode == RestoreMode.overwrite) {
       // If the export does not include provider configs, don't wipe existing local providers.
@@ -628,9 +634,10 @@ class ChatboxImporter {
   static Future<void> _tagImportedAssistants(
     List<String> assistantIds,
     RestoreMode mode,
+    BusinessPreferences preferences,
   ) async {
     if (assistantIds.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = preferences;
 
     List<dynamic> tags = const <dynamic>[];
     Map<String, dynamic> assignment = const <String, dynamic>{};

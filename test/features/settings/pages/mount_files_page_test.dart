@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/pages/html_file_preview_page.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 /// The page loads its listing via real dart:io streams; each stream event is
 /// delivered on the real event loop, so pump+runAsync must cycle until the
@@ -34,6 +35,7 @@ Future<void> pumpUntilFound(
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   testWidgets('empty directory keeps the breadcrumb so the user can step up '
       'one level instead of leaving the page', (tester) async {
     final tmp = Directory.systemTemp.createTempSync('mount_page_test_');
@@ -109,7 +111,7 @@ void main() {
 
     // IosCardPress reads SettingsProvider on tap; its constructor loads
     // shared_preferences, so the platform channel needs the in-memory mock.
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
     final mount = FilesystemMount(
       alias: 'default',
       path: tmp.path,
@@ -117,7 +119,7 @@ void main() {
     );
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(),
+        create: (_) => SettingsProvider(preferences: businessPrefs),
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: MountFilesPage(mount: mount),
@@ -203,7 +205,7 @@ void main() {
 
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(),
+        create: (_) => SettingsProvider(preferences: businessPrefs),
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: Builder(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/providers/mcp_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
@@ -304,10 +305,11 @@ void main() {
 }
 
 /// Constructs the provider the same way [McpProvider] is used in the app
-/// (SharedPreferences-backed persistence, no UI context).
+/// (BusinessPreferences-backed persistence, no UI context).
 McpProvider _provider() {
   final provider = McpProvider(
     contextProvider: () => throw UnimplementedError(),
+    preferences: BusinessPreferences.memoryForTests(),
   );
   return provider;
 }

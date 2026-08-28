@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import '../../models/api_keys.dart';
 import '../../models/assistant.dart';
 import '../../models/backup.dart';
@@ -40,6 +40,7 @@ class CherryImporter {
     required RestoreMode mode,
     required SettingsProvider settings,
     required ChatService chatService,
+    required BusinessPreferences preferences,
   }) async {
     // 1) Load JSON from ZIP/BAK (best-effort)
     final Map<String, dynamic> root = await _readCherryBackupFile(file);
@@ -192,6 +193,7 @@ class CherryImporter {
       cherryProviders,
       settings,
       mode,
+      preferences,
     );
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
@@ -362,6 +364,7 @@ class CherryImporter {
     List<dynamic> cherryProviders,
     SettingsProvider settings,
     RestoreMode mode,
+    BusinessPreferences preferences,
   ) async {
     // Build imported map id -> ProviderConfig JSON-like
     final imported = <String, Map<String, dynamic>>{};
@@ -469,7 +472,7 @@ class CherryImporter {
       imported[id] = map;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = preferences;
 
     if (mode == RestoreMode.overwrite) {
       await prefs.setString(_providersKey, jsonEncode(imported));

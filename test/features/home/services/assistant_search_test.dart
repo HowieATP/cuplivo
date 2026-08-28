@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
@@ -15,6 +15,8 @@ import 'package:Cuplivo/core/services/search/search_tool_service.dart';
 import 'package:Cuplivo/features/home/services/message_builder_service.dart';
 import 'package:Cuplivo/features/home/services/tool_handler_service.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 class _FakeBuildContext implements BuildContext {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -25,8 +27,9 @@ void main() {
 
   group('per-assistant search behavior', () {
     test('does not inject search prompt (moved to tool description)', () {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: ChatService(),
         contextProvider: _FakeBuildContext(),
       );
@@ -36,7 +39,7 @@ void main() {
       ];
       service.injectSearchPrompt(
         disabledMessages,
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         Assistant(id: 'assistant-a', name: 'A'),
         false,
       );
@@ -46,7 +49,7 @@ void main() {
       ];
       service.injectSearchPrompt(
         enabledMessages,
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
         false,
       );
@@ -60,8 +63,8 @@ void main() {
     testWidgets('builds search tools only when the assistant enables search', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       late List<Map<String, dynamic>> disabledTools;
       late List<Map<String, dynamic>> enabledTools;
@@ -76,11 +79,13 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
+            Provider<BusinessPreferences>.value(value: businessPrefs),
             ChangeNotifierProvider<AssistantProvider>(
-              create: (_) => AssistantProvider(),
+              create: (_) => AssistantProvider(preferences: businessPrefs),
             ),
             ChangeNotifierProvider<McpProvider>(
               create: (_) => McpProvider(
+                preferences: businessPrefs,
                 contextProvider: () => throw UnimplementedError(),
               ),
             ),

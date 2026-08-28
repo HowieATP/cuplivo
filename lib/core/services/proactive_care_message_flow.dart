@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../database/business_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../utils/app_directories.dart';
@@ -64,44 +64,6 @@ class ProactiveCareL10nSnapshot {
   final String carePromptDefault;
   final String decisionPromptDefault;
   final String failureNotificationBody;
-
-  static Future<void> save({
-    required String defaultConversationTitle,
-    required String carePromptDefault,
-    required String decisionPromptDefault,
-    required String failureNotificationBody,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _prefsKey,
-      jsonEncode(<String, String>{
-        'defaultConversationTitle': defaultConversationTitle,
-        'carePromptDefault': carePromptDefault,
-        'decisionPromptDefault': decisionPromptDefault,
-        'failureNotificationBody': failureNotificationBody,
-      }),
-    );
-  }
-
-  static Future<ProactiveCareL10nSnapshot?> load() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_prefsKey);
-      if (raw == null || raw.isEmpty) return null;
-      final map = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      return ProactiveCareL10nSnapshot(
-        defaultConversationTitle:
-            (map['defaultConversationTitle'] as String?) ?? '',
-        carePromptDefault: (map['carePromptDefault'] as String?) ?? '',
-        decisionPromptDefault: (map['decisionPromptDefault'] as String?) ?? '',
-        failureNotificationBody:
-            (map['failureNotificationBody'] as String?) ?? '',
-      );
-    } catch (e) {
-      FlutterLogger.log('L10n snapshot load failed: $e', tag: _logTag);
-      return null;
-    }
-  }
 }
 
 /// Resolved provider/model for a proactive care request.
@@ -131,7 +93,53 @@ class ProactiveCareModelConfig {
 /// `tool_choice: auto` (not `required`), so DeepSeek and other
 /// OpenAI-compatible hosts that reject forced tools still work.
 class ProactiveCareMessageFlow {
-  const ProactiveCareMessageFlow._();
+  ProactiveCareMessageFlow({required BusinessPreferences preferences})
+    : _preferences = preferences,
+      _memoryStore = MemoryStore.shared(preferences),
+      _worldBookStore = WorldBookStore.shared(preferences),
+      _instructionInjectionStore = InstructionInjectionStore.shared(
+        preferences,
+      );
+
+  final BusinessPreferences _preferences;
+  final MemoryStore _memoryStore;
+  final WorldBookStore _worldBookStore;
+  final InstructionInjectionStore _instructionInjectionStore;
+  Future<void> saveL10nSnapshot({
+    required String defaultConversationTitle,
+    required String carePromptDefault,
+    required String decisionPromptDefault,
+    required String failureNotificationBody,
+  }) async {
+    await _preferences.setString(
+      ProactiveCareL10nSnapshot._prefsKey,
+      jsonEncode(<String, String>{
+        'defaultConversationTitle': defaultConversationTitle,
+        'carePromptDefault': carePromptDefault,
+        'decisionPromptDefault': decisionPromptDefault,
+        'failureNotificationBody': failureNotificationBody,
+      }),
+    );
+  }
+
+  Future<ProactiveCareL10nSnapshot?> loadL10nSnapshot() async {
+    try {
+      final raw = _preferences.getString(ProactiveCareL10nSnapshot._prefsKey);
+      if (raw == null || raw.isEmpty) return null;
+      final map = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      return ProactiveCareL10nSnapshot(
+        defaultConversationTitle:
+            (map['defaultConversationTitle'] as String?) ?? '',
+        carePromptDefault: (map['carePromptDefault'] as String?) ?? '',
+        decisionPromptDefault: (map['decisionPromptDefault'] as String?) ?? '',
+        failureNotificationBody:
+            (map['failureNotificationBody'] as String?) ?? '',
+      );
+    } catch (e) {
+      FlutterLogger.log('L10n snapshot load failed: $e', tag: _logTag);
+      return null;
+    }
+  }
 
   // SharedPreferences keys owned by other classes that keep them private.
   // They are stable v1 keys; keep in sync with SettingsProvider.
@@ -174,10 +182,10 @@ class ProactiveCareMessageFlow {
   /// Resolves the chat model for [assistant] from SharedPreferences:
   /// assistant-specific model first, then the globally selected model
   /// (mirrors the decision flow in HomeViewModel).
-  static Future<ProactiveCareModelConfig?> loadModelConfigFromPrefs(
+  Future<ProactiveCareModelConfig?> loadModelConfigFromPrefs(
     Assistant assistant,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     String? provKey = assistant.chatModelProvider;
     String? modelId = assistant.chatModelId;
     if (provKey == null || modelId == null) {
@@ -215,10 +223,10 @@ class ProactiveCareMessageFlow {
 
   /// Resolves the proactive care decision model from SharedPreferences.
   /// Falls back to the chat model if no dedicated decision model is set.
-  static Future<ProactiveCareModelConfig?> loadDecisionModelConfigFromPrefs(
+  Future<ProactiveCareModelConfig?> loadDecisionModelConfigFromPrefs(
     Assistant assistant,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final sel = prefs.getString('proactive_care_decision_model_v1');
     if (sel != null && sel.contains('::')) {
       final parts = sel.split('::');
@@ -254,9 +262,9 @@ class ProactiveCareMessageFlow {
 
   /// Loads the user nickname for system prompt placeholders (background
   /// path). 'User' mirrors UserProvider's built-in default.
-  static Future<String> loadUserNicknameFromPrefs() async {
+  Future<String> loadUserNicknameFromPrefs() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       final n = prefs.getString(_userNamePrefsKey);
       if (n != null && n.isNotEmpty) return n;
     } catch (e) {
@@ -267,9 +275,9 @@ class ProactiveCareMessageFlow {
 
   /// Loads the global thinking budget from SharedPreferences for use in
   /// background isolates where SettingsProvider is unavailable.
-  static Future<int?> loadThinkingBudgetFromPrefs() async {
+  Future<int?> loadThinkingBudgetFromPrefs() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       return prefs.getInt('thinking_budget_v1');
     } catch (e) {
       debugPrint('[ProactiveCare] Thinking budget load failed: $e');
@@ -317,7 +325,7 @@ class ProactiveCareMessageFlow {
   /// truncateIndex applied, and only completed non-empty user/assistant turns.
   /// Smart-time timestamps follow [Assistant.enableTimeInjection]. Send-only
   /// assistant regexes are applied only when [applySendRegexes] is true.
-  static List<Map<String, dynamic>> buildHistory({
+  List<Map<String, dynamic>> buildHistory({
     required Conversation conversation,
     required List<ChatMessage> messages,
     required Assistant assistant,
@@ -378,7 +386,7 @@ class ProactiveCareMessageFlow {
   /// Platform.localeName instead of Localizations (otherwise mirrors
   /// PromptTransformer.buildPlaceholders).
   @visibleForTesting
-  static Map<String, String> buildHeadlessPlaceholders({
+  Map<String, String> buildHeadlessPlaceholders({
     required Assistant assistant,
     required String modelId,
     required String userNickname,
@@ -411,7 +419,7 @@ class ProactiveCareMessageFlow {
   /// instruction/world-book injections + conversation history + the care
   /// prompt with the current system time as the final user turn. Smart-time
   /// notes and the assistant's context limit are applied last.
-  static Future<List<Map<String, dynamic>>> buildCareApiMessages({
+  Future<List<Map<String, dynamic>>> buildCareApiMessages({
     required Assistant assistant,
     required String userNickname,
     required String modelId,
@@ -454,7 +462,7 @@ class ProactiveCareMessageFlow {
     if (assistant.enableMemory) {
       try {
         final block = ProactiveCareService.buildMemoriesBlock(
-          await MemoryStore.getForAssistant(assistant.id),
+          await _memoryStore.getForAssistant(assistant.id),
         );
         if (block.isNotEmpty) {
           _appendToSystemMessage(apiMessages, block);
@@ -476,7 +484,7 @@ class ProactiveCareMessageFlow {
 
     // Instruction injections.
     try {
-      final actives = await InstructionInjectionStore.getActives(
+      final actives = await _instructionInjectionStore.getActives(
         assistantId: assistant.id,
       );
       final prompts = actives
@@ -494,12 +502,12 @@ class ProactiveCareMessageFlow {
     // both the main isolate and a headless alarm isolate.
     try {
       final selection = reloadWorldBooks
-          ? await WorldBookStore.loadFreshForAssistant(
+          ? await _worldBookStore.loadFreshForAssistant(
               assistantId: assistant.id,
             )
           : (
-              books: await WorldBookStore.getAll(),
-              activeBookIds: await WorldBookStore.getActiveIds(
+              books: await _worldBookStore.getAll(),
+              activeBookIds: await _worldBookStore.getActiveIds(
                 assistantId: assistant.id,
               ),
             );
@@ -536,7 +544,7 @@ class ProactiveCareMessageFlow {
   }
 
   /// Sends the silent care request and returns the aggregated reply text.
-  static Future<String> requestCareReply({
+  Future<String> requestCareReply({
     required ProviderConfig config,
     required String modelId,
     required Assistant assistant,
@@ -568,7 +576,7 @@ class ProactiveCareMessageFlow {
   ///
   /// [decisionTimeout] bounds each attempt's stream (tests inject a tiny
   /// value); defaults to [_decisionTimeout].
-  static Future<DateTime?> decideNextCareTime({
+  Future<DateTime?> decideNextCareTime({
     required ProviderConfig config,
     required String modelId,
     required Assistant assistant,
@@ -600,7 +608,7 @@ class ProactiveCareMessageFlow {
     if (assistant.enableMemory) {
       try {
         memoriesBlock = ProactiveCareService.buildMemoriesBlock(
-          await MemoryStore.getForAssistant(assistant.id),
+          await _memoryStore.getForAssistant(assistant.id),
         );
       } catch (e) {
         FlutterLogger.log('Decision memories load failed: $e', tag: _logTag);
@@ -680,7 +688,7 @@ class ProactiveCareMessageFlow {
   /// settled the outcome (`time` may still be null = keep current time);
   /// `decided == false` means the attempt produced no decision (free text,
   /// error, timeout) and the caller may retry.
-  static Future<({bool decided, DateTime? time})> _callDecisionOnce({
+  Future<({bool decided, DateTime? time})> _callDecisionOnce({
     required ProactiveCareDecisionSender send,
     required ProviderConfig config,
     required String modelId,
@@ -805,14 +813,22 @@ class ProactiveCareHeadlessChatStore {
 
   static sqlite.Database? _db;
 
-  static Future<sqlite.Database> _ensureDb() async {
-    if (_db != null) return _db!;
+  /// Opens the shared `kelivo.sqlite` (WAL + busy_timeout, mirroring the
+  /// Drift executor). Exposed so helper isolates (proactive-care alarm) can
+  /// build raw-sqlite stores over business tables without Drift.
+  static Future<sqlite.Database> openSharedSqlite() async {
     final dirPath = await dataDirPathProvider();
     final dbPath = '$dirPath/kelivo.sqlite';
-    _db = sqlite.sqlite3.open(dbPath);
-    _db!.execute('PRAGMA journal_mode = WAL;');
-    _db!.execute('PRAGMA foreign_keys = ON;');
-    _db!.execute('PRAGMA busy_timeout = 5000;');
+    final db = sqlite.sqlite3.open(dbPath);
+    db.execute('PRAGMA journal_mode = WAL;');
+    db.execute('PRAGMA foreign_keys = ON;');
+    db.execute('PRAGMA busy_timeout = 5000;');
+    return db;
+  }
+
+  static Future<sqlite.Database> _ensureDb() async {
+    if (_db != null) return _db!;
+    _db = await openSharedSqlite();
     return _db!;
   }
 

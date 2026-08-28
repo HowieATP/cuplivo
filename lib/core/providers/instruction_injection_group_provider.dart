@@ -1,20 +1,21 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 /// Stores UI collapse state for instruction injection groups.
 ///
 /// Groups are keyed by their normalized name (trimmed). Empty group names are
 /// stored under a stable special key so the collapse state can be remembered.
 class InstructionInjectionGroupProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _collapsedKey =
       'instruction_injection_group_collapsed_v1'; // groupKey -> bool
   static const String ungroupedKey = '__ungrouped__';
 
   final Map<String, bool> _collapsed = <String, bool>{};
 
-  InstructionInjectionGroupProvider() {
+  InstructionInjectionGroupProvider({required this._preferences}) {
     _load();
   }
 
@@ -27,7 +28,7 @@ class InstructionInjectionGroupProvider extends ChangeNotifier {
       _collapsed[keyForGroupName(groupName)] ?? false;
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final raw = prefs.getString(_collapsedKey);
     if (raw != null && raw.isNotEmpty) {
       try {
@@ -45,7 +46,7 @@ class InstructionInjectionGroupProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_collapsedKey, jsonEncode(_collapsed));
   }
 

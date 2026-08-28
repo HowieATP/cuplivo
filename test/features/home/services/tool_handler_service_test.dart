@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/assistant_memory.dart';
@@ -14,12 +14,15 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Cuplivo/features/home/services/tool_handler_service.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ToolHandlerService memory tools', () {
     setUp(() {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests();
+      businessPrefs = BusinessPreferences.memoryForTests({});
     });
 
     testWidgets('edit_memory returns updated content when id exists', (
@@ -48,9 +51,11 @@ void main() {
         assistantId: assistant.id,
         content: 'old memory',
       );
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       result = await handler('edit_memory', {
         'id': memory.id,
@@ -80,9 +85,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('edit_memory', {
         'id': 410,
@@ -112,9 +119,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('kelivo_handoff', {
         'assistant': 'research-bot',
@@ -138,7 +147,7 @@ void main() {
 
       await tester.pumpWidget(
         _ToolHandlerTestScope(
-          memoryProvider: _ThrowingMemoryProvider(),
+          memoryProvider: _ThrowingMemoryProvider(preferences: businessPrefs),
           child: Builder(
             builder: (context) {
               return const SizedBox.shrink();
@@ -148,9 +157,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('edit_memory', {
         'id': 410,
@@ -361,16 +372,20 @@ class _ToolHandlerTestScope extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) => AssistantProvider(preferences: businessPrefs),
         ),
         ChangeNotifierProvider<McpProvider>(
-          create: (_) =>
-              McpProvider(contextProvider: () => throw UnimplementedError()),
+          create: (_) => McpProvider(
+            preferences: businessPrefs,
+            contextProvider: () => throw UnimplementedError(),
+          ),
         ),
         ChangeNotifierProvider<McpToolService>(create: (_) => McpToolService()),
         ChangeNotifierProvider<MemoryProvider>(
-          create: (_) => memoryProvider ?? MemoryProvider(),
+          create: (_) =>
+              memoryProvider ?? MemoryProvider(preferences: businessPrefs),
         ),
       ],
       child: child,
@@ -379,6 +394,8 @@ class _ToolHandlerTestScope extends StatelessWidget {
 }
 
 class _ThrowingMemoryProvider extends MemoryProvider {
+  _ThrowingMemoryProvider({required super.preferences});
+
   @override
   Future<AssistantMemory?> update({required int id, required String content}) {
     throw StateError('storage offline');

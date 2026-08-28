@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -69,6 +70,88 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       await context.read<BackupReminderProvider>().recordBackupCompleted();
     } catch (e) {
       debugPrint('BackupExport: recordBackupCompleted failed: $e');
+    }
+  }
+
+  /// Local (FilePicker) export of a backup ZIP in [format].
+  Future<void> _exportLocalBackup(
+    BuildContext context, {
+    BackupFormat format = BackupFormat.jsonl,
+  }) async {
+    final backupProvider = context.read<BackupProvider>();
+    await _saveConfig();
+    if (!context.mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final File file;
+    final stopwatch = Stopwatch()..start();
+    try {
+      debugPrint('BackupExport: pack begin');
+      file = await _runStageTask(
+        context,
+        (onStage) =>
+            backupProvider.exportToFile(onStage: onStage, format: format),
+      );
+      stopwatch.stop();
+      debugPrint(
+        'BackupExport: pack done in ${stopwatch.elapsedMilliseconds} ms -> '
+        '${file.path}',
+      );
+    } catch (e) {
+      debugPrint(
+        'BackupExport: pack failed after ${stopwatch.elapsedMilliseconds} ms: '
+        '$e',
+      );
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupPageExportFailed(e.toString()),
+          type: NotificationType.error,
+        );
+      }
+      return;
+    }
+    try {
+      final String? savePath;
+      try {
+        savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.backupPageExportToFile,
+          fileName: file.uri.pathSegments.last,
+          type: FileType.custom,
+          allowedExtensions: ['zip'],
+        );
+        debugPrint('BackupExport: FilePicker result=$savePath');
+      } catch (e) {
+        debugPrint('BackupExport: picker failed: $e');
+        if (context.mounted) {
+          showAppSnackBar(
+            context,
+            message: l10n.backupPageExportFailed(e.toString()),
+            type: NotificationType.error,
+          );
+        }
+        return;
+      }
+      if (savePath != null) {
+        try {
+          await File(savePath).parent.create(recursive: true);
+          await file.copy(savePath);
+          debugPrint('BackupExport: copied to $savePath');
+          if (context.mounted) {
+            await _recordReminderQuietly(context);
+          }
+        } catch (e) {
+          debugPrint('BackupExport: copy failed: $e');
+          if (context.mounted) {
+            showAppSnackBar(
+              context,
+              message: l10n.backupPageExportFailed(e.toString()),
+              type: NotificationType.error,
+            );
+          }
+        }
+      }
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
     }
   }
 
@@ -982,90 +1065,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageExportToFile,
                 filled: false,
                 dense: true,
+                onTap: busy ? () {} : () => _exportLocalBackup(context),
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageExportKelivoCompatible,
+                filled: false,
+                dense: true,
                 onTap: busy
                     ? () {}
-                    : () async {
-                        final backupProvider = context.read<BackupProvider>();
-                        await _saveConfig();
-                        if (!context.mounted) return;
-                        final File file;
-                        final stopwatch = Stopwatch()..start();
-                        try {
-                          debugPrint('BackupExport: pack begin');
-                          file = await _runStageTask(
-                            context,
-                            (onStage) =>
-                                backupProvider.exportToFile(onStage: onStage),
-                          );
-                          stopwatch.stop();
-                          debugPrint(
-                            'BackupExport: pack done in '
-                            '${stopwatch.elapsedMilliseconds} ms -> '
-                            '${file.path}',
-                          );
-                        } catch (e) {
-                          debugPrint(
-                            'BackupExport: pack failed after '
-                            '${stopwatch.elapsedMilliseconds} ms: $e',
-                          );
-                          if (!context.mounted) return;
-                          showAppSnackBar(
-                            context,
-                            message: l10n.backupPageExportFailed(e.toString()),
-                            type: NotificationType.error,
-                          );
-                          return;
-                        }
-                        try {
-                          final String? savePath;
-                          try {
-                            savePath = await FilePicker.platform.saveFile(
-                              dialogTitle: l10n.backupPageExportToFile,
-                              fileName: file.uri.pathSegments.last,
-                              type: FileType.custom,
-                              allowedExtensions: ['zip'],
-                            );
-                            debugPrint(
-                              'BackupExport: FilePicker result=$savePath',
-                            );
-                          } catch (e) {
-                            debugPrint('BackupExport: picker failed: $e');
-                            if (!context.mounted) return;
-                            showAppSnackBar(
-                              context,
-                              message: l10n.backupPageExportFailed(
-                                e.toString(),
-                              ),
-                              type: NotificationType.error,
-                            );
-                            return;
-                          }
-                          if (savePath != null) {
-                            try {
-                              await File(
-                                savePath,
-                              ).parent.create(recursive: true);
-                              await file.copy(savePath);
-                              debugPrint('BackupExport: copied to $savePath');
-                              if (context.mounted) {
-                                await _recordReminderQuietly(context);
-                              }
-                            } catch (e) {
-                              debugPrint('BackupExport: copy failed: $e');
-                              if (!context.mounted) return;
-                              showAppSnackBar(
-                                context,
-                                message: l10n.backupPageExportFailed(
-                                  e.toString(),
-                                ),
-                                type: NotificationType.error,
-                              );
-                            }
-                          }
-                        } finally {
-                          await DataSync.cleanupTemporaryBackupFile(file);
-                        }
-                      },
+                    : () => _exportLocalBackup(
+                        context,
+                        format: BackupFormat.kelivoLegacy,
+                      ),
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportBackupFile,
@@ -1130,6 +1141,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       mode: mode,
                       settings: settings,
                       chatService: chat,
+                      preferences: context.read<BusinessPreferences>(),
                     );
                     if (!rootCtx.mounted) return;
                     await showDialog(
@@ -1212,6 +1224,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       mode: mode,
                       settings: settings,
                       chatService: chat,
+                      preferences: context.read<BusinessPreferences>(),
                     );
                     if (!rootCtx.mounted) return;
                     await showDialog(

@@ -10,7 +10,9 @@ import 'package:Cuplivo/features/group_chat/services/group_chat_slot_runner.dart
 import 'package:Cuplivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// Records persistence calls instead of touching a real database.
 class _RecordingChatService extends ChatService {
@@ -130,8 +132,8 @@ class _RecordingChatService extends ChatService {
 
 void main() {
   Future<SettingsProvider> makeSettings() async {
-    SharedPreferences.setMockInitialValues({});
-    return SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests({});
+    return SettingsProvider(preferences: businessPrefs);
   }
 
   stream_ctrl.GenerationContext buildCtx(

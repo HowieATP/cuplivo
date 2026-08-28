@@ -5,6 +5,7 @@ import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/mcp_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/providers/workspace_provider.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/features/home/widgets/tools_hub_content.dart';
@@ -17,6 +18,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this.root);
@@ -84,7 +87,7 @@ void main() {
     temp = await Directory.systemTemp.createTemp('tools_hub_directory_');
     PathProviderPlatform.instance = _FakePathProvider(temp.path);
     SharedPreferences.setMockInitialValues({});
-    workspaces = WorkspaceProvider();
+    workspaces = WorkspaceProvider(preferences: businessPrefs);
     await workspaces.init();
   });
 
@@ -97,7 +100,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'assistants_v1': Assistant.encodeList([assistant]),
     });
-    final provider = AssistantProvider();
+    final provider = AssistantProvider(preferences: businessPrefs);
     await provider.loadFromPrefs();
     return provider;
   }
@@ -116,13 +119,18 @@ void main() {
           ChangeNotifierProvider.value(
             value: await assistantProvider(assistant),
           ),
-          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: workspaces),
           ChangeNotifierProvider<ChatService>.value(value: chatService),
           ChangeNotifierProvider(
             create: (context) {
               providerContext = context;
-              return McpProvider(contextProvider: () => providerContext);
+              return McpProvider(
+                contextProvider: () => providerContext,
+                preferences: businessPrefs,
+              );
             },
           ),
         ],

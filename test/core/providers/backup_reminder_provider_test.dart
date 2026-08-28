@@ -1,10 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<BackupReminderProvider> _loadProvider() async {
-  final provider = BackupReminderProvider(autoLoad: false);
+  final provider = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await provider.load(startTimer: false);
   return provider;
 }
@@ -14,7 +19,7 @@ void main() {
 
   group('BackupReminderProvider', () {
     test('defaults to disabled with no due reminder', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
 
       final provider = await _loadProvider();
 
@@ -24,7 +29,7 @@ void main() {
     });
 
     test('requires a chosen time before enabling', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = await _loadProvider();
 
       expect(
@@ -34,7 +39,7 @@ void main() {
     });
 
     test('enables a weekly reminder from the chosen time', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = await _loadProvider();
       final enabledAt = DateTime(2026, 5, 5, 9);
 
@@ -56,7 +61,7 @@ void main() {
     });
 
     test('persists custom interval and validates supported range', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = await _loadProvider();
 
       expect(
@@ -94,7 +99,7 @@ void main() {
     });
 
     test('shows missed due reminder after a new provider load', () async {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
       final provider = await _loadProvider();
 
       await provider.saveSchedule(
@@ -113,7 +118,7 @@ void main() {
     test(
       'snooze hides the reminder only for the current provider session',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         final provider = await _loadProvider();
 
         await provider.saveSchedule(
@@ -137,7 +142,7 @@ void main() {
     test(
       'successful backup resets the next reminder from backup time',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        businessPrefs = BusinessPreferences.memoryForTests({});
         final provider = await _loadProvider();
 
         await provider.saveSchedule(

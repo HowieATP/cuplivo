@@ -6,11 +6,14 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   testWidgets('用户消息附件显示在文本气泡上方且不在气泡内部', (tester) async {
@@ -19,8 +22,13 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
-          ChangeNotifierProvider(create: (_) => UserProvider()),
+          Provider<BusinessPreferences>.value(value: businessPrefs),
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => UserProvider(preferences: businessPrefs),
+          ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

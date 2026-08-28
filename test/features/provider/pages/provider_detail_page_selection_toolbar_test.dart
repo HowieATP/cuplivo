@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -9,9 +9,11 @@ import 'package:Cuplivo/features/provider/pages/provider_detail_page.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<SettingsProvider> _createSettings(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
   await settings.setProviderConfig(
@@ -37,9 +39,10 @@ Widget _buildHarness({
 }) {
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<AssistantProvider>(
-        create: (_) => AssistantProvider(),
+        create: (_) => AssistantProvider(preferences: businessPrefs),
       ),
     ],
     child: MaterialApp(

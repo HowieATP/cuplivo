@@ -2,21 +2,28 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<AssistantProvider> _createLoadedAssistantProvider({
+  required BusinessPreferences preferences,
   required List<Map<String, Object?>> assistants,
   String currentAssistantId = 'assistant-a',
   bool? legacySearchEnabled,
 }) async {
+  // assistants_v1 = entity key → physical SharedPreferences (legacy source).
   SharedPreferences.setMockInitialValues({
     'assistants_v1': jsonEncode(assistants),
+  });
+  businessPrefs = BusinessPreferences.memoryForTests({
     'current_assistant_id_v1': currentAssistantId,
     if (legacySearchEnabled != null) 'search_enabled_v1': legacySearchEnabled,
   });
 
-  final provider = AssistantProvider();
+  final provider = AssistantProvider(preferences: businessPrefs);
   await provider.loadFromPrefs();
   return provider;
 }
@@ -29,6 +36,7 @@ void main() {
       'loads missing assistant search from legacy global preference',
       () async {
         final provider = await _createLoadedAssistantProvider(
+          preferences: businessPrefs,
           legacySearchEnabled: true,
           assistants: const [
             {'id': 'assistant-a', 'name': 'A'},
@@ -47,6 +55,7 @@ void main() {
       'keeps explicit assistant search value during legacy migration',
       () async {
         final provider = await _createLoadedAssistantProvider(
+          preferences: businessPrefs,
           legacySearchEnabled: true,
           assistants: const [
             {'id': 'assistant-a', 'name': 'A', 'searchEnabled': false},
@@ -61,6 +70,7 @@ void main() {
 
     test('updates only the current assistant search value', () async {
       final provider = await _createLoadedAssistantProvider(
+        preferences: businessPrefs,
         assistants: const [
           {'id': 'assistant-a', 'name': 'A'},
           {'id': 'assistant-b', 'name': 'B'},

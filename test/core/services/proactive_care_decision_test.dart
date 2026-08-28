@@ -7,7 +7,10 @@ import 'package:Cuplivo/core/services/api/chat_api_service.dart';
 import 'package:Cuplivo/core/services/proactive_care_decision_tools.dart';
 import 'package:Cuplivo/core/services/proactive_care_message_flow.dart';
 import 'package:Cuplivo/core/services/proactive_care_service.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// Queued fake transport: one [StreamController] per send attempt, so the
 /// retry path gets its own stream. Modeled on the director retry test fake.
@@ -91,6 +94,7 @@ void main() {
   late _FakeDecisionTransport transport;
 
   setUp(() {
+    businessPrefs = BusinessPreferences.memoryForTests();
     transport = _FakeDecisionTransport();
   });
 
@@ -102,7 +106,9 @@ void main() {
     List<Map<String, dynamic>>? history,
     Duration decisionTimeout = const Duration(seconds: 45),
   }) {
-    return ProactiveCareMessageFlow.decideNextCareTime(
+    return ProactiveCareMessageFlow(
+      preferences: businessPrefs,
+    ).decideNextCareTime(
       config: ProviderConfig.defaultsFor('TestProvider'),
       modelId: 'test-model',
       assistant: Assistant(id: 'a1', name: 'Alpha'),

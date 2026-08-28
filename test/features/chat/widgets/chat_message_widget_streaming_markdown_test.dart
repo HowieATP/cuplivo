@@ -10,17 +10,24 @@ import 'package:Cuplivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 Widget _buildHarness({
   required Widget child,
   Map<String, Object> initialPrefs = const {},
 }) {
-  SharedPreferences.setMockInitialValues(initialPrefs);
+  businessPrefs = BusinessPreferences.memoryForTests(initialPrefs);
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
-      ChangeNotifierProvider(create: (_) => TtsProvider()),
+      Provider<BusinessPreferences>.value(value: businessPrefs),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(preferences: businessPrefs),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => TtsProvider(preferences: businessPrefs),
+      ),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
     ],

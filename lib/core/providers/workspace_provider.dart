@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/workspace.dart';
@@ -16,6 +17,7 @@ import '../../utils/platform_utils.dart';
 /// Owns multi-workspace metadata, host paths, and one-shot migrations from the
 /// legacy single `@workspaces` sandbox + desktop external mounts.
 class WorkspaceProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String metaPrefsKey = 'workspaces_meta_v1';
   static const String migratedPrefsKey = 'workspaces_multi_migrated_v1';
   static const String legacyMountsPrefsKey = 'filesystem_mounts_v1';
@@ -86,7 +88,7 @@ class WorkspaceProvider extends ChangeNotifier {
     return p.join(host, '.sandbox');
   }
 
-  WorkspaceProvider() {
+  WorkspaceProvider({required this._preferences}) {
     unawaited(init());
   }
 
@@ -97,7 +99,7 @@ class WorkspaceProvider extends ChangeNotifier {
 
   Future<void> _doInit() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       final root = await AppDirectories.getWorkspacesRootDirectory();
       try {
         await root.create(recursive: true);
@@ -153,7 +155,7 @@ class WorkspaceProvider extends ChangeNotifier {
     await init();
   }
 
-  Future<void> _loadMeta(SharedPreferences prefs) async {
+  Future<void> _loadMeta(BusinessPreferences prefs) async {
     final raw = prefs.getString(metaPrefsKey);
     if (raw == null || raw.isEmpty) return;
     try {
@@ -203,7 +205,7 @@ class WorkspaceProvider extends ChangeNotifier {
     ];
   }
 
-  Future<void> _runOneShotMigration(SharedPreferences prefs) async {
+  Future<void> _runOneShotMigration(BusinessPreferences prefs) async {
     await _loadMeta(prefs);
     if (_workspaces.isEmpty) {
       _workspaces.add(Workspace.createDefault());
@@ -505,15 +507,18 @@ class WorkspaceProvider extends ChangeNotifier {
           return errorDestinationNotEmpty;
         }
       }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppDirectories.workspacesDirPrefsKey, trimmed);
+      // workspaces_dir_v1 is device-local (desktop-only host path, localOnly
+      // in the business registry): physical SharedPreferences is its sole
+      // owner, NOT the business facade.
+      final localPrefs = await SharedPreferences.getInstance();
+      await localPrefs.setString(AppDirectories.workspacesDirPrefsKey, trimmed);
       if (moveFiles && current != null) {
         try {
           await _moveDirectoryContents(current, trimmed);
         } catch (e) {
           debugPrint('setWorkspacesRootLocation: move failed: $e');
           try {
-            await prefs.setString(
+            await localPrefs.setString(
               AppDirectories.workspacesDirPrefsKey,
               current,
             );
@@ -674,7 +679,7 @@ class WorkspaceProvider extends ChangeNotifier {
   }
 
   Future<void> _persistMeta() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(metaPrefsKey, Workspace.encodeList(_workspaces));
   }
 

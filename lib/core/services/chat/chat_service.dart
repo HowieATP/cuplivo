@@ -80,7 +80,7 @@ class ChatService extends ChangeNotifier {
     if (!await appDataDir.exists()) {
       await appDataDir.create(recursive: true);
     }
-    _repo = ChatDatabaseRepository.open(
+    _repo = await ChatDatabaseRepository.openShared(
       file: File(p.join(appDataDir.path, AppDatabase.databaseFileName)),
     );
     // ensureReady runs Drift migrations then opens a post-migration sync DB.

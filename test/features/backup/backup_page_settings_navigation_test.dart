@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/backup_provider.dart';
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
@@ -13,8 +14,13 @@ import 'package:Cuplivo/desktop/setting/backup_pane.dart';
 import 'package:Cuplivo/features/backup/pages/backup_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<BackupReminderProvider> _createReminderProvider() async {
-  final provider = BackupReminderProvider(autoLoad: false);
+  final provider = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await provider.load(startTimer: false);
   return provider;
 }
@@ -24,9 +30,13 @@ Widget _buildHarness({
   required BackupReminderProvider reminder,
 }) {
   final chatService = ChatService();
-  final coordinator = TrashRestoreCoordinator(chatService: chatService);
+  final coordinator = TrashRestoreCoordinator(
+    preferences: businessPrefs,
+    chatService: chatService,
+  );
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>.value(value: chatService),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -47,16 +57,22 @@ Widget _buildDesktopHarness({
 
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>.value(value: chatService),
       Provider(
-        create: (_) => TrashRestoreCoordinator(chatService: chatService),
+        create: (_) => TrashRestoreCoordinator(
+          preferences: businessPrefs,
+          chatService: chatService,
+        ),
       ),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
       ChangeNotifierProvider<BackupProvider>(
         create: (_) => BackupProvider(
+          preferences: businessPrefs,
           chatService: chatService,
           trashRestoreCoordinator: TrashRestoreCoordinator(
+            preferences: businessPrefs,
             chatService: chatService,
           ),
           initialConfig: settings.webDavConfig,
@@ -64,8 +80,10 @@ Widget _buildDesktopHarness({
       ),
       ChangeNotifierProvider<S3BackupProvider>(
         create: (_) => S3BackupProvider(
+          preferences: businessPrefs,
           chatService: chatService,
           trashRestoreCoordinator: TrashRestoreCoordinator(
+            preferences: businessPrefs,
             chatService: chatService,
           ),
           initialConfig: settings.s3Config,
@@ -128,13 +146,15 @@ void main() {
 
   group('BackupPage mobile backup settings navigation', () {
     setUp(() {
-      SharedPreferences.setMockInitialValues(const {});
+      businessPrefs = BusinessPreferences.memoryForTests();
+      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests(const {});
     });
 
     testWidgets('opens WebDAV settings as a full page and saves config', (
       tester,
     ) async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _pumpBackupPage(tester, settings: settings);
 
@@ -165,7 +185,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(900, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _pumpBackupPage(tester, settings: settings);
 
@@ -181,7 +201,7 @@ void main() {
     testWidgets('opens S3 settings as a full page and saves config', (
       tester,
     ) async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _pumpBackupPage(tester, settings: settings);
 
@@ -209,7 +229,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1100, 1300));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _pumpDesktopBackupPane(tester, settings: settings);
 

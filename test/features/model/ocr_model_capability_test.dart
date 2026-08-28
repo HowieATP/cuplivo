@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -42,12 +42,13 @@ ProviderConfig _configWithOcrCandidates() {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('modelSupportsOcrImageInput', () {
     test('accepts models tagged with image input', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -62,8 +63,8 @@ void main() {
     });
 
     test('rejects models tagged as text-only', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -78,8 +79,8 @@ void main() {
     });
 
     test('accepts models whose current inferred tag has image input', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -94,8 +95,8 @@ void main() {
     });
 
     test('honors text-only tag overrides over inferred vision tags', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
@@ -116,8 +117,8 @@ void main() {
 
   group('resolveOcrActive', () {
     Future<SettingsProvider> newSettings({required bool withOcrModel}) async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _waitForSettingsLoad();
       await settings.setProviderConfig(
         'OcrProvider',

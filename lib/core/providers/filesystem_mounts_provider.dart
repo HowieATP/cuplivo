@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import '../services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import '../../utils/app_directories.dart';
@@ -20,6 +21,7 @@ import '../../utils/platform_utils.dart';
 /// desktop, so a backup restored on a phone can never surface a foreign host
 /// path (see CONTEXT.md "Filesystem MCP").
 class FilesystemMountsProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String prefsKey = 'filesystem_mounts_v1';
   static const String workspacesAlias = 'workspaces';
 
@@ -52,13 +54,13 @@ class FilesystemMountsProvider extends ChangeNotifier {
     ..._external,
   ];
 
-  FilesystemMountsProvider() {
+  FilesystemMountsProvider({required this._preferences}) {
     unawaited(init());
   }
 
   Future<void> init() async {
     if (_loaded) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     if (PlatformUtils.isDesktopTarget) {
       final raw = prefs.getString(prefsKey);
       if (raw != null && raw.isNotEmpty) {
@@ -191,6 +193,7 @@ class FilesystemMountsProvider extends ChangeNotifier {
         }
       }
       // Persist BEFORE moving: if the pref write fails, nothing has moved yet.
+      // workspaces_dir_v1 is device-local (localOnly registry) + physical SP.
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppDirectories.workspacesDirPrefsKey, trimmed);
       if (moveFiles && current != null) {
@@ -314,7 +317,7 @@ class FilesystemMountsProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       prefsKey,
       jsonEncode(_external.map((e) => e.toJson()).toList()),

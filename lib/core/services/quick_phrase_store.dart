@@ -1,15 +1,39 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
 import '../models/quick_phrase.dart';
 
 class QuickPhraseStore {
-  static const String _phrasesKey = 'quick_phrases_v1';
-  static List<QuickPhrase>? _cache;
+  QuickPhraseStore(this._preferences);
 
-  static Future<List<QuickPhrase>> getAll() async {
+  /// Per-isolate shared instance, bound to the [BusinessPreferences] facade
+  /// passed on first use. Production code in an isolate always hands over the
+  /// same startup-gate facade, so one shared instance serves every consumer
+  /// and keeps the object-level cache coherent (a stale instance must not
+  /// persist a resurrected snapshot). The alarm background isolate creates a
+  /// fresh facade per invocation: the identity check fails there, so each
+  /// invocation binds a fresh store with a fresh cache.
+  ///
+  /// Never hold a store reference across a switch to a different facade in a
+  /// long-lived isolate: the shared accessor rebinds to the new facade and
+  /// the previously bound store's cache would diverge.
+  static QuickPhraseStore? _shared;
+  static QuickPhraseStore shared(BusinessPreferences preferences) {
+    final current = _shared;
+    if (current == null || !identical(current._preferences, preferences)) {
+      return _shared = QuickPhraseStore(preferences);
+    }
+    return current;
+  }
+
+  static const String _phrasesKey = 'quick_phrases_v1';
+  final BusinessPreferences _preferences;
+  List<QuickPhrase>? _cache;
+
+  Future<List<QuickPhrase>> getAll() async {
     if (_cache != null) return List.of(_cache!);
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_phrasesKey);
+    final json = _preferences.getString(_phrasesKey);
     if (json == null || json.isEmpty) {
       _cache = [];
       return [];
@@ -26,32 +50,31 @@ class QuickPhraseStore {
     }
   }
 
-  static Future<List<QuickPhrase>> getGlobal() async {
+  Future<List<QuickPhrase>> getGlobal() async {
     final all = await getAll();
     return all.where((p) => p.isGlobal).toList();
   }
 
-  static Future<List<QuickPhrase>> getForAssistant(String assistantId) async {
+  Future<List<QuickPhrase>> getForAssistant(String assistantId) async {
     final all = await getAll();
     return all
         .where((p) => !p.isGlobal && p.assistantId == assistantId)
         .toList();
   }
 
-  static Future<void> save(List<QuickPhrase> phrases) async {
+  Future<void> save(List<QuickPhrase> phrases) async {
     _cache = phrases;
-    final prefs = await SharedPreferences.getInstance();
     final json = jsonEncode(phrases.map((p) => p.toJson()).toList());
-    await prefs.setString(_phrasesKey, json);
+    await _preferences.setString(_phrasesKey, json);
   }
 
-  static Future<void> add(QuickPhrase phrase) async {
+  Future<void> add(QuickPhrase phrase) async {
     final all = await getAll();
     all.add(phrase);
     await save(all);
   }
 
-  static Future<void> update(QuickPhrase phrase) async {
+  Future<void> update(QuickPhrase phrase) async {
     final all = await getAll();
     final index = all.indexWhere((p) => p.id == phrase.id);
     if (index != -1) {
@@ -60,15 +83,14 @@ class QuickPhraseStore {
     }
   }
 
-  static Future<void> delete(String id) async {
+  Future<void> delete(String id) async {
     final all = await getAll();
     all.removeWhere((p) => p.id == id);
     await save(all);
   }
 
-  static Future<void> clear() async {
+  Future<void> clear() async {
     _cache = [];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_phrasesKey);
+    await _preferences.remove(_phrasesKey);
   }
 }

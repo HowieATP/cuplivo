@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider desktop message navigation buttons mode', () {
     test('defaults to scroll visibility', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -35,10 +36,10 @@ void main() {
       };
 
       for (final entry in cases.entries) {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'display_desktop_message_nav_buttons_mode_v1': entry.key,
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
 
@@ -49,10 +50,10 @@ void main() {
     test(
       'maps legacy disabled toggle to never when new key is absent',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'display_show_message_nav_v1': false,
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad();
 
@@ -64,8 +65,8 @@ void main() {
     );
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setDesktopMessageNavButtonsMode(
@@ -76,7 +77,7 @@ void main() {
         settings.desktopMessageNavButtonsMode,
         DesktopMessageNavButtonsMode.scrollAndHover,
       );
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(
         prefs.getString('display_desktop_message_nav_buttons_mode_v1'),
         'scrollAndHover',

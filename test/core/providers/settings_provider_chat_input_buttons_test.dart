@@ -1,13 +1,16 @@
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('defaults: no customization (sentinel unset)', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     expect(settings.chatInputButtonOrder, isEmpty);
@@ -16,14 +19,16 @@ void main() {
   });
 
   test('persists order and more ids across loads', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     await settings.setChatInputButtonOrder(['model', 'camera', 'search']);
     await settings.setChatInputMoreButtonIds(['camera', 'photos']);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     expect(prefs.getStringList('chat_input_buttons_v1'), [
       'model',
       'camera',
@@ -34,7 +39,7 @@ void main() {
       'photos',
     ]);
 
-    final reloaded = SettingsProvider();
+    final reloaded = SettingsProvider(preferences: businessPrefs);
     await reloaded.loaded;
     expect(reloaded.chatInputButtonOrder, ['model', 'camera', 'search']);
     expect(reloaded.chatInputMoreButtonIds, ['camera', 'photos']);
@@ -42,21 +47,25 @@ void main() {
   });
 
   test('more ids stay sorted and deduped', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     await settings.setChatInputMoreButtonIds(['photos', 'camera', 'camera']);
 
     expect(settings.chatInputMoreButtonIds, ['camera', 'photos']);
-    final reloaded = SettingsProvider();
+    final reloaded = SettingsProvider(preferences: businessPrefs);
     await reloaded.loaded;
     expect(reloaded.chatInputMoreButtonIds, ['camera', 'photos']);
   });
 
   test('order dedupes but keeps saved sequence', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     await settings.setChatInputButtonOrder(['a', 'b', 'a']);
@@ -65,8 +74,10 @@ void main() {
   });
 
   test('reset clears both keys and reverts to unset', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     await settings.setChatInputButtonOrder(['model', 'camera']);
@@ -74,14 +85,16 @@ void main() {
     await settings.resetChatInputButtons();
 
     expect(settings.chatInputButtonsCustomized, isFalse);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = businessPrefs;
     expect(prefs.getStringList('chat_input_buttons_v1'), isNull);
     expect(prefs.getStringList('chat_input_more_buttons_v1'), isNull);
   });
 
   test('customized flag turns true when only one side is set', () async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
-    final settings = SettingsProvider();
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.loaded;
 
     await settings.setChatInputMoreButtonIds(['camera']);

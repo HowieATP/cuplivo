@@ -2,14 +2,19 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
+import '../database/business_preferences.dart';
 import '../models/world_book.dart';
 import '../services/world_book_store.dart';
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
 
 class WorldBookProvider with ChangeNotifier {
-  WorldBookProvider({this.chatService});
+  WorldBookProvider({
+    required BusinessPreferences preferences,
+    this.chatService,
+  }) : _store = WorldBookStore.shared(preferences);
 
+  final WorldBookStore _store;
   final ChatService? chatService;
 
   List<WorldBook> _books = const <WorldBook>[];
@@ -52,9 +57,9 @@ class WorldBookProvider with ChangeNotifier {
 
   Future<void> loadAll() async {
     try {
-      _books = await WorldBookStore.getAll();
-      _activeIdsByAssistant = await WorldBookStore.getActiveIdsByAssistant();
-      final collapsed = await WorldBookStore.getCollapsedBooksMap();
+      _books = await _store.getAll();
+      _activeIdsByAssistant = await _store.getActiveIdsByAssistant();
+      final collapsed = await _store.getCollapsedBooksMap();
       final knownIds = _books.map((e) => e.id).toSet();
       final cleanedCollapsed = <String, bool>{
         for (final entry in collapsed.entries)
@@ -63,7 +68,7 @@ class WorldBookProvider with ChangeNotifier {
       _collapsedBooks = cleanedCollapsed;
 
       if (cleanedCollapsed.length != collapsed.length) {
-        await WorldBookStore.setCollapsedMap(cleanedCollapsed);
+        await _store.setCollapsedMap(cleanedCollapsed);
       }
 
       notifyListeners();
@@ -77,14 +82,14 @@ class WorldBookProvider with ChangeNotifier {
   }
 
   Future<void> addBook(WorldBook book) async {
-    await WorldBookStore.add(book);
+    await _store.add(book);
     await loadAll();
   }
 
   Future<void> updateBook(WorldBook book) async {
     if (!book.enabled) {
       try {
-        final map = await WorldBookStore.getActiveIdsByAssistant();
+        final map = await _store.getActiveIdsByAssistant();
         final next = <String, List<String>>{};
         bool changed = false;
         for (final entry in map.entries) {
@@ -95,11 +100,11 @@ class WorldBookProvider with ChangeNotifier {
           next[entry.key] = filtered;
         }
         if (changed) {
-          await WorldBookStore.setActiveIdsMap(next);
+          await _store.setActiveIdsMap(next);
         }
       } catch (_) {}
     }
-    await WorldBookStore.update(book);
+    await _store.update(book);
     await loadAll();
   }
 
@@ -122,12 +127,12 @@ class WorldBookProvider with ChangeNotifier {
         }
       }
     }
-    await WorldBookStore.delete(id);
+    await _store.delete(id);
     await loadAll();
   }
 
   Future<void> clear() async {
-    await WorldBookStore.clear();
+    await _store.clear();
     _books = const <WorldBook>[];
     _activeIdsByAssistant = const <String, List<String>>{};
     _collapsedBooks = const <String, bool>{};
@@ -146,7 +151,7 @@ class WorldBookProvider with ChangeNotifier {
     list.insert(newIndex, item);
     _books = list;
     notifyListeners();
-    await WorldBookStore.save(_books);
+    await _store.save(_books);
   }
 
   Future<void> reorderEntries({
@@ -168,7 +173,7 @@ class WorldBookProvider with ChangeNotifier {
     nextBooks[bookIndex] = nextBook;
     _books = nextBooks;
     notifyListeners();
-    await WorldBookStore.save(_books);
+    await _store.save(_books);
   }
 
   Future<void> setBookCollapsed(String id, bool collapsed) async {
@@ -179,7 +184,7 @@ class WorldBookProvider with ChangeNotifier {
     next[key] = collapsed;
     _collapsedBooks = next;
     notifyListeners();
-    await WorldBookStore.setCollapsed(key, collapsed);
+    await _store.setCollapsed(key, collapsed);
   }
 
   Future<void> toggleBookCollapsed(String id) async {
@@ -192,7 +197,7 @@ class WorldBookProvider with ChangeNotifier {
     nextMap[key] = ids.toSet().toList(growable: false);
     _activeIdsByAssistant = nextMap;
     notifyListeners();
-    await WorldBookStore.setActiveIds(ids, assistantId: assistantId);
+    await _store.setActiveIds(ids, assistantId: assistantId);
   }
 
   Future<void> toggleActiveBookId(String id, {String? assistantId}) async {

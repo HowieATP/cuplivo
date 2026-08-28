@@ -2106,6 +2106,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExportToFile => '导出为文件';
 
   @override
+  String get backupPageExportKelivoCompatible => '导出 Kelivo 兼容备份';
+
+  @override
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
@@ -11066,6 +11069,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExportToFile => '导出为文件';
 
   @override
+  String get backupPageExportKelivoCompatible => '导出 Kelivo 兼容备份';
+
+  @override
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
@@ -20024,6 +20030,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageExportToFile => '匯出為檔案';
+
+  @override
+  String get backupPageExportKelivoCompatible => '匯出 Kelivo 相容備份';
 
   @override
   String get backupPageExportToFileSubtitle => '匯出APP資料為檔案';

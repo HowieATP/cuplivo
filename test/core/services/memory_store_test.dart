@@ -1,26 +1,30 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant_memory.dart';
 import 'package:Cuplivo/core/services/memory_store.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('MemoryStore', () {
     setUp(() async {
-      SharedPreferences.setMockInitialValues({});
-      await MemoryStore.saveAll(<AssistantMemory>[]);
+      businessPrefs = BusinessPreferences.memoryForTests();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      await MemoryStore(businessPrefs).saveAll(<AssistantMemory>[]);
     });
 
     test(
       'parallel add() assigns unique ids without losing records (#478)',
       () async {
+        final store = MemoryStore(businessPrefs);
         final results = await Future.wait([
-          MemoryStore.add(assistantId: 'a1', content: 'm1'),
-          MemoryStore.add(assistantId: 'a1', content: 'm2'),
-          MemoryStore.add(assistantId: 'a1', content: 'm3'),
-          MemoryStore.add(assistantId: 'a1', content: 'm4'),
+          store.add(assistantId: 'a1', content: 'm1'),
+          store.add(assistantId: 'a1', content: 'm2'),
+          store.add(assistantId: 'a1', content: 'm3'),
+          store.add(assistantId: 'a1', content: 'm4'),
         ]);
 
         final ids = results.map((m) => m.id).toSet();
@@ -30,7 +34,7 @@ void main() {
           reason: 'parallel adds must not share ids',
         );
 
-        final all = await MemoryStore.getAll();
+        final all = await store.getAll();
         final stored = all.where((m) => m.assistantId == 'a1').toList();
         expect(
           stored.length,
@@ -43,12 +47,13 @@ void main() {
     );
 
     test('parallel add() continues from existing ids monotonically', () async {
-      await MemoryStore.add(assistantId: 'a1', content: 'existing');
+      final store = MemoryStore(businessPrefs);
+      await store.add(assistantId: 'a1', content: 'existing');
 
       final results = await Future.wait([
-        MemoryStore.add(assistantId: 'a1', content: 'm1'),
-        MemoryStore.add(assistantId: 'a1', content: 'm2'),
-        MemoryStore.add(assistantId: 'a1', content: 'm3'),
+        store.add(assistantId: 'a1', content: 'm1'),
+        store.add(assistantId: 'a1', content: 'm2'),
+        store.add(assistantId: 'a1', content: 'm3'),
       ]);
 
       final ids = results.map((m) => m.id).toSet();
@@ -57,14 +62,15 @@ void main() {
     });
 
     test('parallel add and delete serialize without lost updates', () async {
-      final first = await MemoryStore.add(assistantId: 'a1', content: 'm1');
+      final store = MemoryStore(businessPrefs);
+      final first = await store.add(assistantId: 'a1', content: 'm1');
 
       await Future.wait([
-        MemoryStore.add(assistantId: 'a1', content: 'm2'),
-        MemoryStore.delete(id: first.id),
+        store.add(assistantId: 'a1', content: 'm2'),
+        store.delete(id: first.id),
       ]);
 
-      final all = await MemoryStore.getAll();
+      final all = await store.getAll();
       final stored = all.where((m) => m.assistantId == 'a1').toList();
       expect(
         stored.length,

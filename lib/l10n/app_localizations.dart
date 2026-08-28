@@ -4024,6 +4024,12 @@ abstract class AppLocalizations {
   /// **'Export to File'**
   String get backupPageExportToFile;
 
+  /// No description provided for @backupPageExportKelivoCompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'Export for Kelivo'**
+  String get backupPageExportKelivoCompatible;
+
   /// No description provided for @backupPageExportToFileSubtitle.
   ///
   /// In en, this message translates to:

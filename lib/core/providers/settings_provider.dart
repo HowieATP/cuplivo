@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../database/business_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -16,7 +17,7 @@ import '../services/asr/asr_service_options.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/backup/double_pref_keys.dart'
-    show doublePrefKeys, prefDouble;
+    show doublePrefKeys, businessPrefDouble;
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
@@ -688,12 +689,14 @@ class SettingsProvider extends ChangeNotifier {
   late final Future<void> _loaded;
   Future<void> get loaded => _loaded;
 
-  SettingsProvider() {
+  final BusinessPreferences _preferences;
+
+  SettingsProvider({required this._preferences}) {
     _loaded = _load();
   }
 
   Future<_MigrationResult> _migrateEmbeddingModelOverrides(
-    SharedPreferences prefs,
+    BusinessPreferences prefs,
   ) async {
     Map<String, ProviderConfig>? nextProviderConfigs;
     int providersChanged = 0;
@@ -773,7 +776,7 @@ class SettingsProvider extends ChangeNotifier {
   /// AND the v3 embedding-overrides migration is settled — otherwise a
   /// skipped or failed v3 migration would be permanently masked, and
   /// re-running this normalization on later loads is harmless.
-  Future<void> _normalizeDoublePrefKeys(SharedPreferences prefs) async {
+  Future<void> _normalizeDoublePrefKeys(BusinessPreferences prefs) async {
     try {
       final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
       if (migrationVersion >= _doubleKeysNormalizationMigrationVersion) {
@@ -835,7 +838,17 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
+    // Device-bound localOnly keys (window geometry etc.) stay on physical
+    // SharedPreferences. The plugin is unavailable in unit tests that seed
+    // only the business mock — degrade to defaults there (localOnly keys are
+    // UI chrome, their absence is harmless in tests).
+    SharedPreferences? localPrefs;
+    try {
+      localPrefs = await SharedPreferences.getInstance();
+    } catch (_) {
+      localPrefs = null;
+    }
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
     final m = prefs.getString(_themeModeKey);
     switch (m) {
@@ -1221,7 +1234,7 @@ class SettingsProvider extends ChangeNotifier {
       RequestLogger.catSearch,
       _searchLogEnabled,
     );
-    _flutterLogEnabled = prefs.getBool(_flutterLogEnabledKey) ?? false;
+    _flutterLogEnabled = localPrefs?.getBool(_flutterLogEnabledKey) ?? false;
     await FlutterLogger.setEnabled(_flutterLogEnabled);
     _logSaveOutput = prefs.getBool(_logSaveOutputKey) ?? true;
     RequestLogger.saveOutput = _logSaveOutput;
@@ -1260,22 +1273,22 @@ class SettingsProvider extends ChangeNotifier {
       default:
         _desktopSendShortcut = DesktopSendShortcut.enter;
     }
-    _chatFontScale = prefs.getDouble(_displayChatFontScaleKey) ?? 1.0;
+    _chatFontScale = localPrefs?.getDouble(_displayChatFontScaleKey) ?? 1.0;
     _readerFontSize = prefs.getInt(_readerFontSizeKey) ?? 18;
     _autoScrollEnabled = prefs.getBool(_displayAutoScrollEnabledKey) ?? true;
     _autoScrollIdleSeconds =
         prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
-    _chatBackgroundMaskStrength = prefDouble(
+    _chatBackgroundMaskStrength = businessPrefDouble(
       prefs,
       _displayChatBackgroundMaskStrengthKey,
       1.0,
     );
-    _chatInputBackgroundOpacityLight = prefDouble(
+    _chatInputBackgroundOpacityLight = businessPrefDouble(
       prefs,
       _displayChatInputBackgroundOpacityLightKey,
       defaultChatInputBackgroundOpacityLight,
     ).clamp(0.0, 1.0);
-    _chatInputBackgroundOpacityDark = prefDouble(
+    _chatInputBackgroundOpacityDark = businessPrefDouble(
       prefs,
       _displayChatInputBackgroundOpacityDarkKey,
       defaultChatInputBackgroundOpacityDark,
@@ -1294,7 +1307,7 @@ class SettingsProvider extends ChangeNotifier {
     _enableMathRendering =
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
     _experimentalWebViewRendering =
-        prefs.getBool(_experimentalWebViewRenderingKey) ?? false;
+        localPrefs?.getBool(_experimentalWebViewRenderingKey) ?? false;
     final webConversationStyleLibraryJson = prefs.getString(
       webConversationStyleLibraryPreferenceKey,
     );
@@ -1410,9 +1423,13 @@ class SettingsProvider extends ChangeNotifier {
     _mobileAssistantDetailOutlineEnabled =
         prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
     // desktop UI
-    _desktopSidebarWidth = prefDouble(prefs, _desktopSidebarWidthKey, 300);
+    _desktopSidebarWidth = businessPrefDouble(
+      prefs,
+      _desktopSidebarWidthKey,
+      300,
+    );
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
-    _desktopRightSidebarWidth = prefDouble(
+    _desktopRightSidebarWidth = businessPrefDouble(
       prefs,
       _desktopRightSidebarWidthKey,
       300,
@@ -1644,49 +1661,49 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setGlobalProxyEnabled(bool v) async {
     _globalProxyEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_globalProxyEnabledKey, _globalProxyEnabled);
   }
 
   Future<void> setGlobalProxyType(String v) async {
     _globalProxyType = v.trim().isEmpty ? 'http' : v.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyTypeKey, _globalProxyType);
   }
 
   Future<void> setGlobalProxyHost(String v) async {
     _globalProxyHost = v.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyHostKey, _globalProxyHost);
   }
 
   Future<void> setGlobalProxyPort(String v) async {
     _globalProxyPort = v.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyPortKey, _globalProxyPort);
   }
 
   Future<void> setGlobalProxyUsername(String v) async {
     _globalProxyUsername = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyUsernameKey, _globalProxyUsername);
   }
 
   Future<void> setGlobalProxyPassword(String v) async {
     _globalProxyPassword = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyPasswordKey, _globalProxyPassword);
   }
 
   Future<void> setGlobalProxyBypass(String v) async {
     _globalProxyBypass = v.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
   }
 
@@ -1733,7 +1750,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setTtsServices(List<TtsServiceOptions> v) async {
     _ttsServices = List.unmodifiable(v);
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final list = v.map((e) => e.toJson()).toList();
     await prefs.setString(_ttsServicesKey, jsonEncode(list));
     if (_selectedTtsServiceId != null &&
@@ -1759,12 +1776,12 @@ class SettingsProvider extends ChangeNotifier {
         : null;
     if (_selectedTtsServiceId == normalized) return;
     _selectedTtsServiceId = normalized;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistSelectedTtsServiceId(prefs);
     notifyListeners();
   }
 
-  Future<void> _persistSelectedTtsServiceId(SharedPreferences prefs) async {
+  Future<void> _persistSelectedTtsServiceId(BusinessPreferences prefs) async {
     final selectedId = _selectedTtsServiceId;
     if (selectedId == null) {
       await prefs.remove(_ttsSelectedServiceIdKey);
@@ -1777,7 +1794,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_ttsAutoPlayAssistantReplies == value) return;
     _ttsAutoPlayAssistantReplies = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_ttsAutoPlayAssistantRepliesKey, value);
   }
 
@@ -1785,7 +1802,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_ttsTextSelectionMode == mode) return;
     _ttsTextSelectionMode = mode;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_ttsTextSelectionModeKey, mode.storageValue);
   }
 
@@ -1796,7 +1813,7 @@ class SettingsProvider extends ChangeNotifier {
           ? null
           : _asrServices.first.id;
     }
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _asrServicesKey,
       jsonEncode(_asrServices.map((service) => service.toJson()).toList()),
@@ -1812,11 +1829,11 @@ class SettingsProvider extends ChangeNotifier {
         : null;
     if (_selectedAsrServiceId == normalized) return;
     _selectedAsrServiceId = normalized;
-    await _persistSelectedAsrServiceId(await SharedPreferences.getInstance());
+    await _persistSelectedAsrServiceId(_preferences);
     notifyListeners();
   }
 
-  Future<void> _persistSelectedAsrServiceId(SharedPreferences prefs) async {
+  Future<void> _persistSelectedAsrServiceId(BusinessPreferences prefs) async {
     final selectedId = _selectedAsrServiceId;
     if (selectedId == null) {
       await prefs.remove(_asrSelectedServiceIdKey);
@@ -1861,7 +1878,7 @@ class SettingsProvider extends ChangeNotifier {
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayAppFontFamilyKey, _appFontFamily ?? '');
     await prefs.setBool(_displayAppFontIsGoogleKey, _appFontIsGoogle);
     await prefs.remove(_displayAppFontLocalAliasKey);
@@ -1876,7 +1893,7 @@ class SettingsProvider extends ChangeNotifier {
     _codeFontLocalAlias = null;
     _codeFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily ?? '');
     await prefs.setBool(_displayCodeFontIsGoogleKey, _codeFontIsGoogle);
     await prefs.remove(_displayCodeFontLocalAliasKey);
@@ -1889,7 +1906,7 @@ class SettingsProvider extends ChangeNotifier {
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayAppFontFamilyKey, _appFontFamily!);
     await prefs.setBool(_displayAppFontIsGoogleKey, true);
     await prefs.remove(_displayAppFontLocalAliasKey);
@@ -1902,7 +1919,7 @@ class SettingsProvider extends ChangeNotifier {
     _codeFontLocalAlias = null;
     _codeFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily!);
     await prefs.setBool(_displayCodeFontIsGoogleKey, true);
     await prefs.remove(_displayCodeFontLocalAliasKey);
@@ -1929,7 +1946,7 @@ class SettingsProvider extends ChangeNotifier {
     _appFontLocalAlias = fam;
     _appFontLocalPath = localPath;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayAppFontFamilyKey, _appFontFamily!);
     await prefs.setBool(_displayAppFontIsGoogleKey, false);
     await prefs.setString(_displayAppFontLocalAliasKey, _appFontLocalAlias!);
@@ -1957,7 +1974,7 @@ class SettingsProvider extends ChangeNotifier {
     _codeFontLocalAlias = fam;
     _codeFontLocalPath = localPath;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily!);
     await prefs.setBool(_displayCodeFontIsGoogleKey, false);
     await prefs.setString(_displayCodeFontLocalAliasKey, _codeFontLocalAlias!);
@@ -1972,7 +1989,7 @@ class SettingsProvider extends ChangeNotifier {
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_displayAppFontFamilyKey);
     await prefs.remove(_displayAppFontIsGoogleKey);
     await prefs.remove(_displayAppFontLocalAliasKey);
@@ -1987,7 +2004,7 @@ class SettingsProvider extends ChangeNotifier {
     _codeFontLocalAlias = null;
     _codeFontLocalPath = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_displayCodeFontFamilyKey);
     await prefs.remove(_displayCodeFontIsGoogleKey);
     await prefs.remove(_displayCodeFontLocalAliasKey);
@@ -1996,7 +2013,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> _reloadLocalFontsIfAny() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     // Load persisted values
     _appFontFamily = _nonEmpty(prefs.getString(_displayAppFontFamilyKey));
     _codeFontFamily = _nonEmpty(prefs.getString(_displayCodeFontFamilyKey));
@@ -2068,7 +2085,7 @@ class SettingsProvider extends ChangeNotifier {
 
   String? _nonEmpty(String? s) => (s == null || s.isEmpty) ? null : s;
 
-  Future<void> _persistFontSettings(SharedPreferences prefs) async {
+  Future<void> _persistFontSettings(BusinessPreferences prefs) async {
     if (_appFontFamily == null || _appFontFamily!.isEmpty) {
       await prefs.remove(_displayAppFontFamilyKey);
     } else {
@@ -2189,7 +2206,7 @@ class SettingsProvider extends ChangeNotifier {
     if ((w - _desktopSidebarWidth).abs() < 0.5) return;
     _desktopSidebarWidth = w;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(_desktopSidebarWidthKey, _desktopSidebarWidth);
   }
 
@@ -2197,7 +2214,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_desktopSidebarOpen == open) return;
     _desktopSidebarOpen = open;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_desktopSidebarOpenKey, _desktopSidebarOpen);
   }
 
@@ -2205,7 +2222,7 @@ class SettingsProvider extends ChangeNotifier {
     if ((_desktopRightSidebarWidth - w).abs() < 0.5) return;
     _desktopRightSidebarWidth = w;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(
       _desktopRightSidebarWidthKey,
       _desktopRightSidebarWidth,
@@ -2217,7 +2234,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_desktopTopicPosition == pos) return;
     _desktopTopicPosition = pos;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final v = (pos == DesktopTopicPosition.right) ? 'right' : 'left';
     await prefs.setString(_desktopTopicPositionKey, v);
   }
@@ -2227,7 +2244,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_desktopRightSidebarOpen == open) return;
     _desktopRightSidebarOpen = open;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_desktopRightSidebarOpenKey, _desktopRightSidebarOpen);
   }
 
@@ -2243,7 +2260,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_appLocaleTag == tag) return;
     _appLocaleTag = tag;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_appLocaleKey, _appLocaleTag!);
   }
 
@@ -2251,7 +2268,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_appLocaleTag == 'system') return;
     _appLocaleTag = 'system';
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_appLocaleKey, 'system');
   }
 
@@ -2283,7 +2300,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setWebDavConfig(WebDavConfig cfg) async {
     _webDavConfig = cfg;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_webDavConfigKey, jsonEncode(cfg.toJson()));
   }
 
@@ -2292,7 +2309,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setS3Config(S3Config cfg) async {
     _s3Config = cfg;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_s3ConfigKey, jsonEncode(cfg.toJson()));
   }
 
@@ -2336,7 +2353,7 @@ class SettingsProvider extends ChangeNotifier {
     _providersOrder = List.unmodifiable(order);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_providersOrderKey, _providersOrder);
   }
 
@@ -2428,7 +2445,7 @@ class SettingsProvider extends ChangeNotifier {
     return changed;
   }
 
-  Future<void> _persistProviderGrouping(SharedPreferences prefs) async {
+  Future<void> _persistProviderGrouping(BusinessPreferences prefs) async {
     await prefs.setString(
       _providerGroupsKey,
       ProviderGroup.encodeList(_providerGroups),
@@ -2463,7 +2480,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerUngroupedPosition = res.ungroupedIndex;
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
     return id;
   }
@@ -2486,7 +2503,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerGroups = List.unmodifiable(mut);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2503,7 +2520,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerGroups = List.unmodifiable(mut);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2527,7 +2544,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerUngroupedPosition = res.ungroupedIndex;
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2548,7 +2565,7 @@ class SettingsProvider extends ChangeNotifier {
       ..addAll(res.collapsed);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2568,7 +2585,7 @@ class SettingsProvider extends ChangeNotifier {
     }
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2625,7 +2642,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerGroupMap = Map<String, String>.from(groupMap);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2637,7 +2654,7 @@ class SettingsProvider extends ChangeNotifier {
     _providerGroupCollapsed[groupIdOrUngrouped] = value;
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
@@ -2669,14 +2686,14 @@ class SettingsProvider extends ChangeNotifier {
     _providerGroupMap = Map<String, String>.from(res.providerGroupMap);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await _persistProviderGrouping(prefs);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final v = mode == ThemeMode.light
         ? 'light'
         : mode == ThemeMode.dark
@@ -2689,7 +2706,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_themePaletteId == id) return;
     _themePaletteId = id;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_themePaletteKey, id);
   }
 
@@ -2697,11 +2714,11 @@ class SettingsProvider extends ChangeNotifier {
     if (_useDynamicColor == v) return;
     _useDynamicColor = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_useDynamicColorKey, v);
   }
 
-  void _loadCustomThemes(SharedPreferences prefs) {
+  void _loadCustomThemes(BusinessPreferences prefs) {
     final raw = prefs.getStringList(_customThemesKey) ?? const <String>[];
     final themes = <CustomTheme>[];
     for (final s in raw) {
@@ -2764,7 +2781,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> _persistCustomThemes() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(
       _customThemesKey,
       _customThemes.map((t) => t.export()).toList(),
@@ -2807,7 +2824,7 @@ class SettingsProvider extends ChangeNotifier {
       _selectedCustomThemeId = null;
       if (_themePaletteId == ThemePalettes.customPaletteId) {
         _themePaletteId = ThemePalettes.defaultId;
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = _preferences;
         await prefs.setString(_themePaletteKey, ThemePalettes.defaultId);
       }
     }
@@ -2825,7 +2842,7 @@ class SettingsProvider extends ChangeNotifier {
     _selectedCustomThemeId = id;
     _themePaletteId = ThemePalettes.customPaletteId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_customThemeSelectedKey, id);
     await prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId);
   }
@@ -2847,7 +2864,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_usePureBackground == v) return;
     _usePureBackground = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayUsePureBackgroundKey, v);
   }
 
@@ -2862,7 +2879,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_chatMessageBackgroundStyle == style) return;
     _chatMessageBackgroundStyle = style;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final v = switch (style) {
       ChatMessageBackgroundStyle.frosted => 'frosted',
       ChatMessageBackgroundStyle.solid => 'solid',
@@ -2878,7 +2895,7 @@ class SettingsProvider extends ChangeNotifier {
     if (listEquals(_mobileAssistantEditTabOrder, next)) return;
     _mobileAssistantEditTabOrder = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_mobileAssistantEditTabOrderKey, next);
   }
 
@@ -2891,7 +2908,7 @@ class SettingsProvider extends ChangeNotifier {
     if (setEquals(_hiddenMobileAssistantEditTabs, next)) return;
     _hiddenMobileAssistantEditTabs = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_mobileAssistantEditTabHiddenKey, sorted);
   }
 
@@ -2902,7 +2919,7 @@ class SettingsProvider extends ChangeNotifier {
     if (listEquals(_chatInputButtonOrder, next)) return;
     _chatInputButtonOrder = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_chatInputButtonsOrderKey, next);
   }
 
@@ -2914,7 +2931,7 @@ class SettingsProvider extends ChangeNotifier {
     if (listEquals(_chatInputMoreButtonIds, next)) return;
     _chatInputMoreButtonIds = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_chatInputMoreButtonsKey, next);
   }
 
@@ -2928,7 +2945,7 @@ class SettingsProvider extends ChangeNotifier {
     _chatInputButtonOrder = const <String>[];
     _chatInputMoreButtonIds = const <String>[];
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_chatInputButtonsOrderKey);
     await prefs.remove(_chatInputMoreButtonsKey);
   }
@@ -2940,7 +2957,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_mobileAssistantDetailOutlineEnabled == enabled) return;
     _mobileAssistantDetailOutlineEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_mobileAssistantDetailOutlineEnabledKey, enabled);
   }
 
@@ -2955,7 +2972,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_androidBackgroundChatMode == mode) return;
     _androidBackgroundChatMode = mode;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final v = switch (mode) {
       AndroidBackgroundChatMode.onNotify => 'on_notify',
       AndroidBackgroundChatMode.on => 'on',
@@ -2986,7 +3003,7 @@ class SettingsProvider extends ChangeNotifier {
       _iosBackgroundNotificationsEnabled = false;
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosBackgroundGenerationEnabledKey,
       _iosBackgroundGenerationEnabled,
@@ -3005,7 +3022,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosBackgroundTaskRefreshEnabled = v;
     if (v) _iosBackgroundGenerationEnabled = true;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosBackgroundTaskRefreshEnabledKey,
       _iosBackgroundTaskRefreshEnabled,
@@ -3022,7 +3039,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosLiveActivityEnabled = v;
     if (v) _iosBackgroundGenerationEnabled = true;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
     if (v) {
       await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
@@ -3037,7 +3054,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosBackgroundNotificationsEnabled = v;
     if (v) _iosBackgroundGenerationEnabled = true;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosBackgroundNotificationsEnabledKey,
       _iosBackgroundNotificationsEnabled,
@@ -3064,7 +3081,7 @@ class SettingsProvider extends ChangeNotifier {
       _iosLocationKeepAliveEnabled = false;
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_iosKeepAliveEnabledKey, _iosKeepAliveEnabled);
     if (!v) {
       await prefs.setBool(_iosSilentAudioKeepAliveEnabledKey, false);
@@ -3079,7 +3096,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosSilentAudioKeepAliveEnabled = v;
     if (v) _iosKeepAliveEnabled = true;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosSilentAudioKeepAliveEnabledKey,
       _iosSilentAudioKeepAliveEnabled,
@@ -3096,7 +3113,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosLocationKeepAliveEnabled = v;
     if (v) _iosKeepAliveEnabled = true;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosLocationKeepAliveEnabledKey,
       _iosLocationKeepAliveEnabled,
@@ -3112,7 +3129,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_iosLiveActivityPrivacyMode == v) return;
     _iosLiveActivityPrivacyMode = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _iosLiveActivityPrivacyModeKey,
       _iosLiveActivityPrivacyMode,
@@ -3128,7 +3145,7 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setProviderConfig(String key, ProviderConfig config) async {
     _providerConfigs[key] = config;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
   }
@@ -3290,7 +3307,7 @@ class SettingsProvider extends ChangeNotifier {
   /// Clears all global model selections (current, title, translate, OCR) that reference the given provider.
   /// Used when a provider is disabled or deleted.
   Future<void> clearSelectionsForProvider(String providerKey) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     bool changed = false;
     if (_currentModelProvider == providerKey) {
       _currentModelProvider = null;
@@ -3349,7 +3366,7 @@ class SettingsProvider extends ChangeNotifier {
     String providerKey,
     String modelId,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     bool changed = false;
     if (_currentModelProvider == providerKey && _currentModelId == modelId) {
       _currentModelProvider = null;
@@ -3422,7 +3439,7 @@ class SettingsProvider extends ChangeNotifier {
     _cleanupProviderOrderAndGrouping();
 
     // Clear selections referencing this provider to avoid re-creating defaults
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     if (_currentModelProvider == key) {
       _currentModelProvider = null;
       _currentModelId = null;
@@ -3492,7 +3509,7 @@ class SettingsProvider extends ChangeNotifier {
       _pinnedModels.add(k);
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
   }
 
@@ -3509,7 +3526,7 @@ class SettingsProvider extends ChangeNotifier {
     _currentModelProvider = providerKey;
     _currentModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_selectedModelKey, '$providerKey::$modelId');
   }
 
@@ -3517,7 +3534,7 @@ class SettingsProvider extends ChangeNotifier {
     _currentModelProvider = null;
     _currentModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_selectedModelKey);
   }
 
@@ -3551,7 +3568,7 @@ You need to summarize the conversation between user and assistant into a short t
     _titleModelProvider = providerKey;
     _titleModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_titleModelKey, '$providerKey::$modelId');
   }
 
@@ -3559,14 +3576,14 @@ You need to summarize the conversation between user and assistant into a short t
     _titleModelProvider = null;
     _titleModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_titleModelKey);
   }
 
   Future<void> setTitlePrompt(String prompt) async {
     _titlePrompt = prompt.trim().isEmpty ? defaultTitlePrompt : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_titlePromptKey, _titlePrompt);
   }
 
@@ -3600,7 +3617,7 @@ Please translate the <source_text> section:
     _translateModelProvider = providerKey;
     _translateModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_translateModelKey, '$providerKey::$modelId');
   }
 
@@ -3608,14 +3625,14 @@ Please translate the <source_text> section:
     _translateModelProvider = null;
     _translateModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_translateModelKey);
   }
 
   Future<void> setTranslatePrompt(String prompt) async {
     _translatePrompt = prompt.trim().isEmpty ? defaultTranslatePrompt : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_translatePromptKey, _translatePrompt);
   }
 
@@ -3626,14 +3643,14 @@ Please translate the <source_text> section:
     if (trimmed.isEmpty) return;
     _translateTargetLang = trimmed;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_translateTargetLangKey, trimmed);
   }
 
   Future<void> resetTranslateTargetLang() async {
     _translateTargetLang = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_translateTargetLangKey);
   }
 
@@ -3655,7 +3672,7 @@ Please translate the <source_text> section:
     _ocrModelProvider = providerKey;
     _ocrModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_ocrModelKey, '$providerKey::$modelId');
   }
 
@@ -3663,14 +3680,14 @@ Please translate the <source_text> section:
     _ocrModelProvider = null;
     _ocrModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_ocrModelKey);
   }
 
   Future<void> setOcrPrompt(String prompt) async {
     _ocrPrompt = prompt.trim();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_ocrPromptKey, _ocrPrompt);
   }
 
@@ -3711,7 +3728,7 @@ Generate or update a brief summary of the user's questions and intentions.
     _summaryModelProvider = providerKey;
     _summaryModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_summaryModelKey, '$providerKey::$modelId');
   }
 
@@ -3719,14 +3736,14 @@ Generate or update a brief summary of the user's questions and intentions.
     _summaryModelProvider = null;
     _summaryModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_summaryModelKey);
   }
 
   Future<void> setSummaryPrompt(String prompt) async {
     _summaryPrompt = prompt.trim().isEmpty ? defaultSummaryPrompt : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_summaryPromptKey, _summaryPrompt);
   }
 
@@ -3768,7 +3785,7 @@ Rules:
     _suggestionModelProvider = providerKey;
     _suggestionModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_suggestionModelKey, '$providerKey::$modelId');
   }
 
@@ -3776,7 +3793,7 @@ Rules:
     _suggestionModelProvider = null;
     _suggestionModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_suggestionModelKey);
   }
 
@@ -3785,7 +3802,7 @@ Rules:
         ? defaultSuggestionPrompt
         : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_suggestionPromptKey, _suggestionPrompt);
   }
 
@@ -3796,7 +3813,7 @@ Rules:
     if (_insertSuggestionOnTapOnly == value) return;
     _insertSuggestionOnTapOnly = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_suggestionInsertOnTapOnlyKey, value);
   }
 
@@ -3820,7 +3837,7 @@ Rules:
     _compressModelProvider = providerKey;
     _compressModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_compressModelKey, '$providerKey::$modelId');
   }
 
@@ -3828,14 +3845,14 @@ Rules:
     _compressModelProvider = null;
     _compressModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_compressModelKey);
   }
 
   Future<void> setCompressPrompt(String prompt) async {
     _compressPrompt = prompt.trim().isEmpty ? defaultCompressPrompt : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_compressPromptKey, _compressPrompt);
   }
 
@@ -3864,7 +3881,7 @@ Rules:
     _proactiveCareDecisionModelProvider = providerKey;
     _proactiveCareDecisionModelId = modelId;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _proactiveCareDecisionModelKey,
       '$providerKey::$modelId',
@@ -3875,7 +3892,7 @@ Rules:
     _proactiveCareDecisionModelProvider = null;
     _proactiveCareDecisionModelId = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_proactiveCareDecisionModelKey);
   }
 
@@ -3886,7 +3903,7 @@ Rules:
     if (_learningModeEnabled == v) return;
     _learningModeEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_learningModeEnabledKey, v);
   }
 
@@ -3934,7 +3951,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
         ? defaultLearningModePrompt
         : prompt;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_learningModePromptKey, _learningModePrompt);
   }
 
@@ -3948,7 +3965,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   Future<void> setThinkingBudget(int? budget) async {
     _thinkingBudget = budget;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     if (budget == null) {
       await prefs.remove(_thinkingBudgetKey);
     } else {
@@ -3963,7 +3980,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_titleGenerationThinkingEnabled == enabled) return;
     _titleGenerationThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_titleGenerationThinkingEnabledKey, enabled);
   }
 
@@ -3982,7 +3999,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_summaryThinkingEnabled == enabled) return;
     _summaryThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_summaryThinkingEnabledKey, enabled);
   }
 
@@ -4001,7 +4018,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_suggestionThinkingEnabled == enabled) return;
     _suggestionThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_suggestionThinkingEnabledKey, enabled);
   }
 
@@ -4020,7 +4037,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_compressThinkingEnabled == enabled) return;
     _compressThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_compressThinkingEnabledKey, enabled);
   }
 
@@ -4039,7 +4056,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_translateThinkingEnabled == enabled) return;
     _translateThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_translateThinkingEnabledKey, enabled);
   }
 
@@ -4058,7 +4075,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_ocrThinkingEnabled == enabled) return;
     _ocrThinkingEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_ocrThinkingEnabledKey, enabled);
   }
 
@@ -4076,7 +4093,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showUserAvatar == v) return;
     _showUserAvatar = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowUserAvatarKey, v);
   }
 
@@ -4087,7 +4104,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showUserNameTimestamp == v) return;
     _showUserNameTimestamp = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowUserNameTimestampKey, v);
   }
 
@@ -4098,7 +4115,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showUserName == v) return;
     _showUserName = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowUserNameKey, v);
   }
 
@@ -4109,7 +4126,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showUserTimestamp == v) return;
     _showUserTimestamp = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowUserTimestampKey, v);
   }
 
@@ -4119,7 +4136,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showUserMessageActions == v) return;
     _showUserMessageActions = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowUserMessageActionsKey, v);
   }
 
@@ -4129,7 +4146,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showModelIcon == v) return;
     _showModelIcon = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowModelIconKey, v);
   }
 
@@ -4140,7 +4157,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showModelNameTimestamp == v) return;
     _showModelNameTimestamp = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowModelNameTimestampKey, v);
   }
 
@@ -4151,7 +4168,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showModelName == v) return;
     _showModelName = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowModelNameKey, v);
   }
 
@@ -4162,7 +4179,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showModelTimestamp == v) return;
     _showModelTimestamp = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowModelTimestampKey, v);
   }
 
@@ -4173,7 +4190,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showTokenStats == v) return;
     _showTokenStats = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowTokenStatsKey, v);
   }
 
@@ -4184,7 +4201,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoCollapseThinking == v) return;
     _autoCollapseThinking = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayAutoCollapseThinkingKey, v);
   }
 
@@ -4194,7 +4211,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_collapseThinkingSteps == v) return;
     _collapseThinkingSteps = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayCollapseThinkingStepsKey, v);
   }
 
@@ -4204,7 +4221,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showToolResultSummary == v) return;
     _showToolResultSummary = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowToolResultSummaryKey, v);
   }
 
@@ -4215,7 +4232,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_regenerateDeleteTrailingMessages == v) return;
     _regenerateDeleteTrailingMessages = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayRegenerateDeleteTrailingMessagesKey, v);
   }
 
@@ -4225,7 +4242,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showRegenerateConfirmDialog == v) return;
     _showRegenerateConfirmDialog = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowRegenerateConfirmDialogKey, v);
   }
 
@@ -4235,7 +4252,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_forkKeepMessageVersions == v) return;
     _forkKeepMessageVersions = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_chatForkKeepMessageVersionsKey, v);
   }
 
@@ -4246,7 +4263,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showMessageNavButtons == v) return;
     _showMessageNavButtons = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowMessageNavKey, v);
   }
 
@@ -4257,7 +4274,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_useNewAssistantAvatarUx == v) return;
     _useNewAssistantAvatarUx = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayUseNewAssistantAvatarUxKey, v);
   }
 
@@ -4268,7 +4285,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showProviderInModelCapsule == v) return;
     _showProviderInModelCapsule = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowProviderInModelCapsuleKey, v);
   }
 
@@ -4279,7 +4296,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showProviderInChatMessage == v) return;
     _showProviderInChatMessage = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowProviderInChatMessageKey, v);
   }
 
@@ -4290,7 +4307,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_newChatOnLaunch == v) return;
     _newChatOnLaunch = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayNewChatOnLaunchKey, v);
   }
 
@@ -4301,7 +4318,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_newChatOnAssistantSwitch == v) return;
     _newChatOnAssistantSwitch = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayNewChatOnAssistantSwitchKey, v);
   }
 
@@ -4312,7 +4329,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_newChatAfterDelete == v) return;
     _newChatAfterDelete = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayNewChatAfterDeleteKey, v);
   }
 
@@ -4375,8 +4392,9 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   /// in-memory state is NOT updated — prefer the instance method when available.
   static Future<void> clearPinnedAssistantPrefsIfPinned(
     String assistantId,
+    BusinessPreferences preferences,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = preferences;
     if (prefs.getString(_pinnedAssistantIdKey) != assistantId) return;
     await prefs.setString(
       _startupAssistantModeKey,
@@ -4386,7 +4404,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   }
 
   Future<void> _persistStartupAssistant() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_startupAssistantModeKey, _startupAssistantMode.name);
     if (_pinnedAssistantId == null) {
       await prefs.remove(_pinnedAssistantIdKey);
@@ -4402,7 +4420,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enterToSendOnMobile == v) return;
     _enterToSendOnMobile = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnterToSendOnMobileKey, v);
   }
 
@@ -4413,7 +4431,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_desktopSendShortcut == v) return;
     _desktopSendShortcut = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final str = v == DesktopSendShortcut.ctrlEnter ? 'ctrlEnter' : 'enter';
     await prefs.setString(_desktopSendShortcutKey, str);
   }
@@ -4430,7 +4448,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_desktopMessageNavButtonsMode == mode) return;
     _desktopMessageNavButtonsMode = mode;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _displayDesktopMessageNavButtonsModeKey,
       _desktopMessageNavButtonsModeToString(mode),
@@ -4488,7 +4506,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_mobileMessageNavButtonsMode == mode) return;
     _mobileMessageNavButtonsMode = mode;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _displayMobileMessageNavButtonsModeKey,
       _mobileMessageNavButtonsModeToString(mode),
@@ -4534,7 +4552,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_chatFontScale == s) return;
     _chatFontScale = s;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance(); // localOnly
     await prefs.setDouble(_displayChatFontScaleKey, _chatFontScale);
   }
 
@@ -4547,7 +4565,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_readerFontSize == s) return;
     _readerFontSize = s;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_readerFontSizeKey, _readerFontSize);
   }
 
@@ -4558,7 +4576,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoScrollEnabled == v) return;
     _autoScrollEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayAutoScrollEnabledKey, v);
   }
 
@@ -4570,7 +4588,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoScrollIdleSeconds == v) return;
     _autoScrollIdleSeconds = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(
       _displayAutoScrollIdleSecondsKey,
       _autoScrollIdleSeconds,
@@ -4585,7 +4603,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_chatBackgroundMaskStrength == s) return;
     _chatBackgroundMaskStrength = s;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(
       _displayChatBackgroundMaskStrengthKey,
       _chatBackgroundMaskStrength,
@@ -4622,7 +4640,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
       _chatInputBackgroundOpacityLight = v;
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(
       brightness == Brightness.dark
           ? _displayChatInputBackgroundOpacityDarkKey
@@ -4638,7 +4656,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enableDollarLatex == v) return;
     _enableDollarLatex = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnableDollarLatexKey, v);
   }
 
@@ -4649,7 +4667,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enableMathRendering == v) return;
     _enableMathRendering = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
@@ -4691,8 +4709,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   Future<void> _persistWebConversationStyleLibrary(
     WebConversationStyleLibrary next,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = await prefs.setString(
+    final saved = await _preferences.setString(
       webConversationStyleLibraryPreferenceKey,
       next.encode(),
     );
@@ -4710,7 +4727,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enableUserMarkdown == v) return;
     _enableUserMarkdown = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnableUserMarkdownKey, v);
   }
 
@@ -4721,7 +4738,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enableReasoningMarkdown == v) return;
     _enableReasoningMarkdown = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
   }
 
@@ -4732,7 +4749,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_enableAssistantMarkdown == v) return;
     _enableAssistantMarkdown = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayEnableAssistantMarkdownKey, v);
   }
 
@@ -4743,7 +4760,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showChatListDate == v) return;
     _showChatListDate = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowChatListDateKey, v);
   }
 
@@ -4754,7 +4771,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_imageCropperEnabled == v) return;
     _imageCropperEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_imageCropperEnabledKey, v);
   }
 
@@ -4765,7 +4782,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_keepScreenOnDuringGeneration == v) return;
     _keepScreenOnDuringGeneration = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_keepScreenOnDuringGenerationKey, v);
   }
 
@@ -4776,7 +4793,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_oneClickCompressEnabled == v) return;
     _oneClickCompressEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_oneClickCompressEnabledKey, v);
   }
 
@@ -4787,7 +4804,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_oneClickCompressMaxLongEdge == clamped) return;
     _oneClickCompressMaxLongEdge = clamped;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_oneClickCompressMaxLongEdgeKey, clamped);
   }
 
@@ -4798,7 +4815,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_oneClickCompressQuality == clamped) return;
     _oneClickCompressQuality = clamped;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_oneClickCompressQualityKey, clamped);
   }
 
@@ -4808,7 +4825,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_oneClickCompressAlwaysJpg == v) return;
     _oneClickCompressAlwaysJpg = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_oneClickCompressAlwaysJpgKey, v);
   }
 
@@ -4819,7 +4836,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_mobileCodeBlockWrap == v) return;
     _mobileCodeBlockWrap = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayMobileCodeBlockWrapKey, v);
   }
 
@@ -4830,7 +4847,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoCollapseCodeBlock == v) return;
     _autoCollapseCodeBlock = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayAutoCollapseCodeBlockKey, v);
   }
 
@@ -4842,7 +4859,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoCollapseCodeBlockLines == next) return;
     _autoCollapseCodeBlockLines = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_displayAutoCollapseCodeBlockLinesKey, next);
   }
 
@@ -4854,7 +4871,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_htmlStreamingShowCodeInProgress == v) return;
     _htmlStreamingShowCodeInProgress = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHtmlStreamingShowCodeKey, v);
   }
 
@@ -4865,7 +4882,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_autoOpenHtmlPreviewOnComplete == v) return;
     _autoOpenHtmlPreviewOnComplete = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayAutoOpenHtmlPreviewKey, v);
   }
 
@@ -4876,7 +4893,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_desktopAutoSwitchTopics == v) return;
     _desktopAutoSwitchTopics = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayDesktopAutoSwitchTopicsKey, v);
   }
 
@@ -4890,7 +4907,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
       _desktopMinimizeToTrayOnClose = false;
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayDesktopShowTrayKey, _desktopShowTray);
     await prefs.setBool(
       _displayDesktopMinimizeToTrayOnCloseKey,
@@ -4906,7 +4923,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_desktopMinimizeToTrayOnClose == next) return;
     _desktopMinimizeToTrayOnClose = next;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(
       _displayDesktopMinimizeToTrayOnCloseKey,
       _desktopMinimizeToTrayOnClose,
@@ -4920,7 +4937,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_hapticsOnGenerate == v) return;
     _hapticsOnGenerate = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsOnGenerateKey, v);
   }
 
@@ -4931,7 +4948,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_hapticsOnDrawer == v) return;
     _hapticsOnDrawer = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsOnDrawerKey, v);
   }
 
@@ -4944,7 +4961,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     // Apply immediately to service
     Haptics.setEnabled(v);
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsGlobalEnabledKey, v);
   }
 
@@ -4955,7 +4972,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_hapticsIosSwitch == v) return;
     _hapticsIosSwitch = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsIosSwitchKey, v);
   }
 
@@ -4966,7 +4983,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_hapticsOnListItemTap == v) return;
     _hapticsOnListItemTap = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsOnListItemTapKey, v);
   }
 
@@ -4977,7 +4994,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_hapticsOnCardTap == v) return;
     _hapticsOnCardTap = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayHapticsOnCardTapKey, v);
   }
 
@@ -4988,7 +5005,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_showAppUpdates == v) return;
     _showAppUpdates = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayShowAppUpdatesKey, v);
   }
 
@@ -4999,7 +5016,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_keepSidebarOpenOnAssistantTap == v) return;
     _keepSidebarOpenOnAssistantTap = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayKeepSidebarOpenOnAssistantTapKey, v);
   }
 
@@ -5010,7 +5027,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_keepSidebarOpenOnTopicTap == v) return;
     _keepSidebarOpenOnTopicTap = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayKeepSidebarOpenOnTopicTapKey, v);
   }
 
@@ -5022,7 +5039,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_keepAssistantListExpandedOnSidebarClose == v) return;
     _keepAssistantListExpandedOnSidebarClose = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_displayKeepAssistantListExpandedOnSidebarCloseKey, v);
   }
 
@@ -5033,7 +5050,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_requestLogEnabled == v) return;
     _requestLogEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_requestLogEnabledKey, v);
     await RequestLogger.setEnabled(v);
   }
@@ -5045,7 +5062,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_mcpLogEnabled == v) return;
     _mcpLogEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_mcpLogEnabledKey, v);
     await RequestLogger.setCategoryEnabled(RequestLogger.catMcp, v);
   }
@@ -5056,7 +5073,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_ttsLogEnabled == v) return;
     _ttsLogEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_ttsLogEnabledKey, v);
     await RequestLogger.setCategoryEnabled(RequestLogger.catTts, v);
   }
@@ -5067,7 +5084,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_searchLogEnabled == v) return;
     _searchLogEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_searchLogEnabledKey, v);
     await RequestLogger.setCategoryEnabled(RequestLogger.catSearch, v);
   }
@@ -5079,13 +5096,13 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_flutterLogEnabled == v) return;
     _flutterLogEnabled = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance(); // localOnly
     await prefs.setBool(_flutterLogEnabledKey, v);
     await FlutterLogger.setEnabled(v);
   }
 
   Future<void> incrementAppLaunchCount() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final next = (prefs.getInt(_appLaunchCountKey) ?? _appLaunchCount) + 1;
     _appLaunchCount = next;
     await prefs.setInt(_appLaunchCountKey, next);
@@ -5100,7 +5117,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     _logSaveOutput = v;
     RequestLogger.saveOutput = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_logSaveOutputKey, v);
   }
 
@@ -5111,7 +5128,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_logAutoDeleteDays == v) return;
     _logAutoDeleteDays = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_logAutoDeleteDaysKey, v);
     RequestLogger.cleanupLogs(autoDeleteDays: v, maxSizeMB: _logMaxSizeMB);
   }
@@ -5123,7 +5140,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_logMaxSizeMB == v) return;
     _logMaxSizeMB = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_logMaxSizeMBKey, v);
     RequestLogger.cleanupLogs(autoDeleteDays: _logAutoDeleteDays, maxSizeMB: v);
   }
@@ -5135,7 +5152,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     if (_trashCapMb == v) return;
     _trashCapMb = v;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_trashCapMbKey, v);
   }
 
@@ -5148,7 +5165,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
           : 0;
     }
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(
       _searchServicesKey,
       jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
@@ -5159,7 +5176,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   Future<void> setSearchCommonOptions(SearchCommonOptions options) async {
     _searchCommonOptions = options;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_searchCommonKey, jsonEncode(options.toJson()));
   }
 
@@ -5169,21 +5186,21 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
       _searchServices.isNotEmpty ? _searchServices.length - 1 : 0,
     );
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
   }
 
   Future<void> setSearchEnabled(bool enabled) async {
     _searchEnabled = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_searchEnabledKey, enabled);
   }
 
   Future<void> setSearchAutoTestOnLaunch(bool enabled) async {
     _searchAutoTestOnLaunch = enabled;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_searchAutoTestOnLaunchKey, enabled);
   }
 
@@ -5213,7 +5230,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     bool? searchEnabled,
     bool? searchAutoTestOnLaunch,
   }) {
-    final copy = SettingsProvider();
+    final copy = SettingsProvider(preferences: _preferences);
     copy._searchServices = searchServices ?? _searchServices;
     copy._searchCommonOptions = searchCommonOptions ?? _searchCommonOptions;
     copy._searchServiceSelected =

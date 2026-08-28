@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
@@ -12,7 +12,10 @@ import 'package:Cuplivo/core/providers/quick_phrase_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 const _assistantId = 'assistant-mcp-test';
 
@@ -22,10 +25,13 @@ void _seedPreferences() {
       Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
     ]),
   });
+  businessPrefs = BusinessPreferences.memoryForTests();
 }
 
-Future<AssistantProvider> _createAssistantProvider() async {
-  final provider = AssistantProvider();
+Future<AssistantProvider> _createAssistantProvider({
+  required BusinessPreferences preferences,
+}) async {
+  final provider = AssistantProvider(preferences: businessPrefs);
   await provider.loadFromPrefs();
   return provider;
 }
@@ -36,10 +42,17 @@ Widget _buildHarness({
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      Provider<BusinessPreferences>.value(value: businessPrefs),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(preferences: businessPrefs),
+      ),
       ChangeNotifierProvider.value(value: assistantProvider),
-      ChangeNotifierProvider(create: (_) => MemoryProvider()),
-      ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+      ChangeNotifierProvider(
+        create: (_) => MemoryProvider(preferences: businessPrefs),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => QuickPhraseProvider(preferences: businessPrefs),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -54,7 +67,9 @@ void main() {
 
   testWidgets('assistant edit page shows MCP tab on mobile', (tester) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider();
+    final assistantProvider = await _createAssistantProvider(
+      preferences: businessPrefs,
+    );
 
     await tester.pumpWidget(
       _buildHarness(
@@ -72,7 +87,9 @@ void main() {
     tester,
   ) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider();
+    final assistantProvider = await _createAssistantProvider(
+      preferences: businessPrefs,
+    );
 
     await tester.pumpWidget(
       _buildHarness(
@@ -117,7 +134,9 @@ void main() {
   testWidgets('local tools tab hides device tools on desktop', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider();
+    final assistantProvider = await _createAssistantProvider(
+      preferences: businessPrefs,
+    );
 
     await tester.pumpWidget(
       _buildHarness(
@@ -151,7 +170,9 @@ void main() {
 
   testWidgets('assistant local tools page lists handoff tools', (tester) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider();
+    final assistantProvider = await _createAssistantProvider(
+      preferences: businessPrefs,
+    );
 
     await tester.pumpWidget(
       _buildHarness(
@@ -172,7 +193,9 @@ void main() {
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider();
+    final assistantProvider = await _createAssistantProvider(
+      preferences: businessPrefs,
+    );
 
     await tester.pumpWidget(
       _buildHarness(

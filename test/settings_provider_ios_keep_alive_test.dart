@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider iOS advanced keep-alive settings', () {
     test('defaults all keep-alive options to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -26,13 +27,13 @@ void main() {
     });
 
     test('loads persisted keep-alive values', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'ios_keepalive_enabled_v1': true,
         'ios_silent_audio_keepalive_enabled_v1': true,
         'ios_location_keepalive_enabled_v1': true,
         'ios_live_activity_privacy_mode_v1': true,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -43,8 +44,8 @@ void main() {
     });
 
     test('silent audio / location toggles cascade master on', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setIosSilentAudioKeepAliveEnabled(true);
@@ -55,12 +56,12 @@ void main() {
     });
 
     test('master off cascades sub-toggles off', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'ios_keepalive_enabled_v1': true,
         'ios_silent_audio_keepalive_enabled_v1': true,
         'ios_location_keepalive_enabled_v1': true,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setIosKeepAliveEnabled(false);
@@ -71,8 +72,8 @@ void main() {
     });
 
     test('persists keep-alive values to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setIosKeepAliveEnabled(true);
@@ -80,7 +81,7 @@ void main() {
       await settings.setIosLocationKeepAliveEnabled(true);
       await settings.setIosLiveActivityPrivacyMode(true);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getBool('ios_keepalive_enabled_v1'), isTrue);
       expect(prefs.getBool('ios_silent_audio_keepalive_enabled_v1'), isTrue);
       expect(prefs.getBool('ios_location_keepalive_enabled_v1'), isTrue);

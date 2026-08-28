@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
@@ -16,6 +16,8 @@ import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/sync/lan_sync_models.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/lan_sync_section.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// Minimal ChatService fake: the client index builder never touches the
 /// repo when there are no conversations.
@@ -31,7 +33,8 @@ class _FakeChatService extends ChatService {
 /// client index builder calls `buildFileManifest`, and real file I/O cannot
 /// complete inside `testWidgets`'s fake-async zone.
 class _FakeDataSync extends DataSync {
-  _FakeDataSync(ChatService chatService) : super(chatService: chatService);
+  _FakeDataSync(BusinessPreferences preferences, ChatService chatService)
+    : super(chatService: chatService, preferences: preferences);
 
   @override
   Future<Map<String, FileManifestEntry>> buildFileManifest() async => const {};
@@ -54,17 +57,19 @@ void main() {
   late _FakeChatService chatService;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
     chatService = _FakeChatService();
   });
 
   Widget buildHarness(http.Client httpClient) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         // IosCardPress reads SettingsProvider for its tactile feedback.
         ChangeNotifierProvider<SettingsProvider>.value(
-          value: SettingsProvider(),
+          value: SettingsProvider(preferences: businessPrefs),
         ),
       ],
       child: MaterialApp(
@@ -73,7 +78,7 @@ void main() {
         home: Scaffold(
           body: LanSyncSection(
             lanSyncHttpClient: httpClient,
-            dataSync: _FakeDataSync(chatService),
+            dataSync: _FakeDataSync(businessPrefs, chatService),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:drift/native.dart';
 
 import 'package:Cuplivo/core/database/app_database.dart';
@@ -79,15 +80,17 @@ class _ReadyChatService extends ChatService {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
   final services = <ChatService>[];
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     tempDir = await Directory.systemTemp.createTemp('kelivo_init_race_test_');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   tearDown(() async {
@@ -162,7 +165,10 @@ void main() {
         final service = createService();
         expect(service.initialized, isFalse);
 
-        final provider = AssistantProvider(chatService: service);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: service,
+        );
         await provider.ensureLoaded();
 
         expect(
@@ -182,13 +188,17 @@ void main() {
         // Simulate the production ordering problem: another subsystem inits the
         // service and writes assistants while our provider is still unloaded.
         await service.init();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-          'assistants_v1',
-          '[{"id":"a1","name":"Real A"},{"id":"a2","name":"Real B"}]',
-        );
+        // assistants_v1 is the entity key (physical SharedPreferences +
+        // legacy source); _migrateFromPrefs consumes it into the repo.
+        SharedPreferences.setMockInitialValues({
+          'assistants_v1':
+              '[{"id":"a1","name":"Real A"},{"id":"a2","name":"Real B"}]',
+        });
 
-        final provider = AssistantProvider(chatService: service);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: service,
+        );
         await provider.ensureLoaded();
 
         expect(provider.isLoaded, isTrue);
@@ -232,7 +242,10 @@ void main() {
         await seedService.close();
 
         final service = createService();
-        final provider = AssistantProvider(chatService: service);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: service,
+        );
         await provider.ensureDefaults(context);
 
         expect(
@@ -269,6 +282,7 @@ void main() {
           repo.failFirstRead = true;
 
           final provider = AssistantProvider(
+            preferences: businessPrefs,
             chatService: _ReadyChatService(repo),
           );
           await provider.ensureDefaults(context);

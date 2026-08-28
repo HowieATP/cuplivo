@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
@@ -11,12 +11,15 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Cuplivo/features/home/services/tool_handler_service.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Memory mode', () {
     setUp(() {
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests();
+      businessPrefs = BusinessPreferences.memoryForTests({});
     });
 
     test('assistant defaults to injection memory mode', () {
@@ -90,7 +93,7 @@ void main() {
       final service = ToolHandlerService(contextProvider: context);
 
       final injectionDefs = service.buildToolDefinitions(
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         assistantInjection,
         'openai',
         'gpt-4',
@@ -99,7 +102,7 @@ void main() {
       );
 
       final toolDefs = service.buildToolDefinitions(
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         assistantTool,
         'openai',
         'gpt-4',
@@ -146,9 +149,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('create_memory', {
         'content': 'user likes cats',
@@ -188,9 +193,11 @@ void main() {
         content: 'old content',
       );
 
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('edit_memory', {
         'id': memory.id,
@@ -224,7 +231,7 @@ void main() {
       final service = ToolHandlerService(contextProvider: context);
 
       final defs = service.buildToolDefinitions(
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         assistant,
         'openai',
         'gpt-4',
@@ -265,7 +272,7 @@ void main() {
       final service = ToolHandlerService(contextProvider: context);
 
       final defs = service.buildToolDefinitions(
-        SettingsProvider(),
+        SettingsProvider(preferences: businessPrefs),
         assistant,
         'openai',
         'gpt-4',
@@ -313,9 +320,11 @@ void main() {
         content: 'user works at Acme',
       );
 
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('read_memory', {});
 
@@ -345,9 +354,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(preferences: businessPrefs),
+            assistant,
+          )!;
 
       final result = await handler('read_memory', {});
 
@@ -365,15 +376,20 @@ class _ToolHandlerTestScope extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) => AssistantProvider(preferences: businessPrefs),
         ),
         ChangeNotifierProvider<McpProvider>(
-          create: (_) =>
-              McpProvider(contextProvider: () => throw UnimplementedError()),
+          create: (_) => McpProvider(
+            preferences: businessPrefs,
+            contextProvider: () => throw UnimplementedError(),
+          ),
         ),
         ChangeNotifierProvider<McpToolService>(create: (_) => McpToolService()),
-        ChangeNotifierProvider<MemoryProvider>(create: (_) => MemoryProvider()),
+        ChangeNotifierProvider<MemoryProvider>(
+          create: (_) => MemoryProvider(preferences: businessPrefs),
+        ),
       ],
       child: child,
     );

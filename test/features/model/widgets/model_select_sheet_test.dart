@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
@@ -11,6 +11,8 @@ import 'package:Cuplivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/ios_tactile.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 ProviderConfig _providerConfig(String key, String name, List<String> models) {
   return ProviderConfig(
@@ -25,8 +27,8 @@ ProviderConfig _providerConfig(String key, String name, List<String> models) {
 }
 
 Future<SettingsProvider> _settingsWithProviders(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 
@@ -63,8 +65,8 @@ Future<SettingsProvider> _settingsWithOnlyTestProviders(
 Future<SettingsProvider> _settingsWithLongSingleProvider(
   WidgetTester tester,
 ) async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 
@@ -92,9 +94,10 @@ Future<void> _pumpModelSelector(
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) => AssistantProvider(preferences: businessPrefs),
         ),
       ],
       child: MaterialApp(

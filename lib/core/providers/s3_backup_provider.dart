@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../database/business_preferences.dart';
 import '../models/backup.dart';
 import '../models/incremental_backup.dart';
 import '../services/backup/data_sync.dart';
@@ -22,9 +23,11 @@ class S3BackupProvider extends ChangeNotifier {
   S3BackupProvider({
     required ChatService chatService,
     required TrashRestoreCoordinator trashRestoreCoordinator,
+    required BusinessPreferences preferences,
     S3Config? initialConfig,
   }) : _dataSync = DataSync(
          chatService: chatService,
+         preferences: preferences,
          localIdResolver: trashRestoreCoordinator.getLocalIds,
        ),
        _client = const S3BackupClient(),

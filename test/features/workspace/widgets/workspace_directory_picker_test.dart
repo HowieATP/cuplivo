@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/providers/workspace_provider.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/features/settings/pages/mount_files_page.dart';
 import 'package:Cuplivo/features/workspace/widgets/workspace_directory_picker.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
@@ -24,6 +25,7 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getApplicationSupportPath() async => root;
 }
 
+var businessPrefs = BusinessPreferences.memoryForTests();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -46,7 +48,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final workspaces = WorkspaceProvider();
+    final workspaces = WorkspaceProvider(preferences: businessPrefs);
     final workspace = Workspace(
       id: 'tablet-workspace',
       displayName: 'Tablet',

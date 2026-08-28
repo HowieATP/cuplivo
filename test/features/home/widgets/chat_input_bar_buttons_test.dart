@@ -13,12 +13,15 @@ import 'package:Cuplivo/features/home/utils/input_bar_button_layout.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   late SharedPreferences prefs;
   InputDraftPersistence? draftPersistence;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     draftPersistence = InputDraftPersistence(prefs);
@@ -35,9 +38,14 @@ void main() {
   }) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         Provider<InputDraftPersistence>.value(value: draftPersistence!),
-        ChangeNotifierProvider.value(value: SettingsProvider()),
-        ChangeNotifierProvider.value(value: AssistantProvider()),
+        ChangeNotifierProvider.value(
+          value: SettingsProvider(preferences: businessPrefs),
+        ),
+        ChangeNotifierProvider.value(
+          value: AssistantProvider(preferences: businessPrefs),
+        ),
         ChangeNotifierProvider.value(value: InputStatusProvider()),
       ],
       child: MaterialApp(
@@ -202,8 +210,12 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: WorldBookProvider()),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: WorldBookProvider(preferences: businessPrefs),
+          ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -253,9 +265,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: WorldBookProvider()),
-          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: WorldBookProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:drift/native.dart';
 
 import 'package:Cuplivo/core/database/app_database.dart';
@@ -10,6 +10,8 @@ import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 const _assistantsKey = 'assistants_v1';
 const _currentAssistantKey = 'current_assistant_id_v1';
@@ -47,11 +49,14 @@ Future<AssistantProvider> _createProviderWithLoadedAssistants(
         .toList(),
   );
 
-  SharedPreferences.setMockInitialValues({
+  businessPrefs = BusinessPreferences.memoryForTests({
     if (currentAssistantId != null) _currentAssistantKey: currentAssistantId,
   });
 
-  final provider = AssistantProvider(chatService: _MockChatService(repo));
+  final provider = AssistantProvider(
+    preferences: businessPrefs,
+    chatService: _MockChatService(repo),
+  );
   await provider.ensureLoaded();
   return provider;
 }
@@ -81,7 +86,7 @@ void main() {
       expect(await provider.deleteAssistant('legacy-default'), isTrue);
       expect(provider.currentAssistantId, 'regular');
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString(_assistantsKey), isNot(contains('deletable')));
     });
 

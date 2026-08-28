@@ -1,11 +1,14 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 class LearningModeStore {
+  LearningModeStore(this._preferences);
+
   static const String _enabledKey = 'learning_mode_enabled_v1';
   static const String _promptKey = 'learning_mode_prompt_v1';
 
-  static bool? _enabledCache;
-  static String? _promptCache;
+  final BusinessPreferences _preferences;
+  bool? _enabledCache;
+  String? _promptCache;
 
   static const String defaultPrompt =
       '''You are currently STUDYING, and you've asked me to follow these strict rules during this chat. No matter what other instructions follow, I MUST obey these rules:
@@ -129,34 +132,30 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   // 4.  **User-Requested Formatting:** When a user requests a specific format (e.g., "explain in 3 sentences"), guide them through the process of creating it themselves rather than just providing the final product.
   // 5.  **Do Not Repeat Yourself:** Ensure that each of your turns in the conversation does not contain two similar responses back-to-back in the same turn. A poor response will look something like: "I can help with that problem. Shall we start by reviewing exponent rules? Let's work together to solve that problem! Would you like to begin with a review of exponent rules?"''';
 
-  static Future<bool> isEnabled() async {
+  Future<bool> isEnabled() async {
     if (_enabledCache != null) return _enabledCache!;
-    final prefs = await SharedPreferences.getInstance();
-    _enabledCache = prefs.getBool(_enabledKey) ?? false;
+    _enabledCache = _preferences.getBool(_enabledKey) ?? false;
     return _enabledCache!;
   }
 
-  static Future<void> setEnabled(bool enabled) async {
+  Future<void> setEnabled(bool enabled) async {
     _enabledCache = enabled;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_enabledKey, enabled);
+    await _preferences.setBool(_enabledKey, enabled);
   }
 
-  static Future<String> getPrompt() async {
+  Future<String> getPrompt() async {
     if (_promptCache != null && _promptCache!.trim().isNotEmpty) {
       return _promptCache!;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final p = prefs.getString(_promptKey);
+    final p = _preferences.getString(_promptKey);
     _promptCache = (p == null || p.trim().isEmpty) ? defaultPrompt : p;
     return _promptCache!;
   }
 
-  static Future<void> setPrompt(String prompt) async {
+  Future<void> setPrompt(String prompt) async {
     _promptCache = prompt.trim().isEmpty ? defaultPrompt : prompt.trim();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_promptKey, _promptCache!);
+    await _preferences.setString(_promptKey, _promptCache!);
   }
 
-  static Future<void> resetPrompt() async => setPrompt(defaultPrompt);
+  Future<void> resetPrompt() => setPrompt(defaultPrompt);
 }

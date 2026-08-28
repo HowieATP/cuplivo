@@ -7,15 +7,18 @@ import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   late InputDraftPersistence draftPersistence;
 
   setUp(() async {
+    businessPrefs = BusinessPreferences.memoryForTests();
     SharedPreferences.setMockInitialValues({});
     draftPersistence = InputDraftPersistence(
       await SharedPreferences.getInstance(),
@@ -50,12 +53,16 @@ void main() {
   }) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         Provider<InputDraftPersistence>.value(value: draftPersistence),
         ChangeNotifierProvider.value(
-          value: settingsProvider ?? SettingsProvider(),
+          value:
+              settingsProvider ?? SettingsProvider(preferences: businessPrefs),
         ),
         ChangeNotifierProvider.value(
-          value: assistantProvider ?? AssistantProvider(),
+          value:
+              assistantProvider ??
+              AssistantProvider(preferences: businessPrefs),
         ),
         ChangeNotifierProvider.value(
           value: inputStatus ?? InputStatusProvider(),
@@ -199,7 +206,7 @@ void main() {
     final focusNode = FocusNode();
     final mediaController = ChatInputBarController();
     final inputStatus = InputStatusProvider();
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setProviderConfig(
       'OpenAITest',
       ProviderConfig(
@@ -253,7 +260,7 @@ void main() {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
     final mediaController = ChatInputBarController();
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setProviderConfig(
       'OpenAITest',
       ProviderConfig(
@@ -334,7 +341,7 @@ void main() {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
     final mediaController = ChatInputBarController();
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setProviderConfig(
       'OpenAITest',
       ProviderConfig(
@@ -465,7 +472,7 @@ void main() {
   testWidgets('生图参数入口已移出输入栏（调色板按钮不复存在）', (tester) async {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setProviderConfig(
       'OpenAITest',
       ProviderConfig(

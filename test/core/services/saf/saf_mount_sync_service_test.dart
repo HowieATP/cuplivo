@@ -12,6 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// In-memory SAF tree keyed by content URIs (`content://tree/...`).
 class _FakeSafNode {
@@ -320,14 +323,20 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
     tempDir = await Directory.systemTemp.createTemp('saf_mount_test');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir);
     SafMountSyncService.androidProbe = () => true;
     channel = _FakeSafChannel();
-    workspaces = WorkspaceProvider();
+    workspaces = WorkspaceProvider(preferences: businessPrefs);
     await workspaces.init();
     service = _TestSafMountService(
-      SafMountSyncService(workspaces: workspaces, channel: channel),
+      SafMountSyncService(
+        preferences: businessPrefs,
+        workspaces: workspaces,
+        channel: channel,
+      ),
     );
     await service.init();
     await pump();
@@ -1029,6 +1038,7 @@ void main() {
         await pump();
 
         final restarted = SafMountSyncService(
+          preferences: businessPrefs,
           workspaces: workspaces,
           channel: channel,
         );
@@ -1076,7 +1086,11 @@ void main() {
       await workspaces.addSafMount(Workspace.defaultId, entry);
       SafMountSyncService.androidProbe = () => false;
       service = _TestSafMountService(
-        SafMountSyncService(workspaces: workspaces, channel: channel),
+        SafMountSyncService(
+          preferences: businessPrefs,
+          workspaces: workspaces,
+          channel: channel,
+        ),
       );
 
       await service.init();
@@ -1256,7 +1270,7 @@ void main() {
     });
 
     test('legacy global config and mirrors are discarded', () async {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       await prefs.setString(
         SafMountSyncService.legacyPrefsKey,
         '[{"alias":"old"}]',
@@ -1273,7 +1287,7 @@ void main() {
     test(
       'restore keeps the first valid URI and skips malformed mounts',
       () async {
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         await prefs.setString(
           WorkspaceProvider.metaPrefsKey,
           jsonEncode([

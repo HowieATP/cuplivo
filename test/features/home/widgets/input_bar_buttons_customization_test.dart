@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/home/pages/input_bar_buttons_customization_page.dart';
@@ -11,17 +11,24 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:Cuplivo/shared/widgets/ios_switch.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   Future<void> pumpContent(
     WidgetTester tester, {
     Size size = const Size(800, 600),
   }) async {
-    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    businessPrefs = BusinessPreferences.memoryForTests(
+      const <String, Object>{},
+    );
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MultiProvider(
-        providers: [ChangeNotifierProvider.value(value: SettingsProvider())],
+        providers: [
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+        ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

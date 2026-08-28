@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/database/business_preferences.dart';
 import 'window_size_manager.dart';
 import 'dart:async';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
@@ -13,6 +14,7 @@ class DesktopWindowController with WindowListener {
   static final DesktopWindowController instance = DesktopWindowController._();
 
   final WindowSizeManager _sizeMgr = const WindowSizeManager();
+  BusinessPreferences? preferences;
   bool _attached = false;
   // Debounce timers to avoid frequent disk writes during drag/resize
   Timer? _moveDebounce;
@@ -91,6 +93,17 @@ class DesktopWindowController with WindowListener {
     if (_attached) return;
     windowManager.addListener(this);
     _attached = true;
+  }
+
+  /// Flush the business-preferences write tail before the window closes so
+  /// the serialized SQLite queue drains before process exit.
+  @override
+  void onWindowClose() async {
+    try {
+      await preferences?.flushPendingWrites();
+    } catch (e) {
+      debugPrint('DesktopWindowController: business prefs flush failed: $e');
+    }
   }
 
   @override

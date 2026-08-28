@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../database/business_preferences.dart';
 import '../database/chat_database_repository.dart';
 import '../providers/assistant_provider.dart';
 import '../providers/mcp_provider.dart';
@@ -26,13 +27,19 @@ import '../models/world_book.dart';
 class TrashRestoreCoordinator {
   TrashRestoreCoordinator({
     required this.chatService,
+    required BusinessPreferences preferences,
     this.assistantProvider,
     this.worldBookProvider,
     this.quickPhraseProvider,
     this.mcpProvider,
     this.memoryProvider,
-  });
+  }) : _worldBookStore = WorldBookStore.shared(preferences),
+       _quickPhraseStore = QuickPhraseStore.shared(preferences),
+       _memoryStore = MemoryStore.shared(preferences);
 
+  final WorldBookStore _worldBookStore;
+  final QuickPhraseStore _quickPhraseStore;
+  final MemoryStore _memoryStore;
   final ChatService chatService;
   final AssistantProvider? assistantProvider;
   final WorldBookProvider? worldBookProvider;
@@ -111,7 +118,7 @@ class TrashRestoreCoordinator {
       final book = WorldBook.fromJson(
         (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
       );
-      await WorldBookStore.add(book);
+      await _worldBookStore.add(book);
       await worldBookProvider?.loadAll();
       await store.purgeDeletedRecord(id, DeletionEntityType.worldBook);
       return null;
@@ -132,7 +139,7 @@ class TrashRestoreCoordinator {
       final phrase = QuickPhrase.fromJson(
         (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
       );
-      await QuickPhraseStore.add(phrase);
+      await _quickPhraseStore.add(phrase);
       await quickPhraseProvider?.loadAll();
       await store.purgeDeletedRecord(id, DeletionEntityType.quickPhrase);
       return null;
@@ -171,9 +178,9 @@ class TrashRestoreCoordinator {
         (jsonDecode(record.recoveryJson) as Map).cast<String, dynamic>(),
       );
       // Re-insert with original id by writing all memories + this one.
-      final all = await MemoryStore.getAll();
+      final all = await _memoryStore.getAll();
       all.add(mem);
-      await MemoryStore.saveAll(all);
+      await _memoryStore.saveAll(all);
       await memoryProvider?.loadAll();
       await store.purgeDeletedRecord(id, DeletionEntityType.memory);
       return null;

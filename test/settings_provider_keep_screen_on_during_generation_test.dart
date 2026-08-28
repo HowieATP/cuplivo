@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 Future<void> _waitForSettingsLoad() async {
   for (var i = 0; i < 25; i++) {
@@ -9,13 +9,14 @@ Future<void> _waitForSettingsLoad() async {
   }
 }
 
+var businessPrefs = BusinessPreferences.memoryForTests();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider keep screen on during generation', () {
     test('defaults to enabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -23,10 +24,10 @@ void main() {
     });
 
     test('loads persisted disabled value', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'keep_screen_on_during_generation_v1': false,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -34,15 +35,17 @@ void main() {
     });
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setKeepScreenOnDuringGeneration(false);
 
       expect(settings.keepScreenOnDuringGeneration, isFalse);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('keep_screen_on_during_generation_v1'), isFalse);
+      expect(
+        businessPrefs.getBool('keep_screen_on_during_generation_v1'),
+        isFalse,
+      );
     });
   });
 }

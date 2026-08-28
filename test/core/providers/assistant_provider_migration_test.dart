@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/native.dart';
 
@@ -9,6 +10,8 @@ import 'package:Cuplivo/core/database/chat_database_repository.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/models/assistant.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 /// A minimal [ChatService] subclass backed by an in-memory database.
 /// Only overrides the members [AssistantProvider] actually touches.
@@ -78,6 +81,7 @@ void main() {
     late _InMemoryChatService chatService;
 
     setUp(() {
+      businessPrefs = BusinessPreferences.memoryForTests();
       chatService = _InMemoryChatService();
     });
 
@@ -88,15 +92,23 @@ void main() {
     test(
       'migrates assistants_v1 from SharedPreferences to DB when DB empty',
       () async {
+        // assistants_v1 is an entity key — it stays on PHYSICAL
+        // SharedPreferences (legacy source); business companion keys live on
+        // the business facade.
         SharedPreferences.setMockInitialValues({
           'assistants_v1': jsonEncode([
             {'id': 'a1', 'name': 'Migrated A'},
             {'id': 'a2', 'name': 'Migrated B'},
           ]),
+        });
+        businessPrefs = BusinessPreferences.memoryForTests({
           'current_assistant_id_v1': 'a1',
         });
 
-        final provider = AssistantProvider(chatService: chatService);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await provider.ensureLoaded();
 
         expect(provider.assistants.length, 2);
@@ -106,7 +118,7 @@ void main() {
         final fromDb = await chatService.getAllAssistants();
         expect(fromDb.length, 2);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.containsKey('assistants_v1'), isFalse);
       },
       timeout: const Timeout(Duration(seconds: 5)),
@@ -125,7 +137,10 @@ void main() {
           ]),
         });
 
-        final provider = AssistantProvider(chatService: chatService);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await provider.ensureLoaded();
 
         expect(provider.assistants.length, 1);
@@ -139,8 +154,12 @@ void main() {
           {'id': 'p1', 'name': 'Persist Test'},
         ]),
       });
+      businessPrefs = BusinessPreferences.memoryForTests({});
 
-      final provider = AssistantProvider(chatService: chatService);
+      final provider = AssistantProvider(
+        preferences: businessPrefs,
+        chatService: chatService,
+      );
       await provider.ensureLoaded();
 
       await provider.updateAssistant(
@@ -151,7 +170,7 @@ void main() {
       expect(fromDb.length, 1);
       expect(fromDb[0].name, 'Persisted');
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.containsKey('assistants_v1'), isFalse);
     });
   });
@@ -174,9 +193,14 @@ void main() {
     test(
       'legacy true migrates all assistants to auto and removes the key',
       () async {
-        SharedPreferences.setMockInitialValues({'ocr_enabled_v1': true});
+        businessPrefs = BusinessPreferences.memoryForTests({
+          'ocr_enabled_v1': true,
+        });
 
-        final provider = AssistantProvider(chatService: chatService);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await provider.ensureLoaded();
 
         expect(provider.assistants, hasLength(2));
@@ -185,7 +209,7 @@ void main() {
         final fromDb = await chatService.getAllAssistants();
         expect(fromDb.every((a) => a.ocrMode == 'auto'), isTrue);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
       },
     );
@@ -193,9 +217,14 @@ void main() {
     test(
       'legacy false migrates all assistants to never and removes the key',
       () async {
-        SharedPreferences.setMockInitialValues({'ocr_enabled_v1': false});
+        businessPrefs = BusinessPreferences.memoryForTests({
+          'ocr_enabled_v1': false,
+        });
 
-        final provider = AssistantProvider(chatService: chatService);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await provider.ensureLoaded();
 
         expect(provider.assistants.every((a) => a.ocrMode == 'never'), isTrue);
@@ -203,7 +232,7 @@ void main() {
         final fromDb = await chatService.getAllAssistants();
         expect(fromDb.every((a) => a.ocrMode == 'never'), isTrue);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
       },
     );
@@ -212,26 +241,39 @@ void main() {
       final emptyChat = _InMemoryChatService();
       addTearDown(emptyChat.closeDb);
 
-      SharedPreferences.setMockInitialValues({'ocr_enabled_v1': false});
+      businessPrefs = BusinessPreferences.memoryForTests({
+        'ocr_enabled_v1': false,
+      });
 
-      final provider = AssistantProvider(chatService: emptyChat);
+      final provider = AssistantProvider(
+        preferences: businessPrefs,
+        chatService: emptyChat,
+      );
       await provider.ensureLoaded();
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
     });
 
     test('preserves manual ocrMode once the legacy key is consumed', () async {
-      SharedPreferences.setMockInitialValues({'ocr_enabled_v1': false});
+      businessPrefs = BusinessPreferences.memoryForTests({
+        'ocr_enabled_v1': false,
+      });
 
-      final provider = AssistantProvider(chatService: chatService);
+      final provider = AssistantProvider(
+        preferences: businessPrefs,
+        chatService: chatService,
+      );
       await provider.ensureLoaded();
       await provider.updateAssistant(
         provider.assistants[0].copyWith(ocrMode: 'always'),
       );
 
       // Second load must NOT re-apply the legacy mapping (key already gone).
-      final provider2 = AssistantProvider(chatService: chatService);
+      final provider2 = AssistantProvider(
+        preferences: businessPrefs,
+        chatService: chatService,
+      );
       await provider2.ensureLoaded();
       final updated = provider2.assistants.firstWhere(
         (a) => a.id == provider.assistants[0].id,
@@ -246,24 +288,32 @@ void main() {
         addTearDown(flaky.closeDb);
         await flaky.putAssistants([Assistant(id: 'a1', name: 'Alpha')]);
 
-        SharedPreferences.setMockInitialValues({'ocr_enabled_v1': false});
+        businessPrefs = BusinessPreferences.memoryForTests({
+          'ocr_enabled_v1': false,
+        });
 
         flaky.failPutAssistants = true;
-        final provider = AssistantProvider(chatService: flaky);
+        final provider = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: flaky,
+        );
         await provider.ensureLoaded();
 
         // Write failed -> key retained, mapping NOT applied to the DB.
-        var prefs = await SharedPreferences.getInstance();
+        var prefs = businessPrefs;
         expect(prefs.containsKey('ocr_enabled_v1'), isTrue);
         var fromDb = await flaky.getAllAssistants();
         expect(fromDb.single.ocrMode, 'auto');
 
         // Next launch succeeds -> mapping applied and key consumed.
         flaky.failPutAssistants = false;
-        final provider2 = AssistantProvider(chatService: flaky);
+        final provider2 = AssistantProvider(
+          preferences: businessPrefs,
+          chatService: flaky,
+        );
         await provider2.ensureLoaded();
 
-        prefs = await SharedPreferences.getInstance();
+        prefs = businessPrefs;
         expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
         fromDb = await flaky.getAllAssistants();
         expect(fromDb.single.ocrMode, 'never');

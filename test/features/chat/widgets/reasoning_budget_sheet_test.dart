@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/assistant_provider.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/features/chat/widgets/reasoning_budget_sheet.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 Future<SettingsProvider> _settingsForClaudeModel(
   WidgetTester tester,
   String modelId,
 ) async {
-  SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests({});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 
@@ -40,9 +42,10 @@ Future<void> _pumpSheetLauncher(
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) => AssistantProvider(preferences: businessPrefs),
         ),
       ],
       child: MaterialApp(

@@ -12,6 +12,7 @@ import 'package:Cuplivo/features/home/services/tool_approval_service.dart';
 import 'package:Cuplivo/features/home/widgets/live_panel.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 class _FakeChatService extends ChatService {
   _FakeChatService(this.currentConversationId);
@@ -21,6 +22,7 @@ class _FakeChatService extends ChatService {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   late _FakeChatService chatService;
   late GenerationEngine engine;
   late ToolApprovalService approvalService;
@@ -37,8 +39,9 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: MultiProvider(
           providers: [
+            Provider<BusinessPreferences>.value(value: businessPrefs),
             ChangeNotifierProvider<SettingsProvider>(
-              create: (_) => SettingsProvider(),
+              create: (_) => SettingsProvider(preferences: businessPrefs),
             ),
             ChangeNotifierProvider<ChatService>.value(value: chatService),
             ChangeNotifierProvider<GenerationEngine>.value(value: engine),
@@ -70,6 +73,7 @@ void main() {
   }
 
   setUp(() {
+    businessPrefs = BusinessPreferences.memoryForTests();
     chatService = _FakeChatService('parent-conv');
     engine = GenerationEngine(chatService: chatService);
     approvalService = ToolApprovalService();

@@ -4,20 +4,22 @@ import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SharedPreferences.setMockInitialValues(const {});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests(const {});
   });
 
   testWidgets('input background opacity sheet shows light and dark controls', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     addTearDown(settings.dispose);
 
     await tester.pumpWidget(

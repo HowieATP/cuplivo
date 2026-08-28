@@ -661,6 +661,7 @@
   "backupPageBackupUploaded": "已上傳備份",
   "backupPageBackup": "立即備份",
   "backupPageExportToFile": "匯出為檔案",
+  "backupPageExportKelivoCompatible": "匯出 Kelivo 相容備份",
   "backupPageExporting": "正在匯出...",
   "backupPageExportFailed": "匯出失敗：{error}",
   "backupPageExportElapsed": "已耗時 {seconds} 秒",

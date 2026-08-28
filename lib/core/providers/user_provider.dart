@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:io';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
 
 class UserProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _prefsUserNameKey = 'user_name';
   static const String _prefsAvatarTypeKey =
       'avatar_type'; // emoji | url | file | null
@@ -20,12 +21,12 @@ class UserProvider extends ChangeNotifier {
   String? get avatarType => _avatarType;
   String? get avatarValue => _avatarValue;
 
-  UserProvider() {
+  UserProvider({required this._preferences}) {
     _load();
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     final n = prefs.getString(_prefsUserNameKey);
     if (n != null && n.isNotEmpty) {
       _name = n;
@@ -67,7 +68,7 @@ class UserProvider extends ChangeNotifier {
     if (trimmed.isEmpty || trimmed == _name) return;
     _name = trimmed;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_prefsUserNameKey, _name);
   }
 
@@ -77,7 +78,7 @@ class UserProvider extends ChangeNotifier {
     _avatarType = 'emoji';
     _avatarValue = e;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_prefsAvatarTypeKey, _avatarType!);
     await prefs.setString(_prefsAvatarValueKey, _avatarValue!);
   }
@@ -88,7 +89,7 @@ class UserProvider extends ChangeNotifier {
     _avatarType = 'url';
     _avatarValue = u;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_prefsAvatarTypeKey, _avatarType!);
     await prefs.setString(_prefsAvatarValueKey, _avatarValue!);
     // Prefetch to enable offline display later
@@ -137,7 +138,7 @@ class UserProvider extends ChangeNotifier {
       _avatarType = 'file';
       _avatarValue = dest.path;
       notifyListeners();
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       await prefs.setString(_prefsAvatarTypeKey, _avatarType!);
       await prefs.setString(_prefsAvatarValueKey, _avatarValue!);
     } catch (_) {
@@ -145,7 +146,7 @@ class UserProvider extends ChangeNotifier {
       _avatarType = 'file';
       _avatarValue = fixedInput;
       notifyListeners();
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       await prefs.setString(_prefsAvatarTypeKey, _avatarType!);
       await prefs.setString(_prefsAvatarValueKey, _avatarValue!);
     }
@@ -155,7 +156,7 @@ class UserProvider extends ChangeNotifier {
     _avatarType = null;
     _avatarValue = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.remove(_prefsAvatarTypeKey);
     await prefs.remove(_prefsAvatarValueKey);
   }

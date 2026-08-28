@@ -11,6 +11,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/sandbox_path_resolver.dart';
+import '../database/business_preferences.dart';
+import '../database/business_preferences_store.dart';
 import '../models/assistant.dart';
 import '../models/conversation.dart';
 import 'logging/flutter_logger.dart';
@@ -38,6 +40,22 @@ Future<void> proactiveCareAlarmCallback(
   Map<String, dynamic> params,
 ) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // This isolate holds NO state from the main isolate: install its own
+  // BusinessPreferences over the same SQLite table (never SharedPreferences —
+  // the business data migrated out of it; a pre-migration fire degrades
+  // gracefully because reads return empty).
+  ProactiveCareMessageFlow? flow;
+  try {
+    final db = await ProactiveCareHeadlessChatStore.openSharedSqlite();
+    final prefs = BusinessPreferences.open(RawSqliteBusinessStore(db));
+    await prefs.load();
+    flow = ProactiveCareMessageFlow(preferences: prefs);
+  } catch (e, st) {
+    debugPrint('[ProactiveCare] business prefs open failed: $e\n$st');
+    flow = ProactiveCareMessageFlow(
+      preferences: await BusinessPreferences.memoryFallback(),
+    );
+  }
   final assistantId = params['assistantId'] as String?;
   debugPrint('[ProactiveCare] Alarm fired (id=$id, assistantId=$assistantId)');
   if (assistantId == null || assistantId.isEmpty) return;
@@ -63,7 +81,7 @@ Future<void> proactiveCareAlarmCallback(
     return;
   }
 
-  await _runHeadlessCareFlow(assistant, id);
+  await _runHeadlessCareFlow(assistant, id, flow);
 }
 
 bool _forwardToMainIsolate(String assistantId) {
@@ -78,17 +96,19 @@ bool _forwardToMainIsolate(String assistantId) {
 /// SQLite, requests the care reply, appends it to the assistant's most recent
 /// conversation, shows the notification, and asks the model for the next
 /// care time to re-schedule the alarm.
-Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
-  final snapshot = await ProactiveCareL10nSnapshot.load();
+Future<void> _runHeadlessCareFlow(
+  Assistant assistant,
+  int alarmId,
+  ProactiveCareMessageFlow flow,
+) async {
+  final snapshot = await flow.loadL10nSnapshot();
   final failureBody = (snapshot?.failureNotificationBody.isNotEmpty ?? false)
       ? snapshot!.failureNotificationBody
       : _failureBodyFallback;
 
   String body;
   try {
-    final modelCfg = await ProactiveCareMessageFlow.loadModelConfigFromPrefs(
-      assistant,
-    );
+    final modelCfg = await flow.loadModelConfigFromPrefs(assistant);
     if (modelCfg == null) {
       throw StateError('no chat model configured');
     }
@@ -97,8 +117,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
     // running: re-check the main port right before touching the database.
     if (_forwardToMainIsolate(assistant.id)) return;
 
-    final fallbackThinkingBudget =
-        await ProactiveCareMessageFlow.loadThinkingBudgetFromPrefs();
+    final fallbackThinkingBudget = await flow.loadThinkingBudgetFromPrefs();
 
     final recent =
         await ProactiveCareHeadlessChatStore.loadRecentConversationFor(
@@ -106,7 +125,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
         );
     final careHistory = recent.conversation == null
         ? const <Map<String, dynamic>>[]
-        : ProactiveCareMessageFlow.buildHistory(
+        : flow.buildHistory(
             conversation: recent.conversation!,
             messages: recent.messages,
             assistant: assistant,
@@ -114,7 +133,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
           );
     final decisionHistory = recent.conversation == null
         ? const <Map<String, dynamic>>[]
-        : ProactiveCareMessageFlow.buildHistory(
+        : flow.buildHistory(
             conversation: recent.conversation!,
             messages: recent.messages,
             assistant: assistant,
@@ -136,9 +155,9 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
     final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
         ? assistant.proactiveCarePrompt
         : (snapshot?.carePromptDefault ?? '');
-    final apiMessages = await ProactiveCareMessageFlow.buildCareApiMessages(
+    final apiMessages = await flow.buildCareApiMessages(
       assistant: assistant,
-      userNickname: await ProactiveCareMessageFlow.loadUserNicknameFromPrefs(),
+      userNickname: await flow.loadUserNicknameFromPrefs(),
       modelId: modelCfg.modelId,
       history: careHistory,
       carePrompt: carePrompt,
@@ -147,7 +166,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
       reloadWorldBooks: true,
     );
 
-    final reply = await ProactiveCareMessageFlow.requestCareReply(
+    final reply = await flow.requestCareReply(
       config: modelCfg.config,
       modelId: modelCfg.modelId,
       assistant: assistant,
@@ -173,21 +192,19 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
     // Ask the decision model for the next care time (continuous care). A
     // failure here must not hide the reply that was already produced.
     try {
-      final decisionCfg =
-          await ProactiveCareMessageFlow.loadDecisionModelConfigFromPrefs(
-            assistant,
-          );
+      final decisionCfg = await flow.loadDecisionModelConfigFromPrefs(
+        assistant,
+      );
       if (decisionCfg != null) {
         final decisionPrompt =
             assistant.proactiveCareDecisionPrompt.trim().isNotEmpty
             ? assistant.proactiveCareDecisionPrompt
             : (snapshot?.decisionPromptDefault ?? '');
-        final newTime = await ProactiveCareMessageFlow.decideNextCareTime(
+        final newTime = await flow.decideNextCareTime(
           config: decisionCfg.config,
           modelId: decisionCfg.modelId,
           assistant: assistant,
-          userNickname:
-              await ProactiveCareMessageFlow.loadUserNicknameFromPrefs(),
+          userNickname: await flow.loadUserNicknameFromPrefs(),
           history: <Map<String, dynamic>>[
             ...decisionHistory,
             {'role': 'assistant', 'content': reply},

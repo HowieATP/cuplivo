@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/models/web_conversation_style.dart';
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart' as backup;
@@ -23,14 +22,17 @@ WebConversationStyle makeStyle(String id, {String? name, double radius = 12}) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late BusinessPreferences businessPrefs;
+
   setUp(() {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
+    businessPrefs = BusinessPreferences.memoryForTests();
   });
 
   test(
     'imports without activation and restores active style after restart',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.loaded;
 
       await settings.importWebConversationStyles([makeStyle('one')]);
@@ -38,7 +40,7 @@ void main() {
       await settings.setActiveWebConversationStyle('one');
       expect(settings.activeWebConversationStyle?.id, 'one');
 
-      final reloaded = SettingsProvider();
+      final reloaded = SettingsProvider(preferences: businessPrefs);
       await reloaded.loaded;
       expect(reloaded.activeWebConversationStyle?.id, 'one');
       expect(reloaded.webConversationStyleLibrary.entries, hasLength(1));
@@ -48,7 +50,7 @@ void main() {
   test(
     'updating active ID preserves activation and deleting it selects default',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.loaded;
       await settings.importWebConversationStyles([makeStyle('one')]);
       await settings.setActiveWebConversationStyle('one');
@@ -73,32 +75,26 @@ void main() {
   test(
     'style library participates in backup and LAN preference round-trip',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.loaded;
       await settings.importWebConversationStyles([makeStyle('synced')]);
       await settings.setActiveWebConversationStyle('synced');
       await settings.setExperimentalWebViewRendering(true);
 
-      final snapshot = await (await backup.SharedPreferencesAsync.instance)
-          .snapshot();
+      final snapshot = await backup.SharedPreferencesAsync(
+        businessPrefs,
+      ).snapshot();
       expect(snapshot, contains(webConversationStyleLibraryPreferenceKey));
       expect(snapshot, isNot(contains('experimental_webview_rendering_v1')));
       final encoded =
           snapshot[webConversationStyleLibraryPreferenceKey] as String;
       expect(WebConversationStyleLibrary.decode(encoded).activeId, 'synced');
 
-      SharedPreferences.setMockInitialValues(const <String, Object>{});
-      await (await backup.SharedPreferencesAsync.instance).restore({
-        webConversationStyleLibraryPreferenceKey: encoded,
-      });
-      final restoredPrefs = await SharedPreferences.getInstance();
-      expect(
-        jsonDecode(
-          restoredPrefs.getString(webConversationStyleLibraryPreferenceKey)!,
-        ),
-        jsonDecode(encoded),
-      );
-      final restored = SettingsProvider();
+      final restoredPrefs = BusinessPreferences.memoryForTests();
+      await backup.SharedPreferencesAsync(
+        restoredPrefs,
+      ).restore({webConversationStyleLibraryPreferenceKey: encoded});
+      final restored = SettingsProvider(preferences: restoredPrefs);
       await restored.loaded;
       expect(restored.activeWebConversationStyle?.id, 'synced');
     },

@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -202,6 +203,8 @@ class HandoffToolService {
         chatService: chatService,
         // ignore: use_build_context_synchronously (root context)
         contextProvider: context,
+        // ignore: use_build_context_synchronously (root context)
+        preferences: context.read<BusinessPreferences>(),
       );
       final allMessages = chatService.getMessages(conversation.id);
       final apiMessages = messageBuilder.buildApiMessages(

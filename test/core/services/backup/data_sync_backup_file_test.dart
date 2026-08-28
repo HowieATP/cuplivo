@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/database/app_database.dart';
 import 'package:Cuplivo/core/database/chat_database_repository.dart';
@@ -21,6 +21,8 @@ import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/backup/kelivo_v2_exception.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/search/search_service.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
@@ -77,9 +79,12 @@ void main() {
     late Directory root;
 
     setUp(() async {
+      businessPrefs = BusinessPreferences.memoryForTests();
       root = await Directory.systemTemp.createTemp('kelivo_data_sync_test_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
-      SharedPreferences.setMockInitialValues({'backup_test_key': 'value'});
+      businessPrefs = BusinessPreferences.memoryForTests({
+        'backup_test_key': 'value',
+      });
     });
 
     tearDown(() async {
@@ -106,8 +111,15 @@ void main() {
         await File('${staleWorkDir.path}/orphan.zip').writeAsString('old');
         await File('${tmpDir.path}/kelivo_backup_old.zip').writeAsString('old');
         await File('${tmpDir.path}/_bk_chats.json').writeAsString('{}');
+        await File('${tmpDir.path}/_bk_chats_meta.json').writeAsString('{}');
+        await File('${tmpDir.path}/_bk_conversations.jsonl').writeAsString('');
+        await File('${tmpDir.path}/_bk_messages.jsonl').writeAsString('');
+        await File('${tmpDir.path}/_bk_settings_meta.json').writeAsString('{}');
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
         );
@@ -118,6 +130,22 @@ void main() {
           isFalse,
         );
         expect(await File('${tmpDir.path}/_bk_chats.json').exists(), isFalse);
+        expect(
+          await File('${tmpDir.path}/_bk_chats_meta.json').exists(),
+          isFalse,
+        );
+        expect(
+          await File('${tmpDir.path}/_bk_conversations.jsonl').exists(),
+          isFalse,
+        );
+        expect(
+          await File('${tmpDir.path}/_bk_messages.jsonl').exists(),
+          isFalse,
+        );
+        expect(
+          await File('${tmpDir.path}/_bk_settings_meta.json').exists(),
+          isFalse,
+        );
 
         final input = InputFileStream(backupFile.path);
         Archive? archive;
@@ -169,7 +197,10 @@ void main() {
       final existingFile = File('${fontsDir.path}/existing.ttf');
       await existingFile.writeAsBytes(List<int>.filled(64, 3));
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       await sync.restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: false, includeFiles: true),
@@ -214,7 +245,10 @@ void main() {
       await existingFile.create(recursive: true);
       await existingFile.writeAsString('---\nname: local-skill\n---\nbody');
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       await sync.restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: false, includeFiles: true),
@@ -268,7 +302,10 @@ void main() {
         );
         await localFile.setLastModified(DateTime(2026, 1, 1));
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: true),
@@ -316,7 +353,10 @@ void main() {
       await localFile.writeAsString('local version');
       await localFile.setLastModified(DateTime(2026, 1, 1));
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       await sync.restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: false, includeFiles: true),
@@ -373,7 +413,10 @@ void main() {
         await skillFile.writeAsBytes(List<int>.filled(50, 5));
         await skillFile.setLastModified(DateTime(2026, 1, 2));
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final result = await sync.countFilesForSince(since);
 
         // upload new.bin (20) + workspaces note.md (30) + skill (50).
@@ -403,7 +446,10 @@ void main() {
         final dotFile = File('${wsDir.path}/.gitignore');
         await dotFile.writeAsString('ignored');
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
         );
@@ -448,7 +494,10 @@ void main() {
           '${uploadDir.path}/a.bin',
         ).writeAsBytes(List<int>.filled(16, 7));
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final stages = <BackupStage>[];
         final zipFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
@@ -482,7 +531,10 @@ void main() {
         await liveFile.writeAsString('backup version');
         await liveFile.setLastModified(DateTime(2026, 1, 2, 0, 0, 57));
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
           incremental: IncrementalBackupConfig(
@@ -542,7 +594,10 @@ void main() {
             .modified
             .millisecondsSinceEpoch;
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
           incremental: IncrementalBackupConfig(
@@ -592,7 +647,10 @@ void main() {
         await target.setLastModified(DateTime(2026, 1, 2, 12, 34, 56, 800));
         final srcMs = target.statSync().modified.millisecondsSinceEpoch;
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
           incremental: IncrementalBackupConfig(
@@ -665,7 +723,10 @@ void main() {
         }
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final fractions = <double>[];
         await sync.restoreFromLocalFile(
           zipFile,
@@ -700,7 +761,10 @@ void main() {
         await skillFile.create(recursive: true);
         await skillFile.writeAsString('---\nname: pdf-processing\n---\nbody');
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -745,7 +809,10 @@ void main() {
         await skillFile.create(recursive: true);
         await skillFile.writeAsString('---\nname: pdf-processing\n---\nbody');
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final scope = await sync.analyzeIncrementalScope(
           IncrementalBackupConfig(since: since, includeFiles: false),
         );
@@ -759,7 +826,7 @@ void main() {
     test(
       'merge restore imports assistant memories and mcp servers without clobbering local entries',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'assistant_memories_v1': jsonEncode([
             {'id': 1, 'assistantId': 'local', 'content': 'keep local'},
             {'id': 2, 'assistantId': 'dup', 'content': 'same memory'},
@@ -819,14 +886,17 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
           mode: RestoreMode.merge,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final memories =
             jsonDecode(prefs.getString('assistant_memories_v1')!) as List;
         expect(memories, hasLength(4));
@@ -887,7 +957,10 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
@@ -930,7 +1003,7 @@ void main() {
       test(
         'existing provider keeps local proxy, backup updates other fields',
         () async {
-          SharedPreferences.setMockInitialValues({
+          businessPrefs = BusinessPreferences.memoryForTests({
             'provider_configs_v1': jsonEncode({
               'MyProvider': providerConfig(
                 'MyProvider',
@@ -950,7 +1023,7 @@ void main() {
             }),
           });
 
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = businessPrefs;
           final configs =
               jsonDecode(prefs.getString('provider_configs_v1')!)
                   as Map<String, dynamic>;
@@ -971,7 +1044,7 @@ void main() {
       );
 
       test('new provider imported from backup keeps its proxy', () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'provider_configs_v1': jsonEncode({
             'Existing': providerConfig(
               'Existing',
@@ -996,7 +1069,7 @@ void main() {
           }),
         });
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final configs =
             jsonDecode(prefs.getString('provider_configs_v1')!)
                 as Map<String, dynamic>;
@@ -1016,7 +1089,7 @@ void main() {
       test(
         'legacy local provider without a proxy block gets no-proxy defaults',
         () async {
-          SharedPreferences.setMockInitialValues({
+          businessPrefs = BusinessPreferences.memoryForTests({
             'provider_configs_v1': jsonEncode({
               'Legacy': {
                 'id': 'Legacy',
@@ -1039,7 +1112,7 @@ void main() {
             }),
           });
 
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = businessPrefs;
           final configs =
               jsonDecode(prefs.getString('provider_configs_v1')!)
                   as Map<String, dynamic>;
@@ -1063,7 +1136,7 @@ void main() {
         () async {
           // A local config imported from a third-party tool may carry only part
           // of the proxy block (e.g. no password fields at all).
-          SharedPreferences.setMockInitialValues({
+          businessPrefs = BusinessPreferences.memoryForTests({
             'provider_configs_v1': jsonEncode({
               'Partial': {
                 'id': 'Partial',
@@ -1090,7 +1163,7 @@ void main() {
             }),
           });
 
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = businessPrefs;
           final configs =
               jsonDecode(prefs.getString('provider_configs_v1')!)
                   as Map<String, dynamic>;
@@ -1109,7 +1182,7 @@ void main() {
       );
 
       test('malformed provider entry does not abort the whole merge', () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'provider_configs_v1': jsonEncode({
             'LocalOnly': providerConfig(
               'LocalOnly',
@@ -1131,7 +1204,7 @@ void main() {
           }),
         });
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final configs =
             jsonDecode(prefs.getString('provider_configs_v1')!)
                 as Map<String, dynamic>;
@@ -1145,7 +1218,7 @@ void main() {
       });
 
       test('local providers absent from the backup survive merge', () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'provider_configs_v1': jsonEncode({
             'LocalOnly': providerConfig(
               'LocalOnly',
@@ -1165,7 +1238,7 @@ void main() {
           }),
         });
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         final configs =
             jsonDecode(prefs.getString('provider_configs_v1')!)
                 as Map<String, dynamic>;
@@ -1205,7 +1278,10 @@ void main() {
         await request.response.close();
       });
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final tmpDir = Directory('${root.path}/tmp');
       final item = BackupFileItem(
         href: Uri.parse('http://127.0.0.1:${server.port}/restore_source.zip'),
@@ -1226,7 +1302,10 @@ void main() {
     test(
       'incremental: since param produces cuplivo_incr_ prefix and includeSettings=false excludes settings.json',
       () async {
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
           incremental: IncrementalBackupConfig(
@@ -1254,7 +1333,10 @@ void main() {
     test(
       'incremental: no since param produces normal filename without cuplivo_incr_',
       () async {
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -1285,7 +1367,10 @@ void main() {
         encoder.addFileSync(settingsTmp, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         // Should not throw: overwrite mode is silently degraded to merge
         await sync.restoreFromLocalFile(
           zipFile,
@@ -1305,7 +1390,10 @@ void main() {
         '${fontsDir.path}/custom.ttf',
       ).writeAsBytes(List<int>.filled(64, 9));
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: true),
         incremental: IncrementalBackupConfig(
@@ -1334,7 +1422,10 @@ void main() {
       await uploadDir.create(recursive: true);
       await File('${uploadDir.path}/doc.txt').writeAsString('hello');
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: true),
         incremental: IncrementalBackupConfig(
@@ -1393,7 +1484,10 @@ void main() {
         );
         await chatService.restoreConversation(conv, [oldMsg, recentMsg]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
           incremental: IncrementalBackupConfig(
@@ -1407,22 +1501,20 @@ void main() {
         Archive? archive;
         try {
           archive = ZipDecoder().decodeStream(input);
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-
-          final data =
-              jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[])))
-                  as Map<String, dynamic>;
-          expect(data['version'], 1);
-          final convs = data['conversations'] as List;
-          final msgs = data['messages'] as List;
-          final toolEvents = data['toolEvents'] as Map;
+          final chatsMeta = archive.findFile('chats_meta.json');
+          expect(chatsMeta, isNotNull);
+          final convs = _readJsonlRecords(
+            archive,
+            'conversations.jsonl',
+            'conversation',
+          );
+          final msgs = _readJsonlRecords(archive, 'messages.jsonl', 'message');
 
           expect(convs, hasLength(1));
           expect(convs[0]['id'], 'test-conv-1');
           expect(msgs, hasLength(1));
           expect(msgs[0]['id'], 'msg-recent');
-          expect(toolEvents, isEmpty);
+          expect(msgs[0]['toolEvents'], isNull);
         } finally {
           archive?.clearSync();
           input.closeSync();
@@ -1459,7 +1551,10 @@ void main() {
         );
         await chatService.restoreConversation(conv, [oldMsg]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
           incremental: IncrementalBackupConfig(
@@ -1473,15 +1568,13 @@ void main() {
         Archive? archive;
         try {
           archive = ZipDecoder().decodeStream(input);
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-
-          final data =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                  as Map<String, dynamic>;
-          expect(data['version'], 1);
-          final convs = data['conversations'] as List;
-          final msgs = data['messages'] as List;
+          expect(archive.findFile('chats_meta.json'), isNotNull);
+          final convs = _readJsonlRecords(
+            archive,
+            'conversations.jsonl',
+            'conversation',
+          );
+          final msgs = _readJsonlRecords(archive, 'messages.jsonl', 'message');
 
           expect(convs, isEmpty);
           expect(msgs, isEmpty);
@@ -1536,7 +1629,10 @@ void main() {
         );
         await chatService.restoreConversation(conv, [v0, v1]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
           incremental: IncrementalBackupConfig(
@@ -1550,14 +1646,13 @@ void main() {
         Archive? archive;
         try {
           archive = ZipDecoder().decodeStream(input);
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-
-          final data =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                  as Map<String, dynamic>;
-          final convs = data['conversations'] as List;
-          final msgs = data['messages'] as List;
+          expect(archive.findFile('chats_meta.json'), isNotNull);
+          final convs = _readJsonlRecords(
+            archive,
+            'conversations.jsonl',
+            'conversation',
+          );
+          final msgs = _readJsonlRecords(archive, 'messages.jsonl', 'message');
 
           expect(convs, hasLength(1));
           expect(convs[0]['id'], 'test-conv-3');
@@ -1615,7 +1710,10 @@ void main() {
         );
         await chatService.restoreConversation(conv, [v0, v1]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
           incremental: IncrementalBackupConfig(
@@ -1629,14 +1727,13 @@ void main() {
         Archive? archive;
         try {
           archive = ZipDecoder().decodeStream(input);
-          final chatsEntry = archive.findFile('chats.json');
-          expect(chatsEntry, isNotNull);
-
-          final data =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
-                  as Map<String, dynamic>;
-          final convs = data['conversations'] as List;
-          final msgs = data['messages'] as List;
+          expect(archive.findFile('chats_meta.json'), isNotNull);
+          final convs = _readJsonlRecords(
+            archive,
+            'conversations.jsonl',
+            'conversation',
+          );
+          final msgs = _readJsonlRecords(archive, 'messages.jsonl', 'message');
 
           expect(convs, hasLength(1));
           expect(msgs, hasLength(2));
@@ -1734,7 +1831,10 @@ void main() {
           ),
         ]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final scope = await sync.analyzeIncrementalScope(
           IncrementalBackupConfig(since: since, includeFiles: false),
         );
@@ -1794,7 +1894,10 @@ void main() {
           ),
         ]);
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         final scope = await sync.analyzeIncrementalScope(
           IncrementalBackupConfig(since: since, includeFiles: false),
         );
@@ -1816,7 +1919,7 @@ void main() {
     setUp(() async {
       root = await Directory.systemTemp.createTemp('kelivo_ocr_restore_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
     });
 
     tearDown(() async {
@@ -1850,7 +1953,10 @@ void main() {
           'ocr_enabled_v1': false,
         });
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
@@ -1861,7 +1967,7 @@ void main() {
         expect(assistants, hasLength(2));
         expect(assistants.every((a) => a.ocrMode == 'never'), isTrue);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.containsKey('ocr_enabled_v1'), isFalse);
       },
     );
@@ -1878,7 +1984,10 @@ void main() {
           'ocr_enabled_v1': true,
         });
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
@@ -1905,7 +2014,10 @@ void main() {
         'ocr_enabled_v1': false,
       });
 
-      final sync = DataSync(chatService: chatService);
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: chatService,
+      );
       await sync.restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: false, includeFiles: false),
@@ -1931,7 +2043,10 @@ void main() {
           ]),
         });
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
@@ -2010,7 +2125,10 @@ void main() {
         encoder.addFileSync(fontEntry, 'fonts/font.ttf');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: true),
@@ -2044,7 +2162,10 @@ void main() {
         encoder.addFileSync(manifestFile, 'manifest.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: chatService,
+        );
         await expectLater(
           sync.restoreFromLocalFile(
             zipFile,
@@ -2055,7 +2176,7 @@ void main() {
         );
 
         // No side effects: prefs untouched, DB untouched.
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.containsKey('assistants_v1'), isFalse);
         expect(await chatService.getAllAssistants(), isEmpty);
         expect(chatService.getAllCompleteConversations(), isEmpty);
@@ -2069,7 +2190,7 @@ void main() {
     setUp(() async {
       root = await Directory.systemTemp.createTemp('kelivo_imgset_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
-      SharedPreferences.setMockInitialValues({});
+      businessPrefs = BusinessPreferences.memoryForTests({});
     });
 
     tearDown(() async {
@@ -2092,7 +2213,10 @@ void main() {
     test(
       'Kelivo zip overwrite translates upstream keys and strips them from prefs',
       () async {
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await makeSettingsZip({
           'image_upload_quality_v1': 'saver',
           'image_compress_transparent_enabled_v1': true,
@@ -2104,7 +2228,7 @@ void main() {
           mode: RestoreMode.overwrite,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getBool('one_click_compress_enabled_v1'), isTrue);
         expect(prefs.getInt('one_click_compress_max_long_edge_v1'), 1024);
         expect(prefs.getInt('one_click_compress_quality_v1'), 70);
@@ -2121,7 +2245,10 @@ void main() {
     test(
       'Kelivo zip overwrite with unknown enum falls back to balanced',
       () async {
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await makeSettingsZip({
           'image_upload_quality_v1': 'future-quality-mode',
         });
@@ -2132,7 +2259,7 @@ void main() {
           mode: RestoreMode.overwrite,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getBool('one_click_compress_enabled_v1'), isTrue);
         expect(prefs.getInt('one_click_compress_max_long_edge_v1'), 1568);
         expect(prefs.getInt('one_click_compress_quality_v1'), 85);
@@ -2140,13 +2267,16 @@ void main() {
     );
 
     test('Kelivo zip merge keeps existing local one_click_* values', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'one_click_compress_enabled_v1': true,
         'one_click_compress_max_long_edge_v1': 2048,
         'one_click_compress_quality_v1': 90,
         'one_click_compress_always_jpg_v1': false,
       });
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final zipFile = await makeSettingsZip({
         'image_upload_quality_v1': 'saver',
       });
@@ -2157,7 +2287,7 @@ void main() {
         mode: RestoreMode.merge,
       );
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getBool('one_click_compress_enabled_v1'), isTrue);
       expect(prefs.getInt('one_click_compress_max_long_edge_v1'), 2048);
       expect(prefs.getInt('one_click_compress_quality_v1'), 90);
@@ -2170,7 +2300,10 @@ void main() {
         // A Cuplivo export carries BOTH key sets. The import must NOT
         // re-translate it: the file's own maxLongEdge (2048) wins over the
         // upstream-pinned 1568.
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final zipFile = await makeSettingsZip({
           'image_upload_quality_v1': 'custom',
           'image_compress_custom_quality_v1': 90,
@@ -2186,7 +2319,7 @@ void main() {
           mode: RestoreMode.overwrite,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getInt('one_click_compress_max_long_edge_v1'), 2048);
         expect(prefs.getInt('one_click_compress_quality_v1'), 90);
         expect(prefs.containsKey('image_upload_quality_v1'), isFalse);
@@ -2196,13 +2329,16 @@ void main() {
     test(
       'export derives upstream keys from current one_click_* values',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'one_click_compress_enabled_v1': true,
           'one_click_compress_max_long_edge_v1': 1536,
           'one_click_compress_quality_v1': 75,
           'one_click_compress_always_jpg_v1': false,
         });
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -2229,11 +2365,14 @@ void main() {
     );
 
     test('export of a disabled config emits original', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'one_click_compress_enabled_v1': false,
         'one_click_compress_quality_v1': 95,
       });
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         WebDavConfig(includeChats: false, includeFiles: false),
       );
@@ -2259,7 +2398,7 @@ void main() {
     test(
       'export converts search_services_v1 apiKeys to Kelivo string list',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'search_services_v1': jsonEncode([
             {
               'type': 'tavily',
@@ -2283,7 +2422,10 @@ void main() {
             },
           ]),
         });
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -2317,7 +2459,7 @@ void main() {
     );
 
     test('round-trip restores full keyConfigs for search services', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'search_services_v1': jsonEncode([
           {
             'type': 'tavily',
@@ -2341,7 +2483,10 @@ void main() {
           },
         ]),
       });
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         WebDavConfig(includeChats: false, includeFiles: false),
       );
@@ -2375,7 +2520,7 @@ void main() {
     test(
       'export splits apiKeys to Kelivo string list for all new providers',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'search_services_v1': jsonEncode([
             {
               'type': 'doubao',
@@ -2417,7 +2562,10 @@ void main() {
             },
           ]),
         });
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          preferences: businessPrefs,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           WebDavConfig(includeChats: false, includeFiles: false),
         );
@@ -2464,7 +2612,7 @@ void main() {
     );
 
     test('round-trip restores all new provider types from backup', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'search_services_v1': jsonEncode([
           {
             'type': 'doubao',
@@ -2496,7 +2644,10 @@ void main() {
           },
         ]),
       });
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        preferences: businessPrefs,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         WebDavConfig(includeChats: false, includeFiles: false),
       );
@@ -2539,4 +2690,27 @@ void main() {
       await DataSync.cleanupTemporaryBackupFile(backupFile);
     });
   });
+}
+
+/// Reads {table}'s JSONL records (v2 backup format) from [archive],
+/// returning the wrapped-object payloads (the `{key}` field of each line).
+List<Map<String, dynamic>> _readJsonlRecords(
+  Archive archive,
+  String table,
+  String key,
+) {
+  final entry = archive.findFile(table);
+  expect(entry, isNotNull);
+  final lines = utf8.decode(entry!.readBytes() ?? <int>[]).split('\n');
+  final records = <Map<String, dynamic>>[];
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+    final obj = jsonDecode(trimmed) as Map<String, dynamic>;
+    final payload = obj[key] as Map?;
+    if (payload != null) {
+      records.add(payload.cast<String, dynamic>());
+    }
+  }
+  return records;
 }

@@ -1,3 +1,4 @@
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
@@ -96,6 +97,7 @@ class _GroupChatPageState extends State<GroupChatPage> {
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
       contextProvider: context,
+      preferences: context.read<BusinessPreferences>(),
     );
     _generationController = GenerationController(
       chatService: _chatService,

@@ -8,6 +8,9 @@ import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 import 'package:Cuplivo/core/services/workspace/workspace_execution_context.dart';
 import 'package:Cuplivo/features/home/services/message_builder_service.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakeBuildContext implements BuildContext {
   @override
@@ -57,6 +60,7 @@ void main() {
   group('MessageBuilderService.parseInputFromRaw', () {
     test('adds video and audio paths to imagePaths by default', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
       );
@@ -77,6 +81,7 @@ void main() {
 
     test('excludes video and audio from imagePaths when flag is false', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
       );
@@ -101,6 +106,7 @@ void main() {
       'office documents never leak into imagePaths (bugfix: docx sent as png)',
       () {
         final service = MessageBuilderService(
+          preferences: businessPrefs,
           chatService: _FakeChatService(const {}),
           contextProvider: _FakeBuildContext(),
         );
@@ -126,6 +132,7 @@ void main() {
 
     test('mixed: images in imagePaths, office docs in documents only', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
       );
@@ -148,6 +155,7 @@ void main() {
 
     test('mixed with video: video in imagePaths, office docs excluded', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
       );
@@ -171,6 +179,7 @@ void main() {
   group('MessageBuilderService.buildApiMessages', () {
     test('有工具调用时会把 reasoning_content 回填到 assistant tool 消息', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -215,6 +224,7 @@ void main() {
 
     test('reasoningText 为空时不会伪造 reasoning_content', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -258,6 +268,7 @@ void main() {
 
     test('reasoning_details 只挂在最终 assistant 消息，不重复到 tool call 消息', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -313,6 +324,7 @@ void main() {
 
     test('恢复工具回答续写时只发送 tool call 和 tool result', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -374,6 +386,7 @@ void main() {
         reasoningText: '先调用时间工具，再整理成中文时间。',
       );
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService(
           {
             'a1': [
@@ -418,6 +431,7 @@ void main() {
 
     test('关闭 OpenAI 工具消息重建时不额外注入 assistant tool 消息', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -454,6 +468,7 @@ void main() {
 
     test('工具历史会保留 provider 元数据供 Claude 和 Gemini 重放', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -526,6 +541,7 @@ void main() {
 
     test('未完成的工具占位事件不会被重建为 API tool call', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({
           'a1': [
             {
@@ -579,6 +595,7 @@ void main() {
 
     test('上下文裁剪不会保留缺少 tool result 的 assistant tool call', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
       );
@@ -631,6 +648,7 @@ void main() {
 
     test('上下文裁剪会保留完整的 assistant tool call 与 tool result', () {
       final service = MessageBuilderService(
+        preferences: businessPrefs,
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
       );
@@ -687,6 +705,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
+        preferences: businessPrefs,
       );
       final apiMessages = service.buildApiMessages(
         messages: [
@@ -711,6 +730,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
+        preferences: businessPrefs,
       );
       // "**bold** text" → plain "bold text"; range (0..13) selects the whole
       // markdown fragment including markers.
@@ -736,6 +756,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
+        preferences: businessPrefs,
       );
       final apiMessages = service.buildApiMessages(
         messages: [
@@ -758,6 +779,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
+        preferences: businessPrefs,
       );
       final apiMessages = service.buildApiMessages(
         messages: [
@@ -790,6 +812,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
+        preferences: businessPrefs,
       );
       final apiMessages = <Map<String, dynamic>>[
         {'role': 'system', 'content': 'assistant instructions'},

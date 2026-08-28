@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
@@ -16,7 +16,10 @@ import 'package:Cuplivo/core/services/tts/tts_playback_models.dart';
 import 'package:Cuplivo/features/assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/shared/widgets/ios_switch.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 const _assistantId = 'assistant-time-test';
 
@@ -50,10 +53,13 @@ void _seedPreferences({String systemPrompt = ''}) {
       ),
     ]),
   });
+  businessPrefs = BusinessPreferences.memoryForTests();
 }
 
-Future<AssistantProvider> _createAssistantProvider() async {
-  final provider = AssistantProvider();
+Future<AssistantProvider> _createAssistantProvider({
+  required BusinessPreferences preferences,
+}) async {
+  final provider = AssistantProvider(preferences: preferences);
   await provider.loadFromPrefs();
   return provider;
 }
@@ -64,13 +70,22 @@ Widget _buildHarness({
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
-      ChangeNotifierProvider(create: (_) => UserProvider()),
+      Provider<BusinessPreferences>.value(value: businessPrefs),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(preferences: businessPrefs),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => UserProvider(preferences: businessPrefs),
+      ),
       ChangeNotifierProvider<TtsProvider>(create: (_) => _FakeTtsProvider()),
       Provider<ChatService>(create: (_) => _StubChatService()),
       ChangeNotifierProvider.value(value: assistantProvider),
-      ChangeNotifierProvider(create: (_) => MemoryProvider()),
-      ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+      ChangeNotifierProvider(
+        create: (_) => MemoryProvider(preferences: businessPrefs),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => QuickPhraseProvider(preferences: businessPrefs),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -87,7 +102,9 @@ Future<void> _openPromptsTab(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     _buildHarness(
-      assistantProvider: await _createAssistantProvider(),
+      assistantProvider: await _createAssistantProvider(
+        preferences: businessPrefs,
+      ),
       child: const AssistantSettingsEditPage(assistantId: _assistantId),
     ),
   );

@@ -1,14 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import '../database/business_preferences.dart';
 import '../models/quick_phrase.dart';
 import '../services/quick_phrase_store.dart';
 import '../services/chat/chat_service.dart';
 import '../services/deleted_records_store.dart';
 
 class QuickPhraseProvider with ChangeNotifier {
-  QuickPhraseProvider({this.chatService});
+  QuickPhraseProvider({
+    required BusinessPreferences preferences,
+    this.chatService,
+  }) : _store = QuickPhraseStore.shared(preferences);
 
+  final QuickPhraseStore _store;
   final ChatService? chatService;
 
   List<QuickPhrase> _phrases = [];
@@ -31,7 +36,7 @@ class QuickPhraseProvider with ChangeNotifier {
 
   Future<void> loadAll() async {
     try {
-      _phrases = await QuickPhraseStore.getAll();
+      _phrases = await _store.getAll();
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load quick phrases: $e');
@@ -41,12 +46,12 @@ class QuickPhraseProvider with ChangeNotifier {
   }
 
   Future<void> add(QuickPhrase phrase) async {
-    await QuickPhraseStore.add(phrase);
+    await _store.add(phrase);
     await loadAll();
   }
 
   Future<void> update(QuickPhrase phrase) async {
-    await QuickPhraseStore.update(phrase);
+    await _store.update(phrase);
     await loadAll();
   }
 
@@ -69,12 +74,12 @@ class QuickPhraseProvider with ChangeNotifier {
         }
       }
     }
-    await QuickPhraseStore.delete(id);
+    await _store.delete(id);
     await loadAll();
   }
 
   Future<void> clear() async {
-    await QuickPhraseStore.clear();
+    await _store.clear();
     _phrases = [];
     notifyListeners();
   }
@@ -136,7 +141,7 @@ class QuickPhraseProvider with ChangeNotifier {
       assistantId: assistantId,
     );
     notifyListeners();
-    await QuickPhraseStore.save(_phrases);
+    await _store.save(_phrases);
   }
 
   // Backward/alternate API name for clarity
@@ -152,6 +157,6 @@ class QuickPhraseProvider with ChangeNotifier {
       assistantId: assistantId,
     );
     notifyListeners();
-    await QuickPhraseStore.save(_phrases);
+    await _store.save(_phrases);
   }
 }

@@ -290,10 +290,12 @@ dart analyze --fatal-infos lib test
 
 ### 3.14 Database & Storage
 
-- Primary database: **Drift (SQLite)**, defined in `lib/core/database/app_database.dart`, with 7 tables, version 7, and a migration strategy.
+- Primary database: **Drift (SQLite)**, defined in `lib/core/database/app_database.dart` (schema v21 including the `preference_rows` KV table), with a migration strategy + self-heal.
 - Code generation command: `dart run build_runner build --delete-conflicting-outputs`.
 - Access data through `ChatDatabaseRepository`; do not operate on the database connection directly.
-- Lightweight settings use `shared_preferences`.
+- **Business preferences** (settings, providers, MCP, worldbooks, memories, tags, TTS/ASR/search services, injection prompts, etc.) live in SQLite KV (`preference_rows`) accessed ONLY through the `BusinessPreferences` facade (`lib/core/database/business_preferences.dart`, static instance installed by the startup gate) — never `shared_preferences`.
+- **Device-local state** (window geometry, hotkeys, OAuth tokens, chat input draft, `workspaces_dir_v1`, `flutter_log_enabled_v1`) stays in `shared_preferences` forever (`BusinessKeyRegistry.localOnlyKeys`).
+- ⚠️ **Upstream port / rebase discipline**: keys that arrive via upstream or rebase-merged PRs (e.g. `chat_fork_keep_message_versions_v1`, `keep_screen_on_during_generation_v1`) must be re-homed to SQLite in the same change. A new key whose read side lands on the `BusinessPreferences` facade while its write side stays raw `SharedPreferences` silently breaks persistence. There is no analyzer lint for this — enforce with an `rg "SharedPreferences" lib/core/providers` checkpoint; anything outside `BusinessKeyRegistry.localOnly` / entity / discarded must classify as business when migrated or ported.
 - ⚠️ **Assistant storage constraint** (legacy, critically important):
   - Cuplivo has used SQLite from the start and has never used Hive.
   - Assistant data has been **migrated from SharedPreferences to SQLite**, but residual code may still write back to SharedPreferences.

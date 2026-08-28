@@ -9,12 +9,14 @@ import 'package:Cuplivo/core/services/search/search_tool_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   setUp(() {
+    businessPrefs = BusinessPreferences.memoryForTests();
     WebFetchTargetGuard.blockPrivateTargets = false;
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   tearDown(() {
@@ -48,7 +50,7 @@ void main() {
   test(
     'fetch availability follows provider capability and fallback setting',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await pumpEventQueue();
 
       await settings.setSearchServices([TavilyOptions(id: 'native')]);
@@ -83,7 +85,7 @@ void main() {
   test(
     'rejects malformed URL and paging arguments before any request',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       var requests = 0;
       final client = MockClient((_) async {
         requests++;
@@ -117,7 +119,7 @@ void main() {
   test(
     'rotates native provider keys and returns a standardized window',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.setSearchServices([
         TavilyOptions(
           id: 'fetch-rotation-test',
@@ -178,7 +180,7 @@ void main() {
   );
 
   test('native provider exhausts keys without using built-in fetch', () async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setSearchServices([
       TavilyOptions(
         id: 'fetch-all-fail-test',
@@ -209,7 +211,7 @@ void main() {
   test(
     'native provider rejects built-in-only parameters without a request',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.setSearchServices([
         TavilyOptions(
           id: 'fetch-unsupported-parameters',
@@ -239,7 +241,7 @@ void main() {
   );
 
   test('disabled built-in fallback fails before making a request', () async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setSearchServices([BingLocalOptions(id: 'bing-disabled')]);
     await settings.setSearchCommonOptions(
       settings.searchCommonOptions.copyWith(
@@ -261,7 +263,7 @@ void main() {
 
   test('native provider with all keys disabled calls directly instead of '
       'failing rotation', () async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     final disabled = ApiKeyConfig.create('key-a').copyWith(isEnabled: false);
     await settings.setSearchServices([
       TavilyOptions(id: 'all-disabled', apiKeys: [disabled]),
@@ -310,7 +312,7 @@ void main() {
         await subscription.cancel();
         await server.close(force: true);
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await settings.setSearchServices([BingLocalOptions(id: 'bing')]);
       final url = 'http://${server.address.host}:${server.port}/page';
 
@@ -340,7 +342,7 @@ void main() {
       await subscription.cancel();
       await server.close(force: true);
     });
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(preferences: businessPrefs);
     await settings.setSearchServices([BingLocalOptions(id: 'bing')]);
     final url = 'http://${server.address.host}:${server.port}/binary';
 

@@ -18,8 +18,10 @@ import 'package:Cuplivo/core/services/asr/system_asr_service.dart';
 import 'package:Cuplivo/features/home/services/input_draft_persistence.dart';
 import 'package:Cuplivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   Widget harness({
     required SettingsProvider settings,
     required AsrProvider asr,
@@ -27,8 +29,11 @@ void main() {
   }) {
     return MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider.value(value: settings),
-        ChangeNotifierProvider.value(value: AssistantProvider()),
+        ChangeNotifierProvider.value(
+          value: AssistantProvider(preferences: businessPrefs),
+        ),
         ChangeNotifierProvider.value(value: InputStatusProvider()),
         Provider<InputDraftPersistence>(
           create: (_) => InputDraftPersistence(null),

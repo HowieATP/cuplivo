@@ -16,11 +16,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    businessPrefs = BusinessPreferences.memoryForTests({});
   });
 
   testWidgets('macOS 消息列表滚动不主动清除文本选区焦点', (tester) async {
@@ -245,9 +247,16 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          Provider<BusinessPreferences>.value(value: businessPrefs),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -318,9 +327,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -397,9 +412,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -486,9 +507,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -579,9 +606,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -661,9 +694,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -723,9 +762,15 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(preferences: businessPrefs),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: businessPrefs),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],

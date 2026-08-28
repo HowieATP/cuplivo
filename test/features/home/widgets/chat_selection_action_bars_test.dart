@@ -9,13 +9,15 @@ import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/shared/widgets/ios_tactile.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 Future<void> _pumpBar(WidgetTester tester, Widget child) async {
-  SharedPreferences.setMockInitialValues({});
+  businessPrefs = BusinessPreferences.memoryForTests({});
   await tester.pumpWidget(
     ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => SettingsProvider(preferences: businessPrefs),
       child: MaterialApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,

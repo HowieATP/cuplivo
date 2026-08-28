@@ -5,10 +5,13 @@ import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/providers/workspace_provider.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this.root);
@@ -228,7 +231,7 @@ void main() {
         alias: 'workspace',
         customHostPath: root.path,
       );
-      final workspaces = WorkspaceProvider();
+      final workspaces = WorkspaceProvider(preferences: businessPrefs);
       await workspaces.init();
       final instructions = await loadWorkspaceAgentsMdInstructions(
         context: WorkspaceExecutionContext(
@@ -269,7 +272,7 @@ void main() {
         workspace: workspace,
         workingDirectory: '/workspace/project',
       );
-      final workspaces = WorkspaceProvider();
+      final workspaces = WorkspaceProvider(preferences: businessPrefs);
       await workspaces.init();
 
       expect(
@@ -311,7 +314,7 @@ void main() {
       final outsideAgents = File('${outside.path}/AGENTS.md');
       await outsideAgents.writeAsString('outside');
       await Link('${root.path}/project/AGENTS.md').create(outsideAgents.path);
-      final workspaces = WorkspaceProvider();
+      final workspaces = WorkspaceProvider(preferences: businessPrefs);
       await workspaces.init();
 
       await expectLater(
@@ -346,7 +349,7 @@ void main() {
       alias: 'workspace',
       customHostPath: root.path,
     );
-    final workspaces = WorkspaceProvider();
+    final workspaces = WorkspaceProvider(preferences: businessPrefs);
     await workspaces.init();
 
     await expectLater(

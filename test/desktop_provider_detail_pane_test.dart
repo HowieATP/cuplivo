@@ -8,7 +8,9 @@ import 'package:Cuplivo/shared/widgets/ios_checkbox.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
+
+var businessPrefs = BusinessPreferences.memoryForTests();
 
 Future<void> _waitForSettingsLoad() async {
   for (var i = 0; i < 25; i++) {
@@ -42,9 +44,10 @@ Widget _harness(
 }) {
   return MultiProvider(
     providers: [
+      Provider<BusinessPreferences>.value(value: businessPrefs),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<AssistantProvider>(
-        create: (_) => AssistantProvider(),
+        create: (_) => AssistantProvider(preferences: businessPrefs),
       ),
       if (controller != null)
         ChangeNotifierProvider<CodexDeviceCodeController>.value(
@@ -62,8 +65,8 @@ Widget _harness(
 }
 
 Future<SettingsProvider> _buildSettings(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues(const {});
-  final settings = SettingsProvider();
+  businessPrefs = BusinessPreferences.memoryForTests(const {});
+  final settings = SettingsProvider(preferences: businessPrefs);
   await tester.runAsync(_waitForSettingsLoad);
   await settings.setProviderConfig('ProviderA', _providerConfig('ProviderA'));
   await settings.setProviderConfig('ProviderB', _providerConfig('ProviderB'));
@@ -204,8 +207,8 @@ void main() {
       required String key,
       required ProviderConfig cfg,
     }) async {
-      SharedPreferences.setMockInitialValues(const {});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests(const {});
+      final settings = SettingsProvider(preferences: businessPrefs);
       await tester.runAsync(_waitForSettingsLoad);
       await settings.setProviderConfig(key, cfg);
       await settings.setProvidersOrder([key]);

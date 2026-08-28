@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/backup_provider.dart';
 import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
@@ -14,6 +15,8 @@ import 'package:Cuplivo/desktop/setting/backup_pane.dart';
 import 'package:Cuplivo/features/backup/pages/backup_page.dart';
 import 'package:Cuplivo/l10n/app_localizations.dart';
 
+var businessPrefs = BusinessPreferences.memoryForTests();
+
 const _urlLauncherChannel = MethodChannel('plugins.flutter.io/url_launcher');
 const _migrateUrl = 'https://kelivo-helper.netlify.app/#/migrate';
 
@@ -22,13 +25,20 @@ Future<void> _pumpBackupPage(
   required SettingsProvider settings,
 }) async {
   final chatService = ChatService();
-  final coordinator = TrashRestoreCoordinator(chatService: chatService);
-  final reminder = BackupReminderProvider(autoLoad: false);
+  final coordinator = TrashRestoreCoordinator(
+    preferences: businessPrefs,
+    chatService: chatService,
+  );
+  final reminder = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await reminder.load(startTimer: false);
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -48,22 +58,31 @@ Future<void> _pumpDesktopBackupPane(
   required SettingsProvider settings,
 }) async {
   final chatService = ChatService();
-  final reminder = BackupReminderProvider(autoLoad: false);
+  final reminder = BackupReminderProvider(
+    preferences: businessPrefs,
+    autoLoad: false,
+  );
   await reminder.load(startTimer: false);
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
+        Provider<BusinessPreferences>.value(value: businessPrefs),
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         Provider(
-          create: (_) => TrashRestoreCoordinator(chatService: chatService),
+          create: (_) => TrashRestoreCoordinator(
+            preferences: businessPrefs,
+            chatService: chatService,
+          ),
         ),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
         ChangeNotifierProvider<BackupProvider>(
           create: (_) => BackupProvider(
+            preferences: businessPrefs,
             chatService: chatService,
             trashRestoreCoordinator: TrashRestoreCoordinator(
+              preferences: businessPrefs,
               chatService: chatService,
             ),
             initialConfig: settings.webDavConfig,
@@ -71,8 +90,10 @@ Future<void> _pumpDesktopBackupPane(
         ),
         ChangeNotifierProvider<S3BackupProvider>(
           create: (_) => S3BackupProvider(
+            preferences: businessPrefs,
             chatService: chatService,
             trashRestoreCoordinator: TrashRestoreCoordinator(
+              preferences: businessPrefs,
               chatService: chatService,
             ),
             initialConfig: settings.s3Config,
@@ -118,7 +139,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SharedPreferences.setMockInitialValues(const {});
+    businessPrefs = BusinessPreferences.memoryForTests();
+    SharedPreferences.setMockInitialValues({});
+    businessPrefs = BusinessPreferences.memoryForTests(const {});
   });
 
   tearDown(() {
@@ -135,7 +158,7 @@ void main() {
         await tester.binding.setSurfaceSize(const Size(900, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
 
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
         await _pumpBackupPage(tester, settings: settings);
 
         expect(find.text('Import from RikkaHub'), findsOneWidget);
@@ -154,7 +177,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _pumpBackupPage(tester, settings: settings);
 
       await tester.tap(find.text('Import from RikkaHub'));
@@ -182,7 +205,7 @@ void main() {
         },
       );
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _pumpBackupPage(tester, settings: settings);
 
       await tester.tap(find.text('Import from RikkaHub'));
@@ -197,7 +220,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(900, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _pumpBackupPage(tester, settings: settings);
 
       await tester.tap(find.text('Import from RikkaHub'));
@@ -216,7 +239,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1100, 1300));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
       await _pumpDesktopBackupPane(tester, settings: settings);
 
       final button = find.text('Import from RikkaHub');

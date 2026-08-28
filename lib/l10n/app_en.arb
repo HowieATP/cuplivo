@@ -844,6 +844,7 @@
   "backupStagePacking": "Packing backup...",
   "backupStageUploading": "Uploading...",
   "backupPageExportToFile": "Export to File",
+  "backupPageExportKelivoCompatible": "Export for Kelivo",
   "backupPageExportToFileSubtitle": "Export app data to a file",
   "backupPageImportBackupFile": "Import Backup File",
   "backupPageImportBackupFileSubtitle": "Import a local backup file",

@@ -8,14 +8,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import '../../utils/utf16_safe_cut.dart';
 import '../services/network/logging_http_client.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
-import '../services/backup/double_pref_keys.dart' show prefDouble;
+import '../services/backup/double_pref_keys.dart' show businessPrefDouble;
 import '../services/ios_keep_alive.dart';
 
 String ttsAudioFileExtensionForMime(String? mime) {
@@ -44,6 +44,7 @@ String ttsAudioFileExtensionForMime(String? mime) {
 /// while the current chunk is playing; system TTS chunks are sequenced through
 /// flutter_tts with progress callbacks.
 class TtsProvider extends ChangeNotifier {
+  final BusinessPreferences _preferences;
   static const String _rateKey = 'tts_speech_rate_v1';
   static const String _pitchKey = 'tts_pitch_v1';
   static const String _engineKey = 'tts_engine_v1';
@@ -110,16 +111,24 @@ class TtsProvider extends ChangeNotifier {
   TtsPlaybackState get playbackState => _playbackState;
   Duration get seekStep => _seekStep;
 
-  TtsProvider() {
+  TtsProvider({required this._preferences}) {
     _init();
   }
 
   Future<void> _init() async {
     try {
       _tts = FlutterTts();
-      final prefs = await SharedPreferences.getInstance();
-      _speechRate = prefDouble(prefs, _rateKey, 0.5).clamp(0.1, 1.0).toDouble();
-      _pitch = prefDouble(prefs, _pitchKey, 1.0).clamp(0.5, 2.0).toDouble();
+      final prefs = _preferences;
+      _speechRate = businessPrefDouble(
+        prefs,
+        _rateKey,
+        0.5,
+      ).clamp(0.1, 1.0).toDouble();
+      _pitch = businessPrefDouble(
+        prefs,
+        _pitchKey,
+        1.0,
+      ).clamp(0.5, 2.0).toDouble();
       _cacheNetworkAudioForReplay =
           prefs.getBool(_cacheNetworkAudioForReplayKey) ?? false;
       _engineId = prefs.getString(_engineKey);
@@ -340,7 +349,7 @@ class TtsProvider extends ChangeNotifier {
       await _tts.setSpeechRate(_speechRate);
     } catch (_) {}
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(_rateKey, _speechRate);
   }
 
@@ -352,7 +361,7 @@ class TtsProvider extends ChangeNotifier {
       await _tts.setPitch(_pitch);
     } catch (_) {}
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setDouble(_pitchKey, _pitch);
   }
 
@@ -360,7 +369,7 @@ class TtsProvider extends ChangeNotifier {
     if (_cacheNetworkAudioForReplay == value) return;
     _cacheNetworkAudioForReplay = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setBool(_cacheNetworkAudioForReplayKey, value);
   }
 
@@ -382,7 +391,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setEngineId(String id) async {
     _engineId = id;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_engineKey, id);
     try {
       await _tts.setEngine(id);
@@ -393,7 +402,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setLanguageTag(String tag) async {
     _languageTag = tag;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _preferences;
     await prefs.setString(_langKey, tag);
     try {
       await _tts.setLanguage(tag);
@@ -1158,7 +1167,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<TtsServiceOptions?> _getSelectedNetworkService() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _preferences;
       final selectedId = prefs.getString('tts_selected_service_id_v1');
       if (selectedId != null && selectedId.isNotEmpty) {
         final jsonStr = prefs.getString('tts_services_v1') ?? '';

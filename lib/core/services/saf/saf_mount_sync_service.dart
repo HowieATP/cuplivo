@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/workspace.dart';
@@ -190,10 +190,15 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   SafChannel channel;
 
-  SafMountSyncService({required this.workspaces, SafChannel? channel})
-    : channel = channel ?? SafChannel() {
+  SafMountSyncService({
+    required this.workspaces,
+    required this.preferences,
+    SafChannel? channel,
+  }) : channel = channel ?? SafChannel() {
     unawaited(init());
   }
+
+  final BusinessPreferences preferences;
 
   bool get loaded => _loaded;
 
@@ -284,15 +289,14 @@ class SafMountSyncService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _clearLegacyGlobalMountsIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!prefs.containsKey(legacyPrefsKey)) return;
+    if (!preferences.containsKey(legacyPrefsKey)) return;
     try {
       final root = Directory(_mirrorsRoot);
       if (await root.exists()) await root.delete(recursive: true);
     } catch (e) {
       debugPrint('SafMountSyncService: legacy mirror cleanup failed: $e');
     }
-    await prefs.remove(legacyPrefsKey);
+    await preferences.remove(legacyPrefsKey);
   }
 
   Future<void> reloadAfterRestore() async {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 
@@ -10,12 +10,13 @@ Future<void> _waitForSettingsLoad() async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider regeneration preferences', () {
     test('defaults preserve current regeneration behavior', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -24,11 +25,11 @@ void main() {
     });
 
     test('loads persisted regeneration behavior values', () async {
-      SharedPreferences.setMockInitialValues({
+      businessPrefs = BusinessPreferences.memoryForTests({
         'display_regenerate_delete_trailing_messages_v1': true,
         'display_show_regenerate_confirm_dialog_v1': false,
       });
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
 
@@ -37,8 +38,8 @@ void main() {
     });
 
     test('persists regeneration behavior changes', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad();
       await settings.setRegenerateDeleteTrailingMessages(true);
@@ -47,7 +48,7 @@ void main() {
       expect(settings.regenerateDeleteTrailingMessages, isTrue);
       expect(settings.showRegenerateConfirmDialog, isFalse);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(
         prefs.getBool('display_regenerate_delete_trailing_messages_v1'),
         isTrue,

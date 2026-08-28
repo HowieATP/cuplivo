@@ -19,6 +19,7 @@ import '../../../core/services/chat/chat_context_transforms.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/workspace/workspace_execution_context.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/services/world_book_prompt_injector.dart';
@@ -53,9 +54,13 @@ class MessageBuilderService {
   MessageBuilderService({
     required this.chatService,
     required this.contextProvider,
+    required BusinessPreferences preferences,
     this.ocrHandler,
     this.geminiThoughtSignatureHandler,
-  });
+  }) : _worldBookStore = WorldBookStore.shared(preferences),
+       _instructionInjectionStore = InstructionInjectionStore.shared(
+         preferences,
+       );
 
   final ChatService chatService;
 
@@ -71,6 +76,9 @@ class MessageBuilderService {
   /// Handler to append Gemini thought signatures for API calls
   final String Function(ChatMessage message, String content)?
   geminiThoughtSignatureHandler;
+
+  final WorldBookStore _worldBookStore;
+  final InstructionInjectionStore _instructionInjectionStore;
 
   /// Cache for document text extraction to avoid re-reading files on every message
   /// Keyed by path, validated with (modified + size) to avoid stale reuse.
@@ -805,12 +813,12 @@ These memories are automatically included in future conversation contexts within
         final ip = contextProvider.read<InstructionInjectionProvider>();
         actives = ip.activesFor(assistantId);
         if (actives.isEmpty) {
-          actives = await InstructionInjectionStore.getActives(
+          actives = await _instructionInjectionStore.getActives(
             assistantId: assistantId,
           );
         }
       } catch (_) {
-        actives = await InstructionInjectionStore.getActives(
+        actives = await _instructionInjectionStore.getActives(
           assistantId: assistantId,
         );
       }
@@ -913,15 +921,15 @@ These memories are automatically included in future conversation contexts within
         final wb = contextProvider.read<WorldBookProvider>();
         all = wb.books;
         activeBookIds = wb.activeBookIdsFor(assistantId);
-        if (all.isEmpty) all = await WorldBookStore.getAll();
+        if (all.isEmpty) all = await _worldBookStore.getAll();
         if (activeBookIds.isEmpty) {
-          activeBookIds = await WorldBookStore.getActiveIds(
+          activeBookIds = await _worldBookStore.getActiveIds(
             assistantId: assistantId,
           );
         }
       } catch (_) {
-        all = await WorldBookStore.getAll();
-        activeBookIds = await WorldBookStore.getActiveIds(
+        all = await _worldBookStore.getAll();
+        activeBookIds = await _worldBookStore.getActiveIds(
           assistantId: assistantId,
         );
       }

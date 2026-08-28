@@ -4,6 +4,7 @@ import 'package:Cuplivo/core/models/assistant.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/models/workspace.dart';
 import 'package:Cuplivo/core/providers/workspace_provider.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 import 'package:Cuplivo/core/services/mcp/kelivo_filesystem/kelivo_filesystem_server.dart';
 import 'package:Cuplivo/core/services/workspace/workspace_execution_context.dart';
 import 'package:Cuplivo/core/services/workspace/workspace_tools_service.dart';
@@ -30,6 +31,7 @@ class _FakePathProvider extends PathProviderPlatform {
   Future<String?> getTemporaryPath() async => '$root/tmp';
 }
 
+var businessPrefs = BusinessPreferences.memoryForTests();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -101,7 +103,7 @@ void main() {
       temp = await Directory.systemTemp.createTemp('cuplivo_tools_cwd_');
       PathProviderPlatform.instance = _FakePathProvider(temp.path);
       SharedPreferences.setMockInitialValues({});
-      workspaces = WorkspaceProvider();
+      workspaces = WorkspaceProvider(preferences: businessPrefs);
       await workspaces.init();
       workspace = workspaces.defaultWorkspace!;
     });

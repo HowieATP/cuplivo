@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Cuplivo/core/database/business_preferences.dart';
 
 import 'package:Cuplivo/core/providers/settings_provider.dart';
 import 'package:Cuplivo/theme/custom_theme.dart';
@@ -13,6 +13,7 @@ Future<void> _waitForSettingsLoad(SettingsProvider settings) async {
 }
 
 void main() {
+  var businessPrefs = BusinessPreferences.memoryForTests();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('CustomTheme model', () {
@@ -92,11 +93,11 @@ void main() {
     test(
       'migrates the legacy seed into a CustomTheme and selects it',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'theme_palette_v1': 'custom_dynamic',
           'dynamic_color_seed_v1': 0xFF3E5E98,
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad(settings);
 
@@ -108,7 +109,7 @@ void main() {
         expect(migrated.tertiaryArgb, isNull);
 
         // The legacy key is removed after migration.
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getInt('dynamic_color_seed_v1'), isNull);
       },
     );
@@ -116,11 +117,11 @@ void main() {
     test(
       'migrates the seed into the list even when it was not active',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'theme_palette_v1': 'default',
           'dynamic_color_seed_v1': 0xFF166C47,
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad(settings);
 
@@ -132,7 +133,7 @@ void main() {
         expect(settings.selectedCustomThemeId, isNull);
         expect(settings.selectedCustomTheme, isNull);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getString('custom_theme_selected_v1'), isNull);
         expect(prefs.getInt('dynamic_color_seed_v1'), isNull);
       },
@@ -141,24 +142,24 @@ void main() {
     test(
       'resets a stale custom_dynamic palette id when no seed exists',
       () async {
-        SharedPreferences.setMockInitialValues({
+        businessPrefs = BusinessPreferences.memoryForTests({
           'theme_palette_v1': 'custom_dynamic',
         });
-        final settings = SettingsProvider();
+        final settings = SettingsProvider(preferences: businessPrefs);
 
         await _waitForSettingsLoad(settings);
 
         expect(settings.themePaletteId, ThemePalettes.defaultId);
         expect(settings.customThemes, isEmpty);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = businessPrefs;
         expect(prefs.getString('theme_palette_v1'), ThemePalettes.defaultId);
       },
     );
 
     test('saveCustomTheme assigns an id and persists', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 
@@ -168,7 +169,7 @@ void main() {
       expect(settings.customThemes.single.id, saved.id);
 
       // Persisted as JSON string list.
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       final raw = prefs.getStringList('custom_themes_v1');
       expect(raw, isNotNull);
       expect(raw, hasLength(1));
@@ -176,8 +177,8 @@ void main() {
     });
 
     test('selectCustomTheme activates the custom palette', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 
@@ -189,7 +190,7 @@ void main() {
       expect(settings.selectedCustomThemeId, saved.id);
       expect(settings.themePaletteId, ThemePalettes.customPaletteId);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('custom_theme_selected_v1'), saved.id);
       expect(
         prefs.getString('theme_palette_v1'),
@@ -199,8 +200,8 @@ void main() {
 
     test('deleting the active theme falls back to the default palette even '
         'when other themes remain', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 
@@ -219,14 +220,14 @@ void main() {
       expect(settings.selectedCustomThemeId, isNull);
       expect(settings.themePaletteId, ThemePalettes.defaultId);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = businessPrefs;
       expect(prefs.getString('custom_theme_selected_v1'), isNull);
       expect(prefs.getString('theme_palette_v1'), ThemePalettes.defaultId);
     });
 
     test('deleting an inactive theme keeps the active selection', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 
@@ -244,8 +245,8 @@ void main() {
     });
 
     test('importCustomTheme reassigns a taken id and activates it', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 
@@ -265,8 +266,8 @@ void main() {
     });
 
     test('selectCustomTheme ignores unknown ids', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      businessPrefs = BusinessPreferences.memoryForTests({});
+      final settings = SettingsProvider(preferences: businessPrefs);
 
       await _waitForSettingsLoad(settings);
 

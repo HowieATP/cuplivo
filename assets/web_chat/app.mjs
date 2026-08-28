@@ -378,6 +378,72 @@ function containsMath(root) {
   return state.display?.dollarMath === true && /(^|[^\\$])\$[^\n$]+\$/.test(source);
 }
 
+const appearanceSurfaces = {
+  userBubble: 'user',
+  assistantBubble: 'assistant',
+  processCard: 'process',
+};
+const appearanceFields = {
+  backgroundColor: { suffix: 'background', kind: 'color' },
+  textColor: { suffix: 'text', kind: 'color' },
+  accentColor: { suffix: 'accent', kind: 'color', processOnly: true },
+  borderColor: { suffix: 'border-color', kind: 'color' },
+  borderWidth: { suffix: 'border-width', kind: 'number', min: 0, max: 4, unit: 'px' },
+  cornerRadius: { suffix: 'corner-radius', kind: 'number', min: 0, max: 48, unit: 'px' },
+  paddingHorizontal: { suffix: 'padding-x', kind: 'number', min: 0, max: 32, unit: 'px' },
+  paddingVertical: { suffix: 'padding-y', kind: 'number', min: 0, max: 32, unit: 'px' },
+  shadowElevation: { suffix: 'shadow', kind: 'shadow', min: 0, max: 24 },
+  maxWidthPercent: { suffix: 'max-width', kind: 'number', min: 40, max: 100, unit: '%', bubbleOnly: true },
+};
+
+function appearanceDataKey(surface, suffix) {
+  return `style${surface[0].toUpperCase()}${surface.slice(1)}${suffix
+    .split('-')
+    .map((part) => `${part[0].toUpperCase()}${part.slice(1)}`)
+    .join('')}`;
+}
+
+function appearanceCssValue(spec, value) {
+  if (spec.kind === 'color') {
+    return typeof value === 'string' && /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value)
+      ? value
+      : null;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) ||
+      value < spec.min || value > spec.max) return null;
+  if (spec.kind === 'shadow') {
+    if (value === 0) return 'none';
+    const y = Number((value * 0.5).toFixed(2));
+    const blur = Number((value * 1.5).toFixed(2));
+    const alpha = Number(Math.min(0.28, 0.08 + value * 0.008).toFixed(3));
+    return `0 ${y}px ${blur}px rgba(0, 0, 0, ${alpha})`;
+  }
+  return `${value}${spec.unit}`;
+}
+
+function applyAppearance() {
+  const rootStyle = document.documentElement.style;
+  let applied = false;
+  for (const [snapshotSurface, cssSurface] of Object.entries(appearanceSurfaces)) {
+    const surface = state?.appearance?.[snapshotSurface];
+    for (const [field, spec] of Object.entries(appearanceFields)) {
+      const variable = `--cuplivo-style-${cssSurface}-${spec.suffix}`;
+      const dataKey = appearanceDataKey(cssSurface, spec.suffix);
+      rootStyle.removeProperty(variable);
+      delete document.body.dataset[dataKey];
+      if (!surface || typeof surface !== 'object' || Array.isArray(surface)) continue;
+      if (spec.processOnly && snapshotSurface !== 'processCard') continue;
+      if (spec.bubbleOnly && snapshotSurface === 'processCard') continue;
+      const cssValue = appearanceCssValue(spec, surface[field]);
+      if (cssValue == null) continue;
+      rootStyle.setProperty(variable, cssValue);
+      document.body.dataset[dataKey] = 'true';
+      applied = true;
+    }
+  }
+  document.body.dataset.customAppearance = String(applied);
+}
+
 function applyTheme() {
   if (!state) return;
   document.documentElement.lang = state.locale || 'en';
@@ -418,6 +484,7 @@ function applyTheme() {
     backgroundLayer.style.backgroundImage = 'none';
     document.body.dataset.hasBackground = 'false';
   }
+  applyAppearance();
 }
 
 function sendAction(action, messageId = null, payload = {}) {

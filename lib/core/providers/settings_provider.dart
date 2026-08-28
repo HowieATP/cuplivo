@@ -20,6 +20,7 @@ import '../services/backup/double_pref_keys.dart'
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
+import '../models/web_conversation_style.dart';
 import '../services/haptics.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -1294,6 +1295,21 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
     _experimentalWebViewRendering =
         prefs.getBool(_experimentalWebViewRenderingKey) ?? false;
+    final webConversationStyleLibraryJson = prefs.getString(
+      webConversationStyleLibraryPreferenceKey,
+    );
+    if (webConversationStyleLibraryJson != null) {
+      try {
+        _webConversationStyleLibrary = WebConversationStyleLibrary.decode(
+          webConversationStyleLibraryJson,
+        );
+      } on Object catch (error, stackTrace) {
+        debugPrint(
+          'SettingsProvider: failed to load web conversation style library: '
+          '$error\n$stackTrace',
+        );
+      }
+    }
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown =
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
@@ -4648,6 +4664,45 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_experimentalWebViewRenderingKey, value);
   }
 
+  WebConversationStyleLibrary _webConversationStyleLibrary =
+      WebConversationStyleLibrary();
+  WebConversationStyleLibrary get webConversationStyleLibrary =>
+      _webConversationStyleLibrary;
+  WebConversationStyle? get activeWebConversationStyle =>
+      _webConversationStyleLibrary.activeStyle;
+
+  Future<void> importWebConversationStyles(
+    Iterable<WebConversationStyle> styles,
+  ) async {
+    final next = _webConversationStyleLibrary.importBatch(styles);
+    await _persistWebConversationStyleLibrary(next);
+  }
+
+  Future<void> setActiveWebConversationStyle(String? id) async {
+    final next = _webConversationStyleLibrary.activate(id);
+    await _persistWebConversationStyleLibrary(next);
+  }
+
+  Future<void> deleteWebConversationStyle(String id) async {
+    final next = _webConversationStyleLibrary.remove(id);
+    await _persistWebConversationStyleLibrary(next);
+  }
+
+  Future<void> _persistWebConversationStyleLibrary(
+    WebConversationStyleLibrary next,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = await prefs.setString(
+      webConversationStyleLibraryPreferenceKey,
+      next.encode(),
+    );
+    if (!saved) {
+      throw Exception('Failed to persist web conversation style library');
+    }
+    _webConversationStyleLibrary = next;
+    notifyListeners();
+  }
+
   // Display: render user messages with Markdown
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
@@ -5270,6 +5325,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
     copy._experimentalWebViewRendering = _experimentalWebViewRendering;
+    copy._webConversationStyleLibrary = _webConversationStyleLibrary;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
     copy._enableAssistantMarkdown = _enableAssistantMarkdown;

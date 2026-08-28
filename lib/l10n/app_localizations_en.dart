@@ -9287,4 +9287,110 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => 'Task in progress…';
+
+  @override
+  String get webConversationStylesTitle => 'Web conversation styles';
+
+  @override
+  String get webConversationStylesEntrySubtitle =>
+      'Import styles for bubbles and process cards';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView rendering is off. You can manage styles now, but the selected style will not take effect yet.';
+
+  @override
+  String get webConversationStylesDefaultName => 'Default style';
+
+  @override
+  String get webConversationStylesDefaultDescription =>
+      'Use the current theme and display settings without style overrides.';
+
+  @override
+  String get webConversationStylesActive => 'Active';
+
+  @override
+  String get webConversationStylesUseStyle => 'Use style';
+
+  @override
+  String get webConversationStylesImport => 'Import';
+
+  @override
+  String get webConversationStylesImportChoiceTitle =>
+      'Import Web conversation style';
+
+  @override
+  String get webConversationStylesImportManual => 'Paste JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => 'Paste style JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      'Paste one complete .cuplivo-style.json object';
+
+  @override
+  String get webConversationStylesImportFile => 'Local file or ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub repository';
+
+  @override
+  String get webConversationStylesGithubTitle => 'Import from GitHub';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'https://github.com/owner/repo[/tree/branch[/path]]';
+
+  @override
+  String get webConversationStylesSelectTitle => 'Select styles to import';
+
+  @override
+  String get webConversationStylesSelectAll => 'Select all';
+
+  @override
+  String get webConversationStylesDeselectAll => 'Deselect all';
+
+  @override
+  String get webConversationStylesEmpty => 'No imported styles yet.';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return 'Imported $count style(s)';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return 'Imported with $count compatibility warning(s). Unknown fields were preserved but not applied.';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return 'Could not import styles: $detail';
+  }
+
+  @override
+  String get webConversationStylesExport => 'Export';
+
+  @override
+  String get webConversationStylesExportSuccess => 'Style exported';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return 'Could not export style: $detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => 'Delete style';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return 'Delete “$name”? This cannot be undone.';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => 'Delete';
+
+  @override
+  String get webConversationStylesNoDescription => 'No description';
 }

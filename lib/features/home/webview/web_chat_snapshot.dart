@@ -189,6 +189,7 @@ class WebChatSnapshotBuilder {
     required bool hasMoreAfter,
     required Map<String, String> strings,
     required Map<String, String> theme,
+    Map<String, dynamic> appearance = const <String, dynamic>{},
     required Map<String, dynamic> user,
     required Map<String, dynamic> display,
     required double topContentPadding,
@@ -255,6 +256,7 @@ class WebChatSnapshotBuilder {
       'hasMoreAfter': hasMoreAfter,
       'strings': strings,
       'theme': theme,
+      'appearance': _appearance(appearance),
       'user': user,
       'display': snapshotDisplay,
       'fontScale': fontScale,
@@ -272,6 +274,52 @@ class WebChatSnapshotBuilder {
 
   double _contentInset(double value) =>
       value.isFinite && value >= 0 ? value : 0;
+
+  Map<String, dynamic> _appearance(Map<String, dynamic> source) {
+    const surfaces = <String>{'userBubble', 'assistantBubble', 'processCard'};
+    const colorFields = <String>{
+      'backgroundColor',
+      'textColor',
+      'accentColor',
+      'borderColor',
+    };
+    const ranges = <String, (double, double)>{
+      'borderWidth': (0, 4),
+      'cornerRadius': (0, 48),
+      'paddingHorizontal': (0, 32),
+      'paddingVertical': (0, 32),
+      'shadowElevation': (0, 24),
+      'maxWidthPercent': (40, 100),
+    };
+    final colorPattern = RegExp(r'^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$');
+    final result = <String, dynamic>{};
+    for (final surfaceName in surfaces) {
+      final value = source[surfaceName];
+      if (value is! Map) continue;
+      final surface = <String, dynamic>{};
+      for (final field in colorFields) {
+        if (field == 'accentColor' && surfaceName != 'processCard') continue;
+        final color = value[field];
+        if (color is String && colorPattern.hasMatch(color)) {
+          surface[field] = color;
+        }
+      }
+      for (final entry in ranges.entries) {
+        if (entry.key == 'maxWidthPercent' && surfaceName == 'processCard') {
+          continue;
+        }
+        final number = value[entry.key];
+        if (number is num &&
+            number.isFinite &&
+            number >= entry.value.$1 &&
+            number <= entry.value.$2) {
+          surface[entry.key] = number.toDouble();
+        }
+      }
+      if (surface.isNotEmpty) result[surfaceName] = surface;
+    }
+    return result;
+  }
 
   Map<String, dynamic> _message(
     ChatMessage message, {

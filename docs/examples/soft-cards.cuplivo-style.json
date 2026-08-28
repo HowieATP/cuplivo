@@ -1,0 +1,67 @@
+{
+  "kind": "cuplivo.web-conversation-style",
+  "schemaVersion": 1,
+  "id": "soft-cards",
+  "name": "Soft Cards",
+  "description": "Rounded conversation surfaces with a calm process accent.",
+  "common": {
+    "userBubble": {
+      "borderWidth": 1,
+      "cornerRadius": 22,
+      "paddingHorizontal": 14,
+      "paddingVertical": 11,
+      "shadowElevation": 2,
+      "maxWidthPercent": 78
+    },
+    "assistantBubble": {
+      "borderWidth": 1,
+      "cornerRadius": 18,
+      "paddingHorizontal": 14,
+      "paddingVertical": 12,
+      "maxWidthPercent": 94
+    },
+    "processCard": {
+      "borderWidth": 1,
+      "cornerRadius": 16,
+      "paddingHorizontal": 10,
+      "paddingVertical": 6,
+      "shadowElevation": 1
+    }
+  },
+  "light": {
+    "userBubble": {
+      "backgroundColor": "#EEF5FF",
+      "textColor": "#172033",
+      "borderColor": "#B7CAE6"
+    },
+    "assistantBubble": {
+      "backgroundColor": "#FFFFFFCC",
+      "textColor": "#172033",
+      "borderColor": "#D8DEE8"
+    },
+    "processCard": {
+      "backgroundColor": "#F5F7FA",
+      "textColor": "#273244",
+      "accentColor": "#4A72B2",
+      "borderColor": "#D8DEE8"
+    }
+  },
+  "dark": {
+    "userBubble": {
+      "backgroundColor": "#26364A",
+      "textColor": "#F2F6FC",
+      "borderColor": "#46617F"
+    },
+    "assistantBubble": {
+      "backgroundColor": "#1E232BCC",
+      "textColor": "#F2F6FC",
+      "borderColor": "#39424F"
+    },
+    "processCard": {
+      "backgroundColor": "#252B34",
+      "textColor": "#E7ECF4",
+      "accentColor": "#9DBCE8",
+      "borderColor": "#414B59"
+    }
+  }
+}

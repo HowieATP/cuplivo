@@ -804,3 +804,132 @@ fieldset input:not([type="radio"]):not([type="checkbox"]) {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+/* Typed Web conversation style overrides. Variables are populated only from
+   the validated snapshot projection; missing fields keep the existing rules. */
+body[data-style-user-background="true"] .message.is-user .bubble {
+  background: var(--cuplivo-style-user-background);
+}
+body[data-style-user-text="true"] .message.is-user .bubble {
+  color: var(--cuplivo-style-user-text);
+}
+body[data-style-user-border-color="true"] .message.is-user .bubble {
+  border-color: var(--cuplivo-style-user-border-color);
+}
+body[data-style-user-border-width="true"] .message.is-user .bubble {
+  border-width: var(--cuplivo-style-user-border-width);
+  border-style: solid;
+}
+body[data-style-user-corner-radius="true"] .message.is-user .bubble {
+  border-radius: var(--cuplivo-style-user-corner-radius);
+}
+body[data-style-user-padding-x="true"] .message.is-user .bubble {
+  padding-inline: var(--cuplivo-style-user-padding-x);
+}
+body[data-style-user-padding-y="true"] .message.is-user .bubble {
+  padding-block: var(--cuplivo-style-user-padding-y);
+}
+body[data-style-user-shadow="true"] .message.is-user .bubble {
+  box-shadow: var(--cuplivo-style-user-shadow);
+}
+body[data-style-user-max-width="true"] .message.is-user .bubble {
+  max-width: var(--cuplivo-style-user-max-width);
+}
+
+body[data-style-assistant-background="true"] .assistant-text-surface {
+  background: var(--cuplivo-style-assistant-background);
+}
+body[data-style-assistant-text="true"] .assistant-text-surface {
+  color: var(--cuplivo-style-assistant-text);
+}
+body[data-style-assistant-border-color="true"] .assistant-text-surface {
+  border-color: var(--cuplivo-style-assistant-border-color);
+}
+body[data-style-assistant-border-width="true"] .assistant-text-surface {
+  border-width: var(--cuplivo-style-assistant-border-width);
+  border-style: solid;
+}
+body[data-style-assistant-corner-radius="true"] .assistant-text-surface {
+  border-radius: var(--cuplivo-style-assistant-corner-radius);
+}
+body[data-style-assistant-padding-x="true"] .assistant-text-surface {
+  padding-inline: var(--cuplivo-style-assistant-padding-x);
+}
+body[data-style-assistant-padding-y="true"] .assistant-text-surface {
+  padding-block: var(--cuplivo-style-assistant-padding-y);
+}
+body[data-style-assistant-shadow="true"] .assistant-text-surface {
+  box-shadow: var(--cuplivo-style-assistant-shadow);
+}
+body[data-style-assistant-max-width="true"] .assistant-text-surface {
+  max-width: var(--cuplivo-style-assistant-max-width);
+}
+
+body[data-style-process-background="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  background: var(--cuplivo-style-process-background);
+}
+body[data-style-process-text="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) :is(.disclosure-header, .thinking-body, .tool-body) {
+  color: var(--cuplivo-style-process-text);
+}
+body[data-style-process-accent="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) :is(.disclosure-icon, .disclosure-chevron) {
+  color: var(--cuplivo-style-process-accent);
+}
+body[data-style-process-accent="true"] .chain-card > .thinking:has(~ .thinking, ~ .tool)::after,
+body[data-style-process-accent="true"] .chain-card > .tool:has(~ .thinking, ~ .tool)::after {
+  background: var(--cuplivo-style-process-accent);
+}
+body[data-style-process-border-color="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  border-color: var(--cuplivo-style-process-border-color);
+}
+body[data-style-process-border-width="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  border-width: var(--cuplivo-style-process-border-width);
+  border-style: solid;
+}
+body[data-style-process-corner-radius="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  border-radius: var(--cuplivo-style-process-corner-radius);
+}
+body[data-style-process-padding-x="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  padding-inline: var(--cuplivo-style-process-padding-x);
+}
+body[data-style-process-padding-y="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  padding-block: var(--cuplivo-style-process-padding-y);
+}
+body[data-style-process-shadow="true"] :is(
+  .chain-card,
+  .message.is-assistant .bubble > .thinking,
+  .message.is-assistant .bubble > .tool
+) {
+  box-shadow: var(--cuplivo-style-process-shadow);
+}

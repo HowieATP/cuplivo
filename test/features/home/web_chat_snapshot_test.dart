@@ -91,8 +91,8 @@ void main() {
     );
 
     final rendered = (snapshot['messages'] as List).single as Map;
-    expect(snapshot['protocolVersion'], 3);
-    expect(snapshot['assetVersion'], 'web-chat-v16');
+    expect(snapshot['protocolVersion'], 4);
+    expect(snapshot['assetVersion'], 'web-chat-v17');
     expect(snapshot['initialViewportMode'], 'anchor');
     expect(snapshot['locale'], 'zh-Hans');
     expect(snapshot['textDirection'], 'ltr');
@@ -127,6 +127,45 @@ void main() {
     expect(rendered['selected'], isTrue);
     expect(rendered['showContextDivider'], isTrue);
   });
+
+  test(
+    'snapshot emits only typed appearance fields and never raw style JSON',
+    () {
+      final snapshot = _minimalWebChatSnapshot(
+        const <ChatMessage>[],
+        appearance: <String, dynamic>{
+          'userBubble': <String, dynamic>{
+            'backgroundColor': '#112233AA',
+            'cornerRadius': 18,
+            'accentColor': '#FFFFFF',
+            'unknown': '<style>body{display:none}</style>',
+          },
+          'assistantBubble': <String, dynamic>{
+            'maxWidthPercent': 85,
+            'backgroundColor': 'url(https://example.com/x)',
+          },
+          'processCard': <String, dynamic>{
+            'accentColor': '#445566',
+            'maxWidthPercent': 70,
+          },
+          'raw': <String, dynamic>{'unknown': true},
+        },
+      );
+
+      expect(snapshot['appearance'], <String, dynamic>{
+        'userBubble': <String, dynamic>{
+          'backgroundColor': '#112233AA',
+          'cornerRadius': 18.0,
+        },
+        'assistantBubble': <String, dynamic>{'maxWidthPercent': 85.0},
+        'processCard': <String, dynamic>{'accentColor': '#445566'},
+      });
+      final encoded = jsonEncode(snapshot);
+      expect(encoded, isNot(contains('<style>')));
+      expect(encoded, isNot(contains('example.com')));
+      expect(encoded, isNot(contains('"raw"')));
+    },
+  );
 
   test('snapshot defaults a fresh conversation to the bottom edge', () {
     final snapshot = const WebChatSnapshotBuilder().build(
@@ -622,6 +661,7 @@ Map<String, dynamic> _minimalWebChatSnapshot(
   Map<String, stream_ctrl.ReasoningData> reasoning =
       const <String, stream_ctrl.ReasoningData>{},
   Map<String, List<ToolUIPart>> toolParts = const <String, List<ToolUIPart>>{},
+  Map<String, dynamic> appearance = const <String, dynamic>{},
 }) => const WebChatSnapshotBuilder().build(
   renderSessionId: 'test-session',
   conversationId: 'c1',
@@ -642,6 +682,7 @@ Map<String, dynamic> _minimalWebChatSnapshot(
   hasMoreAfter: false,
   strings: const <String, String>{},
   theme: const <String, String>{},
+  appearance: appearance,
   user: const <String, dynamic>{'name': 'User'},
   display: const <String, dynamic>{},
   topContentPadding: 0,

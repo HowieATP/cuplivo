@@ -20,6 +20,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
+import 'web_conversation_styles_page.dart';
 import '../../../features/assistant/widgets/assistant_select_sheet.dart';
 import '../../home/pages/input_bar_buttons_customization_page.dart';
 import '../../home/webview/web_chat_platform.dart';
@@ -1912,6 +1913,18 @@ class RenderingSettingsPage extends StatelessWidget {
                   onChanged: (value) => context
                       .read<SettingsProvider>()
                       .setExperimentalWebViewRendering(value),
+                ),
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Palette,
+                  label: l10n.webConversationStylesTitle,
+                  detailText: l10n.webConversationStylesEntrySubtitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WebConversationStylesPage(),
+                    ),
+                  ),
                 ),
                 _iosDivider(context),
               ],

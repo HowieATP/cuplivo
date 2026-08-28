@@ -1,5 +1,27 @@
 # Cuplivo Domain Glossary
 
+## Web Conversation Styles
+
+- **Web 对话样式 (Web conversation style)**: A declarative
+  `.cuplivo-style.json` document that overrides the user bubble, assistant
+  answer bubble, and unified tool/thinking/chain process card in the optional
+  one-to-one Web conversation viewport. It is typed data, never CSS/HTML/JS,
+  and does not apply to Flutter fallback, group chat, MultiAI, Linux, or
+  Flutter Web.
+- **样式库 (style library)**: The global set of imported original JSON
+  objects, keyed by stable style `id`. It is stored under
+  `web_conversation_style_library_v1` and participates in `settings.json`
+  backup and LAN sync. The built-in default is a virtual row, not a stored
+  library entry.
+- **当前样式 (active style)**: The library `activeId`, or `null` for default.
+  Import does not change it; deleting the active entry clears it. It resolves
+  as current theme/display settings → `common` → current `light`/`dark` layer,
+  then only the validated projection enters Web snapshot `appearance`.
+- **Not an M3 Custom Theme**: An M3 Custom Theme generates the app-wide
+  `ColorScheme`/semantic tokens. A Web conversation style consumes those as
+  defaults and only decorates three Web chat surfaces; it cannot recolor app
+  navigation, settings, Flutter-rendered messages, or the viewport background.
+
 ## Title Preset System
 - **Hash Fingerprint matching**: `detect()` uses `trim()` only (conservative), exact character match after stripping leading/trailing whitespace.
 - **PromptPreset data class**: `id`, `label`, `prompt` fields only. No `recommendedThinking` — presets are style-only, Thinking is independently controlled.

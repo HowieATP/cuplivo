@@ -74,6 +74,7 @@ import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/skills_pane.dart';
+import 'setting/web_conversation_styles_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -114,6 +115,7 @@ enum _SettingsMenuItem {
   quickPhrases,
   instructionInjection,
   skills,
+  webConversationStyles,
   worldBook,
   tts,
   networkProxy,
@@ -253,6 +255,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopSkillsPane(
                             key: ValueKey('skills'),
                           );
+                        case _SettingsMenuItem.webConversationStyles:
+                          return const DesktopWebConversationStylesPane(
+                            key: ValueKey('webConversationStyles'),
+                          );
                         case _SettingsMenuItem.worldBook:
                           return const DesktopWorldBookPane(
                             key: ValueKey('worldBook'),
@@ -329,6 +335,15 @@ class _SettingsMenu extends StatelessWidget {
         lucide.Lucide.BookOpen,
         l10n.settingsPageSkills,
       ),
+      if (supportsWebConversationViewport(
+        isWeb: kIsWeb,
+        platform: defaultTargetPlatform,
+      ))
+        (
+          _SettingsMenuItem.webConversationStyles,
+          lucide.Lucide.Palette,
+          l10n.webConversationStylesTitle,
+        ),
       (
         _SettingsMenuItem.worldBook,
         lucide.Lucide.BookOpen,

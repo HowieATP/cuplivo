@@ -16702,6 +16702,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Task in progress…'**
   String get iosBackgroundGenerationPrivacyActiveDetail;
+
+  /// No description provided for @webConversationStylesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web conversation styles'**
+  String get webConversationStylesTitle;
+
+  /// No description provided for @webConversationStylesEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import styles for bubbles and process cards'**
+  String get webConversationStylesEntrySubtitle;
+
+  /// No description provided for @webConversationStylesInactiveNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'WebView rendering is off. You can manage styles now, but the selected style will not take effect yet.'**
+  String get webConversationStylesInactiveNotice;
+
+  /// No description provided for @webConversationStylesDefaultName.
+  ///
+  /// In en, this message translates to:
+  /// **'Default style'**
+  String get webConversationStylesDefaultName;
+
+  /// No description provided for @webConversationStylesDefaultDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the current theme and display settings without style overrides.'**
+  String get webConversationStylesDefaultDescription;
+
+  /// No description provided for @webConversationStylesActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get webConversationStylesActive;
+
+  /// No description provided for @webConversationStylesUseStyle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use style'**
+  String get webConversationStylesUseStyle;
+
+  /// No description provided for @webConversationStylesImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get webConversationStylesImport;
+
+  /// No description provided for @webConversationStylesImportChoiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Web conversation style'**
+  String get webConversationStylesImportChoiceTitle;
+
+  /// No description provided for @webConversationStylesImportManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste JSON'**
+  String get webConversationStylesImportManual;
+
+  /// No description provided for @webConversationStylesImportManualTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste style JSON'**
+  String get webConversationStylesImportManualTitle;
+
+  /// No description provided for @webConversationStylesImportManualHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste one complete .cuplivo-style.json object'**
+  String get webConversationStylesImportManualHint;
+
+  /// No description provided for @webConversationStylesImportFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Local file or ZIP'**
+  String get webConversationStylesImportFile;
+
+  /// No description provided for @webConversationStylesImportGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub repository'**
+  String get webConversationStylesImportGithub;
+
+  /// No description provided for @webConversationStylesGithubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from GitHub'**
+  String get webConversationStylesGithubTitle;
+
+  /// No description provided for @webConversationStylesGithubHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://github.com/owner/repo[/tree/branch[/path]]'**
+  String get webConversationStylesGithubHint;
+
+  /// No description provided for @webConversationStylesSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select styles to import'**
+  String get webConversationStylesSelectTitle;
+
+  /// No description provided for @webConversationStylesSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get webConversationStylesSelectAll;
+
+  /// No description provided for @webConversationStylesDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get webConversationStylesDeselectAll;
+
+  /// No description provided for @webConversationStylesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No imported styles yet.'**
+  String get webConversationStylesEmpty;
+
+  /// No description provided for @webConversationStylesImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} style(s)'**
+  String webConversationStylesImportSuccess(int count);
+
+  /// No description provided for @webConversationStylesImportWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported with {count} compatibility warning(s). Unknown fields were preserved but not applied.'**
+  String webConversationStylesImportWarnings(int count);
+
+  /// No description provided for @webConversationStylesImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import styles: {detail}'**
+  String webConversationStylesImportFailed(String detail);
+
+  /// No description provided for @webConversationStylesExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get webConversationStylesExport;
+
+  /// No description provided for @webConversationStylesExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Style exported'**
+  String get webConversationStylesExportSuccess;
+
+  /// No description provided for @webConversationStylesExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export style: {detail}'**
+  String webConversationStylesExportFailed(String detail);
+
+  /// No description provided for @webConversationStylesDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete style'**
+  String get webConversationStylesDeleteTitle;
+
+  /// No description provided for @webConversationStylesDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”? This cannot be undone.'**
+  String webConversationStylesDeleteMessage(String name);
+
+  /// No description provided for @webConversationStylesDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get webConversationStylesDeleteAction;
+
+  /// No description provided for @webConversationStylesNoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No description'**
+  String get webConversationStylesNoDescription;
 }
 
 class _AppLocalizationsDelegate

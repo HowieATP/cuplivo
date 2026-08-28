@@ -92,7 +92,7 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
   let result = null;
   for (const [index, chunk] of chunks.entries()) {
     result = receiveTransferChunk({
-      protocolVersion: 3,
+      protocolVersion: 4,
       transferId: 'utf8-transfer',
       index,
       total: chunks.length,
@@ -103,14 +103,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
 });
 
 test('snapshot reducer rejects an older revision in the same session', () => {
-  const current = { type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16', renderSessionId: 's', renderRevision: 4, messages: [] };
+  const current = { type: 'snapshot', protocolVersion: 4, assetVersion: 'web-chat-v17', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };
   assert.equal(reduceEnvelope(current, older), current);
 });
 
 test('new snapshots retain resolved opaque media only in the same session', () => {
   const current = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
+    type: 'snapshot', protocolVersion: 4, assetVersion: 'web-chat-v17',
     renderSessionId: 's', renderRevision: 4, messages: [],
     media: { 'asset:icon': 'data:image/svg+xml;base64,PHN2Zy8+' },
   };
@@ -186,9 +186,26 @@ test('stream patches can register opaque media without leaking it into messages'
   assert.match(appSource, /return messagePatch/);
 });
 
+test('typed appearance maps only the three supported surfaces and clears defaults', () => {
+  assert.match(appSource, /const appearanceSurfaces = \{[\s\S]*?userBubble: 'user'[\s\S]*?assistantBubble: 'assistant'[\s\S]*?processCard: 'process'/);
+  assert.match(appSource, /\^#\[0-9a-f\]\{6\}/i);
+  assert.match(appSource, /rootStyle\.removeProperty\(variable\)/);
+  assert.match(appSource, /delete document\.body\.dataset\[dataKey\]/);
+  assert.match(appSource, /document\.body\.dataset\.customAppearance = String\(applied\)/);
+  assert.match(appSource, /applyAppearance\(\)/);
+  assert.doesNotMatch(appSource, /state\?\.appearance[\s\S]{0,160}innerHTML/);
+
+  assert.match(styleSource, /data-style-user-background/);
+  assert.match(styleSource, /data-style-assistant-background/);
+  assert.match(styleSource, /data-style-process-background/);
+  assert.match(styleSource, /\.assistant-text-surface/);
+  assert.match(styleSource, /\.chain-card/);
+  assert.match(styleSource, /\.message\.is-user \.bubble/);
+});
+
 test('same-session streaming snapshots preserve a newer live patch', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
+    type: 'snapshot', protocolVersion: 4, assetVersion: 'web-chat-v17',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{ id: 'm', content: 'new', isStreaming: true, streamRevision: 7 }],
   };
@@ -203,7 +220,7 @@ test('same-session streaming snapshots preserve a newer live patch', () => {
 
 test('live translation survives unrelated snapshots until it is finalized', () => {
   const state = {
-    type: 'snapshot', protocolVersion: 3, assetVersion: 'web-chat-v16',
+    type: 'snapshot', protocolVersion: 4, assetVersion: 'web-chat-v17',
     renderSessionId: 's', conversationId: 'c', renderRevision: 2,
     messages: [{
       id: 'm', content: 'answer', isStreaming: false,

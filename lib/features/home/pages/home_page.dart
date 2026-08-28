@@ -1953,6 +1953,11 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       },
+      appearance:
+          settings.activeWebConversationStyle?.resolveAppearance(
+            isDark: isDark,
+          ) ??
+          const <String, dynamic>{},
       user: buildWebChatUserSnapshot(
         name: user.name,
         avatarType: user.avatarType,

@@ -8859,6 +8859,109 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 对话样式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '导入气泡与过程卡片样式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 渲染尚未开启。你仍可管理样式，但当前样式暂不会生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '默认样式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不添加样式覆盖，使用当前主题和显示设置。';
+
+  @override
+  String get webConversationStylesActive => '当前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用样式';
+
+  @override
+  String get webConversationStylesImport => '导入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '导入 Web 对话样式';
+
+  @override
+  String get webConversationStylesImportManual => '粘贴 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '粘贴样式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '粘贴一个完整的 .cuplivo-style.json 对象';
+
+  @override
+  String get webConversationStylesImportFile => '本地文件或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 仓库';
+
+  @override
+  String get webConversationStylesGithubTitle => '从 GitHub 导入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'https://github.com/owner/repo[/tree/branch[/path]]';
+
+  @override
+  String get webConversationStylesSelectTitle => '选择要导入的样式';
+
+  @override
+  String get webConversationStylesSelectAll => '全选';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全选';
+
+  @override
+  String get webConversationStylesEmpty => '尚未导入样式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已导入 $count 个样式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '导入完成，但有 $count 条兼容性警告。未知字段已保留，但不会生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '无法导入样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '导出';
+
+  @override
+  String get webConversationStylesExportSuccess => '样式已导出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '无法导出样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '删除样式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '删除“$name”？此操作无法撤销。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '删除';
+
+  @override
+  String get webConversationStylesNoDescription => '无描述';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -17716,6 +17819,109 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任务进行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 对话样式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '导入气泡与过程卡片样式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 渲染尚未开启。你仍可管理样式，但当前样式暂不会生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '默认样式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不添加样式覆盖，使用当前主题和显示设置。';
+
+  @override
+  String get webConversationStylesActive => '当前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用样式';
+
+  @override
+  String get webConversationStylesImport => '导入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '导入 Web 对话样式';
+
+  @override
+  String get webConversationStylesImportManual => '粘贴 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '粘贴样式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '粘贴一个完整的 .cuplivo-style.json 对象';
+
+  @override
+  String get webConversationStylesImportFile => '本地文件或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 仓库';
+
+  @override
+  String get webConversationStylesGithubTitle => '从 GitHub 导入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'https://github.com/owner/repo[/tree/branch[/path]]';
+
+  @override
+  String get webConversationStylesSelectTitle => '选择要导入的样式';
+
+  @override
+  String get webConversationStylesSelectAll => '全选';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全选';
+
+  @override
+  String get webConversationStylesEmpty => '尚未导入样式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已导入 $count 个样式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '导入完成，但有 $count 条兼容性警告。未知字段已保留，但不会生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '无法导入样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '导出';
+
+  @override
+  String get webConversationStylesExportSuccess => '样式已导出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '无法导出样式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '删除样式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '删除“$name”？此操作无法撤销。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '删除';
+
+  @override
+  String get webConversationStylesNoDescription => '无描述';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -26575,4 +26781,107 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundGenerationPrivacyActiveDetail => '任務進行中…';
+
+  @override
+  String get webConversationStylesTitle => 'Web 對話樣式';
+
+  @override
+  String get webConversationStylesEntrySubtitle => '匯入氣泡與過程卡片樣式';
+
+  @override
+  String get webConversationStylesInactiveNotice =>
+      'WebView 算繪尚未開啟。你仍可管理樣式，但目前樣式暫不會生效。';
+
+  @override
+  String get webConversationStylesDefaultName => '預設樣式';
+
+  @override
+  String get webConversationStylesDefaultDescription => '不加入樣式覆寫，使用目前主題和顯示設定。';
+
+  @override
+  String get webConversationStylesActive => '目前使用';
+
+  @override
+  String get webConversationStylesUseStyle => '使用樣式';
+
+  @override
+  String get webConversationStylesImport => '匯入';
+
+  @override
+  String get webConversationStylesImportChoiceTitle => '匯入 Web 對話樣式';
+
+  @override
+  String get webConversationStylesImportManual => '貼上 JSON';
+
+  @override
+  String get webConversationStylesImportManualTitle => '貼上樣式 JSON';
+
+  @override
+  String get webConversationStylesImportManualHint =>
+      '貼上一個完整的 .cuplivo-style.json 物件';
+
+  @override
+  String get webConversationStylesImportFile => '本機檔案或 ZIP';
+
+  @override
+  String get webConversationStylesImportGithub => 'GitHub 儲存庫';
+
+  @override
+  String get webConversationStylesGithubTitle => '從 GitHub 匯入';
+
+  @override
+  String get webConversationStylesGithubHint =>
+      'https://github.com/owner/repo[/tree/branch[/path]]';
+
+  @override
+  String get webConversationStylesSelectTitle => '選擇要匯入的樣式';
+
+  @override
+  String get webConversationStylesSelectAll => '全選';
+
+  @override
+  String get webConversationStylesDeselectAll => '取消全選';
+
+  @override
+  String get webConversationStylesEmpty => '尚未匯入樣式。';
+
+  @override
+  String webConversationStylesImportSuccess(int count) {
+    return '已匯入 $count 個樣式';
+  }
+
+  @override
+  String webConversationStylesImportWarnings(int count) {
+    return '匯入完成，但有 $count 條相容性警告。未知欄位已保留，但不會生效。';
+  }
+
+  @override
+  String webConversationStylesImportFailed(String detail) {
+    return '無法匯入樣式：$detail';
+  }
+
+  @override
+  String get webConversationStylesExport => '匯出';
+
+  @override
+  String get webConversationStylesExportSuccess => '樣式已匯出';
+
+  @override
+  String webConversationStylesExportFailed(String detail) {
+    return '無法匯出樣式：$detail';
+  }
+
+  @override
+  String get webConversationStylesDeleteTitle => '刪除樣式';
+
+  @override
+  String webConversationStylesDeleteMessage(String name) {
+    return '刪除「$name」？此操作無法復原。';
+  }
+
+  @override
+  String get webConversationStylesDeleteAction => '刪除';
+
+  @override
+  String get webConversationStylesNoDescription => '無描述';
 }

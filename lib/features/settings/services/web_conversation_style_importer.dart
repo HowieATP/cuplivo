@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/models/web_conversation_style.dart';
 import '../../../core/services/network/dio_http_client.dart';
-import '../../skills/github_importer.dart' show GitHubRepoInfo, parseGitHubUrl;
+import '../../skills/github_importer.dart' show parseGitHubUrl;
 
 const int webConversationStyleArchiveByteLimit = 64 * 1024 * 1024;
 const int webConversationStyleArchiveEntryLimit = 2000;
@@ -44,6 +44,69 @@ class WebConversationStyleCandidate {
 
   WebConversationStyle parse() => WebConversationStyle.parseBytes(bytes);
 }
+
+class WebConversationStyleGitHubFile {
+  const WebConversationStyleGitHubFile({
+    required this.downloadUri,
+    required this.sourceName,
+  });
+
+  final Uri downloadUri;
+  final String sourceName;
+}
+
+WebConversationStyleGitHubFile? parseWebConversationStyleGitHubFileUrl(
+  String url,
+) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null ||
+      uri.scheme != 'https' ||
+      uri.hasPort ||
+      uri.userInfo.isNotEmpty) {
+    return null;
+  }
+
+  final host = uri.host.toLowerCase();
+  final segments = uri.pathSegments
+      .where((segment) => segment.isNotEmpty)
+      .toList();
+  late final List<String> rawSegments;
+  if (host == 'github.com' || host == 'www.github.com') {
+    if (segments.length < 5 || segments[2] != 'blob') return null;
+    rawSegments = [segments[0], segments[1], ...segments.sublist(3)];
+  } else if (host == 'raw.githubusercontent.com') {
+    if (segments.length < 4) return null;
+    rawSegments = segments;
+  } else {
+    return null;
+  }
+
+  if (!_isSafeGitHubIdentitySegment(rawSegments[0]) ||
+      !_isSafeGitHubIdentitySegment(rawSegments[1]) ||
+      !_isSafeGitHubIdentitySegment(rawSegments[2]) ||
+      rawSegments.sublist(3).any(_isUnsafeGitHubFilePathSegment)) {
+    return null;
+  }
+  final sourceName = rawSegments.last;
+  if (!sourceName.endsWith(webConversationStyleFileSuffix)) return null;
+
+  return WebConversationStyleGitHubFile(
+    downloadUri: Uri(
+      scheme: 'https',
+      host: 'raw.githubusercontent.com',
+      pathSegments: rawSegments,
+    ),
+    sourceName: sourceName,
+  );
+}
+
+bool _isSafeGitHubIdentitySegment(String value) =>
+    RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(value) &&
+    value != '.' &&
+    value != '..';
+
+bool _isUnsafeGitHubFilePathSegment(String value) =>
+    value.isEmpty || value == '.' || value == '..';
 
 class _ArchiveScanRequest {
   const _ArchiveScanRequest({
@@ -114,17 +177,26 @@ class WebConversationStyleImporter {
   Future<List<WebConversationStyleCandidate>> downloadGithub(
     String url, {
     NetworkProxyConfig? proxy,
+    http.Client? client,
   }) async {
-    final info = parseGitHubUrl(url);
-    if (info == null || !_isSafeGithubInfo(info)) {
+    final repoInfo = parseGitHubUrl(url);
+    final fileInfo = parseWebConversationStyleGitHubFileUrl(url);
+    if (repoInfo == null && fileInfo == null) {
       throw const WebConversationStyleImportException(
         WebConversationStyleImportErrorCode.invalidGithubUrl,
       );
     }
-    final client = DioHttpClient(proxy: proxy, forceCloseOnDispose: true);
+    final ownsClient = client == null;
+    final requestClient =
+        client ?? DioHttpClient(proxy: proxy, forceCloseOnDispose: true);
+    final byteLimit = fileInfo == null
+        ? webConversationStyleArchiveByteLimit
+        : webConversationStyleFileByteLimit;
     try {
-      final response = await client
-          .send(http.Request('GET', Uri.parse(info.archiveUrl)))
+      final downloadUri =
+          fileInfo?.downloadUri ?? Uri.parse(repoInfo!.archiveUrl);
+      final response = await requestClient
+          .send(http.Request('GET', downloadUri))
           .timeout(const Duration(seconds: 60));
       if (response.statusCode != 200) {
         throw WebConversationStyleImportException(
@@ -133,30 +205,30 @@ class WebConversationStyleImporter {
         );
       }
       final declaredLength = response.contentLength;
-      if (declaredLength != null &&
-          declaredLength > webConversationStyleArchiveByteLimit) {
-        throw const WebConversationStyleImportException(
-          WebConversationStyleImportErrorCode.archiveTooLarge,
-        );
+      if (declaredLength != null && declaredLength > byteLimit) {
+        _throwGithubDownloadTooLarge(isFile: fileInfo != null);
       }
       final bytes = BytesBuilder(copy: false);
       await for (final chunk in response.stream.timeout(
         const Duration(seconds: 60),
       )) {
-        if (bytes.length + chunk.length >
-            webConversationStyleArchiveByteLimit) {
-          throw const WebConversationStyleImportException(
-            WebConversationStyleImportErrorCode.archiveTooLarge,
-          );
+        if (bytes.length + chunk.length > byteLimit) {
+          _throwGithubDownloadTooLarge(isFile: fileInfo != null);
         }
         bytes.add(chunk);
       }
+      final downloadedBytes = bytes.takeBytes();
+      if (fileInfo != null) {
+        return [singleFile(fileInfo.sourceName, downloadedBytes)];
+      }
       return scanArchive(
-        bytes.takeBytes(),
-        subPath: info.subPath,
-        stripPrefix: info.stripPrefix,
+        downloadedBytes,
+        subPath: repoInfo!.subPath,
+        stripPrefix: repoInfo.stripPrefix,
       );
     } on WebConversationStyleImportException {
+      rethrow;
+    } on WebConversationStyleException {
       rethrow;
     } on Object catch (error, stackTrace) {
       debugPrint(
@@ -167,7 +239,7 @@ class WebConversationStyleImporter {
         '$error',
       );
     } finally {
-      client.close();
+      if (ownsClient) requestClient.close();
     }
   }
 
@@ -188,11 +260,15 @@ class WebConversationStyleImporter {
   }
 }
 
-bool _isSafeGithubInfo(GitHubRepoInfo info) {
-  final segment = RegExp(r'^[A-Za-z0-9._-]+$');
-  return segment.hasMatch(info.owner) &&
-      segment.hasMatch(info.repo) &&
-      segment.hasMatch(info.branch);
+Never _throwGithubDownloadTooLarge({required bool isFile}) {
+  if (isFile) {
+    throw const WebConversationStyleException(
+      WebConversationStyleErrorCode.fileTooLarge,
+    );
+  }
+  throw const WebConversationStyleImportException(
+    WebConversationStyleImportErrorCode.archiveTooLarge,
+  );
 }
 
 class _ArchiveScanResult {

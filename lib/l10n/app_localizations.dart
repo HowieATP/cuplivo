@@ -16784,7 +16784,7 @@ abstract class AppLocalizations {
   /// No description provided for @webConversationStylesImportGithub.
   ///
   /// In en, this message translates to:
-  /// **'GitHub repository'**
+  /// **'GitHub repository or style file'**
   String get webConversationStylesImportGithub;
 
   /// No description provided for @webConversationStylesGithubTitle.
@@ -16796,7 +16796,7 @@ abstract class AppLocalizations {
   /// No description provided for @webConversationStylesGithubHint.
   ///
   /// In en, this message translates to:
-  /// **'https://github.com/owner/repo[/tree/branch[/path]]'**
+  /// **'GitHub repository, tree, blob, or raw style file URL'**
   String get webConversationStylesGithubHint;
 
   /// No description provided for @webConversationStylesSelectTitle.

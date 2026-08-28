@@ -9333,14 +9333,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webConversationStylesImportFile => 'Local file or ZIP';
 
   @override
-  String get webConversationStylesImportGithub => 'GitHub repository';
+  String get webConversationStylesImportGithub =>
+      'GitHub repository or style file';
 
   @override
   String get webConversationStylesGithubTitle => 'Import from GitHub';
 
   @override
   String get webConversationStylesGithubHint =>
-      'https://github.com/owner/repo[/tree/branch[/path]]';
+      'GitHub repository, tree, blob, or raw style file URL';
 
   @override
   String get webConversationStylesSelectTitle => 'Select styles to import';

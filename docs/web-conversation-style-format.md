@@ -57,9 +57,16 @@ fonts, images, and remote resources are never accepted.
 ## Import and forward compatibility
 
 The settings manager accepts pasted JSON, one local style file, a ZIP archive,
-or a public GitHub repository/tree URL. ZIP and repository scans are recursive;
-when several files are found, Cuplivo asks which ones to import before it
-validates the entire selected batch.
+or a public GitHub URL. A bare repository URL follows that repository's default
+branch. A `/tree/<branch>[/path]` URL selects an explicit branch and optional
+subdirectory. ZIP and repository scans are recursive; when several files are
+found, Cuplivo asks which ones to import before it validates the entire
+selected batch.
+
+A GitHub `/blob/<branch>/<path>.cuplivo-style.json` URL or the equivalent
+`raw.githubusercontent.com` URL imports exactly one style file. Other hosts,
+GitHub page types, and file suffixes are rejected. GitHub imports support only
+public repositories and files.
 
 Unknown fields and schema versions above v1 are retained in the original JSON
 and reported as compatibility warnings, but only known v1 fields render. A

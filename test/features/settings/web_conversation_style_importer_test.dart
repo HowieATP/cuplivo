@@ -5,6 +5,8 @@ import 'package:Cuplivo/core/models/web_conversation_style.dart';
 import 'package:Cuplivo/features/settings/services/web_conversation_style_importer.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 List<int> styleBytes(String id) => utf8.encode(
   jsonEncode({
@@ -59,6 +61,129 @@ void main() {
     expect(style.id, 'soft-cards');
     expect(style.resolveAppearance(isDark: false), contains('processCard'));
     expect(style.resolveAppearance(isDark: true), contains('assistantBubble'));
+  });
+
+  test('parses GitHub blob and raw style file URLs', () {
+    const rawUrl =
+        'https://raw.githubusercontent.com/owner/repo/master/'
+        'styles/cloud.cuplivo-style.json';
+    final blob = parseWebConversationStyleGitHubFileUrl(
+      'https://github.com/owner/repo/blob/master/'
+      'styles/cloud.cuplivo-style.json',
+    );
+    final raw = parseWebConversationStyleGitHubFileUrl(rawUrl);
+
+    expect(blob, isNotNull);
+    expect(blob!.downloadUri.toString(), rawUrl);
+    expect(blob.sourceName, 'cloud.cuplivo-style.json');
+    expect(raw, isNotNull);
+    expect(raw!.downloadUri.toString(), rawUrl);
+    expect(raw.sourceName, 'cloud.cuplivo-style.json');
+  });
+
+  test('rejects unsafe or unsupported GitHub style file URLs', () {
+    expect(
+      parseWebConversationStyleGitHubFileUrl(
+        'https://example.com/owner/repo/master/a.cuplivo-style.json',
+      ),
+      isNull,
+    );
+    expect(
+      parseWebConversationStyleGitHubFileUrl(
+        'http://raw.githubusercontent.com/owner/repo/master/'
+        'a.cuplivo-style.json',
+      ),
+      isNull,
+    );
+    expect(
+      parseWebConversationStyleGitHubFileUrl(
+        'https://github.com/owner/repo/blob/master/style.json',
+      ),
+      isNull,
+    );
+    expect(
+      parseWebConversationStyleGitHubFileUrl(
+        'https://github.com/owner/repo/tree/master/'
+        'a.cuplivo-style.json',
+      ),
+      isNull,
+    );
+  });
+
+  test('downloads a raw style file through the single-file pipeline', () async {
+    const rawUrl =
+        'https://raw.githubusercontent.com/owner/repo/master/'
+        'cloud.cuplivo-style.json';
+    final client = MockClient((request) async {
+      expect(request.url.toString(), rawUrl);
+      return http.Response.bytes(styleBytes('cloud'), 200);
+    });
+
+    final candidates = await importer.downloadGithub(rawUrl, client: client);
+
+    expect(candidates, hasLength(1));
+    expect(candidates.single.sourceName, 'cloud.cuplivo-style.json');
+    expect(candidates.single.parse().id, 'cloud');
+  });
+
+  test('downloads a bare repository from its HEAD archive', () async {
+    final client = MockClient((request) async {
+      expect(
+        request.url.toString(),
+        'https://codeload.github.com/owner/repo/zip/HEAD',
+      );
+      return http.Response.bytes(
+        zipBytes({'repo-HEAD/cloud.cuplivo-style.json': styleBytes('cloud')}),
+        200,
+      );
+    });
+
+    final candidates = await importer.downloadGithub(
+      'https://github.com/owner/repo',
+      client: client,
+    );
+
+    expect(candidates, hasLength(1));
+    expect(candidates.single.sourceName, 'cloud.cuplivo-style.json');
+    expect(candidates.single.parse().id, 'cloud');
+  });
+
+  test('reports GitHub HTTP failures and raw file size limits', () async {
+    final failedClient = MockClient((_) async => http.Response('missing', 404));
+    expect(
+      () => importer.downloadGithub(
+        'https://github.com/owner/repo',
+        client: failedClient,
+      ),
+      throwsA(
+        isA<WebConversationStyleImportException>().having(
+          (error) => error.code,
+          'code',
+          WebConversationStyleImportErrorCode.githubDownloadFailed,
+        ),
+      ),
+    );
+
+    final oversizedClient = MockClient(
+      (_) async => http.Response.bytes(
+        List<int>.filled(webConversationStyleFileByteLimit + 1, 0),
+        200,
+      ),
+    );
+    expect(
+      () => importer.downloadGithub(
+        'https://raw.githubusercontent.com/owner/repo/main/'
+        'large.cuplivo-style.json',
+        client: oversizedClient,
+      ),
+      throwsA(
+        isA<WebConversationStyleException>().having(
+          (error) => error.code,
+          'code',
+          WebConversationStyleErrorCode.fileTooLarge,
+        ),
+      ),
+    );
   });
 
   test(

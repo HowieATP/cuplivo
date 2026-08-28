@@ -64,31 +64,29 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 2. **OAuth account sign-in** — Device-code sign-in for Grok xAI and OpenAI Codex, so you can use your subscriptions in Cuplivo.
 
-3. **MCP tool result images** — Send images returned by MCP tools back to LLM providers so models can see tool outputs.
+3. **Smart OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control.
 
-4. **Smart OCR mode** — New "Smart" OCR mode: OCR stays off for vision-capable models and turns on for those without vision; per-assistant auto/always/never control.
-
-5. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+4. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
 ### Practical Utilities
 
-1. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch.
+1. **Message reply** — QQ-style message-level reply: quote via long-press text selection or the message-level "More" menu; citations are displayed smartly and trimmed for context.
 
-2. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction.
+2. **Input drafts** — Typed input is saved as a draft and restored when the app restarts, so your last unsent content survives a relaunch.
 
-3. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG.
+3. **Enhanced assistant message direct copy** — Naive subsequence Markdown copy + quote for quick message extraction.
 
-4. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI.
+4. **Math formula export** — Block-level formulas can be copied as LaTeX / copied as PNG / downloaded as PNG.
 
-5. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat.
+5. **AI log analysis** — Ask AI to analyze redacted request logs with a one-click draft right from the request log UI.
 
-6. **Startup assistant pin** — Choose an assistant that gets auto-selected when the app restarts, keeping your preferred assistant across sessions.
+6. **Tools Hub** — MCP servers, local tools, and workspace management (including mounts and Android terminal launch) unified into the original MCP entry, for quick adjustments during chat.
 
-7. **Screen awake during generation** — Mobile keeps the screen on while the AI is generating, so long streaming responses never interrupt you.
+7. **Startup assistant pin** — Choose an assistant that gets auto-selected when the app restarts, keeping your preferred assistant across sessions.
 
 ### UI & Rendering
 
-1. **HTML preview blocks** — HTML code fences render as interactive inline previews right in the chat list, letting assistants craft rich layouts (e.g. role-play scenes) by simply outputting an HTML code block.
+1. **Web conversation view (experimental)** — Enable the experimental toggle to render standard conversations in a WebView on Android/iOS/macOS/Windows, with a declarative "Web conversation style library" JSON style import for bubble and card styling.
 
 2. **Reading mode** — Long assistant answers can open in a dedicated reading mode to reduce fatigue.
 

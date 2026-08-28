@@ -1,5 +1,41 @@
 # Changelog
 
+## [3.1.0] - 2026-08-28
+
+### Added
+
+- **Experimental Web conversation view**: with the experimental toggle enabled, regular conversations on Android/iOS/macOS/Windows can switch to WebView rendering, supporting import of declarative "Web conversation style library" JSON styles, including bubble styling once enabled (#555 by @Pheobe-Southwood)
+- **Backup v2 (JSONL + LWW)**: the backup format is upgraded to streaming JSONL writes, lowering peak memory for large backup restore and export, while keeping the Kelivo-compatible export path (#560 by @cup113)
+- **Backup export experience**: export stages now show progress and elapsed time, avoiding blind re-taps; fixes silent export failures (#549 by @cup113)
+- **Message reply**: added a QQ-style reply feature (via long-press text selection or the message-level "More" button), with smart quote display and context trimming (#559 by @cup113)
+- **Assistant & conversation-level working directories**: assistants and conversations can keep independent working directories per workspace, and automatically load `AGENTS.md` into the system prompt (#495 by @Pheobe-Southwood)
+- **Customizable input bar buttons**: input bar buttons can be reordered and shown directly or tucked into "More" (#532 by @cup113)
+- **Local device tools**: ported upstream screen time and calendar local tools (screen time is Android-only; calendar supports Android/iOS, with optional reminders for `calendar_create`) (#534 by @cup113, @Chevey339)
+- Workspace dependency expansion: new detection for GitHub CLI, curl, OpenSSH Client, zip/unzip, compile toolchains, plus dependency prerequisites
+- Keep message versions when forking: new "Keep message versions when forking" switch, off by default (#548 by @cup113, @Chevey339)
+- Smart time injection compatibility: synced upstream time injection UI — append current time row, volatile-variable ⚠ badges, and format info (#541 by @cup113, @Chevey339)
+- Import from new Kelivo: backup page gains an import entry and guide for newer Kelivo versions (#566 by @Pheobe-Southwood)
+- Opt-out for screen awake during generation: mobile screen-awake during generation can now be disabled (#568 by @cup113)
+
+### Changed
+
+- **Business preferences migrated to SQLite**: business preferences now live in a SQLite KV table instead of SharedPreferences, making persistence more reliable (#560 by @cup113, @Chevey339)
+- **Subagent UX upgrade**: unified terminology to "delegate to subagent", improved setup guidance, and retired the rarely-useful non-waiting delegation to avoid user/AI confusion (#542 by @cup113)
+- **MCP connection synced with upstream**: safe session reuse, heartbeat mechanism retired (#558 by @cup113, @Chevey339)
+- Search service copy: Fetch functionality is now uniformly phrased as "Browse" (#563 by @Pheobe-Southwood)
+
+### Fixed
+
+- **Android SAF mount sync**: fixed zero-file copies caused by `path_provider` directory layout not matching the native path allowlist (#529 by @HowieATP, @cup113)
+- **Markdown code block rendering**: unified the code scanning engine, correctly rendering text like `D:\` instead of treating it as escaped (#561 by @cup113)
+- Tools Hub: the Tools Hub button no longer requires an MCP server, improving discoverability of local tools and terminal; row pitch tightened for a more compact UI (#550 by @cup113)
+- Workspace dependency detection: failures no longer overwrite previous successful results (#567 by @Pheobe-Southwood)
+- Fixed post-send chat "bounce": ported upstream `super-silver-list` to prevent mis-framed scroll (#530 by @cup113, @Chevey339)
+- iOS Live Activities: orphaned activity cards are cleaned up on launch and before creating a new one (#536 by @HowieATP); fixed ActivityKit build compatibility (#564 by @Pheobe-Southwood)
+- Math formula export: keeps display-math source intact; wide formulas scale down to fit the export canvas (#539 by @HowieATP)
+- Sandbox runtime: fixed iOS Node termination without fetch, removed fixed exit waits and polling, Android tar buffer reuse (#562 by @Pheobe-Southwood)
+- iOS sandbox pipes: transferred pipe read-end ownership to fix fd races (#535 by @HowieATP)
+
 ## [3.0.3] - 2026-08-22
 
 ### Added

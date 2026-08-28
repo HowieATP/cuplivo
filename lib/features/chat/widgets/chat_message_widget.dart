@@ -825,11 +825,36 @@ class ChatMessageWidget extends StatefulWidget {
   State<ChatMessageWidget> createState() => _ChatMessageWidgetState();
 }
 
-class _ChatMessageWidgetState extends State<ChatMessageWidget> {
+class _ChatMessageWidgetState extends State<ChatMessageWidget>
+    with AutomaticKeepAliveClientMixin {
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
   String? _selectedPlainText;
+
+  // Per-region live-selection flags. When ANY text region of this message
+  // currently holds a non-empty selection, `wantKeepAlive` becomes true so
+  // the virtualized SuperListView never recycles this item while the user is
+  // still selecting / scrolling with a live highlight — recycling would drop
+  // the SelectionArea selection immediately.
+  static const String _selectionRegionAssistant = 'assistant';
+  static const String _selectionRegionUser = 'user';
+  final Map<String, bool> _selectionActive = <String, bool>{
+    _selectionRegionAssistant: false,
+    _selectionRegionUser: false,
+  };
+  bool _keepAliveFromSelection = false;
+
+  @override
+  bool get wantKeepAlive => _keepAliveFromSelection;
+
+  void _refreshSelectionKeepAlive() {
+    final anyActive = _selectionActive.values.any((a) => a);
+    if (_keepAliveFromSelection == anyActive) return;
+    setState(() {
+      _keepAliveFromSelection = anyActive;
+    });
+  }
 
   void _speakSelectedText(String text) {
     final settings = context.read<SettingsProvider>();
@@ -1694,6 +1719,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return isDesktop
         ? SelectionArea(
             key: ValueKey('user_${widget.message.id}'),
+            onSelectionChanged: (selection) {
+              _selectedPlainText = selection?.plainText;
+              final active =
+                  selection != null && selection.plainText.isNotEmpty;
+              if (_selectionActive[_selectionRegionUser] != active) {
+                _selectionActive[_selectionRegionUser] = active;
+                _refreshSelectionKeepAlive();
+              }
+            },
             child: content,
           )
         : content;
@@ -1989,6 +2023,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         key: ValueKey('assistant_${widget.message.id}'),
         onSelectionChanged: (selection) {
           _selectedPlainText = selection?.plainText;
+          final active = selection != null && selection.plainText.isNotEmpty;
+          if (_selectionActive[_selectionRegionAssistant] != active) {
+            _selectionActive[_selectionRegionAssistant] = active;
+            _refreshSelectionKeepAlive();
+          }
         },
         contextMenuBuilder: (context, selectableRegionState) {
           final defaultItems = selectableRegionState.contextMenuButtonItems
@@ -3220,6 +3259,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     if (widget.message.role == 'user') return _buildUserMessage();
     if (widget.message.role == 'tool') return _buildToolMessage();
     return _buildAssistantMessage();

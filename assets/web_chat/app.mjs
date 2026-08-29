@@ -102,8 +102,19 @@ let rendererRefreshFrame = 0;
 const bridge = {
   post(message) {
     const encoded = JSON.stringify(message);
-    if (window.chrome?.webview) window.chrome.webview.postMessage(encoded);
-    else window.CuplivoChat?.postMessage(encoded);
+    try {
+      if (window.chrome?.webview) {
+        window.chrome.webview.postMessage(encoded);
+        return true;
+      }
+      if (window.CuplivoChat?.postMessage) {
+        window.CuplivoChat.postMessage(encoded);
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
   },
 };
 const renderCommitCoordinator = createRenderCommitCoordinator({
@@ -3171,4 +3182,34 @@ window.CuplivoWeb = {
   },
 };
 window.chrome?.webview?.addEventListener('message', (event) => window.CuplivoWeb.receive(event.data));
-bridge.post({ type: 'ready', protocolVersion: PROTOCOL_VERSION, assetVersion: ASSET_VERSION });
+let readyBootstrapTimer = 0;
+let readyBootstrapAttempts = 0;
+let readyBootstrapped = false;
+const readyBootstrapMaxAttempts = 40;
+const readyBootstrapIntervalMs = 250;
+
+function trySendReady() {
+  if (readyBootstrapped) return true;
+  const sent = bridge.post({
+    type: 'ready',
+    protocolVersion: PROTOCOL_VERSION,
+    assetVersion: ASSET_VERSION,
+  });
+  if (sent) readyBootstrapped = true;
+  return sent;
+}
+
+function scheduleReadyBootstrap() {
+  if (readyBootstrapped || readyBootstrapTimer !== 0) return;
+  const attempt = () => {
+    readyBootstrapTimer = 0;
+    if (trySendReady()) return;
+    readyBootstrapAttempts += 1;
+    if (readyBootstrapAttempts >= readyBootstrapMaxAttempts) return;
+    readyBootstrapTimer = window.setTimeout(attempt, readyBootstrapIntervalMs);
+  };
+  readyBootstrapTimer = window.setTimeout(attempt, 0);
+}
+
+window.addEventListener('load', scheduleReadyBootstrap, { once: true });
+scheduleReadyBootstrap();

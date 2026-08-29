@@ -102,6 +102,14 @@ test('transfer chunks reassemble UTF-8 snapshots', () => {
   assert.deepEqual(result, payload);
 });
 
+test('bridge post reports delivery readiness', () => {
+  assert.match(appSource, /const bridge = \{/);
+  assert.match(appSource, /return true;/);
+  assert.match(appSource, /return false;/);
+  assert.match(appSource, /let readyBootstrapped = false;/);
+  assert.match(appSource, /if \(readyBootstrapped\) return true;/);
+});
+
 test('snapshot reducer rejects an older revision in the same session', () => {
   const current = { type: 'snapshot', protocolVersion: 4, assetVersion: 'web-chat-v17', renderSessionId: 's', renderRevision: 4, messages: [] };
   const older = { ...current, renderRevision: 3, messages: [{ id: 'old' }] };

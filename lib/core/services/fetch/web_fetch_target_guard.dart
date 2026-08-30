@@ -10,6 +10,11 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 /// (169.254.169.254) — and in download mode write those bytes into
 /// `@workspaces`. Every direct connection is validated before a socket is
 /// opened, and each redirect hop is re-validated.
+///
+/// DNS-layer limits (see also [resolvedBlockReason]): under a fake-IP proxy,
+/// answers cannot distinguish virtual from real hosts; IPv6 fake-IP ranges
+/// (user-configured `fake-ip-range6`, ULA space) are deliberately not
+/// exempted since fc00::/7 is also a genuine internal range.
 class WebFetchTargetGuard {
   WebFetchTargetGuard._();
 
@@ -66,9 +71,11 @@ class WebFetchTargetGuard {
       // default to this range): the OS resolves the public hostname into a
       // synthetic loopback-like address that the proxy then rewrites in
       // software. Treating these as blocked would reject every ordinary
-      // public site under such a proxy. Real SSRF targets (RFC 1918,
-      // loopback, link-local, metadata) still resolve to their own ranges
-      // even under fake-IP, so blocking them is unaffected.
+      // public site under such a proxy. Tradeoff: under a fake-IP proxy,
+      // internal-only hostnames (e.g. intranet.corp.com) also resolve to
+      // fake addresses and are routed to the real internal host by the
+      // proxy, so hostname-level SSRF protection is inherently limited —
+      // only literal-IP URLs and `localhost` stay hard-blocked.
       if (_isBlockedAddress(address, allowFakeIpRange: true)) {
         return '${url.host} resolves to $address, a loopback/private/'
             'link-local/metadata address and not an allowed web_fetch target';
@@ -105,6 +112,7 @@ class WebFetchTargetGuard {
           raw[11] == 0xff) {
         return _isBlockedAddress(
           InternetAddress.fromRawAddress(raw.sublist(12)),
+          allowFakeIpRange: allowFakeIpRange,
         );
       }
       return false;
